@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -24,7 +25,6 @@
 #include "absl/log/log.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
@@ -38,7 +38,7 @@ namespace dataset {
 absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     const absl::string_view typed_path,
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>>& required_columns) {
+    const std::optional<std::vector<int>>& required_columns) {
   std::string sharded_path;
   proto::DatasetFormat format;
   ASSIGN_OR_RETURN(std::tie(sharded_path, format),

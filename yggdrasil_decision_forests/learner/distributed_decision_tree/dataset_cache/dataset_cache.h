@@ -60,10 +60,11 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_DECISION_TREE_DATASET_CACHE_DATASET_CACHE_H_
 
+#include <optional>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
@@ -115,7 +116,7 @@ absl::StatusOr<proto::CacheMetadata> LoadCacheMetadata(absl::string_view path);
 // the statistics on all the features.
 std::string MetaDataReport(
     const proto::CacheMetadata& metadata,
-    const absl::optional<std::vector<int>>& features = {});
+    const std::optional<std::vector<int>>& features = {});
 
 namespace internal {
 

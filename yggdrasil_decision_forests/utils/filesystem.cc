@@ -15,7 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 
-#include "absl/memory/memory.h"
+#include <memory>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -25,14 +26,14 @@ namespace file {
 
 absl::StatusOr<std::unique_ptr<FileInputByteStream>> OpenInputFile(
     absl::string_view path) {
-  auto reader = absl::make_unique<FileInputByteStream>();
+  auto reader = std::make_unique<FileInputByteStream>();
   RETURN_IF_ERROR(reader->Open(path));
   return std::move(reader);
 }
 
 absl::StatusOr<std::unique_ptr<FileOutputByteStream>> OpenOutputFile(
     absl::string_view path) {
-  auto writer = absl::make_unique<FileOutputByteStream>();
+  auto writer = std::make_unique<FileOutputByteStream>();
   RETURN_IF_ERROR(writer->Open(path));
   return std::move(writer);
 }

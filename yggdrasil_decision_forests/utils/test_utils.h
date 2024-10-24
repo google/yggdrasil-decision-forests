@@ -46,6 +46,7 @@
 #include <cstdlib>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -55,7 +56,6 @@
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -80,7 +80,7 @@ class TrainAndTestTester : public ::testing::Test {
   // "train_config_" is set. After this function is called, "evaluation_"
   // contains the result of the evaluation.
   void TrainAndEvaluateModel(
-      absl::optional<absl::string_view> numerical_weight_attribute = {},
+      std::optional<absl::string_view> numerical_weight_attribute = {},
       bool emulate_weight_with_duplication = false,
       std::function<void(void)> callback_training_about_to_start = nullptr);
 
@@ -113,7 +113,7 @@ class TrainAndTestTester : public ::testing::Test {
   // Training configuration of the model.
   model::proto::TrainingConfig train_config_;
 
-  absl::optional<model::proto::GenericHyperParameters> generic_parameters_;
+  std::optional<model::proto::GenericHyperParameters> generic_parameters_;
 
   model::proto::DeploymentConfig deployment_config_;
 
@@ -167,7 +167,7 @@ class TrainAndTestTester : public ::testing::Test {
   int num_shards_ = 3;
 
   // If set, interrupts the training after "interrupt_training_after".
-  absl::optional<absl::Duration> interrupt_training_after;
+  std::optional<absl::Duration> interrupt_training_after;
 
   // If true, the model is checked and the implementation is checked for
   // potential issues e.g. serializing+deserializing, creation of serving
@@ -201,7 +201,7 @@ class TrainAndTestTester : public ::testing::Test {
       const absl::string_view dataset_path);
 
   void FixConfiguration(
-      absl::optional<absl::string_view> numerical_weight_attribute,
+      std::optional<absl::string_view> numerical_weight_attribute,
       const dataset::proto::DataSpecification& data_spec,
       int32_t* numerical_weight_attribute_idx,
       float* max_numerical_weight_value);
@@ -331,19 +331,19 @@ void TestPredefinedHyperParameters(
     absl::string_view train_ds_path, absl::string_view test_ds_path,
     const model::proto::TrainingConfig& train_config,
     const int expected_num_preconfigured_parameters,
-    absl::optional<float> min_accuracy);
+    std::optional<float> min_accuracy);
 
 // Runs "TestPredefinedHyperParameters" on the adult dataset.
 void TestPredefinedHyperParametersAdultDataset(
     model::proto::TrainingConfig train_config,
     const int expected_num_preconfigured_parameters,
-    absl::optional<float> min_accuracy);
+    std::optional<float> min_accuracy);
 
 // Runs "TestPredefinedHyperParameters" on the synthetic ranking dataset.
 void TestPredefinedHyperParametersRankingDataset(
     model::proto::TrainingConfig train_config,
     int expected_num_preconfigured_parameters,
-    absl::optional<float> min_accuracy);
+    std::optional<float> min_accuracy);
 
 // Randomly shards a dataset. Returns the sharded path in the temp directory.
 std::string ShardDataset(const dataset::VerticalDataset& dataset,

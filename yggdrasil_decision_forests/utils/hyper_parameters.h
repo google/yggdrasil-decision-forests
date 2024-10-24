@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_HYPER_PARAMETERS_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_HYPER_PARAMETERS_H_
 
+#include <optional>
 #include <string>
 
 #include "absl/container/flat_hash_map.h"
@@ -23,7 +24,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 
 namespace yggdrasil_decision_forests {
@@ -36,7 +36,7 @@ class GenericHyperParameterConsumer {
       const model::proto::GenericHyperParameters& generic_hyper_parameters);
 
   // Returns a hparam if present.
-  absl::optional<model::proto::GenericHyperParameters::Field> Get(
+  std::optional<model::proto::GenericHyperParameters::Field> Get(
       absl::string_view key);
 
   // Ensures that all the fields have been consumed.

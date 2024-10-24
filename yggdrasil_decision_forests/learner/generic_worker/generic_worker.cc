@@ -15,9 +15,10 @@
 
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.h"
 
+#include <optional>
+
 #include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -65,7 +66,7 @@ absl::Status GenericWorker::TrainModel(
 
   learner->set_stop_training_trigger(&done_was_called_);
 
-  absl::optional<std::string> valid_dataset;
+  std::optional<std::string> valid_dataset;
   if (request.has_valid_dataset_path()) {
     valid_dataset = request.valid_dataset_path();
   }

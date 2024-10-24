@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -26,14 +27,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -133,7 +132,7 @@ void CheckCompatibleEngine(
 TEST(SpecializedRandomForestTest,
      BinaryClassificationNumericalOnlyFlatNodeGenericToSpecializedModel) {
   model::random_forest::RandomForestModel rf_model;
-  auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
+  auto tree = std::make_unique<model::decision_tree::DecisionTree>();
   tree->CreateRoot();
   tree->mutable_root()->CreateChildren();
   tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(1);
@@ -282,7 +281,7 @@ TEST_P(AllCompatibleEnginesTest, Concurent) {
     processor.CloseSubmits();
 
     for (int rep_idx = 0; rep_idx < num_repetitions; rep_idx++) {
-      const absl::optional<absl::Status> result = processor.GetResult();
+      const std::optional<absl::Status> result = processor.GetResult();
       ASSERT_TRUE(result.has_value());
       EXPECT_OK(*result);
     }
@@ -528,7 +527,7 @@ void BuildFullTree(const int d, model::decision_tree::NodeWithChildren* node) {
 TEST(SpecializedGradientBoostedTreesTest, MoreThan65kNodesPerTrees) {
   model::gradient_boosted_trees::GradientBoostedTreesModel model;
 
-  auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
+  auto tree = std::make_unique<model::decision_tree::DecisionTree>();
   tree->CreateRoot();
   BuildFullTree(18, tree->mutable_root());
   EXPECT_GT(tree->NumNodes(), std::numeric_limits<uint16_t>::max());
@@ -558,7 +557,7 @@ TEST(SpecializedGradientBoostedTreesTest, MoreThan65kNodesPerTrees) {
 }
 
 std::unique_ptr<GradientBoostedTreesModel> BuildNonGlobalImputationGBT() {
-  auto model = absl::make_unique<GradientBoostedTreesModel>();
+  auto model = std::make_unique<GradientBoostedTreesModel>();
 
   dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "a" }
@@ -607,7 +606,7 @@ std::unique_ptr<GradientBoostedTreesModel> BuildNonGlobalImputationGBT() {
   //              ├─(pos)─ pred:2
   //              └─(neg)─ pred:1
 
-  auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
+  auto tree = std::make_unique<model::decision_tree::DecisionTree>();
   tree->CreateRoot();
   auto n1 = split(tree->mutable_root(), 1, 1.0, false);
   auto n2 = split(n1.neg, 2, 1.0, false);
@@ -624,7 +623,7 @@ std::unique_ptr<GradientBoostedTreesModel> BuildNonGlobalImputationGBT() {
 template <typename Engine>
 std::unique_ptr<typename Engine::ExampleSet> BuildNonGlobalImputationExamples(
     const Engine& engine) {
-  auto examples = absl::make_unique<typename Engine::ExampleSet>(6, engine);
+  auto examples = std::make_unique<typename Engine::ExampleSet>(6, engine);
 
   const auto& fs = engine.features();
   auto feature_b = engine.features().GetNumericalFeatureId("b").value();
@@ -694,7 +693,7 @@ TEST(DecisionForest, NonGlobalImputationEngines) {
 }
 
 std::unique_ptr<GradientBoostedTreesModel> BuildNAConditionGBT() {
-  auto model = absl::make_unique<GradientBoostedTreesModel>();
+  auto model = std::make_unique<GradientBoostedTreesModel>();
 
   dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "a" }
@@ -714,7 +713,7 @@ std::unique_ptr<GradientBoostedTreesModel> BuildNAConditionGBT() {
   //     ├─(pos)─ pred:10
   //     └─(neg)─ pred:-10
 
-  auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
+  auto tree = std::make_unique<model::decision_tree::DecisionTree>();
   tree->CreateRoot();
   tree->mutable_root()->CreateChildren();
   tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(1);
@@ -753,7 +752,7 @@ TEST(DecisionForest, NAConditionGenericPredictions) {
   ASSERT_OK(GenericToSpecializedModel(*model.get(), &engine));
 
   auto examples =
-      absl::make_unique<typename GradientBoostedTreesRegression::ExampleSet>(
+      std::make_unique<typename GradientBoostedTreesRegression::ExampleSet>(
           2, engine);
 
   const auto& fs = engine.features();

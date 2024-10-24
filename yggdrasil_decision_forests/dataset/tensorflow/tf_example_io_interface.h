@@ -42,13 +42,13 @@
 #include <stdint.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -96,7 +96,7 @@ class TFExampleReaderToExampleReader : public ExampleReaderInterface {
 
   TFExampleReaderToExampleReader(
       const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> ensure_non_missing);
+      std::optional<std::vector<int>> ensure_non_missing);
 
   absl::Status Open(absl::string_view sharded_path) override;
 
@@ -106,7 +106,7 @@ class TFExampleReaderToExampleReader : public ExampleReaderInterface {
   std::unique_ptr<AbstractTFExampleReader> tf_reader_;
   tensorflow::Example tfexample_buffer_;
   const proto::DataSpecification data_spec_;
-  const absl::optional<std::vector<int>> ensure_non_missing_;
+  const std::optional<std::vector<int>> ensure_non_missing_;
 };
 
 // Wrapper around a TFExampleReader with the signature of an dataspec generator.

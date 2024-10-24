@@ -17,9 +17,9 @@
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_LOSS_LIBRARY_H_
 
 #include <memory>
+#include <variant>
 
 #include "absl/status/statusor.h"
-#include "absl/types/variant.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_binary_classification.h"
@@ -34,16 +34,16 @@ namespace model {
 namespace gradient_boosted_trees {
 
 using CustomLossFunctions =
-    absl::variant<absl::monostate, CustomBinaryClassificationLossFunctions,
-                  CustomMultiClassificationLossFunctions,
-                  CustomRegressionLossFunctions>;
+    std::variant<std::monostate, CustomBinaryClassificationLossFunctions,
+                 CustomMultiClassificationLossFunctions,
+                 CustomRegressionLossFunctions>;
 
 // Creates a training loss.
 absl::StatusOr<std::unique_ptr<AbstractLoss>> CreateLoss(
     proto::Loss loss, model::proto::Task task,
     const dataset::proto::Column& label_column,
     const proto::GradientBoostedTreesTrainingConfig& config,
-    CustomLossFunctions custom_loss_functions = absl::monostate{});
+    CustomLossFunctions custom_loss_functions = std::monostate{});
 
 }  // namespace gradient_boosted_trees
 }  // namespace model

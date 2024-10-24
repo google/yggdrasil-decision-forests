@@ -15,17 +15,17 @@
 
 #include "yggdrasil_decision_forests/metric/report.h"
 
+#include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
 #include "absl/log/check.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -59,10 +59,10 @@ absl::Status PlotClassificationCurves(const proto::Roc& roc,
                                       utils::plot::Plot* pr_plot,
                                       utils::plot::Plot* tv_plot,
                                       utils::plot::Plot* ta_plot) {
-  auto roc_curve = absl::make_unique<utils::plot::Curve>();
-  auto pr_curve = absl::make_unique<utils::plot::Curve>();
-  auto tv_curve = absl::make_unique<utils::plot::Curve>();
-  auto ta_curve = absl::make_unique<utils::plot::Curve>();
+  auto roc_curve = std::make_unique<utils::plot::Curve>();
+  auto pr_curve = std::make_unique<utils::plot::Curve>();
+  auto tv_curve = std::make_unique<utils::plot::Curve>();
+  auto ta_curve = std::make_unique<utils::plot::Curve>();
 
   roc_curve->label = std::string(label);
   pr_curve->label = std::string(label);
@@ -179,7 +179,7 @@ void PlotConditionalVariables(const std::vector<float>& var_1,
   }
 
   // Plot the mean of var2 for each segment of var1.
-  auto curve_mean = absl::make_unique<utils::plot::Curve>();
+  auto curve_mean = std::make_unique<utils::plot::Curve>();
 
   for (int bin_idx = 0; bin_idx < num_bins; bin_idx++) {
     const auto& bucket = buckets.ContentArray()[bin_idx];
@@ -286,7 +286,7 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
   {
     const auto minimum_model_output = ground_truth_bounds.min();
     const auto maximum_model_output = ground_truth_bounds.max();
-    auto diagonal = absl::make_unique<utils::plot::Curve>();
+    auto diagonal = std::make_unique<utils::plot::Curve>();
     diagonal->xs = {minimum_model_output, maximum_model_output};
     diagonal->ys = {minimum_model_output, maximum_model_output};
     diagonal->style = utils::plot::LineStyle::DOTTED;
@@ -316,7 +316,7 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
   const auto add_histogram = [&weights, &num_bins](
                                  const std::vector<float>& values,
                                  utils::plot::Plot* plot) -> absl::Status {
-    auto bars = absl::make_unique<utils::plot::Bars>();
+    auto bars = std::make_unique<utils::plot::Bars>();
     const auto hist = utils::histogram::Histogram<float>::MakeUniform(
         values, static_cast<size_t>(num_bins), weights);
     RETURN_IF_ERROR(bars->FromHistogram(hist));
@@ -428,7 +428,7 @@ absl::Status AppendTextReportClassification(
   const auto append_x_at_y_metric =
       [&](absl::string_view x_label, absl::string_view y_label,
           const google::protobuf::RepeatedPtrField<proto::Roc::XAtYMetric>& x_at_ys,
-          absl::optional<ConfidenceIntervalAccessor> confidence_intervals) {
+          std::optional<ConfidenceIntervalAccessor> confidence_intervals) {
         if (!x_at_ys.empty()) {
           absl::SubstituteAndAppend(report, "    $0 @ fixed $1\n", x_label,
                                     y_label);
@@ -493,7 +493,7 @@ absl::Status AppendTextReportClassification(
     absl::StrAppend(report, "\n");
     // X@Y
     for (const auto& x_at_y_accessor : XAtYMetricsAccessors()) {
-      absl::optional<ConfidenceIntervalAccessor> confidence_interval_accessors;
+      std::optional<ConfidenceIntervalAccessor> confidence_interval_accessors;
       const bool has_confidence_intervals =
           roc.has_bootstrap_lower_bounds_95p();
       if (has_confidence_intervals) {

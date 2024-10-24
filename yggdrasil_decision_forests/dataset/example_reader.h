@@ -38,11 +38,11 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_READER_H_
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
 
@@ -64,7 +64,7 @@ namespace dataset {
 //
 absl::StatusOr<std::unique_ptr<ExampleReaderInterface>> CreateExampleReader(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>>& required_columns = {});
+    const std::optional<std::vector<int>>& required_columns = {});
 
 // Checks if the format of a typed dataset is supported i.e. a dataset reader is
 // registered for this format. Returns true, if the format is supported. Returns

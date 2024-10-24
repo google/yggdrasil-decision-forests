@@ -26,13 +26,13 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "absl/log/check.h"
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -188,7 +188,7 @@ class NodeWithChildren {
   // Append a human readable semi-graphical description of the model structure.
   void AppendModelStructure(const dataset::proto::DataSpecification& data_spec,
                             int label_col_idx, int depth,
-                            absl::optional<bool> is_pos,
+                            std::optional<bool> is_pos,
                             const std::string& prefix,
                             std::string* description) const;
 
@@ -438,7 +438,7 @@ absl::Status Distance(
     absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees,
     const dataset::VerticalDataset& dataset1,
     const dataset::VerticalDataset& dataset2, absl::Span<float> distances,
-    const absl::optional<std::reference_wrapper<std::vector<float>>>&
+    const std::optional<std::reference_wrapper<std::vector<float>>>&
         tree_weights = {});
 
 // Lists the input features used by the trees. The input features are given as

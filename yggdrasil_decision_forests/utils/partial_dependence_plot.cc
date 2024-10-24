@@ -490,7 +490,7 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs,
     const int num_numerical_bins, const float example_sampling,
-    const absl::optional<float> maximum_duration_seconds) {
+    const std::optional<float> maximum_duration_seconds) {
   LOG(INFO) << "Initiate PDP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializePartialDependencePlotSet(
@@ -503,7 +503,7 @@ absl::StatusOr<proto::PartialDependencePlotSet> ComputePartialDependencePlotSet(
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_unit;
 
-  absl::optional<absl::Time> cutoff_time;
+  std::optional<absl::Time> cutoff_time;
   if (maximum_duration_seconds.has_value()) {
     cutoff_time = absl::Now() + absl::Seconds(maximum_duration_seconds.value());
   }
@@ -534,7 +534,7 @@ ComputeConditionalExpectationPlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs,
     const int num_numerical_bins, const float example_sampling,
-    const absl::optional<float> maximum_duration_seconds) {
+    const std::optional<float> maximum_duration_seconds) {
   LOG(INFO) << "Initiate CEP accumulator";
   ASSIGN_OR_RETURN(auto pdp_set,
                    InitializeConditionalExpectationPlotSet(
@@ -547,7 +547,7 @@ ComputeConditionalExpectationPlotSet(
   std::default_random_engine random;
   std::uniform_real_distribution<float> dist_unif_01;
 
-  absl::optional<absl::Time> cutoff_time;
+  std::optional<absl::Time> cutoff_time;
   if (maximum_duration_seconds.has_value()) {
     cutoff_time = absl::Now() + absl::Seconds(maximum_duration_seconds.value());
   }

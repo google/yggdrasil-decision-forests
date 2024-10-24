@@ -17,13 +17,13 @@
 
 #include <algorithm>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -67,7 +67,7 @@ constexpr char kKeyValueLegendSeparator[] = ":";
 
 // Adds a curve to a plot.
 plot::Curve* AddCurve(plot::Plot* plot) {
-  auto curve = absl::make_unique<plot::Curve>();
+  auto curve = std::make_unique<plot::Curve>();
   auto* curve_ptr = curve.get();
   plot->items.push_back(std::move(curve));
   return curve_ptr;
@@ -646,12 +646,12 @@ absl::StatusOr<utils::plot::MultiPlot> Plot(
   multiplot.num_rows = num_rows;
 
   for (int pdp_idx = 0; pdp_idx < pdp_set.pdps_size(); pdp_idx++) {
-    multiplot.items.push_back(absl::make_unique<plot::MultiPlotItem>());
+    multiplot.items.push_back(std::make_unique<plot::MultiPlotItem>());
     auto* pdp_plot = multiplot.items.back().get();
     pdp_plot->col = pdp_idx % num_cols;
     pdp_plot->row = (pdp_idx / num_cols) * num_rows_per_columns;
 
-    multiplot.items.push_back(absl::make_unique<plot::MultiPlotItem>());
+    multiplot.items.push_back(std::make_unique<plot::MultiPlotItem>());
     auto* density_plot = multiplot.items.back().get();
     density_plot->col = pdp_plot->col;
     density_plot->row = pdp_plot->row + 1;
@@ -723,10 +723,10 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
     return absl::InvalidArgumentError("The dataset is empty.");
   }
 
-  const absl::optional<float> maximum_duration_seconds =
+  const std::optional<float> maximum_duration_seconds =
       options.has_maximum_duration_seconds()
           ? options.maximum_duration_seconds()
-          : absl::optional<float>{};
+          : std::optional<float>{};
 
   // Try to create a fast engine.
   const model::AbstractModel* effective_model = &model;

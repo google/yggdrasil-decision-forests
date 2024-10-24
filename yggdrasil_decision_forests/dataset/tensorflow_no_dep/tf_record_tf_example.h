@@ -17,10 +17,9 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_NO_DEP_TF_RECORD_TF_EXAMPLE_H_
 
 #include <memory>
+#include <optional>
 #include <vector>
 
-#include "absl/memory/memory.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example_reader_interface.h"
@@ -42,11 +41,11 @@ class TFRecordV2TFEToExampleReaderInterface
  public:
   TFRecordV2TFEToExampleReaderInterface(
       const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> ensure_non_missing)
+      std::optional<std::vector<int>> ensure_non_missing)
       : TFExampleReaderToExampleReader(data_spec, ensure_non_missing) {}
 
   std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
-    return absl::make_unique<TFRecordV2TFExampleReader>();
+    return std::make_unique<TFRecordV2TFExampleReader>();
   }
 };
 REGISTER_ExampleReaderInterface(TFRecordV2TFEToExampleReaderInterface,
@@ -55,7 +54,7 @@ REGISTER_ExampleReaderInterface(TFRecordV2TFEToExampleReaderInterface,
 class TFRecordV2TFExampleReaderToDataSpecCreator
     : public TFExampleReaderToDataSpecCreator {
   std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
-    return absl::make_unique<TFRecordV2TFExampleReader>();
+    return std::make_unique<TFRecordV2TFExampleReader>();
   }
 };
 
@@ -74,11 +73,11 @@ class TFRecordCompressedV2TFEToExampleReaderInterface
  public:
   TFRecordCompressedV2TFEToExampleReaderInterface(
       const proto::DataSpecification& data_spec,
-      absl::optional<std::vector<int>> ensure_non_missing)
+      std::optional<std::vector<int>> ensure_non_missing)
       : TFExampleReaderToExampleReader(data_spec, ensure_non_missing) {}
 
   std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
-    return absl::make_unique<TFRecordV2TFExampleReader>(true);
+    return std::make_unique<TFRecordV2TFExampleReader>(true);
   }
 };
 REGISTER_ExampleReaderInterface(TFRecordCompressedV2TFEToExampleReaderInterface,
@@ -87,7 +86,7 @@ REGISTER_ExampleReaderInterface(TFRecordCompressedV2TFEToExampleReaderInterface,
 class TFRecordCompressedV2TFExampleReaderToDataSpecCreator
     : public TFExampleReaderToDataSpecCreator {
   std::unique_ptr<AbstractTFExampleReader> CreateReader() override {
-    return absl::make_unique<TFRecordV2TFExampleReader>(true);
+    return std::make_unique<TFRecordV2TFExampleReader>(true);
   }
 };
 
@@ -110,7 +109,7 @@ class TFRecordV2TFEToExampleWriterInterface
       : TFExampleWriterToExampleWriter(data_spec) {}
 
   std::unique_ptr<AbstractTFExampleWriter> CreateWriter() override {
-    return absl::make_unique<TFRecordV2TFExampleWriter>();
+    return std::make_unique<TFRecordV2TFExampleWriter>();
   }
 };
 REGISTER_ExampleWriterInterface(TFRecordV2TFEToExampleWriterInterface,
@@ -132,7 +131,7 @@ class TFRecordCompressedV2TFEToExampleWriterInterface
       : TFExampleWriterToExampleWriter(data_spec) {}
 
   std::unique_ptr<AbstractTFExampleWriter> CreateWriter() override {
-    return absl::make_unique<TFRecordCompressedV2TFExampleWriter>();
+    return std::make_unique<TFRecordCompressedV2TFExampleWriter>();
   }
 };
 REGISTER_ExampleWriterInterface(TFRecordCompressedV2TFEToExampleWriterInterface,

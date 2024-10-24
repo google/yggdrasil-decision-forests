@@ -26,12 +26,10 @@
 #include <vector>
 
 #include "absl/log/check.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "nlohmann/json.hpp"
 #include "nlohmann/json_fwd.hpp"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
@@ -121,15 +119,15 @@ absl::StatusOr<std::unique_ptr<RecursiveAvroField>> ParseRecursiveAvroField(
   if (json_type.is_string()) {
     // type: "<scalar>"
     ASSIGN_OR_RETURN(const auto type, ParseType(json_type.get<std::string>()));
-    return absl::make_unique<RecursiveAvroField>(type);
+    return std::make_unique<RecursiveAvroField>(type);
   } else if (json_type.is_object()) {
     // type: {"type": "array", "items": <scalar>}
     // TODO: Add support for {"type": "array", "items": <something>}
     ASSIGN_OR_RETURN(const auto json_items,
                      ExtractItemsInTypeArrayObject(json_type));
     ASSIGN_OR_RETURN(auto sub_type, ParseRecursiveAvroField(*json_items));
-    return absl::make_unique<RecursiveAvroField>(AvroType::kArray,
-                                                 std::move(sub_type));
+    return std::make_unique<RecursiveAvroField>(AvroType::kArray,
+                                                std::move(sub_type));
   } else if (json_type.is_array()) {
     // type: ["null", <something>]
     ASSIGN_OR_RETURN(const auto json_sub_type,
@@ -394,26 +392,26 @@ absl::StatusOr<bool> AvroReader::ReadNextRecord() {
   return true;
 }
 
-absl::StatusOr<absl::optional<bool>> AvroReader::ReadNextFieldBoolean(
+absl::StatusOr<std::optional<bool>> AvroReader::ReadNextFieldBoolean(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
   ASSIGN_OR_RETURN(const auto value, current_block_reader_->ReadByte());
   return value;
 }
 
-absl::StatusOr<absl::optional<int64_t>> AvroReader::ReadNextFieldInteger(
+absl::StatusOr<std::optional<int64_t>> AvroReader::ReadNextFieldInteger(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
   return internal::ReadInteger(&current_block_reader_.value());
 }
 
-absl::StatusOr<absl::optional<float>> AvroReader::ReadNextFieldFloat(
+absl::StatusOr<std::optional<float>> AvroReader::ReadNextFieldFloat(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
   return internal::ReadFloat(&current_block_reader_.value());
 }
 
-absl::StatusOr<absl::optional<double>> AvroReader::ReadNextFieldDouble(
+absl::StatusOr<std::optional<double>> AvroReader::ReadNextFieldDouble(
     const AvroField& field) {
   MAYBE_SKIP_OPTIONAL(field);
   return internal::ReadDouble(&current_block_reader_.value());

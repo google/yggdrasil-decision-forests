@@ -21,6 +21,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -35,7 +36,6 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -1358,7 +1358,7 @@ std::vector<std::string> AbstractModel::ListCompatibleFastEngineNames() const {
 
 absl::StatusOr<std::unique_ptr<serving::FastEngine>>
 AbstractModel::BuildFastEngine(
-    const absl::optional<std::string>& force_engine_name) const {
+    const std::optional<std::string>& force_engine_name) const {
   if (!allow_fast_engine_) {
     return absl::NotFoundError("allow_fast_engine is set to false.");
   }

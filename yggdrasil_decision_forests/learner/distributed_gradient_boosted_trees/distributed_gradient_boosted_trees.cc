@@ -15,9 +15,11 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include <memory>
+#include <optional>
+
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -26,7 +28,6 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.h"
@@ -68,7 +69,7 @@ DistributedGradientBoostedTreesLearner::Capabilities() const {
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 DistributedGradientBoostedTreesLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   return absl::InvalidArgumentError(
       "The Distributed Gradient Boosted Tree learner does not support training "
@@ -214,7 +215,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>>
 DistributedGradientBoostedTreesLearner::TrainWithStatusImpl(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path) const {
+    const std::optional<std::string>& typed_valid_path) const {
   internal::Monitoring monitoring;
 
   // Extract and check the configuration.
@@ -387,7 +388,7 @@ TrainWithCache(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const absl::string_view cache_path,
-    const absl::optional<std::string>& typed_valid_path,
+    const std::optional<std::string>& typed_valid_path,
     const absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
     const absl::string_view& log_directory, internal::Monitoring* monitoring) {
@@ -582,7 +583,7 @@ TrainWithCache(
   }
 
   // Display the final training logs.
-  absl::optional<proto::Evaluation> previous_validation_evaluation;
+  std::optional<proto::Evaluation> previous_validation_evaluation;
   if (validation_aggregator.Active() && iter_idx > 0) {
     ASSIGN_OR_RETURN(previous_validation_evaluation,
                      validation_aggregator.GetAggregated(iter_idx - 1));
@@ -626,7 +627,7 @@ absl::Status SkipAsyncAnswers(int num_skip,
 std::string TrainingLog(
     const gradient_boosted_trees::GradientBoostedTreesModel& model,
     const Evaluation& training_evaluation,
-    const absl::optional<proto::Evaluation>& previous_validation_evaliation,
+    const std::optional<proto::Evaluation>& previous_validation_evaliation,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<std::string>& metric_names,
     internal::Monitoring* monitoring,
@@ -754,7 +755,7 @@ absl::Status RunIteration(
        weak_model_idx++) {
     auto& weak_model = weak_models[weak_model_idx];
     model->mutable_decision_trees()->push_back(
-        absl::make_unique<decision_tree::DecisionTree>(
+        std::make_unique<decision_tree::DecisionTree>(
             std::move(*weak_model.tree_builder->mutable_tree())));
   }
 
@@ -765,7 +766,7 @@ absl::Status RunIteration(
   // Note: The validation evaluation is asynchronous and is generally (unless a
   // checkpoint was just made, or this is the last iteration) late by one
   // iteration.
-  absl::optional<proto::Evaluation> validation_evaluation;
+  std::optional<proto::Evaluation> validation_evaluation;
   if (validation_aggregator->Active() && iter_idx > 0) {
     ASSIGN_OR_RETURN(validation_evaluation,
                      validation_aggregator->GetAggregated(iter_idx - 1));
@@ -826,7 +827,7 @@ InitializeModel(
     const dataset::proto::DataSpecification& data_spec,
     const gradient_boosted_trees::AbstractLoss& loss) {
   auto model =
-      absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
+      std::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
   model->set_data_spec(data_spec);
   model->set_loss(spe_config.gbt().loss(),
                   gradient_boosted_trees::GradientBoostedTreesLearner::
@@ -925,7 +926,7 @@ absl::Status RestoreManagerCheckpoint(
                            checkpoint, file::Defaults()));
   *label_statistics = checkpoint->label_statistics();
   *model =
-      absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
+      std::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
   RETURN_IF_ERROR(model->get()->Load(file::JoinPath(checkpoint_dir, "model"),
                                      /*io_options=*/{/*file_prefix=*/""}));
 
@@ -1305,7 +1306,7 @@ absl::Status EmitShareSplits(
 absl::Status EmitEndIter(int iter_idx, bool is_last_iteration,
                          const WeakModels& weak_models,
                          distribute::AbstractManager* distribute,
-                         absl::optional<Evaluation*> training_evaluation,
+                         std::optional<Evaluation*> training_evaluation,
                          internal::Monitoring* monitoring,
                          distributed_decision_tree::LoadBalancer* load_balancer,
                          PartialEvaluationAggregator* validation_aggregator) {

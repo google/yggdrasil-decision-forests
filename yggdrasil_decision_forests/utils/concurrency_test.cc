@@ -17,13 +17,13 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 #include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
@@ -68,7 +68,7 @@ TEST(StreamProcessor, Simple) {
 
   // Continuously consume a result, and restart a new job.
   for (int i = 0; i < num_jobs; i++) {
-    const absl::optional<int> result_or = processor.GetResult();
+    const std::optional<int> result_or = processor.GetResult();
     ASSERT_TRUE(result_or.has_value());
     sum += *result_or;
     if (i < num_jobs - num_initially_planned_jobs) {
@@ -89,7 +89,7 @@ TEST(StreamProcessor, NonCopiableData) {
 
   processor.StartWorkers();
   processor.Submit(std::make_unique<int>(10));
-  const absl::optional<std::unique_ptr<int>> result_or = processor.GetResult();
+  const std::optional<std::unique_ptr<int>> result_or = processor.GetResult();
   EXPECT_THAT(result_or, testing::Optional(testing::Pointee(10)));
 }
 
@@ -115,7 +115,7 @@ TEST(StreamProcessor, InOrder) {
 
   // Continuously consume a result, and restart a new job.
   for (int i = 0; i < num_jobs; i++) {
-    const absl::optional<int> result = processor.GetResult();
+    const std::optional<int> result = processor.GetResult();
     EXPECT_THAT(result, testing::Optional(next_expected_result++));
     processor.Submit(next_query++);
   }
@@ -131,7 +131,7 @@ TEST(StreamProcessor, EarlyClose) {
   processor.Submit(3);
   processor.CloseSubmits();
 
-  absl::optional<int> result = processor.GetResult();
+  std::optional<int> result = processor.GetResult();
   EXPECT_THAT(result, testing::Optional(1));
   result = processor.GetResult();
   EXPECT_THAT(result, testing::Optional(2));

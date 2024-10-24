@@ -18,12 +18,12 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_READER_INTERFACE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_READER_INTERFACE_H_
 
+#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
@@ -45,7 +45,7 @@ class ExampleReaderInterface {
 
 REGISTRATION_CREATE_POOL(ExampleReaderInterface,
                          const proto::DataSpecification&,
-                         absl::optional<std::vector<int>>);
+                         std::optional<std::vector<int>>);
 
 #define REGISTER_ExampleReaderInterface(name, key) \
   REGISTRATION_REGISTER_CLASS(name, key, ExampleReaderInterface)

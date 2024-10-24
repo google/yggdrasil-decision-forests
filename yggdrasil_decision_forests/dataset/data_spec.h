@@ -28,7 +28,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -68,7 +67,7 @@ constexpr char CSV_NA_V2[] = "nan";
 absl::Status BuildColIdxToFeatureLabelIdx(
     const proto::DataSpecification& data_spec,
     const std::vector<std::string>& fields,
-    const absl::optional<std::vector<int>>& required_columns,
+    const std::optional<std::vector<int>>& required_columns,
     std::vector<int>* col_idx_to_field_idx);
 
 // Returns a sorted list (in increasing order of column idx) of column idxs from
@@ -110,7 +109,7 @@ absl::StatusOr<int> GetColumnIdxFromNameWithStatus(
 
 // Returns the index of the column with the corresponding name. Returns  an
 // error if the column does not exist.
-absl::optional<int> GetOptionalColumnIdxFromName(
+std::optional<int> GetOptionalColumnIdxFromName(
     absl::string_view name, const proto::DataSpecification& data_spec);
 
 // Test if the dataspec contains this column.

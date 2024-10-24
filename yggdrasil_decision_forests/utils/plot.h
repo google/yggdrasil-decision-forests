@@ -26,7 +26,7 @@
 // plot.title = "the title of my plot";
 //
 // // Create a new curve.
-// auto curve = absl::make_unique<Curve>();
+// auto curve = std::make_unique<Curve>();
 // curve->label = "curve 1";
 // curve->xs = {1, 2, 3};
 // curve->ys = {2, 0.5, 4};
@@ -39,13 +39,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_PLOT_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_PLOT_H_
 
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/histogram.h"
 
 namespace yggdrasil_decision_forests {
@@ -150,12 +150,12 @@ struct Axis {
   AxisScale scale = AxisScale::UNIFORM;
 
   // List of tick values. If not set, ticks are set automatically.
-  absl::optional<std::vector<double>> manual_tick_values;
+  std::optional<std::vector<double>> manual_tick_values;
 
   // List of tick texts. If not set, "manual_tick_values" should also be set and
   // both "manual_tick_values" and "manual_tick_texts" should have the same
   // number of examples.
-  absl::optional<std::vector<std::string>> manual_tick_texts;
+  std::optional<std::vector<std::string>> manual_tick_texts;
 };
 
 // A set of geometrical object in a 2d space.
@@ -163,14 +163,14 @@ struct Plot {
   absl::Status Check() const;
 
   Curve* AddCurve() {
-    auto curve = absl::make_unique<Curve>();
+    auto curve = std::make_unique<Curve>();
     auto* raw_curve = curve.get();
     items.push_back(std::move(curve));
     return raw_curve;
   }
 
   Bars* AddBars() {
-    auto bars = absl::make_unique<Bars>();
+    auto bars = std::make_unique<Bars>();
     auto* raw_bars = bars.get();
     items.push_back(std::move(bars));
     return raw_bars;
@@ -225,7 +225,7 @@ struct MultiPlot {
   absl::Status Check() const;
 
   MultiPlotItem* AddItem() {
-    items.push_back(absl::make_unique<MultiPlotItem>());
+    items.push_back(std::make_unique<MultiPlotItem>());
     return items.back().get();
   }
 

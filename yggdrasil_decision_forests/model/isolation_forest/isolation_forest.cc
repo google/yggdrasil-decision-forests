@@ -21,13 +21,13 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -188,7 +188,7 @@ absl::Status IsolationForestModel::Validate() const {
   return absl::OkStatus();
 }
 
-absl::optional<size_t> IsolationForestModel::ModelSizeInBytes() const {
+std::optional<size_t> IsolationForestModel::ModelSizeInBytes() const {
   return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
 }

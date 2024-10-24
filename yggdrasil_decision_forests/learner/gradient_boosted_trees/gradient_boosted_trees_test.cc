@@ -25,6 +25,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -36,12 +37,10 @@
 #include "absl/container/btree_set.h"
 #include "absl/container/fixed_array.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -329,7 +328,7 @@ CustomMultiClassificationLossFunctions Multinomial3CustomLoss() {
 
 // Utility to set the configured and expected sorting strategy.
 void SetSortingStrategy(Internal::SortingStrategy set,
-                        absl::optional<Internal::SortingStrategy> expected,
+                        std::optional<Internal::SortingStrategy> expected,
                         model::proto::TrainingConfig* train_config) {
   auto* gbt_config = train_config->MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1962,7 +1961,7 @@ TEST(DartPredictionAccumulator, Base) {
   CHECK_OK(acc.GetAllPredictions(&predictions));
   EXPECT_NEAR(predictions[0], 2.5f, 0.0001f);
 
-  auto tree = absl::make_unique<decision_tree::DecisionTree>();
+  auto tree = std::make_unique<decision_tree::DecisionTree>();
   tree->CreateRoot();
   tree->mutable_root()->CreateChildren();
   tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);

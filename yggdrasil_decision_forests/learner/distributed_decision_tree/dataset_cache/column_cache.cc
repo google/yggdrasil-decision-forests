@@ -26,7 +26,6 @@
 #include <vector>
 
 #include "absl/log/check.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
@@ -372,7 +371,7 @@ template <typename Value>
 std::unique_ptr<typename InMemoryIntegerColumnReaderFactory<
     Value>::InMemoryIntegerColumnReader>
 InMemoryIntegerColumnReaderFactory<Value>::CreateIterator() const {
-  return absl::make_unique<
+  return std::make_unique<
       InMemoryIntegerColumnReaderFactory<Value>::InMemoryIntegerColumnReader>(
       this);
 }
@@ -382,7 +381,7 @@ std::unique_ptr<typename InMemoryIntegerColumnReaderFactory<
     Value>::InMemoryIntegerColumnReader>
 InMemoryIntegerColumnReaderFactory<Value>::CreateIterator(
     size_t begin_idx, size_t end_idx) const {
-  return absl::make_unique<
+  return std::make_unique<
       InMemoryIntegerColumnReaderFactory<Value>::InMemoryIntegerColumnReader>(
       this, begin_idx, end_idx);
 }
@@ -627,7 +626,7 @@ absl::Status InMemoryFloatColumnReaderFactory::Borrow(
 
 std::unique_ptr<InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader>
 InMemoryFloatColumnReaderFactory::CreateIterator() const {
-  return absl::make_unique<
+  return std::make_unique<
       InMemoryFloatColumnReaderFactory::InMemoryFloatColumnReader>(this);
 }
 

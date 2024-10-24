@@ -20,13 +20,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/avro.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -47,7 +47,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
 class AvroExampleReader final : public ExampleReaderInterface {
  public:
   explicit AvroExampleReader(const proto::DataSpecification& data_spec,
-                             absl::optional<std::vector<int>> required_columns)
+                             std::optional<std::vector<int>> required_columns)
       : sharded_reader_(data_spec, required_columns) {}
 
   absl::StatusOr<bool> Next(proto::Example* example) override {
@@ -63,7 +63,7 @@ class AvroExampleReader final : public ExampleReaderInterface {
    public:
     explicit Implementation(
         const proto::DataSpecification& data_spec,
-        const absl::optional<std::vector<int>>& required_columns)
+        const std::optional<std::vector<int>>& required_columns)
         : dataspec_(data_spec), required_columns_(required_columns) {}
 
    protected:
@@ -88,7 +88,7 @@ class AvroExampleReader final : public ExampleReaderInterface {
     // multivariate features. -1's are used for ignored fields.
     std::vector<int> multivariate_field_idx_to_unroll_idx_;
 
-    const absl::optional<std::vector<int>> required_columns_;
+    const std::optional<std::vector<int>> required_columns_;
   };
 
   Implementation sharded_reader_;

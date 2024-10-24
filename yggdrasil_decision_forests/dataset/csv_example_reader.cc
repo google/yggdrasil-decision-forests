@@ -18,19 +18,18 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -47,13 +46,13 @@ using proto::ColumnType;
 
 CsvExampleReader::Implementation::Implementation(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>>& required_columns)
+    const std::optional<std::vector<int>>& required_columns)
     : data_spec_(data_spec), required_columns_(required_columns) {}
 
 absl::Status CsvExampleReader::Implementation::OpenShard(
     const absl::string_view path) {
   ASSIGN_OR_RETURN(auto file_handle, file::OpenInputFile(path));
-  csv_reader_ = absl::make_unique<utils::csv::Reader>(file_handle.get());
+  csv_reader_ = std::make_unique<utils::csv::Reader>(file_handle.get());
   RETURN_IF_ERROR(file_closer_.reset(std::move(file_handle)));
 
   std::vector<absl::string_view>* new_header;
@@ -91,7 +90,7 @@ absl::StatusOr<bool> CsvExampleReader::Implementation::NextInShard(
 
 CsvExampleReader::CsvExampleReader(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> required_columns)
+    const std::optional<std::vector<int>> required_columns)
     : sharded_csv_reader_(data_spec, required_columns) {}
 
 // Does this value looks like to be a numerical value?

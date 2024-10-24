@@ -23,7 +23,6 @@
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -304,7 +303,7 @@ TEST(PredictionAnalysis, ToyModel) {
   model::random_forest::RandomForestModel model;
 
   {
-    auto tree = absl::make_unique<model::decision_tree::DecisionTree>();
+    auto tree = std::make_unique<model::decision_tree::DecisionTree>();
     model::decision_tree::TreeBuilder root(tree.get());
     auto [l1, neg] = root.ConditionIsGreater(1, 3);
     l1.LeafRegression(1);

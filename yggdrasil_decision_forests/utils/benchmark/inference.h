@@ -16,13 +16,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_BENCHMARK_INFERENCE_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_BENCHMARK_INFERENCE_H_
 
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
@@ -52,8 +52,8 @@ struct BenchmarkInterfaceTimingOptions {
 // How to run the benchmark.
 struct BenchmarkInferenceRunOptions {
   int batch_size;
-  absl::optional<BenchmarkInterfaceNumRunsOptions> runs;
-  absl::optional<BenchmarkInterfaceTimingOptions> time;
+  std::optional<BenchmarkInterfaceNumRunsOptions> runs;
+  std::optional<BenchmarkInterfaceTimingOptions> time;
 };
 
 // Benchmark the inference time per example using the generic slow engine.

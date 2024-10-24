@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -28,7 +29,6 @@
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -36,7 +36,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
@@ -373,7 +372,7 @@ absl::Status RandomForestLearner::CheckConfiguration(
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 RandomForestLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   // TODO: Divide function into smaller blocks.
   const auto begin_training = absl::Now();
@@ -421,7 +420,7 @@ RandomForestLearner::TrainWithStatusImpl(
       config_with_default, config_link, train_dataset.data_spec(),
       rf_config.mutable_decision_tree());
 
-  auto mdl = absl::make_unique<RandomForestModel>();
+  auto mdl = std::make_unique<RandomForestModel>();
   mdl->set_data_spec(train_dataset.data_spec());
   internal::InitializeModelWithTrainingConfig(config_with_default, config_link,
                                               mdl.get());
@@ -471,7 +470,7 @@ RandomForestLearner::TrainWithStatusImpl(
     }
   }
   for (int tree_idx = 0; tree_idx < rf_config.num_trees(); tree_idx++) {
-    mdl->AddTree(absl::make_unique<decision_tree::DecisionTree>());
+    mdl->AddTree(std::make_unique<decision_tree::DecisionTree>());
   }
 
   // OOB (out-of-bag) predictions.
@@ -539,7 +538,7 @@ RandomForestLearner::TrainWithStatusImpl(
           "\"bootstrap_training_dataset\" required for adaptive "
           "bootstrap_size_ratio");
     }
-    adaptative_work = absl::make_unique<utils::AdaptativeWork>(
+    adaptative_work = std::make_unique<utils::AdaptativeWork>(
         rf_config.num_trees(),
         training_config().maximum_training_duration_seconds() *
             deployment().num_threads(),
@@ -674,7 +673,7 @@ RandomForestLearner::TrainWithStatusImpl(
         }
 
         // Timeout in the tree training.
-        absl::optional<absl::Time> timeout;
+        std::optional<absl::Time> timeout;
         if (training_config().has_maximum_training_duration_seconds()) {
           timeout = begin_training +
                     absl::Seconds(
@@ -959,7 +958,7 @@ void UpdateOOBPredictionsWithNewTree(
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
-    const absl::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
+    const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
     std::vector<PredictionAccumulator>* oob_predictions) {
   // "next_non_oob_example_idx" is the index in "sorted_non_oob_example_indices"
   // of the example, with the smallest index which is greater or equal to the
@@ -1021,7 +1020,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     const int uplift_treatment_col_idx,
-    const absl::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
+    const std::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<PredictionAccumulator>& oob_predictions,
     const bool for_permutation_importance) {
   // Configure the evaluation options.
@@ -1126,9 +1125,9 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
                              /*for_permutation_importance=*/true));
 
   const auto permutation_evaluation = [&](const int feature_idx)
-      -> absl::StatusOr<absl::optional<metric::proto::EvaluationResults>> {
+      -> absl::StatusOr<std::optional<metric::proto::EvaluationResults>> {
     if (oob_predictions_per_input_features[feature_idx].empty()) {
-      return absl::optional<metric::proto::EvaluationResults>{};
+      return std::optional<metric::proto::EvaluationResults>{};
     }
     ASSIGN_OR_RETURN(auto eval,
                      EvaluateOOBPredictions(

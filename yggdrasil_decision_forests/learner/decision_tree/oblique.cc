@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <type_traits>
 #include <vector>
@@ -27,7 +28,6 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "Eigen/Dense"
 #include "Eigen/Eigenvalues"
@@ -129,7 +129,7 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   if (!weights.empty()) {
@@ -480,7 +480,7 @@ absl::StatusOr<bool> FindBestConditionMHLDObliqueTemplate(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
   if (config_link.numerical_features().empty()) {
@@ -579,7 +579,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const ClassificationLabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
   switch (dt_config.split_axis_case()) {
@@ -608,7 +608,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionHessianLabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   switch (dt_config.split_axis_case()) {
@@ -638,7 +638,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionLabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache) {
   switch (dt_config.split_axis_case()) {

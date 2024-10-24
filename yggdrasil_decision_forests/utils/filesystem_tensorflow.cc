@@ -15,10 +15,10 @@
 
 #include "yggdrasil_decision_forests/utils/filesystem_tensorflow.h"
 
+#include <memory>
 #include <regex>  // NOLINT
 
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
@@ -109,7 +109,7 @@ absl::Status FileInputByteStream::Open(absl::string_view path) {
   RETURN_IF_ERROR(ToUtilStatus(tensorflow::Env::Default()->NewRandomAccessFile(
       std::string(path), &file)));
   file_ =
-      absl::make_unique<::tensorflow::RandomAccessFileWrapper>(file.release());
+      std::make_unique<::tensorflow::RandomAccessFileWrapper>(file.release());
   offset_ = 0;
   return absl::OkStatus();
 }
@@ -158,7 +158,7 @@ absl::Status FileOutputByteStream::Open(absl::string_view path) {
   std::unique_ptr<::tensorflow::WritableFile> file;
   RETURN_IF_ERROR(ToUtilStatus(
       tensorflow::Env::Default()->NewWritableFile(std::string(path), &file)));
-  file_ = absl::make_unique<::tensorflow::WritableFileWrapper>(file.release());
+  file_ = std::make_unique<::tensorflow::WritableFileWrapper>(file.release());
   return absl::OkStatus();
 }
 
@@ -172,7 +172,7 @@ absl::Status FileOutputByteStream::Close() {
 
 absl::Status SetBinaryProto(absl::string_view path,
                             const google::protobuf::MessageLite& message, int unused) {
-  auto writer = absl::make_unique<FileOutputByteStream>();
+  auto writer = std::make_unique<FileOutputByteStream>();
   RETURN_IF_ERROR(writer->Open(path));
   auto write_status = writer->Write(message.SerializeAsString());
   RETURN_IF_ERROR(writer->Close());
@@ -181,7 +181,7 @@ absl::Status SetBinaryProto(absl::string_view path,
 
 absl::Status GetBinaryProto(absl::string_view path,
                             google::protobuf::MessageLite* message, int unused) {
-  auto reader = absl::make_unique<FileInputByteStream>();
+  auto reader = std::make_unique<FileInputByteStream>();
   RETURN_IF_ERROR(reader->Open(path));
   auto content_or = reader->ReadAll();
   RETURN_IF_ERROR(reader->Close());
@@ -198,7 +198,7 @@ absl::Status SetTextProto(absl::string_view path,
                           const google::protobuf::Message& message, int unused) {
   std::string content;
   google::protobuf::TextFormat::PrintToString(message, &content);
-  auto writer = absl::make_unique<FileOutputByteStream>();
+  auto writer = std::make_unique<FileOutputByteStream>();
   RETURN_IF_ERROR(writer->Open(path));
   auto write_status = writer->Write(content);
   RETURN_IF_ERROR(writer->Close());
@@ -207,7 +207,7 @@ absl::Status SetTextProto(absl::string_view path,
 
 absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* message,
                           int unused) {
-  auto reader = absl::make_unique<FileInputByteStream>();
+  auto reader = std::make_unique<FileInputByteStream>();
   RETURN_IF_ERROR(reader->Open(path));
   auto content_or = reader->ReadAll();
   RETURN_IF_ERROR(reader->Close());

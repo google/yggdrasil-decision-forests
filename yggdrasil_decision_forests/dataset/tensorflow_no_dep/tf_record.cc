@@ -23,7 +23,6 @@
 #include "absl/base/internal/endian.h"
 #include "absl/crc/crc32c.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -82,7 +81,7 @@ absl::StatusOr<std::unique_ptr<TFRecordReader>> TFRecordReader::Create(
     ASSIGN_OR_RETURN(stream,
                      utils::GZipInputByteStream::Create(std::move(stream)));
   }
-  return absl::make_unique<TFRecordReader>(std::move(stream));
+  return std::make_unique<TFRecordReader>(std::move(stream));
 }
 
 absl::StatusOr<bool> TFRecordReader::Next(google::protobuf::MessageLite* message) {
@@ -139,7 +138,7 @@ absl::StatusOr<std::unique_ptr<TFRecordWriter>> TFRecordWriter::Create(
     ASSIGN_OR_RETURN(stream,
                      utils::GZipOutputByteStream::Create(std::move(stream)));
   }
-  return absl::make_unique<TFRecordWriter>(std::move(stream));
+  return std::make_unique<TFRecordWriter>(std::move(stream));
 }
 
 TFRecordWriter::~TFRecordWriter() {

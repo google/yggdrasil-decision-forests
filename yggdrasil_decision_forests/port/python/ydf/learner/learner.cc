@@ -36,7 +36,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "pybind11_protobuf/native_proto_caster.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -140,7 +139,7 @@ class GenericCCLearner {
 
   absl::StatusOr<std::unique_ptr<GenericCCModel>> Train(
       const dataset::VerticalDataset& dataset,
-      const absl::optional<
+      const std::optional<
           std::reference_wrapper<const dataset::VerticalDataset>>
           validation_dataset = std::nullopt) const {
     LOG(INFO) << "Data spec:\n"
@@ -159,7 +158,7 @@ class GenericCCLearner {
   absl::StatusOr<std::unique_ptr<GenericCCModel>> TrainFromPathWithDataSpec(
       const std::string& dataset_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string> validation_dataset_path =
+      const std::optional<std::string> validation_dataset_path =
           std::nullopt) const {
     LOG(INFO) << "Data spec:\n" << dataset::PrintHumanReadable(data_spec);
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,

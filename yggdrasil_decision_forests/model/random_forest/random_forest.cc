@@ -21,6 +21,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -33,7 +34,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -283,7 +283,7 @@ absl::Status RandomForestModel::Validate() const {
   return absl::OkStatus();
 }
 
-absl::optional<size_t> RandomForestModel::ModelSizeInBytes() const {
+std::optional<size_t> RandomForestModel::ModelSizeInBytes() const {
   return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
 }

@@ -21,6 +21,7 @@
 #include <cstring>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -31,7 +32,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -790,7 +790,7 @@ absl::Status GenericToSpecializedModelHelper(
 template <typename SetLeaf, typename GenericModel, typename SpecializedModel>
 absl::Status GenericToSpecializedGenericModelHelper(
     SetLeaf set_leaf, const GenericModel& src, SpecializedModel* dst,
-    absl::optional<bool> global_imputation_optimization = {}) {
+    std::optional<bool> global_imputation_optimization = {}) {
   dst->global_imputation_optimization =
       src.CheckStructure({/*.global_imputation_is_higher =*/true});
   dst->uses_na_conditions = !src.CheckStructure(
@@ -1189,7 +1189,7 @@ absl::Status LoadFlatBatchFromDataset(
     VerticalDataset::row_t end_example_idx,
     const std::vector<std::string>& feature_names,
     std::vector<Value>* flat_examples, const ExampleFormat example_format,
-    absl::optional<int64_t> batch_size,
+    std::optional<int64_t> batch_size,
     const std::function<absl::StatusOr<Value>(
         const int feature_idx, const int example_idx,
         const std::vector<int>& node_feature_idx_to_spec_feature_idx)>
@@ -1278,7 +1278,7 @@ absl::Status LoadFlatBatchFromDataset(
     const std::vector<std::string>& feature_names,
     const std::vector<NumericalOrCategoricalValue>& na_replacement_values,
     std::vector<float>* flat_examples, const ExampleFormat example_format,
-    absl::optional<int64_t> batch_size) {
+    std::optional<int64_t> batch_size) {
   // Gather and store the feature values.
   const auto get_value =
       [&](const int node_feature_idx, const int example_idx,
@@ -1313,7 +1313,7 @@ absl::Status LoadFlatBatchFromDataset(
     const std::vector<std::string>& feature_names,
     const std::vector<NumericalOrCategoricalValue>& na_replacement_values,
     std::vector<NumericalOrCategoricalValue>* flat_examples,
-    const ExampleFormat example_format, absl::optional<int64_t> batch_size) {
+    const ExampleFormat example_format, std::optional<int64_t> batch_size) {
   // Gather and store the feature values.
   const auto get_value =
       [&](const int node_feature_idx, const int example_idx,

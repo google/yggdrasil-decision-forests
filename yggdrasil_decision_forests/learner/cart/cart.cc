@@ -19,6 +19,7 @@
 #include <functional>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -27,13 +28,11 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
@@ -168,7 +167,7 @@ CartLearner::GetGenericHyperParameterSpecification() const {
 
 absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   const auto begin_training = absl::Now();
 
@@ -196,14 +195,14 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
                                      config_link, deployment()));
 
   // Initialize the model.
-  auto mdl = absl::make_unique<model::random_forest::RandomForestModel>();
+  auto mdl = std::make_unique<model::random_forest::RandomForestModel>();
   mdl->set_data_spec(train_dataset.data_spec());
   InitializeModelWithAbstractTrainingConfig(config, config_link, mdl.get());
 
   // Outputs probabilities.
   mdl->set_winner_take_all_inference(false);
 
-  mdl->AddTree(absl::make_unique<decision_tree::DecisionTree>());
+  mdl->AddTree(std::make_unique<decision_tree::DecisionTree>());
   auto* decision_tree = mdl->mutable_decision_trees()->front().get();
 
   LOG(INFO) << "Training CART on " << train_dataset.nrow() << " example(s) and "
@@ -252,7 +251,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   }
 
   // Timeout in the tree training.
-  absl::optional<absl::Time> timeout;
+  std::optional<absl::Time> timeout;
   if (training_config().has_maximum_training_duration_seconds()) {
     timeout =
         begin_training +

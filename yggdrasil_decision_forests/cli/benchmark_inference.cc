@@ -50,6 +50,7 @@
 //   21.547          2154.8  Generic slow engine
 //   ----------------------------------------
 //
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -58,7 +59,6 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"

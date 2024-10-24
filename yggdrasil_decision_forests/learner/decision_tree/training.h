@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <random>
 #include <utility>
 #include <vector>
@@ -26,7 +27,6 @@
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -130,7 +130,7 @@ struct SplitterWorkRequest {
   utils::RandomEngine::result_type seed;
   // If set, search for oblique split. In this case "attribute_idx" should be
   // -1.
-  absl::optional<int> num_oblique_projections_to_run;
+  std::optional<int> num_oblique_projections_to_run;
 };
 
 // Contains the result of a splitter.
@@ -759,7 +759,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 

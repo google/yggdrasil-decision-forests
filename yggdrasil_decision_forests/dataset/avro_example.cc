@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -28,7 +29,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/avro.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -208,7 +208,7 @@ absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
 
       case AvroType::kDouble:
       case AvroType::kFloat: {
-        absl::optional<double> value;
+        std::optional<double> value;
         if (field.type == AvroType::kFloat) {
           ASSIGN_OR_RETURN(value, reader_->ReadNextFieldFloat(field));
         } else {
@@ -499,7 +499,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
 
         case AvroType::kDouble:
         case AvroType::kFloat: {
-          absl::optional<double> value;
+          std::optional<double> value;
           if (field.type == AvroType::kFloat) {
             ASSIGN_OR_RETURN(value, reader->ReadNextFieldFloat(field));
           } else {

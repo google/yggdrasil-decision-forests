@@ -25,11 +25,11 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_PARTIAL_DEPENDENCE_PLOT_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_PARTIAL_DEPENDENCE_PLOT_H_
 
+#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -79,15 +79,13 @@ absl::Status UpdateConditionalExpectationPlotSet(
 absl::StatusOr<PartialDependencePlotSet> ComputePartialDependencePlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
-    float example_sampling,
-    absl::optional<float> maximum_duration_seconds = {});
+    float example_sampling, std::optional<float> maximum_duration_seconds = {});
 
 absl::StatusOr<ConditionalExpectationPlotSet>
 ComputeConditionalExpectationPlotSet(
     const dataset::VerticalDataset& dataset, const model::AbstractModel& model,
     const std::vector<std::vector<int>>& attribute_idxs, int num_numerical_bins,
-    float example_sampling,
-    absl::optional<float> maximum_duration_seconds = {});
+    float example_sampling, std::optional<float> maximum_duration_seconds = {});
 
 // Appends all the "num_dims"-dimensional combinations of input features.
 absl::Status AppendAttributesCombinations(

@@ -22,7 +22,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -78,7 +77,7 @@ absl::Status LoadTreesFromDisk(
   RETURN_IF_ERROR(node_reader->Open(file::GenerateShardedFileSpec(
       file::JoinPath(directory, basename), num_shards)));
   for (int64_t tree_idx = 0; tree_idx < num_trees; tree_idx++) {
-    auto decision_tree = absl::make_unique<decision_tree::DecisionTree>();
+    auto decision_tree = std::make_unique<decision_tree::DecisionTree>();
     RETURN_IF_ERROR(decision_tree->ReadNodes(node_reader.get()));
     decision_tree->SetLeafIndices();
     trees->push_back(std::move(decision_tree));
@@ -134,7 +133,7 @@ absl::Status DeserializeTrees(
   } proto_reader(reader);
 
   for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
-    auto decision_tree = absl::make_unique<decision_tree::DecisionTree>();
+    auto decision_tree = std::make_unique<decision_tree::DecisionTree>();
     RETURN_IF_ERROR(decision_tree->ReadNodes(&proto_reader));
     decision_tree->SetLeafIndices();
     trees->push_back(std::move(decision_tree));

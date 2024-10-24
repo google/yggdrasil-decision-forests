@@ -17,10 +17,10 @@
 #define YGGDRASIL_DECISION_FORESTS_UTILS_CONCURRENCY_COMMON_H_
 
 #include <memory>
+#include <optional>
 #include <queue>
 #include <string>
 
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 
@@ -60,7 +60,7 @@ class StreamProcessor {
 
   // Get the result of a job. Returns {} if the "JoinAllAndStopThreads" or
   // "CloseSubmits" has been called and all outputs have already been retrieved.
-  absl::optional<Output> GetResult();
+  std::optional<Output> GetResult();
 
   // Indicates that no more request can be submitted.
   void CloseSubmits();
@@ -195,7 +195,7 @@ void StreamProcessor<Input, Output>::Submit(Input input) {
 }
 
 template <typename Input, typename Output>
-absl::optional<Output> StreamProcessor<Input, Output>::GetResult() {
+std::optional<Output> StreamProcessor<Input, Output>::GetResult() {
   return output_channel_.Pop();
 }
 

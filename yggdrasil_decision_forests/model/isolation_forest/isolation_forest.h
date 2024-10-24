@@ -21,13 +21,13 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -63,7 +63,7 @@ class IsolationForestModel : public AbstractModel,
   bool CheckStructure(
       const decision_tree::CheckStructureOptions& options) const override;
 
-  absl::optional<size_t> ModelSizeInBytes() const override;
+  std::optional<size_t> ModelSizeInBytes() const override;
 
   void AppendDescriptionAndStatistics(bool full_definition,
                                       std::string* description) const override;
@@ -99,7 +99,7 @@ class IsolationForestModel : public AbstractModel,
     return &decision_trees_;
   }
 
-  void set_node_format(const absl::optional<std::string>& format) override {
+  void set_node_format(const std::optional<std::string>& format) override {
     node_format_ = format;
   }
 
@@ -129,7 +129,7 @@ class IsolationForestModel : public AbstractModel,
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> decision_trees_;
 
   // Node storage format.
-  absl::optional<std::string> node_format_;
+  std::optional<std::string> node_format_;
 
   absl::Status SerializeModelImpl(model::proto::SerializedModel* dst_proto,
                                   std::string* dst_raw) const override;

@@ -15,13 +15,13 @@
 
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/memory/memory.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -405,7 +405,7 @@ TEST(VerticalDataset, PushBackOwnedColumn) {
   VerticalDataset dataset;
   EXPECT_EQ(dataset.ncol(), 0);
   dataset.PushBackOwnedColumn(
-      absl::make_unique<VerticalDataset::NumericalColumn>());
+      std::make_unique<VerticalDataset::NumericalColumn>());
   EXPECT_EQ(dataset.column(0)->nrows(), 0);
   EXPECT_EQ(dataset.ncol(), 1);
   dataset.MutableColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(0)

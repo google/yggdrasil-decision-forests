@@ -23,6 +23,7 @@
 #include <functional>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <queue>
 #include <random>
 #include <string>
@@ -32,14 +33,12 @@
 
 #include "absl/base/optimization.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -1192,7 +1191,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache) {
   switch (config.task()) {
@@ -4133,7 +4132,7 @@ absl::Status DecisionTreeTrain(
   }
 
   splitter_concurrency_setup.split_finder_processor =
-      absl::make_unique<SplitterFinderStreamProcessor>(
+      std::make_unique<SplitterFinderStreamProcessor>(
           "SplitFinder", internal_config.num_threads,
           [&](SplitterWorkRequest request) -> SplitterWorkResponse {
             return FindBestConditionFromSplitterWorkRequest(
@@ -4275,7 +4274,7 @@ absl::Status NodeTrain(
 
   // Ensure the per-depth cache is allocated.
   while (cache->per_depth.size() < depth) {
-    cache->per_depth.push_back(absl::make_unique<PerThreadCache::PerDepth>());
+    cache->per_depth.push_back(std::make_unique<PerThreadCache::PerDepth>());
   }
 
   // Separate the positive and negative examples.

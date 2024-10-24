@@ -13,10 +13,11 @@
  * limitations under the License.
  */
 
+#include <memory>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
-#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -58,7 +59,7 @@ ManagerCreatorAndWorkers CreateGrpcManagerCreator(
 
     // Create worker thread.
     manager_and_workers.worker_threads.push_back(
-        absl::make_unique<utils::concurrency::Thread>(
+        std::make_unique<utils::concurrency::Thread>(
             [port]() { CHECK_OK(WorkerMain(port)); }));
     absl::SleepFor(absl::Seconds(0.2));
   }
@@ -160,7 +161,7 @@ TEST(GRPC, TestMessup) {
         std::move(all.worker_threads.front()));
 
     // Create worker thread.
-    all.worker_threads.front() = absl::make_unique<utils::concurrency::Thread>(
+    all.worker_threads.front() = std::make_unique<utils::concurrency::Thread>(
         [port]() { CHECK_OK(WorkerMain(port)); });
     absl::SleepFor(absl::Seconds(0.2));
 

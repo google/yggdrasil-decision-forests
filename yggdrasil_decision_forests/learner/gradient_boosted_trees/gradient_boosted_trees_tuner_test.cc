@@ -15,11 +15,11 @@
 
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "gtest/gtest.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.h"
 #include "yggdrasil_decision_forests/metric/metric.h"

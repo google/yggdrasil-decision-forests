@@ -80,7 +80,6 @@ cc_library_ydf(
         ":decision_tree_io_interface",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:sharded_io_blob_sequence",
-        "@com_google_absl//absl/memory",
     ],
     alwayslink = 1,
 )
@@ -92,7 +91,6 @@ cc_library_ydf(
         ":decision_tree",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@com_google_absl//absl/status",
-        "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
     ],
 )

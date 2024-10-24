@@ -38,7 +38,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "pybind11_protobuf/native_proto_caster.h"  // IWYU pragma : keep
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"

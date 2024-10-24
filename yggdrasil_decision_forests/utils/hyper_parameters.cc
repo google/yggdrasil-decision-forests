@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -25,7 +26,6 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -44,7 +44,7 @@ GenericHyperParameterConsumer::GenericHyperParameterConsumer(
   }
 }
 
-absl::optional<model::proto::GenericHyperParameters::Field>
+std::optional<model::proto::GenericHyperParameters::Field>
 GenericHyperParameterConsumer::Get(const absl::string_view key) {
   if (consumed_values_.find(key) != consumed_values_.end()) {
     LOG(FATAL) << absl::StrCat("Already consumed hyper-parameter \"", key,

@@ -15,9 +15,10 @@
 
 // Train a ML model and export it to disk.
 
+#include <optional>
+
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
@@ -90,7 +91,7 @@ void Train() {
   learner->set_log_directory(
       file::JoinPath(absl::GetFlag(FLAGS_output), "train_logs"));
 
-  absl::optional<std::string> valid_dataset;
+  std::optional<std::string> valid_dataset;
   if (!absl::GetFlag(FLAGS_valid_dataset).empty()) {
     valid_dataset = absl::GetFlag(FLAGS_valid_dataset);
   }

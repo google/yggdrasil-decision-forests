@@ -16,12 +16,12 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CORE_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CORE_H_
 
+#include <optional>
 #include <string>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
@@ -174,7 +174,7 @@ class AbstractManager {
   //
   // Requesting a new work (e.g. BlockingRequest) or waiting for a result (e.g.
   // NextAsynchronousAnswer) after Done is called results in an error.
-  virtual absl::Status Done(absl::optional<bool> kill_worker_manager = {}) = 0;
+  virtual absl::Status Done(std::optional<bool> kill_worker_manager = {}) = 0;
 
   // Changes the number of queries executed by each worker in parallel.
   // This method should be called with no pending queries.

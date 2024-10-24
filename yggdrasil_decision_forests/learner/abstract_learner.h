@@ -20,12 +20,12 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -66,7 +66,7 @@ class AbstractLearner {
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path = {}) const;
+      const std::optional<std::string>& typed_valid_path = {}) const;
 
   // Trains a model using the dataset stored on memory .
   //
@@ -80,7 +80,7 @@ class AbstractLearner {
   // Internally or in any new code, this method should not be overridden.
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const;
 
   // [Deprecated] Similar as TrainWithStatus, but fails (CHECK) in case of
@@ -181,7 +181,7 @@ class AbstractLearner {
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path) const;
+      const std::optional<std::string>& typed_valid_path) const;
 
   // Implementation of the "TrainWithStatus" function. Callers should call
   // "TrainWithStatus". Learners should implement this "TrainWithStatusImpl"
@@ -190,7 +190,7 @@ class AbstractLearner {
   // This method is not a pure virtual function for historical reasons.
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const;
 
  protected:

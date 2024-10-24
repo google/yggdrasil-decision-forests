@@ -19,7 +19,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -40,9 +39,8 @@ CsvExampleWriter::Implementation::Implementation(
 absl::Status CsvExampleWriter::Implementation::OpenShard(
     const absl::string_view path) {
   ASSIGN_OR_RETURN(auto file_handle, file::OpenOutputFile(path));
-  csv_writer =
-      absl::make_unique<yggdrasil_decision_forests::utils::csv::Writer>(
-          file_handle.get());
+  csv_writer = std::make_unique<yggdrasil_decision_forests::utils::csv::Writer>(
+      file_handle.get());
   RETURN_IF_ERROR(file_closer_.reset(std::move(file_handle)));
 
   // Header.

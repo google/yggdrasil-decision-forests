@@ -20,11 +20,11 @@
 #define YGGDRASIL_DECISION_FORESTS_UTILS_CONCURRENCY_CHANNEL_H_
 
 #include <memory>
+#include <optional>
 #include <queue>
 #include <string>
 
 #include "absl/log/log.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -75,7 +75,7 @@ class Channel {
   // If "num_pop" is specified, the pointed value will be set the number of
   // "Pop" results returned so far. The number of pops returned by
   // "PopAndNumPop" is guaranteed to be unique, dense and in order.
-  absl::optional<Input> Pop(int64_t* get_num_pop = nullptr) {
+  std::optional<Input> Pop(int64_t* get_num_pop = nullptr) {
     MutexLock results_lock(&mutex_);
     while (content_.empty() && !close_channel_) {
       cond_var_.Wait(&mutex_, &results_lock);

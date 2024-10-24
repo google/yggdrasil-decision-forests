@@ -23,12 +23,12 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -78,7 +78,7 @@ class RandomForestLearner : public AbstractLearner {
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const override;
 
   // Detects configuration errors and warnings.
@@ -151,7 +151,7 @@ void UpdateOOBPredictionsWithNewTree(
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
-    const absl::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
+    const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
     std::vector<PredictionAccumulator>* oob_predictions);
 
 // Evaluates the OOB predictions. Examples without any tree predictions are
@@ -160,7 +160,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     int uplift_treatment_col_idx,
-    const absl::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
+    const std::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<PredictionAccumulator>& oob_predictions,
     bool for_permutation_importance = false);
 

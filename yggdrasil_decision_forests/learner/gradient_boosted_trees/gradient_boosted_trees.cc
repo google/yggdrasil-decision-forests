@@ -24,6 +24,7 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <tuple>
@@ -33,7 +34,6 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -43,7 +43,6 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -621,7 +620,7 @@ std::unique_ptr<GradientBoostedTreesModel>
 GradientBoostedTreesLearner::InitializeModel(
     const internal::AllTrainingConfiguration& config,
     const dataset::proto::DataSpecification& data_spec) const {
-  auto mdl = absl::make_unique<GradientBoostedTreesModel>();
+  auto mdl = std::make_unique<GradientBoostedTreesModel>();
   mdl->set_data_spec(data_spec);
   internal::InitializeModelWithTrainingConfig(
       config.train_config, config.train_config_link, mdl.get());
@@ -644,7 +643,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::TrainWithStatusImpl(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path) const {
+    const std::optional<std::string>& typed_valid_path) const {
   const auto& gbt_config = training_config().GetExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   if (!gbt_config.has_sample_with_shards()) {
@@ -660,7 +659,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::ShardedSamplingTrain(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path) const {
+    const std::optional<std::string>& typed_valid_path) const {
   // The logic of this method is similar to "TrainWithStatus", with the
   // exceptions:
   // - The loss on the training dataset is  computed.
@@ -950,7 +949,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           trees.push_back(&*mdl->decision_trees()[tree_idx]);
         }
 
-        thread_load_next_shards = absl::make_unique<utils::concurrency::Thread>(
+        thread_load_next_shards = std::make_unique<utils::concurrency::Thread>(
             [&load_and_prepare_next_sample, &next_train_dataset, trees]() {
               next_train_dataset = load_and_prepare_next_sample(trees).value();
             });
@@ -999,7 +998,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     std::vector<std::unique_ptr<decision_tree::DecisionTree>> new_trees;
     new_trees.reserve(mdl->num_trees_per_iter());
     for (int grad_idx = 0; grad_idx < mdl->num_trees_per_iter(); grad_idx++) {
-      auto tree = absl::make_unique<decision_tree::DecisionTree>();
+      auto tree = std::make_unique<decision_tree::DecisionTree>();
 
       const auto internal_config = internal::BuildWeakLearnerInternalConfig(
           config, deployment().num_threads(), grad_idx,
@@ -1159,7 +1158,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 GradientBoostedTreesLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   // The training of the model works as follows:
   //
@@ -1293,7 +1292,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           "\"maximum_training_duration_seconds\" required if "
           "\"subsample_for_maximum_training_duration\" is enabled.");
     }
-    adaptive_work = absl::make_unique<utils::AdaptativeWork>(
+    adaptive_work = std::make_unique<utils::AdaptativeWork>(
         config.gbt_config->num_trees(),
         training_config().maximum_training_duration_seconds(),
         kAdaptativeWarmUpSeconds, config.gbt_config->min_adapted_subsample());
@@ -1333,12 +1332,12 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   std::unique_ptr<RankingGroupsIndices> train_ranking_index;
   std::unique_ptr<RankingGroupsIndices> valid_ranking_index;
   if (mdl->task() == model::proto::Task::RANKING) {
-    train_ranking_index = absl::make_unique<RankingGroupsIndices>();
+    train_ranking_index = std::make_unique<RankingGroupsIndices>();
     RETURN_IF_ERROR(train_ranking_index->Initialize(
         sub_train_dataset, config.train_config_link.label(),
         config.train_config_link.ranking_group()));
     if (has_validation_dataset) {
-      valid_ranking_index = absl::make_unique<RankingGroupsIndices>();
+      valid_ranking_index = std::make_unique<RankingGroupsIndices>();
       RETURN_IF_ERROR(valid_ranking_index->Initialize(
           validation_dataset, config.train_config_link.label(),
           config.train_config_link.ranking_group()));
@@ -1462,7 +1461,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     std::vector<std::unique_ptr<decision_tree::DecisionTree>> new_trees;
     new_trees.reserve(gradients.size());
     for (int grad_idx = 0; grad_idx < gradients.size(); grad_idx++) {
-      auto tree = absl::make_unique<decision_tree::DecisionTree>();
+      auto tree = std::make_unique<decision_tree::DecisionTree>();
 
       auto internal_config = internal::BuildWeakLearnerInternalConfig(
           config, deployment().num_threads(), grad_idx, gradients,
@@ -2495,7 +2494,7 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
     const int grad_idx, const std::vector<GradientData>& gradients,
     const std::vector<float>& predictions, const absl::Time& begin_training) {
   // Timeout in the tree training.
-  absl::optional<absl::Time> timeout;
+  std::optional<absl::Time> timeout;
   if (config.train_config.has_maximum_training_duration_seconds()) {
     timeout =
         begin_training +
@@ -2567,7 +2566,7 @@ LoadCompleteDatasetForWeakLearner(
     const AllTrainingConfiguration& config, const bool allocate_gradient,
     const GradientBoostedTreesModel* mdl) {
   auto complete_dataset =
-      absl::make_unique<CompleteTrainingDatasetForWeakLearner>();
+      std::make_unique<CompleteTrainingDatasetForWeakLearner>();
 
   const auto dataset_loading_config =
       OptimalDatasetLoadingConfig(config.train_config_link);

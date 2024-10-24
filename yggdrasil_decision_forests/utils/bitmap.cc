@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "absl/log/check.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/utils/bitmap.pb.h"
@@ -361,7 +360,7 @@ std::unique_ptr<MultibitWriter> ShardedMultiBitmap::CreateWriter(
   DCHECK_GE(shard_idx, 0);
   DCHECK_LT(shard_idx, shards_.size());
   DCHECK(!shards_[shard_idx].empty());
-  return absl::make_unique<MultibitWriter>(
+  return std::make_unique<MultibitWriter>(
       bits_by_elements_, NumElementsInShard(shard_idx), &shards_[shard_idx]);
 }
 

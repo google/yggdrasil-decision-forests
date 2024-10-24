@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <string>
@@ -30,7 +31,6 @@
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -2073,10 +2073,9 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
 
   SplitterConcurrencySetup setup{
       .num_threads = internal_config.num_threads,
-      .split_finder_processor =
-          absl::make_unique<SplitterFinderStreamProcessor>(
-              "SplitFinder", internal_config.num_threads,
-              FakeFindBestConditionConcurrentConsumerMultiplicative)};
+      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+          "SplitFinder", internal_config.num_threads,
+          FakeFindBestConditionConcurrentConsumerMultiplicative)};
   setup.split_finder_processor->StartWorkers();
 
   // Test case: Features are valid and scores are based on feature id, but
@@ -2114,10 +2113,9 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
 
   SplitterConcurrencySetup setup{
       .num_threads = internal_config.num_threads,
-      .split_finder_processor =
-          absl::make_unique<SplitterFinderStreamProcessor>(
-              "SplitFinder", internal_config.num_threads,
-              FakeFindBestConditionConcurrentConsumerAlwaysInvalid)};
+      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+          "SplitFinder", internal_config.num_threads,
+          FakeFindBestConditionConcurrentConsumerAlwaysInvalid)};
   setup.split_finder_processor->StartWorkers();
 
   // Test case: All features are invalid.
@@ -2156,10 +2154,9 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
 
   SplitterConcurrencySetup setup{
       .num_threads = internal_config.num_threads,
-      .split_finder_processor =
-          absl::make_unique<SplitterFinderStreamProcessor>(
-              "SplitFinder", internal_config.num_threads,
-              FakeFindBestConditionConcurrentConsumerMultiplicative)};
+      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+          "SplitFinder", internal_config.num_threads,
+          FakeFindBestConditionConcurrentConsumerMultiplicative)};
   setup.split_finder_processor->StartWorkers();
 
   // Test case: Features are valid and scores are based on feature id, but
@@ -2210,10 +2207,9 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Alternate) {
 
   SplitterConcurrencySetup setup{
       .num_threads = internal_config.num_threads,
-      .split_finder_processor =
-          absl::make_unique<SplitterFinderStreamProcessor>(
-              "SplitFinder", internal_config.num_threads,
-              FakeFindBestConditionConcurrentConsumerAlternate)};
+      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+          "SplitFinder", internal_config.num_threads,
+          FakeFindBestConditionConcurrentConsumerAlternate)};
   setup.split_finder_processor->StartWorkers();
 
   // Test case: Features alternate between valid and invalid.
@@ -2252,10 +2248,9 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
   SplitterConcurrencySetup setup{
       .concurrent_execution = true,
       .num_threads = internal_config.num_threads,
-      .split_finder_processor =
-          absl::make_unique<SplitterFinderStreamProcessor>(
-              "SplitFinder", internal_config.num_threads,
-              FakeFindBestConditionConcurrentConsumerAlternate)};
+      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+          "SplitFinder", internal_config.num_threads,
+          FakeFindBestConditionConcurrentConsumerAlternate)};
   setup.split_finder_processor->StartWorkers();
 
   // Test case: Features alternate between valid and invalid, and processed in

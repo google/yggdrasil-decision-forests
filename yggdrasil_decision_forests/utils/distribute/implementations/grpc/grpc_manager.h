@@ -18,6 +18,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 
+#include <optional>
+
 #include "grpcpp/channel.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/server.h"
@@ -26,7 +28,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
@@ -57,7 +58,7 @@ class GRPCManager : public AbstractManager {
 
   int NumWorkers() override;
 
-  absl::Status Done(absl::optional<bool> kill_worker_manager) override;
+  absl::Status Done(std::optional<bool> kill_worker_manager) override;
 
   absl::StatusOr<int> NumWorkersInConfiguration(
       const proto::Config& config) const override;
@@ -189,7 +190,7 @@ class GRPCManager : public AbstractManager {
   std::unique_ptr<utils::concurrency::Thread> event_checking_thread_;
 
   // Identifier of the session.
-  absl::optional<int> key_;
+  std::optional<int> key_;
 };
 
 REGISTER_Distribution_Manager(GRPCManager, GRPCManager::kKey);

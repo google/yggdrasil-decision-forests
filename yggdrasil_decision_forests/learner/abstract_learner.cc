@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <set>
 #include <string>
 #include <tuple>
@@ -37,7 +38,6 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
@@ -299,7 +299,7 @@ std::unique_ptr<AbstractModel> AbstractLearner::Train(
 // API; dataset in memory.
 absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   utils::usage::OnTrainingStart(train_dataset.data_spec(), training_config(),
                                 train_dataset.nrow());
@@ -322,7 +322,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 AbstractLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   // This method should always be implemented by learners.
   return absl::UnimplementedError(
@@ -335,7 +335,7 @@ AbstractLearner::TrainWithStatusImpl(
 absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
     absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path) const {
+    const std::optional<std::string>& typed_valid_path) const {
   std::string path;
   ASSIGN_OR_RETURN(std::tie(std::ignore, path),
                    dataset::SplitTypeAndPath(typed_path));
@@ -363,7 +363,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>>
 AbstractLearner::TrainWithStatusImpl(
     absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path) const {
+    const std::optional<std::string>& typed_valid_path) const {
   // If training on disk is not implemented, we load the dataset and use
   // training from memory.
 
@@ -383,7 +383,7 @@ AbstractLearner::TrainWithStatusImpl(
   RETURN_IF_ERROR(dataset::CheckNumExamples(train_dataset.nrow()));
 
   dataset::VerticalDataset valid_dataset_data;
-  absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+  std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
       valid_dataset;
   if (typed_valid_path.has_value()) {
     RETURN_IF_ERROR(LoadVerticalDataset(

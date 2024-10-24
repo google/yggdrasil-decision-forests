@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -30,7 +31,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -53,7 +53,7 @@ using proto::ColumnType;
 namespace {
 
 // Converts a TensorFlow Example DType into a YDF DType.
-absl::optional<dataset::proto::DType> TFEDtypeToDType(
+std::optional<dataset::proto::DType> TFEDtypeToDType(
     const tensorflow::Feature::KindCase kind) {
   switch (kind) {
     case tensorflow::Feature::KindCase::KIND_NOT_SET:
@@ -270,7 +270,7 @@ absl::Status UpdateDataSpecWithTFExample(
 
 TFExampleReaderToExampleReader::TFExampleReaderToExampleReader(
     const proto::DataSpecification& data_spec,
-    const absl::optional<std::vector<int>> ensure_non_missing)
+    const std::optional<std::vector<int>> ensure_non_missing)
     : data_spec_(data_spec), ensure_non_missing_(ensure_non_missing) {}
 
 absl::Status TFExampleReaderToExampleReader::Open(

@@ -20,13 +20,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -48,7 +48,7 @@ namespace dataset {
 class CsvExampleReader final : public ExampleReaderInterface {
  public:
   explicit CsvExampleReader(const proto::DataSpecification& data_spec,
-                            absl::optional<std::vector<int>> required_columns);
+                            std::optional<std::vector<int>> required_columns);
 
   absl::StatusOr<bool> Next(proto::Example* example) override {
     return sharded_csv_reader_.Next(example);
@@ -63,7 +63,7 @@ class CsvExampleReader final : public ExampleReaderInterface {
    public:
     explicit Implementation(
         const proto::DataSpecification& data_spec,
-        const absl::optional<std::vector<int>>& required_columns);
+        const std::optional<std::vector<int>>& required_columns);
 
    protected:
     // Opens the .csv file at "path", and check that the header is as expected.
@@ -86,7 +86,7 @@ class CsvExampleReader final : public ExampleReaderInterface {
     // Header of the csv file.
     std::vector<std::string> csv_header_;
 
-    const absl::optional<std::vector<int>> required_columns_;
+    const std::optional<std::vector<int>> required_columns_;
   };
 
   Implementation sharded_csv_reader_;

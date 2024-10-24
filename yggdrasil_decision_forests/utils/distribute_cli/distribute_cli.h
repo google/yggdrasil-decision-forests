@@ -33,13 +33,13 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_H_
 
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli.pb.h"
@@ -83,7 +83,7 @@ class DistributeCLIManager {
   //     is "skip_already_run_commands=true". If not specified, the uid is
   //     "command".
   absl::Status Schedule(const absl::string_view command,
-                        const absl::optional<std::string>& uid = {});
+                        const std::optional<std::string>& uid = {});
 
   // Waits for all the previously scheduled commands to run. If a command fails,
   // returns immediately with the error. Following an error, the manager can be
@@ -106,7 +106,7 @@ class DistributeCLIManager {
 
   // Schedules a new commands immediately.
   absl::Status ScheduleNow(const absl::string_view command,
-                           const absl::optional<std::string>& uid);
+                           const std::optional<std::string>& uid);
 
   std::unique_ptr<distribute::AbstractManager> distribute_manager_;
   proto::Config config_;
@@ -115,7 +115,7 @@ class DistributeCLIManager {
   // Commands sent to the workers when "WaitCompletion" is called.
   struct WaitingCommand {
     std::string command;
-    absl::optional<std::string> uid;
+    std::optional<std::string> uid;
   };
   std::vector<WaitingCommand> waiting_commands_;
 

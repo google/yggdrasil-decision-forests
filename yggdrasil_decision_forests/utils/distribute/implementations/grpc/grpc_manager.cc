@@ -16,19 +16,18 @@
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_manager.h"
 
 #include <memory>
+#include <optional>
 #include <random>
 
 #include "grpcpp/create_channel.h"
 #include "grpcpp/support/channel_arguments.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
@@ -160,7 +159,7 @@ absl::Status GRPCManager::InitializeWorkers(
   }
 
   for (int worker_idx = 0; worker_idx < worker_addresses.size(); worker_idx++) {
-    auto worker = absl::make_unique<Worker>();
+    auto worker = std::make_unique<Worker>();
     worker->worker_idx = worker_idx;
     {
       utils::concurrency::MutexLock l(&worker->mutex_address);
@@ -215,7 +214,7 @@ void GRPCManager::Worker::StartThreads(int parallel_execution_per_worker,
       parallel_execution_per_worker,
       [this, manager]() { manager->ProcessGlobalQueries(this); });
 
-  peer_worker_update_thread_ = absl::make_unique<utils::concurrency::Thread>(
+  peer_worker_update_thread_ = std::make_unique<utils::concurrency::Thread>(
       [this, manager]() { manager->ProcessPeerWorkerAddressUpdate(this); });
 }
 
@@ -424,7 +423,7 @@ absl::StatusOr<Blob> GRPCManager::NextAsynchronousAnswer() {
 
 int GRPCManager::NumWorkers() { return workers_.size(); }
 
-absl::Status GRPCManager::Done(absl::optional<bool> kill_worker_manager) {
+absl::Status GRPCManager::Done(std::optional<bool> kill_worker_manager) {
   if (verbosity_ >= 1) {
     LOG(INFO) << "Shutdown manager with key="
               << (key_.has_value() ? key_.value() : -1);
@@ -616,7 +615,7 @@ void UpdateWorkerAddress(int key, int worker_idx,
 
 void GRPCManager::StartEventCheckingThread() {
   DCHECK(!event_checking_thread_);
-  event_checking_thread_ = absl::make_unique<utils::concurrency::Thread>(
+  event_checking_thread_ = std::make_unique<utils::concurrency::Thread>(
       [this]() { MainEventCheckingThread(); });
 }
 

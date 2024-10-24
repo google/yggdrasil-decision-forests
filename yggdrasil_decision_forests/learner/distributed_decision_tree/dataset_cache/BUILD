@@ -26,7 +26,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:own_or_borrow",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
@@ -60,7 +59,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -85,12 +83,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "@com_google_absl//absl/log",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -218,7 +214,6 @@ cc_test(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest_main",
     ],
 )

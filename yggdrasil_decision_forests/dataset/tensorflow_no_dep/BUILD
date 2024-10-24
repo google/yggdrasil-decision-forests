@@ -23,7 +23,6 @@ cc_library_ydf(
         "@com_google_absl//absl/base:endian",
         "@com_google_absl//absl/crc:crc32c",
         "@com_google_absl//absl/log",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -42,8 +41,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:example_reader_interface",
         "//yggdrasil_decision_forests/dataset:example_writer_interface",
         "//yggdrasil_decision_forests/dataset/tensorflow:tf_example_io_interface",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/types:optional",
     ],
     alwayslink = 1,
 )

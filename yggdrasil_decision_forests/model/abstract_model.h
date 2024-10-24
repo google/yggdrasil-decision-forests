@@ -23,6 +23,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,7 +31,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -57,7 +57,7 @@ struct ModelIOOptions {
   // For loading a model, if `file_prefix` is not set, the model prefix is
   // auto-detected (if possible) based on the existing files in the given
   // directory.
-  absl::optional<std::string> file_prefix;
+  std::optional<std::string> file_prefix;
 };
 
 class AbstractModel {
@@ -101,7 +101,7 @@ class AbstractModel {
   // If "force_engine_name" is not specified, create the fastest compatible
   // engine.
   absl::StatusOr<std::unique_ptr<serving::FastEngine>> BuildFastEngine(
-      const absl::optional<std::string>& force_engine_name = {}) const;
+      const std::optional<std::string>& force_engine_name = {}) const;
 
   // Lists the fast engines compatible with the model.
   // Engines are sorted by decreasing expected speed i.e., for the fastest
@@ -183,7 +183,7 @@ class AbstractModel {
   }
 
   // Get the weights used during training..
-  absl::optional<dataset::proto::LinkedWeightDefinition> weights() const {
+  std::optional<dataset::proto::LinkedWeightDefinition> weights() const {
     return weights_;
   }
 
@@ -366,7 +366,7 @@ class AbstractModel {
   // compiled version of the model can be much smaller.
   //
   // This value should not be relied upon in tests.
-  virtual absl::optional<size_t> ModelSizeInBytes() const { return {}; }
+  virtual std::optional<size_t> ModelSizeInBytes() const { return {}; }
 
   // Estimates the memory usage of the attributes defined in the "AbstractModel"
   // object.
@@ -413,11 +413,11 @@ class AbstractModel {
   MetaData* mutable_metadata() { return &metadata_; }
 
   // Hyperparameter tuning logs.
-  const absl::optional<proto::HyperparametersOptimizerLogs>&
+  const std::optional<proto::HyperparametersOptimizerLogs>&
   hyperparameter_optimizer_logs() const {
     return hyperparameter_optimizer_logs_;
   }
-  absl::optional<proto::HyperparametersOptimizerLogs>*
+  std::optional<proto::HyperparametersOptimizerLogs>*
   mutable_hyperparameter_optimizer_logs() {
     return &hyperparameter_optimizer_logs_;
   }
@@ -519,7 +519,7 @@ class AbstractModel {
 
   // Example weight used during training. If not specified, all the examples
   // have the same weight.
-  absl::optional<dataset::proto::LinkedWeightDefinition> weights_;
+  std::optional<dataset::proto::LinkedWeightDefinition> weights_;
 
   // Input features of the model sorted by index.
   std::vector<int> input_features_;
@@ -539,7 +539,7 @@ class AbstractModel {
   // Note: Cannot use proto::Metadata with the version of protobuf linked by TF.
   MetaData metadata_;
 
-  absl::optional<proto::HyperparametersOptimizerLogs>
+  std::optional<proto::HyperparametersOptimizerLogs>
       hyperparameter_optimizer_logs_;
 
   // Indicate if a model is pure for serving i.e. the model was tripped of all

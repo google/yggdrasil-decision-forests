@@ -18,8 +18,9 @@
 
 #include <string>
 
+#include <memory>
+
 #include "absl/log/check.h"
-#include "absl/memory/memory.h"
 #include "absl/status/statusor.h"
 #include "tensorflow/core/lib/io/record_reader.h"
 #include "tensorflow/core/lib/io/record_writer.h"
@@ -75,7 +76,7 @@ absl::Status TFRecordShardedReader<T>::OpenShard(const absl::string_view path) {
   RETURN_IF_ERROR(
       ToUtilStatus(::tensorflow::Env::Default()->NewRandomAccessFile(
           std::string(path), &file_)));
-  reader_ = absl::make_unique<::tensorflow::io::SequentialRecordReader>(
+  reader_ = std::make_unique<::tensorflow::io::SequentialRecordReader>(
       file_.get(),
       ::tensorflow::io::RecordReaderOptions::CreateRecordReaderOptions("GZIP"));
 
@@ -103,7 +104,7 @@ absl::Status TFRecordShardedWriter<T>::OpenShard(const absl::string_view path) {
   RETURN_IF_ERROR(CloseWithStatus());
   RETURN_IF_ERROR(ToUtilStatus(::tensorflow::Env::Default()->NewWritableFile(
       std::string(path), &file_)));
-  writer_ = absl::make_unique<::tensorflow::io::RecordWriter>(
+  writer_ = std::make_unique<::tensorflow::io::RecordWriter>(
       file_.get(),
       ::tensorflow::io::RecordWriterOptions::CreateRecordWriterOptions("GZIP"));
   return absl::OkStatus();

@@ -19,11 +19,11 @@
 #define YGGDRASIL_DECISION_FORESTS_MODEL_DECISION_FOREST_INTERFACE_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -81,7 +81,7 @@ class DecisionForestInterface {
   // Updates the format used to save the model on disk. If not specified, the
   // recommended format `model::decision_tree::RecommendedSerializationFormat()`
   // is used.
-  virtual void set_node_format(const absl::optional<std::string>& format) = 0;
+  virtual void set_node_format(const std::optional<std::string>& format) = 0;
 };
 
 }  // namespace model

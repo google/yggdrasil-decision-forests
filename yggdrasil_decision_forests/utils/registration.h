@@ -36,10 +36,10 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_REGISTRATION_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_REGISTRATION_H_
 
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
@@ -69,7 +69,7 @@
           &::yggdrasil_decision_forests::registration::internal::            \
               registration_mutex);                                           \
       InternalGetItems()->push_back(                                         \
-          absl::make_unique<                                                 \
+          std::make_unique<                                                  \
               ::yggdrasil_decision_forests::registration::internal::Creator< \
                   INTERFACE, IMPLEMENTATION, ##__VA_ARGS__>>(key));          \
       return {};                                                             \
@@ -108,7 +108,7 @@ class Creator final : public AbstractCreator<Interface, Args...> {
  public:
   Creator(absl::string_view name) : AbstractCreator<Interface, Args...>(name) {}
   std::unique_ptr<Interface> Create(Args... args) override {
-    return absl::make_unique<Implementation>(args...);
+    return std::make_unique<Implementation>(args...);
   };
 };
 

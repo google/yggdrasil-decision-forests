@@ -22,6 +22,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -30,7 +31,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -115,7 +115,7 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
 
   // Estimates the memory usage of the model in RAM. The serialized or the
   // compiled version of the model can be much smaller.
-  absl::optional<size_t> ModelSizeInBytes() const override;
+  std::optional<size_t> ModelSizeInBytes() const override;
 
   // Number of nodes in the model.
   int64_t NumNodes() const;
@@ -208,12 +208,12 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   // Updates the format used to save the model on disk. If not specified, the
   // recommended format `model::decision_tree::RecommendedSerializationFormat()`
   // is used.
-  void set_node_format(const absl::optional<std::string>& format) override {
+  void set_node_format(const std::optional<std::string>& format) override {
     node_format_ = format;
   }
 
   // Number of nodes pruned during training.
-  absl::optional<int64_t> num_pruned_nodes() const { return num_pruned_nodes_; }
+  std::optional<int64_t> num_pruned_nodes() const { return num_pruned_nodes_; }
 
   void set_num_pruned_nodes(int64_t value) { num_pruned_nodes_ = value; }
 
@@ -266,11 +266,11 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   // If not specified, the format `RecommendedSerializationFormat()` will be
   // used. When loading a model from disk, this field is populated with the
   // format.
-  absl::optional<std::string> node_format_;
+  std::optional<std::string> node_format_;
 
   // Number of nodes trained and then pruned during the training.
   // The classical random forest learning algorithm does not prune nodes.
-  absl::optional<int64_t> num_pruned_nodes_;
+  std::optional<int64_t> num_pruned_nodes_;
 
   absl::Status SerializeModelImpl(model::proto::SerializedModel* dst_proto,
                                   std::string* dst_raw) const override;

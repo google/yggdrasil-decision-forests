@@ -42,12 +42,12 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -77,7 +77,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const ClassificationLabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 
@@ -91,7 +91,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionHessianLabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
@@ -105,7 +105,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const RegressionLabelStats& label_stats,
-    const absl::optional<int>& override_num_projections,
+    const std::optional<int>& override_num_projections,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 

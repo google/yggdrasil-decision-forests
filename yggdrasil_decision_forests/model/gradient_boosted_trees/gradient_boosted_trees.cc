@@ -22,6 +22,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -37,7 +38,6 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -232,7 +232,7 @@ absl::Status GradientBoostedTreesModel::Validate() const {
   return absl::OkStatus();
 }
 
-absl::optional<size_t> GradientBoostedTreesModel::ModelSizeInBytes() const {
+std::optional<size_t> GradientBoostedTreesModel::ModelSizeInBytes() const {
   return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
 }

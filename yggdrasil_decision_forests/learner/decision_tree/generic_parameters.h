@@ -16,11 +16,11 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_GENERIC_PARAMETERS_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_GENERIC_PARAMETERS_H_
 
+#include <optional>
 #include <string>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
@@ -126,9 +126,9 @@ constexpr char kHParamHonestFixedSeparation[] = "honest_fixed_separation";
 absl::Status GetGenericHyperParameterSpecification(
     const proto::DecisionTreeTrainingConfig& config,
     model::proto::GenericHyperParameterSpecification* hparam_def,
-    absl::optional<absl::flat_hash_set<std::string>> valid_hyperparameters =
+    std::optional<absl::flat_hash_set<std::string>> valid_hyperparameters =
         absl::nullopt,
-    absl::optional<absl::flat_hash_set<std::string>> invalid_hyperparameters =
+    std::optional<absl::flat_hash_set<std::string>> invalid_hyperparameters =
         absl::nullopt);
 
 // Set the fields of a decision tree training proto from the set of generic

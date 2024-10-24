@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <string>
 
 #include "absl/container/flat_hash_map.h"
@@ -27,7 +28,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -135,7 +135,7 @@ HyperParameterOptimizerLearner::GetGenericHyperParameterSpecification() const {
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   LOG(INFO) << "Serialize memory dataset to disk. To skip this stage and a "
                "more efficient training, provide the dataset as a path instead "
@@ -152,7 +152,7 @@ HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
   RETURN_IF_ERROR(
       dataset::SaveVerticalDataset(train_dataset, train_dataset_path));
 
-  absl::optional<std::string> valid_dataset_path;
+  std::optional<std::string> valid_dataset_path;
   if (valid_dataset.has_value()) {
     valid_dataset_path = absl::StrCat(
         serialized_dataset_format, ":",
@@ -168,7 +168,7 @@ HyperParameterOptimizerLearner::TrainFromFileOnMemoryDataset(
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 HyperParameterOptimizerLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   if (deployment().execution_case() ==
       model::proto::DeploymentConfig::ExecutionCase::kDistribute) {
@@ -260,7 +260,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>>
 HyperParameterOptimizerLearner::TrainWithStatusImpl(
     const absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path) const {
+    const std::optional<std::string>& typed_valid_path) const {
   if (deployment().execution_case() ==
           model::proto::DeploymentConfig::ExecutionCase::EXECUTION_NOT_SET ||
       deployment().execution_case() ==
@@ -346,7 +346,7 @@ HyperParameterOptimizerLearner::TrainRemoteModel(
     const model::proto::GenericHyperParameters& generic_hyper_params,
     const absl::string_view typed_train_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path,
+    const std::optional<std::string>& typed_valid_path,
     distribute::AbstractManager* manager) const {
   generic_worker::proto::Request generic_request;
   auto& train_request = *generic_request.mutable_train_model();
@@ -449,7 +449,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     const model::proto::GenericHyperParameterSpecification& search_space_spec,
     const model::proto::HyperParameterSpace& search_space,
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset,
     std::unique_ptr<AbstractModel>* best_model,
     model::proto::HyperparametersOptimizerLogs* logs) const {
@@ -609,7 +609,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
     const model::proto::HyperParameterSpace& search_space,
     const absl::string_view typed_train_path,
     const dataset::proto::DataSpecification& data_spec,
-    const absl::optional<std::string>& typed_valid_path,
+    const std::optional<std::string>& typed_valid_path,
     std::unique_ptr<AbstractModel>* best_model,
     distribute::AbstractManager* manager,
     model::proto::HyperparametersOptimizerLogs* logs) const {
@@ -772,7 +772,7 @@ absl::StatusOr<double> HyperParameterOptimizerLearner::EvaluateCandidateLocally(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
     const model::proto::TrainingConfigLinking& config_link,
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset,
     std::unique_ptr<AbstractModel>* model) const {
   ASSIGN_OR_RETURN(const auto base_learner, BuildBaseLearner(spe_config, true));

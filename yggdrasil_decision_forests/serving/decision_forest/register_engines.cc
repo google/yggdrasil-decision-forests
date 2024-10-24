@@ -25,7 +25,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -217,14 +216,14 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
                 .number_of_unique_values() == 3) {
           // Binary classification.
           if (need_uint32_node_index) {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::
                     GenericGradientBoostedTreesBinaryClassification<uint32_t>,
                 serving::decision_forest::Predict>>();
             RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
             return engine;
           } else {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::
                     GradientBoostedTreesBinaryClassification,
                 serving::decision_forest::Predict>>();
@@ -233,7 +232,7 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
           }
         } else {
           // Multi-class classification.
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::
                   GradientBoostedTreesMulticlassClassification,
               serving::decision_forest::Predict>>();
@@ -242,7 +241,7 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
         }
 
       case proto::REGRESSION: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::GradientBoostedTreesRegression,
             serving::decision_forest::Predict>>();
         RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
@@ -250,7 +249,7 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
       }
 
       case proto::RANKING: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::GradientBoostedTreesRanking,
             serving::decision_forest::Predict>>();
         RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
@@ -338,7 +337,7 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
                 .categorical()
                 .number_of_unique_values() == 3) {
           // Binary classification.
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::
                   GradientBoostedTreesBinaryClassificationQuickScorerExtended,
               serving::decision_forest::Predict>>();
@@ -350,14 +349,14 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
 
       case proto::REGRESSION: {
         if (gbt_model->loss() == gradient_boosted_trees::proto::POISSON) {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::
                   GradientBoostedTreesPoissonRegressionQuickScorerExtended,
               serving::decision_forest::Predict>>();
           RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
           return engine;
         } else {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::
                   GradientBoostedTreesRegressionQuickScorerExtended,
               serving::decision_forest::Predict>>();
@@ -367,7 +366,7 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
       }
 
       case proto::RANKING: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::
                 GradientBoostedTreesRankingQuickScorerExtended,
             serving::decision_forest::Predict>>();
@@ -460,7 +459,7 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
                 .categorical()
                 .number_of_unique_values() == 3) {
           // Binary classification.
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::
                   GradientBoostedTreesBinaryClassificationNumericalAndCategorical,
               serving::decision_forest::PredictWithExampleSet>>();
@@ -471,7 +470,7 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
         }
 
       case proto::REGRESSION: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::
                 GradientBoostedTreesRegressionNumericalAndCategorical,
             serving::decision_forest::PredictWithExampleSet>>();
@@ -480,7 +479,7 @@ class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
       }
 
       case proto::RANKING: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::
                 GradientBoostedTreesRankingNumericalAndCategorical,
             serving::decision_forest::PredictWithExampleSet>>();
@@ -535,14 +534,14 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
           3) {
         // Binary classification.
         if (need_uint32_node_index) {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::GenericRandomForestBinaryClassification<
                   uint32_t>,
               serving::decision_forest::Predict>>();
           RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*rf_model));
           return engine;
         } else {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::GenericRandomForestBinaryClassification<
                   uint16_t>,
               serving::decision_forest::Predict>>();
@@ -552,14 +551,14 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
       } else {
         // Multi-class classification.
         if (need_uint32_node_index) {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::
                   GenericRandomForestMulticlassClassification<uint32_t>,
               serving::decision_forest::Predict>>();
           RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*rf_model));
           return engine;
         } else {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::
                   GenericRandomForestMulticlassClassification<uint16_t>,
               serving::decision_forest::Predict>>();
@@ -569,14 +568,14 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
 
         case model::proto::REGRESSION:
           if (need_uint32_node_index) {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::GenericRandomForestRegression<
                     uint32_t>,
                 serving::decision_forest::Predict>>();
             RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*rf_model));
             return engine;
           } else {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::GenericRandomForestRegression<
                     uint16_t>,
                 serving::decision_forest::Predict>>();
@@ -586,14 +585,14 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
 
         case model::proto::CATEGORICAL_UPLIFT:
           if (need_uint32_node_index) {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::GenericRandomForestCategoricalUplift<
                     uint32_t>,
                 serving::decision_forest::Predict>>();
             RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*rf_model));
             return engine;
           } else {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::GenericRandomForestCategoricalUplift<
                     uint16_t>,
                 serving::decision_forest::Predict>>();
@@ -603,14 +602,14 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
 
         case model::proto::NUMERICAL_UPLIFT:
           if (need_uint32_node_index) {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::GenericRandomForestNumericalUplift<
                     uint32_t>,
                 serving::decision_forest::Predict>>();
             RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*rf_model));
             return engine;
           } else {
-            auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+            auto engine = std::make_unique<serving::ExampleSetModelWrapper<
                 serving::decision_forest::GenericRandomForestNumericalUplift<
                     uint16_t>,
                 serving::decision_forest::Predict>>();
@@ -665,13 +664,13 @@ class IsolationForestGenericFastEngineFactory
     switch (if_model->task()) {
       case model::proto::ANOMALY_DETECTION: {
         if (need_uint32_node_index) {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::GenericIsolationForest<uint32_t>,
               serving::decision_forest::Predict>>();
           RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*if_model));
           return engine;
         } else {
-          auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
               serving::decision_forest::GenericIsolationForest<uint16_t>,
               serving::decision_forest::Predict>>();
           RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*if_model));
@@ -749,7 +748,7 @@ class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
 
     switch (rf_model->task()) {
       case model::proto::CLASSIFICATION: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::
                 RandomForestBinaryClassificationNumericalAndCategoricalFeatures,
             serving::decision_forest::PredictWithExampleSet>>();
@@ -758,7 +757,7 @@ class RandomForestOptPredFastEngineFactory : public model::FastEngineFactory {
       }
 
       case model::proto::REGRESSION: {
-        auto engine = absl::make_unique<serving::ExampleSetModelWrapper<
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::
                 RandomForestRegressionNumericalAndCategorical,
             serving::decision_forest::PredictWithExampleSet>>();

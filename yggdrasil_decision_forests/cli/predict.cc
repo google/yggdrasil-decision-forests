@@ -34,11 +34,11 @@
 //    --output=csv:/path/to/predictions.csv
 //
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -92,7 +92,7 @@ void Predict() {
   const auto key = absl::GetFlag(FLAGS_key);
 
   // Column index of the key in the dataspec. -1 if there is no key.
-  absl::optional<int> key_col_idx;
+  std::optional<int> key_col_idx;
   if (!key.empty()) {
     key_col_idx = dataset::GetOptionalColumnIdxFromName(key, data_spec);
     if (!key_col_idx.has_value()) {
@@ -180,7 +180,7 @@ void Predict() {
   // Save the predictions.
   const auto& label_column = model->data_spec().columns(model->label_col_idx());
 
-  absl::optional<std::string> optional_prediction_key;
+  std::optional<std::string> optional_prediction_key;
   if (key_col_idx.has_value()) {
     optional_prediction_key = key;
   }

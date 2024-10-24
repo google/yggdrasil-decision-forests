@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -33,7 +34,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
@@ -289,7 +289,7 @@ absl::StatusOr<proto::CacheMetadata> LoadCacheMetadata(
 }
 
 std::string MetaDataReport(const proto::CacheMetadata& metadata,
-                           const absl::optional<std::vector<int>>& features) {
+                           const std::optional<std::vector<int>>& features) {
   // List the feature used to compute the statistics.
   std::vector<int> effective_features;
   if (features.has_value()) {

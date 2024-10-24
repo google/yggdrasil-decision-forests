@@ -45,6 +45,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -52,7 +53,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -138,13 +138,13 @@ class GradientBoostedTreesLearner : public AbstractLearner {
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const override;
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path) const override;
+      const std::optional<std::string>& typed_valid_path) const override;
 
   // Detects configuration errors and warnings.
   static absl::Status CheckConfiguration(
@@ -200,7 +200,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   absl::StatusOr<std::unique_ptr<AbstractModel>> ShardedSamplingTrain(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path) const;
+      const std::optional<std::string>& typed_valid_path) const;
 
   CustomLossFunctions custom_loss_functions_;
 };

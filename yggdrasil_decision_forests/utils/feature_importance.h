@@ -17,13 +17,13 @@
 #define YGGDRASIL_DECISION_FORESTS_TOOL_FEATURE_IMPORTANCE_H_
 
 #include <functional>
+#include <optional>
 #include <random>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -52,7 +52,7 @@ struct ComputeFeatureImportanceOptions {
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
-        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+        absl::StatusOr<std::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportance* output,
     const ComputeFeatureImportanceOptions& options = {});
@@ -60,7 +60,7 @@ absl::Status ComputePermutationFeatureImportance(
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
-        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+        absl::StatusOr<std::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportanceProto* output,
     const ComputeFeatureImportanceOptions& options = {});

@@ -23,12 +23,12 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
@@ -54,13 +54,13 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const override;
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path) const override;
+      const std::optional<std::string>& typed_valid_path) const override;
 
   // Sets the hyper-parameters of the learning algorithm from "generic hparams".
   absl::Status SetHyperParametersImpl(
@@ -82,7 +82,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
   // memory.
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainFromFileOnMemoryDataset(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const;
 
   // Aggregates the user inputs and automated logic output and returns the
@@ -111,7 +111,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const model::proto::GenericHyperParameterSpecification& search_space_spec,
       const model::proto::HyperParameterSpace& search_space,
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset,
       std::unique_ptr<AbstractModel>* best_model,
       model::proto::HyperparametersOptimizerLogs* logs) const;
@@ -126,7 +126,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const model::proto::HyperParameterSpace& search_space,
       const absl::string_view typed_train_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path,
+      const std::optional<std::string>& typed_valid_path,
       std::unique_ptr<AbstractModel>* best_model,
       distribute::AbstractManager* manager,
       model::proto::HyperparametersOptimizerLogs* logs) const;
@@ -144,7 +144,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
       const model::proto::TrainingConfigLinking& config_link,
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset,
       std::unique_ptr<AbstractModel>* model) const;
 
@@ -162,7 +162,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
       const model::proto::GenericHyperParameters& generic_hyper_params,
       absl::string_view typed_train_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path,
+      const std::optional<std::string>& typed_valid_path,
       distribute::AbstractManager* manager) const;
 
   // Extracts the score from an evaluation. For scores, larger is always better.

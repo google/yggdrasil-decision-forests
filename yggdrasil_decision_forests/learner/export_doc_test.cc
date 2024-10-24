@@ -16,13 +16,13 @@
 #include "yggdrasil_decision_forests/learner/export_doc.h"
 
 #include <memory>
+#include <optional>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -40,7 +40,7 @@ class FakeLearner1 : public AbstractLearner {
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {
     return std::unique_ptr<AbstractModel>();
   }
@@ -67,7 +67,7 @@ class FakeLearner2 : public AbstractLearner {
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {
     return std::unique_ptr<AbstractModel>();
   }
@@ -82,7 +82,7 @@ class FakeLearner3 : public AbstractLearner {
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset = {}) const override {
     return std::unique_ptr<AbstractModel>();
   }

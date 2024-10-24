@@ -23,7 +23,6 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "ydf/utils/status_casters.h"
@@ -72,7 +71,7 @@ absl::StatusOr<uint64_t> StartWorkerNonBlocking(const int port) {
                                     /*port=*/port,
                                     /*use_loas=*/false));
   auto thread =
-      absl::make_unique<utils::concurrency::Thread>([server = server.get()]() {
+      std::make_unique<utils::concurrency::Thread>([server = server.get()]() {
         distribute::grpc_worker::WaitForGRPCWorkerToShutdown(server);
       });
 

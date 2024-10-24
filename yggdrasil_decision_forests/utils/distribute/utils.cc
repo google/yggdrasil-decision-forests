@@ -15,7 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
 
-#include "absl/memory/memory.h"
+#include <memory>
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -23,7 +23,7 @@ namespace distribute {
 void ThreadVector::Start(int num_threads, std::function<void()> callback) {
   threads_.resize(num_threads);
   for (int i = 0; i < num_threads; i++) {
-    threads_[i] = absl::make_unique<Thread>(callback);
+    threads_[i] = std::make_unique<Thread>(callback);
   }
 }
 

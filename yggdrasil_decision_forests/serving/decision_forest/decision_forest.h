@@ -48,11 +48,11 @@
 #define YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_H_
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
@@ -157,7 +157,7 @@ absl::Status LoadFlatBatchFromDataset(
     const std::vector<NumericalOrCategoricalValue>& na_replacement_values,
     std::vector<float>* flat_examples,
     ExampleFormat example_format = ExampleFormat::FORMAT_EXAMPLE_MAJOR,
-    absl::optional<int64_t> batch_size = {});
+    std::optional<int64_t> batch_size = {});
 
 absl::Status LoadFlatBatchFromDataset(
     const dataset::VerticalDataset& dataset,
@@ -167,7 +167,7 @@ absl::Status LoadFlatBatchFromDataset(
     const std::vector<NumericalOrCategoricalValue>& na_replacement_values,
     std::vector<NumericalOrCategoricalValue>* flat_examples,
     ExampleFormat example_format = ExampleFormat::FORMAT_EXAMPLE_MAJOR,
-    absl::optional<int64_t> batch_size = {});
+    std::optional<int64_t> batch_size = {});
 
 std::vector<NumericalOrCategoricalValue> FloatToValue(
     const std::vector<float>& values);

@@ -26,10 +26,11 @@
 //     --dataspec= spec.pbtxt \
 //     --output=tfrecord:/my/dataset.tfrecord-tfe
 //
+#include <optional>
+
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
@@ -86,7 +87,7 @@ void ConvertDataset() {
                                  file::Defaults()));
   }
 
-  absl::optional<std::vector<int>> required_columns;
+  std::optional<std::vector<int>> required_columns;
   if (absl::GetFlag(FLAGS_ignore_missing_columns)) {
     // Ignore all missing columns.
     required_columns = std::vector<int>{};

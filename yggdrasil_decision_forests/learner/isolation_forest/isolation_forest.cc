@@ -23,6 +23,7 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -31,13 +32,11 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/random/distributions.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -872,7 +871,7 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 IsolationForestLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   RETURN_IF_ERROR(dataset::CheckNumExamples(train_dataset.nrow()));
 
@@ -880,7 +879,7 @@ IsolationForestLearner::TrainWithStatusImpl(
       const internal::Configuration config,
       BuildConfig(*this, train_dataset.data_spec(), train_dataset.nrow()));
 
-  auto model = absl::make_unique<IsolationForestModel>();
+  auto model = std::make_unique<IsolationForestModel>();
   InitializeModelWithAbstractTrainingConfig(config.training_config,
                                             config.config_link, model.get());
   model->set_data_spec(train_dataset.data_spec());

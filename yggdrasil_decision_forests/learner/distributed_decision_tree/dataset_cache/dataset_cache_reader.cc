@@ -23,12 +23,12 @@
 #include <iterator>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -36,7 +36,6 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -212,7 +211,7 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
   non_blocking_.unload_features = unload_features;
 
   non_blocking_.loading_thread =
-      absl::make_unique<utils::concurrency::Thread>([this, num_threads]() {
+      std::make_unique<utils::concurrency::Thread>([this, num_threads]() {
         const auto begin = absl::Now();
 
         {
@@ -443,7 +442,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
     case proto::CacheMetadata_Column::kCategorical: {
       auto& dst = in_memory_cache_.inorder_categorical_columns_[column_idx];
       STATUS_CHECK(dst == nullptr);
-      dst = absl::make_unique<
+      dst = std::make_unique<
           InMemoryIntegerColumnReaderFactory<CategoricalType>>();
       const auto max_value =
           meta_data_.columns(column_idx).categorical().num_values();
@@ -482,7 +481,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
 
       if (column.numerical().discretized()) {
         dst_discretized_values =
-            absl::make_unique<InMemoryIntegerColumnReaderFactory<
+            std::make_unique<InMemoryIntegerColumnReaderFactory<
                 DiscretizedIndexedNumericalType>>();
         RETURN_IF_ERROR(dst_discretized_values->Load(
             file::JoinPath(path_, kFilenameIndexed,
@@ -506,7 +505,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
         *memory_usage += dst_discretized_boundaries.size() * sizeof(float);
       } else {
         // Raw numerical value.
-        dst_in_order = absl::make_unique<InMemoryFloatColumnReaderFactory>();
+        dst_in_order = std::make_unique<InMemoryFloatColumnReaderFactory>();
         RETURN_IF_ERROR(dst_in_order->Load(
             file::JoinPath(path_, kFilenameRaw,
                            absl::StrCat(kFilenameColumn, column_idx),
@@ -517,7 +516,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
             /*reserve=*/meta_data_.num_examples()));
         *memory_usage += dst_in_order->MemoryUsage();
 
-        dst_presorted_example_idxs = absl::make_unique<
+        dst_presorted_example_idxs = std::make_unique<
             InMemoryIntegerColumnReaderFactory<ExampleIdxType>>();
         RETURN_IF_ERROR(dst_presorted_example_idxs->Load(
             file::JoinPath(path_, kFilenameIndexed,
@@ -531,7 +530,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
         *memory_usage += dst_presorted_example_idxs->MemoryUsage();
 
         dst_presorted_unique_values =
-            absl::make_unique<InMemoryFloatColumnReaderFactory>();
+            std::make_unique<InMemoryFloatColumnReaderFactory>();
 
         RETURN_IF_ERROR(dst_presorted_unique_values->Load(
             file::JoinPath(path_, kFilenameIndexed,
@@ -549,8 +548,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
       auto& dst = in_memory_cache_.inorder_boolean_columns_[column_idx];
       STATUS_CHECK(dst == nullptr);
 
-      dst =
-          absl::make_unique<InMemoryIntegerColumnReaderFactory<BooleanType>>();
+      dst = std::make_unique<InMemoryIntegerColumnReaderFactory<BooleanType>>();
       RETURN_IF_ERROR(
           dst->Load(file::JoinPath(path_, kFilenameRaw,
                                    absl::StrCat(kFilenameColumn, column_idx),
@@ -567,7 +565,7 @@ absl::Status DatasetCacheReader::LoadInMemoryCacheColumn(int column_idx,
       auto& dst = in_memory_cache_.inorder_hash_columns_[column_idx];
       STATUS_CHECK(dst == nullptr);
 
-      dst = absl::make_unique<InMemoryIntegerColumnReaderFactory<HashType>>();
+      dst = std::make_unique<InMemoryIntegerColumnReaderFactory<HashType>>();
       RETURN_IF_ERROR(
           dst->Load(file::JoinPath(path_, kFilenameRaw,
                                    absl::StrCat(kFilenameColumn, column_idx),
@@ -685,7 +683,7 @@ DatasetCacheReader::PresortedNumericalFeatureExampleIterator(
         ->CreateIterator();
   }
 
-  auto reader = absl::make_unique<ShardedIntegerColumnReader<ExampleIdxType>>();
+  auto reader = std::make_unique<ShardedIntegerColumnReader<ExampleIdxType>>();
   RETURN_IF_ERROR(reader->Open(
       file::JoinPath(path_, kFilenameIndexed,
                      absl::StrCat(kFilenameColumn, column_idx),
@@ -717,7 +715,7 @@ DatasetCacheReader::PresortedNumericalFeatureValueIterator(
         ->CreateIterator();
   }
 
-  auto reader = absl::make_unique<ShardedFloatColumnReader>();
+  auto reader = std::make_unique<ShardedFloatColumnReader>();
   RETURN_IF_ERROR(
       reader->Open(file::JoinPath(path_, kFilenameIndexed,
                                   absl::StrCat(kFilenameColumn, column_idx),
@@ -744,7 +742,7 @@ DatasetCacheReader::InOrderNumericalFeatureValueIterator(int column_idx) const {
         ->CreateIterator();
   }
 
-  auto reader = absl::make_unique<ShardedFloatColumnReader>();
+  auto reader = std::make_unique<ShardedFloatColumnReader>();
   RETURN_IF_ERROR(
       reader->Open(file::JoinPath(path_, kFilenameRaw,
                                   absl::StrCat(kFilenameColumn, column_idx),
@@ -773,8 +771,7 @@ DatasetCacheReader::InOrderCategoricalFeatureValueIterator(
         ->CreateIterator();
   }
 
-  auto reader =
-      absl::make_unique<ShardedIntegerColumnReader<CategoricalType>>();
+  auto reader = std::make_unique<ShardedIntegerColumnReader<CategoricalType>>();
   RETURN_IF_ERROR(reader->Open(
       file::JoinPath(path_, kFilenameRaw,
                      absl::StrCat(kFilenameColumn, column_idx),
@@ -802,7 +799,7 @@ DatasetCacheReader::InOrderHashFeatureValueIterator(int column_idx) const {
     return in_memory_cache_.inorder_hash_columns_[column_idx]->CreateIterator();
   }
 
-  auto reader = absl::make_unique<ShardedIntegerColumnReader<HashType>>();
+  auto reader = std::make_unique<ShardedIntegerColumnReader<HashType>>();
   RETURN_IF_ERROR(
       reader->Open(file::JoinPath(path_, kFilenameRaw,
                                   absl::StrCat(kFilenameColumn, column_idx),
@@ -831,7 +828,7 @@ DatasetCacheReader::InOrderBooleanFeatureValueIterator(int column_idx) const {
         ->CreateIterator();
   }
 
-  auto reader = absl::make_unique<ShardedIntegerColumnReader<BooleanType>>();
+  auto reader = std::make_unique<ShardedIntegerColumnReader<BooleanType>>();
   RETURN_IF_ERROR(
       reader->Open(file::JoinPath(path_, kFilenameRaw,
                                   absl::StrCat(kFilenameColumn, column_idx),
@@ -868,7 +865,7 @@ DatasetCacheReader::InOrderDiscretizedNumericalFeatureValueIterator(
         ->CreateIterator();
   }
 
-  auto reader = absl::make_unique<
+  auto reader = std::make_unique<
       ShardedIntegerColumnReader<DiscretizedIndexedNumericalType>>();
   RETURN_IF_ERROR(reader->Open(
       file::JoinPath(path_, kFilenameIndexed,

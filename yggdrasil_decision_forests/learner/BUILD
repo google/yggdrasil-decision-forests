@@ -87,7 +87,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -164,10 +163,8 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:test",
-        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -198,7 +195,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest_main",
     ],
 )

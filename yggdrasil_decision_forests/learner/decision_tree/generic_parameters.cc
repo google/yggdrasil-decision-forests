@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 
+#include <optional>
 #include <string>
 
 #include "absl/container/flat_hash_set.h"
@@ -24,7 +25,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
@@ -38,8 +38,8 @@ namespace decision_tree {
 namespace {
 absl::Status PruneInvalidHyperparameters(
     model::proto::GenericHyperParameterSpecification* hparam_def,
-    absl::optional<absl::flat_hash_set<std::string>> valid_hyperparameters,
-    absl::optional<absl::flat_hash_set<std::string>> invalid_hyperparameters) {
+    std::optional<absl::flat_hash_set<std::string>> valid_hyperparameters,
+    std::optional<absl::flat_hash_set<std::string>> invalid_hyperparameters) {
   if (valid_hyperparameters.has_value() !=
       invalid_hyperparameters.has_value()) {
     return absl::InternalError(
@@ -83,8 +83,8 @@ absl::Status PruneInvalidHyperparameters(
 absl::Status GetGenericHyperParameterSpecification(
     const proto::DecisionTreeTrainingConfig& config,
     model::proto::GenericHyperParameterSpecification* hparam_def,
-    absl::optional<absl::flat_hash_set<std::string>> valid_hyperparameters,
-    absl::optional<absl::flat_hash_set<std::string>> invalid_hyperparameters) {
+    std::optional<absl::flat_hash_set<std::string>> valid_hyperparameters,
+    std::optional<absl::flat_hash_set<std::string>> invalid_hyperparameters) {
   auto& fields = *hparam_def->mutable_fields();
 
   const auto get_params = [&fields](const absl::string_view key)

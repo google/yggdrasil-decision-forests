@@ -15,13 +15,13 @@
 
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 
+#include <optional>
 #include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {

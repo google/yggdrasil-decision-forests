@@ -14,7 +14,7 @@
  */
 
 // clang-format off
-#include "absl/memory/memory.h"
+#include <memory>
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #ifdef YDF_EVAL_TFRECORD
@@ -364,7 +364,7 @@ TEST(Evaluation, ExportPredictionsToTFRecord) {
                               dataspec.columns(0), typed_path, -1));
 
   auto reader =
-      absl::make_unique<TFRecordShardedReader<model::proto::Prediction>>();
+      std::make_unique<TFRecordShardedReader<model::proto::Prediction>>();
   EXPECT_OK(reader->Open(path));
 
   model::proto::Prediction prediction;

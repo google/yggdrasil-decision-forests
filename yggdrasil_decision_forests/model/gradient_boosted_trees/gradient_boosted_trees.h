@@ -23,6 +23,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -31,7 +32,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -155,7 +155,7 @@ class GradientBoostedTreesModel : public AbstractModel,
   // Updates the format used to save the model on disk. If not specified, the
   // recommended format `model::decision_tree::RecommendedSerializationFormat()`
   // is used.
-  void set_node_format(const absl::optional<std::string>& format) override {
+  void set_node_format(const std::optional<std::string>& format) override {
     node_format_ = format;
   }
 
@@ -200,7 +200,7 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   // Estimates the memory usage of the model in RAM. The serialized or the
   // compiled version of the model can be much smaller.
-  absl::optional<size_t> ModelSizeInBytes() const override;
+  std::optional<size_t> ModelSizeInBytes() const override;
 
   // Call the function "callback" on all the leafs in which the example (defined
   // by a dataset and a row index) is falling.
@@ -252,7 +252,7 @@ class GradientBoostedTreesModel : public AbstractModel,
   // If not specified, the format `RecommendedSerializationFormat()` will be
   // used. When loading a model from disk, this field is populated with the
   // format.
-  absl::optional<std::string> node_format_;
+  std::optional<std::string> node_format_;
 
   struct Testing testing_;
 

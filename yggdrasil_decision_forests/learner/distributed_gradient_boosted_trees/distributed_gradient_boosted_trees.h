@@ -41,13 +41,13 @@
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_DISTRIBUTED_GRADIENT_BOOSTED_TREES_H_
 
 #include <memory>
+#include <optional>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -83,13 +83,13 @@ class DistributedGradientBoostedTreesLearner : public AbstractLearner {
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
-      absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const override;
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const absl::optional<std::string>& typed_valid_path) const override;
+      const std::optional<std::string>& typed_valid_path) const override;
 
   absl::Status SetHyperParametersImpl(
       utils::GenericHyperParameterConsumer* generic_hyper_params) override;
@@ -281,7 +281,7 @@ TrainWithCache(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     absl::string_view cache_path,
-    const absl::optional<std::string>& typed_valid_path,
+    const std::optional<std::string>& typed_valid_path,
     absl::string_view work_directory,
     const dataset::proto::DataSpecification& data_spec,
     const absl::string_view& log_directory, internal::Monitoring* monitoring);
@@ -334,7 +334,7 @@ absl::Status CreateCheckpoint(
 std::string TrainingLog(
     const gradient_boosted_trees::GradientBoostedTreesModel& model,
     const Evaluation& training_evaluation,
-    const absl::optional<proto::Evaluation>& previous_validation_evaliation,
+    const std::optional<proto::Evaluation>& previous_validation_evaliation,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config,
     const std::vector<std::string>& metric_names,
     internal::Monitoring* monitoring,
@@ -397,7 +397,7 @@ absl::Status EmitShareSplits(
 absl::Status EmitEndIter(int iter_idx, bool is_last_iteration,
                          const WeakModels& weak_models,
                          distribute::AbstractManager* distribute,
-                         absl::optional<Evaluation*> training_evaluation,
+                         std::optional<Evaluation*> training_evaluation,
                          internal::Monitoring* monitoring,
                          distributed_decision_tree::LoadBalancer* load_balancer,
                          PartialEvaluationAggregator* validation_aggregator);

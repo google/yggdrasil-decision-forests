@@ -22,6 +22,7 @@
 #include <cmath>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -31,13 +32,11 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -60,7 +59,7 @@ using row_t = dataset::VerticalDataset::row_t;
 namespace {
 
 // Prefix added in front of a node when printing it with AppendModelStructure.
-std::string PrettyLocalPrefix(const absl::optional<bool>& is_pos) {
+std::string PrettyLocalPrefix(const std::optional<bool>& is_pos) {
   if (!is_pos.has_value()) {
     return "";
   }
@@ -485,7 +484,7 @@ absl::Status DecisionTree::Validate(
 
 void DecisionTree::CreateRoot() {
   DCHECK(!root_);
-  root_ = absl::make_unique<NodeWithChildren>();
+  root_ = std::make_unique<NodeWithChildren>();
 }
 
 absl::Status DecisionTree::WriteNodes(
@@ -528,8 +527,8 @@ absl::Status NodeWithChildren::ReadNodes(
 }
 
 void NodeWithChildren::CreateChildren() {
-  children_[0] = absl::make_unique<NodeWithChildren>();
-  children_[1] = absl::make_unique<NodeWithChildren>();
+  children_[0] = std::make_unique<NodeWithChildren>();
+  children_[1] = std::make_unique<NodeWithChildren>();
 }
 
 void NodeWithChildren::ClearLabelDistributionDetails() {
@@ -1486,7 +1485,7 @@ void DecisionTree::AppendModelStructure(
 
 void NodeWithChildren::AppendModelStructure(
     const dataset::proto::DataSpecification& data_spec, const int label_col_idx,
-    const int depth, const absl::optional<bool> is_pos,
+    const int depth, const std::optional<bool> is_pos,
     const std::string& prefix, std::string* description) const {
   auto children_prefix = prefix;
   if (is_pos.has_value()) {
@@ -1765,7 +1764,7 @@ absl::Status Distance(
     const absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> trees,
     const dataset::VerticalDataset& dataset1,
     const dataset::VerticalDataset& dataset2, const absl::Span<float> distances,
-    const absl::optional<std::reference_wrapper<std::vector<float>>>&
+    const std::optional<std::reference_wrapper<std::vector<float>>>&
         tree_weights) {
   const size_t num_trees = trees.size();
   if (num_trees == 0) {

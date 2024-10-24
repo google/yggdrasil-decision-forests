@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -35,7 +36,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -879,9 +879,9 @@ class VerticalDataset {
   // If "load_columns" is set, only the columns specified in it will be loaded.
   absl::Status AppendExampleWithStatus(
       const proto::Example& example,
-      const absl::optional<std::vector<int>>& load_columns = {});
+      const std::optional<std::vector<int>>& load_columns = {});
   void AppendExample(const proto::Example& example,
-                     const absl::optional<std::vector<int>>& load_columns = {});
+                     const std::optional<std::vector<int>>& load_columns = {});
 
   absl::Status AppendExampleWithStatus(
       const std::unordered_map<std::string, std::string>& example);
@@ -903,7 +903,7 @@ class VerticalDataset {
   // It is not required to reserve the memory, but it can speed-up the code
   // (similarly to std::vector:reserve).
   void Reserve(row_t num_rows,
-               const absl::optional<std::vector<int>>& load_columns = {});
+               const std::optional<std::vector<int>>& load_columns = {});
 
   // Resize the dataset.
   void Resize(row_t num_rows);
@@ -928,7 +928,7 @@ class VerticalDataset {
   //     the number of printed examples.
   //   vertical: Controls if the examples are printed horizontally or
   //    vertically (look like a table or a csv file).
-  std::string DebugString(absl::optional<row_t> max_displayed_rows = 10,
+  std::string DebugString(std::optional<row_t> max_displayed_rows = 10,
                           bool vertical = true, int digit_precision = 4) const;
 
  private:

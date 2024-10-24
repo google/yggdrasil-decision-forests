@@ -79,7 +79,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -102,10 +101,7 @@ cc_library_ydf(
     name = "utils",
     srcs = ["utils.cc"],
     hdrs = ["utils.h"],
-    deps = [
-        "//yggdrasil_decision_forests/utils:concurrency",
-        "@com_google_absl//absl/memory",
-    ],
+    deps = ["//yggdrasil_decision_forests/utils:concurrency"],
 )
 
 # Tests

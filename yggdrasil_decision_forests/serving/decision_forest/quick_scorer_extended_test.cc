@@ -13,11 +13,12 @@
  * limitations under the License.
  */
 
+#include <memory>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -114,7 +115,7 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
   for (int duplication_idx = 0; duplication_idx < duplicate_factor;
        duplication_idx++) {
     {
-      auto tree = absl::make_unique<DecisionTree>();
+      auto tree = std::make_unique<DecisionTree>();
       tree->CreateRoot();
       auto n1 = split_node(tree->mutable_root(), 1);
       n1.condition->mutable_higher_condition()->set_threshold(2.0f);
@@ -133,7 +134,7 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
     }
 
     {
-      auto tree = absl::make_unique<DecisionTree>();
+      auto tree = std::make_unique<DecisionTree>();
       tree->CreateRoot();
       auto n1 = split_node(tree->mutable_root(), 2);
       n1.condition->mutable_contains_condition()->add_elements(1);
@@ -153,7 +154,7 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
     }
 
     {
-      auto tree = absl::make_unique<DecisionTree>();
+      auto tree = std::make_unique<DecisionTree>();
       tree->CreateRoot();
       auto n1 = split_node(tree->mutable_root(), 1);
       n1.condition->mutable_higher_condition()->set_threshold(10.0f);
@@ -174,7 +175,7 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
     }
 
     {
-      auto tree = absl::make_unique<DecisionTree>();
+      auto tree = std::make_unique<DecisionTree>();
       tree->CreateRoot();
       auto n1 = split_node(tree->mutable_root(), 3);
       n1.condition->mutable_discretized_higher_condition()->set_threshold(
@@ -185,7 +186,7 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
     }
 
     if (use_cateset_feature) {
-      auto tree = absl::make_unique<DecisionTree>();
+      auto tree = std::make_unique<DecisionTree>();
       tree->CreateRoot();
       auto n1 = split_node(tree->mutable_root(), 4);
       n1.condition->mutable_contains_condition()->add_elements(2);

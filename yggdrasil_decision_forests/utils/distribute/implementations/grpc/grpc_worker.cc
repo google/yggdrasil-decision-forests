@@ -15,13 +15,14 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_worker.h"
 
+#include <memory>
+
 #include "grpcpp/create_channel.h"
 #include "grpcpp/server.h"
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 #include "grpcpp/support/channel_arguments.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
@@ -313,7 +314,7 @@ void WorkerService::ProcessInterWorkerCommunication() {
 void WorkerService::InitializerInterWorkerCommunication(
     const proto::WorkerConfig& worker_config) {
   DCHECK(!intra_worker_communication_);
-  intra_worker_communication_ = absl::make_unique<InterWorkerCommunication>();
+  intra_worker_communication_ = std::make_unique<InterWorkerCommunication>();
   intra_worker_communication_->threads.Start(
       worker_config.parallel_execution_per_worker(),
       [&]() { ProcessInterWorkerCommunication(); });
@@ -322,7 +323,7 @@ void WorkerService::InitializerInterWorkerCommunication(
       worker_config.worker_addresses_size());
   for (int worker_idx = 0; worker_idx < worker_config.worker_addresses_size();
        worker_idx++) {
-    auto worker = absl::make_unique<InterWorkerCommunication::Worker>();
+    auto worker = std::make_unique<InterWorkerCommunication::Worker>();
     utils::concurrency::MutexLock l(&worker->mutex_address);
     worker->expected_address = worker_config.worker_addresses(worker_idx);
     intra_worker_communication_->workers.push_back(std::move(worker));
@@ -381,10 +382,10 @@ void WorkerService::FinalizeIntraWorkerCommunication() {
 
 absl::StatusOr<std::unique_ptr<GRPCWorkerServer>> StartGRPCWorker(
     int port, bool use_loas) {
-  auto server = absl::make_unique<GRPCWorkerServer>();
+  auto server = std::make_unique<GRPCWorkerServer>();
 
-  server->service = absl::make_unique<internal::WorkerService>(
-      &server->stop_server, use_loas);
+  server->service =
+      std::make_unique<internal::WorkerService>(&server->stop_server, use_loas);
 
   std::shared_ptr<grpc::ServerCredentials> credential;
   if (use_loas) {
@@ -409,7 +410,7 @@ absl::StatusOr<std::unique_ptr<GRPCWorkerServer>> StartGRPCWorker(
 }
 
 void WaitForGRPCWorkerToShutdown(GRPCWorkerServer* server) {
-  server->server_thread = absl::make_unique<utils::concurrency::Thread>(
+  server->server_thread = std::make_unique<utils::concurrency::Thread>(
       [&]() { server->grpc_server->Wait(); });
   server->stop_server.WaitForNotification();
   absl::SleepFor(absl::Seconds(1));

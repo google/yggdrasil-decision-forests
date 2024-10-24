@@ -24,11 +24,11 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 
@@ -41,9 +41,9 @@ struct LoadConfig {
   // num_threads=1 is more memory efficient than num_threads>1.
   int num_threads = 10;
   // If specified, only load this subset of columns.
-  absl::optional<std::vector<int>> load_columns;
+  std::optional<std::vector<int>> load_columns;
   // If specified, only load the examples that evaluate to true.
-  absl::optional<std::function<bool(const proto::Example&)>> load_example;
+  std::optional<std::function<bool(const proto::Example&)>> load_example;
 };
 
 // Load the dataset content from a file (or a set of files).
@@ -68,7 +68,7 @@ struct LoadConfig {
 absl::Status LoadVerticalDataset(
     absl::string_view typed_path, const proto::DataSpecification& data_spec,
     VerticalDataset* dataset,
-    const absl::optional<std::vector<int>>& required_columns = {},
+    const std::optional<std::vector<int>>& required_columns = {},
     const LoadConfig& config = {});
 
 // Save the dataset to a file (or a set of files). If

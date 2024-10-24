@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,7 +31,6 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -50,7 +50,7 @@ namespace gradient_boosted_trees {
 struct LossResults {
   float loss;
   std::vector<float> secondary_metrics;
-  absl::optional<utils::IntegersConfusionMatrixDouble> confusion_table;
+  std::optional<utils::IntegersConfusionMatrixDouble> confusion_table;
 };
 
 // One dimension of gradient and hessian values.

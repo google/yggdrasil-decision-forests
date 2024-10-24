@@ -18,7 +18,6 @@
 #include <memory>
 #include <utility>
 
-#include "absl/memory/memory.h"
 #include "absl/status/statusor.h"
 #include "absl/types/variant.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -45,17 +44,17 @@ absl::StatusOr<std::unique_ptr<AbstractLoss>> CreateCustomLoss(
   std::unique_ptr<AbstractLoss> custom_loss;
   if (absl::holds_alternative<CustomBinaryClassificationLossFunctions>(
           loss_functions)) {
-    custom_loss = absl::make_unique<CustomBinaryClassificationLoss>(
+    custom_loss = std::make_unique<CustomBinaryClassificationLoss>(
         config, task, label_column,
         absl::get<CustomBinaryClassificationLossFunctions>(loss_functions));
   } else if (absl::holds_alternative<CustomMultiClassificationLossFunctions>(
                  loss_functions)) {
-    custom_loss = absl::make_unique<CustomMultiClassificationLoss>(
+    custom_loss = std::make_unique<CustomMultiClassificationLoss>(
         config, task, label_column,
         absl::get<CustomMultiClassificationLossFunctions>(loss_functions));
   } else if (absl::holds_alternative<CustomRegressionLossFunctions>(
                  loss_functions)) {
-    custom_loss = absl::make_unique<CustomRegressionLoss>(
+    custom_loss = std::make_unique<CustomRegressionLoss>(
         config, task, label_column,
         absl::get<CustomRegressionLossFunctions>(loss_functions));
   } else {

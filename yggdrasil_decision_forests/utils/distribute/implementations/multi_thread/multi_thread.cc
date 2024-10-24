@@ -15,12 +15,13 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.h"
 
+#include <memory>
+#include <optional>
+
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/multi_thread/multi_thread.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -123,8 +124,7 @@ void MultiThreadManager::ProcessInterWorkersLocalQueries(Worker* worker) {
 
 int MultiThreadManager::NumWorkers() { return workers_.size(); }
 
-absl::Status MultiThreadManager::Done(
-    absl::optional<bool> kill_worker_manager) {
+absl::Status MultiThreadManager::Done(std::optional<bool> kill_worker_manager) {
   if (verbosity_ >= 1) {
     LOG(INFO) << "Release workers";
   }
@@ -196,7 +196,7 @@ absl::Status MultiThreadManager::Initialize(const proto::Config& config,
 
   workers_.reserve(num_workers);
   for (int worker_idx = 0; worker_idx < num_workers; worker_idx++) {
-    auto worker = absl::make_unique<Worker>();
+    auto worker = std::make_unique<Worker>();
     ASSIGN_OR_RETURN(worker->worker_imp,
                      AbstractWorkerRegisterer::Create(worker_name));
     RETURN_IF_ERROR(InternalInitializeWorker(worker_idx, num_workers,

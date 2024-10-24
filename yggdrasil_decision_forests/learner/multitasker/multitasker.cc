@@ -15,13 +15,14 @@
 
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.h"
 
+#include <memory>
+#include <optional>
+
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -117,7 +118,7 @@ MultitaskerLearner::MultitaskerLearner(
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 MultitaskerLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
-    absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   const auto& mt_config =
       training_config().GetExtension(proto::multitasker_config);
@@ -125,7 +126,7 @@ MultitaskerLearner::TrainWithStatusImpl(
     return absl::InvalidArgumentError("At least one task required");
   }
 
-  auto model = absl::make_unique<MultitaskerModel>();
+  auto model = std::make_unique<MultitaskerModel>();
   model->set_data_spec(train_dataset.data_spec());
   STATUS_CHECK_LE(model->models_.size(), mt_config.subtasks_size());
   model->models_.resize(mt_config.subtasks_size());
@@ -220,7 +221,7 @@ MultitaskerLearner::TrainWithStatusImpl(
     dataset::VerticalDataset local_train_ds;
     RETURN_IF_ERROR(ExtractExamplesWithLabels(label_idx, primary_train_dataset,
                                               &local_train_ds));
-    absl::optional<dataset::VerticalDataset> local_valid_ds;
+    std::optional<dataset::VerticalDataset> local_valid_ds;
     if (valid_dataset.has_value()) {
       local_valid_ds = dataset::VerticalDataset();
       RETURN_IF_ERROR(ExtractExamplesWithLabels(

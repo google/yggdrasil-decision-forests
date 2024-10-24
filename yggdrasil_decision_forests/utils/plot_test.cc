@@ -15,10 +15,11 @@
 
 #include "yggdrasil_decision_forests/utils/plot.h"
 
+#include <memory>
+
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -41,8 +42,8 @@ TEST(MultiPlot, Check) {
   multiplot.num_cols = 2;
   EXPECT_OK(multiplot.Check());
 
-  multiplot.items.push_back(absl::make_unique<plot::MultiPlotItem>());
-  multiplot.items.back()->plot.items.push_back(absl::make_unique<Curve>());
+  multiplot.items.push_back(std::make_unique<plot::MultiPlotItem>());
+  multiplot.items.back()->plot.items.push_back(std::make_unique<Curve>());
   auto* curve =
       dynamic_cast<Curve*>(multiplot.items.back()->plot.items.back().get());
   EXPECT_OK(multiplot.Check());
@@ -78,7 +79,7 @@ TEST(Plot, Base) {
   plot.title = "Hello world";
   plot.chart_id = "chard_1";
 
-  auto curve = absl::make_unique<Curve>();
+  auto curve = std::make_unique<Curve>();
   curve->label = "curve 1";
   curve->xs = {1, 2, 3};
   curve->ys = {2, 0.5, 4};
@@ -168,14 +169,14 @@ TEST(MultiPlot, Base) {
     plot.x_axis.label = "x axis";
     plot.y_axis.label = "y axis";
 
-    auto curve = absl::make_unique<Curve>();
+    auto curve = std::make_unique<Curve>();
     curve->label = "curve 1";
     curve->xs = {1, 2, 3};
     curve->ys = {2, 0.5, 4};
     plot.items.push_back(std::move(curve));
 
     multiplot.items.push_back(
-        absl::make_unique<plot::MultiPlotItem>(std::move(plot), 0, 0));
+        std::make_unique<plot::MultiPlotItem>(std::move(plot), 0, 0));
   }
 
   {
@@ -183,14 +184,14 @@ TEST(MultiPlot, Base) {
     plot.chart_id = "chard_2";
     plot.title = "Plot 2";
 
-    auto curve = absl::make_unique<Curve>();
+    auto curve = std::make_unique<Curve>();
     curve->label = "curve 2";
     curve->xs = {10, 11, 15};
     curve->ys = {7, 9, 2};
     plot.items.push_back(std::move(curve));
 
     multiplot.items.push_back(
-        absl::make_unique<plot::MultiPlotItem>(std::move(plot), 1, 0));
+        std::make_unique<plot::MultiPlotItem>(std::move(plot), 1, 0));
   }
 
   {
@@ -198,14 +199,14 @@ TEST(MultiPlot, Base) {
     plot.chart_id = "chard_3";
     plot.title = "Plot 3";
 
-    auto bars = absl::make_unique<Bars>();
+    auto bars = std::make_unique<Bars>();
     bars->label = "bars 3";
     bars->centers = {10, 11, 15};
     bars->heights = {7, 9, 2};
     plot.items.push_back(std::move(bars));
 
     multiplot.items.push_back(
-        absl::make_unique<plot::MultiPlotItem>(std::move(plot), 0, 1, 2, 1));
+        std::make_unique<plot::MultiPlotItem>(std::move(plot), 0, 1, 2, 1));
   }
 
   const auto html_plot = ExportToHtml(multiplot).value();

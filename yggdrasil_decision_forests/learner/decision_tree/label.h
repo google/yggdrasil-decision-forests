@@ -18,11 +18,11 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
@@ -189,7 +189,7 @@ struct InternalTrainConfig {
   // If set, the training of the tree will stop after this time, leading to an
   // under-grow but valid decision tree. The growing strategy defines how the
   // tree is "under-grown".
-  absl::optional<absl::Time> timeout;
+  std::optional<absl::Time> timeout;
 };
 
 }  // namespace yggdrasil_decision_forests::model::decision_tree

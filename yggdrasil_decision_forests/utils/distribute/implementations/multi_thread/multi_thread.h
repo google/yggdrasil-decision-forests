@@ -21,12 +21,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_MULTI_THREAD_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_MULTI_THREAD_H_
 
+#include <optional>
+
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
@@ -55,7 +56,7 @@ class MultiThreadManager : public AbstractManager,
 
   int NumWorkers() override;
 
-  absl::Status Done(absl::optional<bool> kill_worker_manager) override;
+  absl::Status Done(std::optional<bool> kill_worker_manager) override;
 
   absl::StatusOr<int> NumWorkersInConfiguration(
       const proto::Config& config) const override;

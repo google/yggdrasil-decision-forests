@@ -24,7 +24,6 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -140,7 +139,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
 
     // Load the dataset in memory.
     // TODO: Only load the necessary columns.
-    validation_.dataset = absl::make_unique<dataset::VerticalDataset>();
+    validation_.dataset = std::make_unique<dataset::VerticalDataset>();
     if (welcome_.validation_dataset_per_worker(EvaluationWorkerIdx()).empty()) {
       // Empty dataset.
       validation_.dataset->set_data_spec(welcome_.dataspec());
@@ -186,7 +185,7 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     LOG(INFO) << "Create thread pool with "
               << welcome_.deployment_config().num_threads() << " threads";
   }
-  thread_pool_ = absl::make_unique<utils::concurrency::ThreadPool>(
+  thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>(
       "generic", welcome_.deployment_config().num_threads());
   thread_pool_->StartWorkers();
 
@@ -497,7 +496,7 @@ DistributedGradientBoostedTreesWorker::InitializeTrainingWorkerMemory(
     }
     weak_model.label_accessor_type =
         distributed_decision_tree::LabelAccessorType::kNumericalWithHessian;
-    weak_model.label_accessor = absl::make_unique<
+    weak_model.label_accessor = std::make_unique<
         distributed_decision_tree::RegressionWithHessianLabelAccessor>(
         weak_model.gradients, weak_model.hessians, dataset_->weights());
   }
@@ -1055,7 +1054,7 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIterEvaluationWorker(
   // Deserialize the new trees into a GBT model without bias (since the bias is
   // already applied at the initialization of the prediction accumulator).
   auto partial_model =
-      absl::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
+      std::make_unique<gradient_boosted_trees::GradientBoostedTreesModel>();
   partial_model->set_data_spec(welcome_.dataspec());
   const auto& spe_config = welcome_.train_config().GetExtension(
       proto::distributed_gradient_boosted_trees_config);
@@ -1072,7 +1071,7 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIterEvaluationWorker(
                                             welcome_.train_config_linking(),
                                             partial_model.get());
   for (const auto& src_weak_model : request.new_trees()) {
-    auto dst_weak_model = absl::make_unique<decision_tree::DecisionTree>();
+    auto dst_weak_model = std::make_unique<decision_tree::DecisionTree>();
     EndIterTreeProtoReader stream(src_weak_model);
     RETURN_IF_ERROR(dst_weak_model->ReadNodes(&stream));
     partial_model->AddTree(std::move(dst_weak_model));
@@ -1102,7 +1101,7 @@ absl::Status DistributedGradientBoostedTreesWorker::RunValidationThread(
   }
   validation_.evaluation.set_iter_idx(iter_idx);
   validation_.weak_model_thread =
-      absl::make_unique<utils::concurrency::Thread>([this]() {
+      std::make_unique<utils::concurrency::Thread>([this]() {
         validation_.status = EvaluateWeakModelOnvalidationDataset();
       });
   return absl::OkStatus();

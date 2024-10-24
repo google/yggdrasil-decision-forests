@@ -25,6 +25,7 @@
 #include <iterator>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <tuple>
@@ -34,7 +35,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/random/random.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -42,7 +42,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -160,7 +159,7 @@ std::string TrainAndTestTester::EffectiveDatasetRootDirectory() {
 }
 
 void TrainAndTestTester::TrainAndEvaluateModel(
-    absl::optional<absl::string_view> numerical_weight_attribute,
+    std::optional<absl::string_view> numerical_weight_attribute,
     const bool emulate_weight_with_duplication,
     std::function<void(void)> callback_training_about_to_start) {
   model::ModelIOOptions model_io;
@@ -220,7 +219,7 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   std::unique_ptr<utils::concurrency::Thread> interrupter_thread;
   if (interrupt_training_after.has_value()) {
     learner_->set_stop_training_trigger(&stop_training);
-    interrupter_thread = absl::make_unique<utils::concurrency::Thread>([&]() {
+    interrupter_thread = std::make_unique<utils::concurrency::Thread>([&]() {
       absl::SleepFor(interrupt_training_after.value());
       LOG(INFO) << "Interrupt the training. Waiting for the learner to return "
                    "a model.";
@@ -458,7 +457,7 @@ dataset::proto::DataSpecification TrainAndTestTester::BuildDataspec(
 }
 
 void TrainAndTestTester::FixConfiguration(
-    absl::optional<absl::string_view> numerical_weight_attribute,
+    std::optional<absl::string_view> numerical_weight_attribute,
     const dataset::proto::DataSpecification& data_spec,
     int32_t* numerical_weight_attribute_idx,
     float* max_numerical_weight_value) {
@@ -820,7 +819,7 @@ void TestPredefinedHyperParameters(
     const model::proto::TrainingConfig& train_config,
     dataset::proto::DataSpecification data_spec,
     const int expected_num_preconfigured_parameters,
-    absl::optional<float> min_accuracy) {
+    std::optional<float> min_accuracy) {
   dataset::VerticalDataset train_ds;
   CHECK_OK(LoadVerticalDataset(train_ds_path, data_spec, &train_ds));
   dataset::VerticalDataset test_ds;
@@ -857,7 +856,7 @@ void TestPredefinedHyperParameters(
 void TestPredefinedHyperParametersAdultDataset(
     model::proto::TrainingConfig train_config,
     const int expected_num_preconfigured_parameters,
-    absl::optional<float> min_accuracy) {
+    std::optional<float> min_accuracy) {
   const auto base_ds_path = absl::StrCat(
       "csv:", file::JoinPath(
                   test::DataRootDirectory(),
@@ -879,7 +878,7 @@ void TestPredefinedHyperParametersAdultDataset(
 void TestPredefinedHyperParametersRankingDataset(
     model::proto::TrainingConfig train_config,
     const int expected_num_preconfigured_parameters,
-    absl::optional<float> min_accuracy) {
+    std::optional<float> min_accuracy) {
   const auto base_ds_path = absl::StrCat(
       "csv:", file::JoinPath(
                   test::DataRootDirectory(),

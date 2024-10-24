@@ -13,7 +13,8 @@
  * limitations under the License.
  */
 
-#include "absl/memory/memory.h"
+#include <memory>
+
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree_io_interface.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
@@ -32,12 +33,12 @@ class BlobSequenceFormat : public AbstractFormat {
 
   std::unique_ptr<utils::ShardedReader<proto::Node>> CreateReader()
       const override {
-    return absl::make_unique<utils::BlobSequenceShardedReader<proto::Node>>();
+    return std::make_unique<utils::BlobSequenceShardedReader<proto::Node>>();
   };
 
   std::unique_ptr<utils::ShardedWriter<proto::Node>> CreateWriter()
       const override {
-    return absl::make_unique<utils::BlobSequenceShardedWriter<proto::Node>>();
+    return std::make_unique<utils::BlobSequenceShardedWriter<proto::Node>>();
   };
 };
 REGISTER_AbstractFormat(BlobSequenceFormat, "BLOB_SEQUENCE");

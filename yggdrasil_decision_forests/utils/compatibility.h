@@ -25,14 +25,14 @@
 #include <stdint.h>
 
 #include <cassert>
+#include <optional>
 #include <string>
 
-#include "absl/types/optional.h"
 namespace yggdrasil_decision_forests {
 namespace utils {
 
 // Name of the user.
-inline absl::optional<std::string> UserName() {
+inline std::optional<std::string> UserName() {
    // TODO: Platform specific implementation.
    return {};
 }

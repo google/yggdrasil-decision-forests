@@ -17,12 +17,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
@@ -123,7 +123,7 @@ void BuildToyModelAndToyDataset(
     //         └─(neg)─ "f2".index >= 1 i.e. "f2" >= 0.5
     //                  ├─(pos)─ pred:3
     //                  └─(neg)─ pred:4
-    auto tree = absl::make_unique<DecisionTree>();
+    auto tree = std::make_unique<DecisionTree>();
     tree->CreateRoot();
     auto n1 = split(tree->mutable_root(), 1, 2);
 
@@ -143,7 +143,7 @@ void BuildToyModelAndToyDataset(
     //     "f2".index >= 2 i.e. "f2" >= 1.5
     //         ├─(pos)─ pred:10
     //         └─(neg)─ pred:11
-    auto tree = absl::make_unique<DecisionTree>();
+    auto tree = std::make_unique<DecisionTree>();
     tree->CreateRoot();
     auto n1 = split(tree->mutable_root(), 2, 2);
     n1.pos->mutable_node()->mutable_regressor()->set_top_value(10.f);

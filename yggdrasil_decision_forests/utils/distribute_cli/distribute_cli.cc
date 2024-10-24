@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli.h"
 
 #include <algorithm>
+#include <optional>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -24,7 +25,6 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hash.h"
@@ -96,7 +96,7 @@ absl::Status DistributeCLIManager::Initialize() {
 }
 
 absl::Status DistributeCLIManager::Schedule(
-    const absl::string_view command, const absl::optional<std::string>& uid) {
+    const absl::string_view command, const std::optional<std::string>& uid) {
   if (config_.distribute_config().verbosity() >= 2) {
     LOG(INFO) << "Schedule command: " << command;
   }
@@ -111,7 +111,7 @@ absl::Status DistributeCLIManager::Schedule(
 }
 
 absl::Status DistributeCLIManager::ScheduleNow(
-    const absl::string_view command, const absl::optional<std::string>& uid) {
+    const absl::string_view command, const std::optional<std::string>& uid) {
   proto::Request generic_request;
   auto& request = *generic_request.mutable_command();
   *request.mutable_command() = std::string(command);

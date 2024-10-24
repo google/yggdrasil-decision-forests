@@ -40,7 +40,6 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -168,7 +167,7 @@ absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
 absl::Status BuildColIdxToFeatureLabelIdx(
     const proto::DataSpecification& data_spec,
     const std::vector<std::string>& fields,
-    const absl::optional<std::vector<int>>& required_columns,
+    const std::optional<std::vector<int>>& required_columns,
     std::vector<int>* col_idx_to_field_idx) {
   col_idx_to_field_idx->resize(data_spec.columns_size());
   for (int col_idx = 0; col_idx < data_spec.columns_size(); col_idx++) {
@@ -270,7 +269,7 @@ absl::StatusOr<int> GetColumnIdxFromNameWithStatus(
       absl::Substitute("Unknown column $0", name));
 }
 
-absl::optional<int> GetOptionalColumnIdxFromName(
+std::optional<int> GetOptionalColumnIdxFromName(
     absl::string_view name, const proto::DataSpecification& data_spec) {
   for (int col_idx = 0; col_idx < data_spec.columns_size(); col_idx++) {
     if (data_spec.columns(col_idx).name() == name) {

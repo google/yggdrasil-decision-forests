@@ -19,10 +19,10 @@
 #include <stdlib.h>
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 #include <vector>
 
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 
@@ -116,7 +116,7 @@ struct NodeConstraints {
     float min = -std::numeric_limits<float>::infinity();
     float max = std::numeric_limits<float>::infinity();
   };
-  absl::optional<MinMax> min_max_output;
+  std::optional<MinMax> min_max_output;
 
   static NodeConstraints CreateNodeConstraints() { return NodeConstraints(); }
 };

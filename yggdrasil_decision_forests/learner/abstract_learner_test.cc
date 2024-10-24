@@ -15,14 +15,13 @@
 
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -253,9 +252,9 @@ TEST(AbstractLearner, EvaluateLearner) {
 
     absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
         const dataset::VerticalDataset& train_dataset,
-        absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
             valid_dataset = {}) const override {
-      auto model = absl::make_unique<FakeClassificationModel>();
+      auto model = std::make_unique<FakeClassificationModel>();
       model::proto::TrainingConfigLinking config_link;
       RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
           training_config(), train_dataset.data_spec(), &config_link));
@@ -315,7 +314,7 @@ TEST(AbstractLearner, MaximumModelSizeInMemoryInBytes) {
 
     absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
         const dataset::VerticalDataset& train_dataset,
-        absl::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
             valid_dataset = {}) const override {
       return absl::UnimplementedError("");
     }

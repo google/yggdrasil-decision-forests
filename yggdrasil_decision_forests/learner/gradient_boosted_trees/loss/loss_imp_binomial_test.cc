@@ -15,9 +15,10 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binomial.h"
 
+#include <optional>
+
 #include "gmock/gmock.h"
 #include "absl/status/statusor.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"

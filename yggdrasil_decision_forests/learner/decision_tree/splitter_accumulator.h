@@ -38,13 +38,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <optional>
 #include <ostream>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "absl/base/optimization.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -2007,7 +2007,7 @@ struct LabelCategoricalBucket {
    private:
     const utils::IntegerDistributionDouble* non_owned_label_distribution_ =
         nullptr;
-    absl::optional<utils::IntegerDistributionDouble> owned_label_distribution_;
+    std::optional<utils::IntegerDistributionDouble> owned_label_distribution_;
     double initial_entropy_;
   };
 

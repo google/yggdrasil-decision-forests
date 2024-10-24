@@ -15,13 +15,14 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 
+#include <optional>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -46,7 +47,7 @@ using test::StatusIs;
 class End2End : public ::testing::Test {
  public:
   void Prepare(absl::string_view dataset_name, absl::string_view label_key,
-               absl::optional<absl::string_view> group_column) {
+               std::optional<absl::string_view> group_column) {
     // Prepare the dataspec.
     const auto dataset_path = absl::StrCat(
         "csv:",

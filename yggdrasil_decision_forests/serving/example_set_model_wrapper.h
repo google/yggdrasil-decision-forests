@@ -41,7 +41,7 @@ class ExampleSetModelWrapper : public FastEngine {
 
   std::unique_ptr<AbstractExampleSet> AllocateExamples(
       int num_examples) const override {
-    return absl::make_unique<typename Model::ExampleSet>(num_examples, model_);
+    return std::make_unique<typename Model::ExampleSet>(num_examples, model_);
   }
 
   void Predict(const AbstractExampleSet& examples, int num_examples,

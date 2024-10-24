@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <functional>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -27,7 +28,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -106,7 +106,7 @@ dataset::VerticalDataset ShuffleDatasetColumns(
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
-        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+        absl::StatusOr<std::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportance* output,
     const ComputeFeatureImportanceOptions& options) {
@@ -242,7 +242,7 @@ absl::Status ComputePermutationFeatureImportance(
 
   const auto permutation_evaluation = [&dataset, &eval_options, &rng,
                                        &rng_mutex, model](const int feature_idx)
-      -> absl::optional<metric::proto::EvaluationResults> {
+      -> std::optional<metric::proto::EvaluationResults> {
     const auto it_input_feature =
         std::find(model->input_features().begin(),
                   model->input_features().end(), feature_idx);
@@ -279,7 +279,7 @@ absl::Status ComputePermutationFeatureImportance(
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
-        absl::StatusOr<absl::optional<metric::proto::EvaluationResults>>(
+        absl::StatusOr<std::optional<metric::proto::EvaluationResults>>(
             const int feature_idx)>& get_permutation_evaluation,
     const model::AbstractModel* model, ResultFeatureImportanceProto* output,
     const ComputeFeatureImportanceOptions& options) {

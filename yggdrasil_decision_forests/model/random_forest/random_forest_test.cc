@@ -23,7 +23,6 @@
 #include "gtest/gtest.h"
 #include "absl/container/node_hash_set.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
@@ -105,7 +104,7 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
   //   └── [b=gamma]
   auto create_tree = [&task](const float alpha, const int beta,
                              const int gamma) {
-    auto tree = absl::make_unique<decision_tree::DecisionTree>();
+    auto tree = std::make_unique<decision_tree::DecisionTree>();
     tree->CreateRoot();
     tree->mutable_root()->CreateChildren();
     tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);

@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -28,7 +29,6 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 
 namespace yggdrasil_decision_forests::dataset::avro {
@@ -95,13 +95,13 @@ class AvroReader {
   absl::Status SkipAllFieldsInRecord();
 
   // Reads the next field. Returns nullopt if the field is optional and not set.
-  absl::StatusOr<absl::optional<bool>> ReadNextFieldBoolean(
+  absl::StatusOr<std::optional<bool>> ReadNextFieldBoolean(
       const AvroField& field);
-  absl::StatusOr<absl::optional<int64_t>> ReadNextFieldInteger(
+  absl::StatusOr<std::optional<int64_t>> ReadNextFieldInteger(
       const AvroField& field);
-  absl::StatusOr<absl::optional<float>> ReadNextFieldFloat(
+  absl::StatusOr<std::optional<float>> ReadNextFieldFloat(
       const AvroField& field);
-  absl::StatusOr<absl::optional<double>> ReadNextFieldDouble(
+  absl::StatusOr<std::optional<double>> ReadNextFieldDouble(
       const AvroField& field);
 
   absl::StatusOr<bool> ReadNextFieldString(const AvroField& field,
@@ -163,7 +163,7 @@ class AvroReader {
   std::string current_block_;
   std::string current_block_decompressed_;
   std::string zlib_working_buffer_;
-  absl::optional<utils::StringViewInputByteStream> current_block_reader_;
+  std::optional<utils::StringViewInputByteStream> current_block_reader_;
 
   size_t num_objects_in_current_block_ = 0;
   size_t next_object_in_current_block_ = 0;
