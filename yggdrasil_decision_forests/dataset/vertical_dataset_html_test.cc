@@ -14,6 +14,7 @@
  */
 
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_html.h"
+#include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,7 +25,6 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
-#include "yggdrasil_decision_forests/utils/html.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {

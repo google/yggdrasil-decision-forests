@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/dataset/csv_example_reader.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
@@ -33,6 +35,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"

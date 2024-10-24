@@ -27,7 +27,6 @@
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
-#include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {

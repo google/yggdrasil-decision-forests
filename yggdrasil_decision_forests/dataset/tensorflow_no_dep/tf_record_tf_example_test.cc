@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_record_tf_example.h"
 
 #include <memory>
 #include <string>
@@ -24,6 +23,7 @@
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
+#include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"

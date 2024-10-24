@@ -16,7 +16,7 @@
 #include "yggdrasil_decision_forests/dataset/csv_example_writer.h"
 
 #include <memory>
-#include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/memory/memory.h"

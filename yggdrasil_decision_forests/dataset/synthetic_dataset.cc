@@ -52,7 +52,15 @@
 //
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <random>
+#include <set>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -63,7 +71,6 @@
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
-#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hash.h"

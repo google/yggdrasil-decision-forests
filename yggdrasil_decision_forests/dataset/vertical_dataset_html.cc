@@ -14,10 +14,12 @@
  */
 
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_html.h"
+#include <string>
 
 #include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/html.h"
 
 namespace yggdrasil_decision_forests {

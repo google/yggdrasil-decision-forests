@@ -19,6 +19,7 @@
 #define YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_H_
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <ostream>
 #include <string>
@@ -29,7 +30,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
-#include "yggdrasil_decision_forests/utils/filesystem.h"
 
 namespace yggdrasil_decision_forests::dataset::avro {
 

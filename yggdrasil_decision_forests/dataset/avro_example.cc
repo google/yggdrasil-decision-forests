@@ -15,12 +15,15 @@
 
 #include "yggdrasil_decision_forests/dataset/avro_example.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"

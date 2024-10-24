@@ -16,10 +16,10 @@
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <tuple>
-#include <utility>
 #include <vector>
 
 #include "gmock/gmock.h"

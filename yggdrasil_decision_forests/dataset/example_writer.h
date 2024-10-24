@@ -33,12 +33,12 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_WRITER_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_WRITER_H_
 
+#include <cstdint>
 #include <memory>
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 
 namespace yggdrasil_decision_forests {

@@ -72,7 +72,7 @@ bool VerticalDataset::NumericalVectorSequenceColumn::IsNa(
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::AddNA() {
-  items_.emplace_back(0, -1);
+  items_.push_back({0, -1});
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::SetNA(const row_t row) {
@@ -97,7 +97,7 @@ void VerticalDataset::NumericalVectorSequenceColumn::Add(
     absl::Span<const float> values) {
   DCHECK_EQ(values.size() % vector_length_, 0);
   const int32_t num_values = values.size() / vector_length_;
-  items_.emplace_back(values_.size(), num_values);
+  items_.push_back({values_.size(), num_values});
   values_.insert(values_.end(), values.begin(), values.end());
 }
 
@@ -116,8 +116,8 @@ void VerticalDataset::NumericalVectorSequenceColumn::AddFromExample(
   } else {
     DCHECK_EQ(attribute.type_case(),
               proto::Example::Attribute::TypeCase::kNumericalVectorSequence);
-    items_.emplace_back(values_.size(),
-                        attribute.numerical_vector_sequence().vectors_size());
+    items_.push_back(
+        {values_.size(), attribute.numerical_vector_sequence().vectors_size()});
     for (const auto& src_vector :
          attribute.numerical_vector_sequence().vectors()) {
       const auto src_values = src_vector.values();

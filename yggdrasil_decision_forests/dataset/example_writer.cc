@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -22,13 +23,10 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
-#include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
-#include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 

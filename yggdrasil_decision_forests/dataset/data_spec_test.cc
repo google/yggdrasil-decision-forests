@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <utility>

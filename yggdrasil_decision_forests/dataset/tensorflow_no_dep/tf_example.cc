@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
 
+#include <initializer_list>
 #include <string>
 
 #include "absl/strings/string_view.h"

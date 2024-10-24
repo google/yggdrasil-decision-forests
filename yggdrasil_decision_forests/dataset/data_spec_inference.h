@@ -23,6 +23,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_DATA_SPEC_INFERENCE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_DATA_SPEC_INFERENCE_H_
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>

@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_CSV_EXAMPLE_WRITER_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_CSV_EXAMPLE_WRITER_H_
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>

@@ -16,6 +16,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TENSORFLOW_TF_EXAMPLE_H_
 
+#include <string>
+#include <vector>
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"

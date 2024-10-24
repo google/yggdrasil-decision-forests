@@ -25,7 +25,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
-#include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"

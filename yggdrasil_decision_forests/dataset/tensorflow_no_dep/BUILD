@@ -35,6 +35,7 @@ cc_library_ydf(
     srcs = ["tf_record_tf_example.cc"],
     hdrs = ["tf_record_tf_example.h"],
     deps = [
+        ":tf_example",
         ":tf_record",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
@@ -104,6 +105,7 @@ cc_test(
         ":tf_record_tf_example",
         "//yggdrasil_decision_forests/dataset:example_writer",
         "//yggdrasil_decision_forests/dataset:example_writer_interface",
+        "//yggdrasil_decision_forests/dataset/tensorflow:tf_example_io_interface",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",

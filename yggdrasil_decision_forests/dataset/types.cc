@@ -14,6 +14,8 @@
  */
 
 #include "yggdrasil_decision_forests/dataset/types.h"
+#include <cstddef>
+#include <limits>
 
 #include "absl/status/status.h"
 #include "absl/strings/substitute.h"

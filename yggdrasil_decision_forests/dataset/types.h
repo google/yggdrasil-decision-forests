@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_TYPES_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_TYPES_H_
 
+#include <cstddef>
 #include <cstdint>
 
 #include "absl/status/status.h"

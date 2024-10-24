@@ -14,7 +14,9 @@
  */
 
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
+#include <string>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"

@@ -15,8 +15,13 @@
 
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
-#include <type_traits>
+#include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include "absl/log/log.h"
@@ -33,7 +38,6 @@
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
 #include "yggdrasil_decision_forests/dataset/example_writer_interface.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
-#include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/logging.h"

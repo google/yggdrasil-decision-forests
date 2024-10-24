@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-#include <string>
 #include <vector>
 
 #include "gmock/gmock.h"

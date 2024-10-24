@@ -14,9 +14,11 @@
  */
 
 #include "yggdrasil_decision_forests/dataset/example_builder.h"
+#include <cstddef>
 
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 
 namespace yggdrasil_decision_forests::dataset {

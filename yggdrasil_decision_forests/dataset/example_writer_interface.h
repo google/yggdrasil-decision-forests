@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_WRITER_INTERFACE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_EXAMPLE_WRITER_INTERFACE_H_
 
+#include <cstdint>
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
