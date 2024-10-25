@@ -942,6 +942,35 @@ class RandomForestLearnerTest(LearnerTest):
     ).train(create_dataset(1_000))
     _ = model.analyze(create_dataset(100_000))
 
+  def test_boolean_feature(self):
+    data = {
+        "f1": np.array(
+            [True, True, True, True, True, False, False, False, False, False]
+        ),
+        "label": np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1]),
+    }
+    model = specialized_learners.RandomForestLearner(
+        label="label",
+        features=[("f1", dataspec.Semantic.BOOLEAN)],
+        num_trees=1,
+        bootstrap_training_dataset=False,
+    ).train(data)
+    npt.assert_equal(model.predict(data), data["label"])
+
+  def test_fail_gracefully_for_hash_columns(self):
+    data = {
+        "f1": np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+        "label": np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1]),
+    }
+    with self.assertRaisesRegex(
+        test_utils.AbslInvalidArgumentError,
+        "Column f1 has type HASH, which is not supported for decision tree"
+        " training.",
+    ):
+      _ = specialized_learners.RandomForestLearner(
+          label="label", features=[("f1", dataspec.Semantic.HASH)], num_trees=2
+      ).train(data)
+
 
 class CARTLearnerTest(LearnerTest):
 

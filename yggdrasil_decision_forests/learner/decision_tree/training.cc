@@ -4073,6 +4073,23 @@ absl::Status DecisionTreeTrain(
   std::vector<UnsignedExampleIdx> selected_examples_buffer;
   std::vector<UnsignedExampleIdx> leaf_examples_buffer;
 
+  // Fail if the data spec has invalid columns.
+  for (const auto feature_idx : config_link.features()) {
+    const auto& data_spec_columns = train_dataset.data_spec().columns();
+    const auto column_type = data_spec_columns[feature_idx].type();
+    if (column_type != dataset::proto::NUMERICAL &&
+        column_type != dataset::proto::CATEGORICAL &&
+        column_type != dataset::proto::CATEGORICAL_SET &&
+        column_type != dataset::proto::BOOLEAN &&
+        column_type != dataset::proto::DISCRETIZED_NUMERICAL) {
+      return absl::InvalidArgumentError(
+          absl::Substitute("Column $0 has type $1, which is not supported "
+                           "for decision tree training.",
+                           data_spec_columns[feature_idx].name(),
+                           dataset::proto::ColumnType_Name(column_type)));
+    }
+  }
+
   // Check monotonic constraints
   if (config.monotonic_constraints_size() > 0 &&
       !dt_config.keep_non_leaf_label_distribution()) {

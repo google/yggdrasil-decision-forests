@@ -1496,6 +1496,45 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
     ):
       dataset.create_vertical_dataset(pd.DataFrame([[1, 2, 3], [4, 5, 6]]))
 
+  def test_boolean_column(self):
+    data = {
+        "f1": np.array([True, True, True, False, False, False, False]),
+    }
+    ds = dataset.create_vertical_dataset(
+        data,
+        columns=[("f1", dataspec.Semantic.BOOLEAN)],
+    )
+    self.assertEqual(
+        ds.data_spec(),
+        ds_pb.DataSpecification(
+            created_num_rows=7,
+            columns=[
+                ds_pb.Column(
+                    name="f1",
+                    type=ds_pb.ColumnType.BOOLEAN,
+                    count_nas=0,
+                    boolean=ds_pb.BooleanSpec(count_true=3, count_false=4),
+                    dtype=ds_pb.DType.DTYPE_BOOL,
+                )
+            ],
+        ),
+    )
+    self.assertEqual(ds._dataset.DebugString(), "f1\n1\n1\n1\n0\n0\n0\n0\n")
+
+  def test_fail_gracefully_for_incorrect_boolean_type(self):
+    data = {
+        "f1": np.array([1, 1, 1, 1, 1, 0, 0, 0, 0, 0]),
+    }
+    with self.assertRaisesRegex(
+        test_utils.AbslInvalidArgumentError,
+        "Cannot import column 'f1' with semantic=Semantic.BOOLEAN as it does"
+        " not contain boolean values.*",
+    ):
+      dataset.create_vertical_dataset(
+          data,
+          columns=[("f1", dataspec.Semantic.BOOLEAN)],
+      )
+
 
 class CategoricalSetTest(absltest.TestCase):
 

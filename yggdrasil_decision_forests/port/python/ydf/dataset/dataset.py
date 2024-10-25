@@ -142,6 +142,13 @@ class VerticalDataset:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, np.bool_)
       ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+      if column_data.dtype != np.bool_:
+        message = (
+            f"Cannot import column {column.name!r} with"
+            f" semantic={column.semantic} as it does not contain boolean"
+            f" values. Got {original_column_data!r}."
+        )
+        raise ValueError(message)
 
       self._dataset.PopulateColumnBooleanNPBool(
           column.name,
