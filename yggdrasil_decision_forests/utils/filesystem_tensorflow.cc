@@ -15,8 +15,14 @@
 
 #include "yggdrasil_decision_forests/utils/filesystem_tensorflow.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <initializer_list>
 #include <memory>
 #include <regex>  // NOLINT
+#include <string>
+#include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -24,11 +30,14 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "src/google/protobuf/message.h"
+#include "src/google/protobuf/message_lite.h"
+#include "src/google/protobuf/text_format.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/platform/file_system.h"
 #include "tensorflow/core/platform/path.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
-#include "yggdrasil_decision_forests/utils/tensorflow.h"
 
 namespace tensorflow {
 
@@ -45,8 +54,6 @@ WritableFileWrapper::~WritableFileWrapper() {
 }  // namespace tensorflow
 
 namespace file {
-
-using yggdrasil_decision_forests::utils::ToUtilStatus;
 
 std::string JoinPathList(std::initializer_list<absl::string_view> paths) {
   return ::tensorflow::io::internal::JoinPathImpl(paths);
@@ -85,29 +92,26 @@ bool GenerateShardedFilenames(absl::string_view spec,
 
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
                    const int options) {
-  RETURN_IF_ERROR(yggdrasil_decision_forests::utils::ToUtilStatus(
-      tensorflow::Env::Default()->GetMatchingPaths(std::string(pattern),
-                                                   results)));
+  RETURN_IF_ERROR(tensorflow::Env::Default()->GetMatchingPaths(
+      std::string(pattern), results));
   std::sort(results->begin(), results->end());
   return absl::OkStatus();
 }
 
 absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
-  return yggdrasil_decision_forests::utils::ToUtilStatus(
-      tensorflow::Env::Default()->RecursivelyCreateDir(std::string(path)));
+  return tensorflow::Env::Default()->RecursivelyCreateDir(std::string(path));
 }
 
 absl::Status RecursivelyDelete(absl::string_view path, int options) {
   int64_t ignore_1, ignore_2;
-  return yggdrasil_decision_forests::utils::ToUtilStatus(
-      tensorflow::Env::Default()->DeleteRecursively(std::string(path),
-                                                    &ignore_1, &ignore_2));
+  return tensorflow::Env::Default()->DeleteRecursively(std::string(path),
+                                                       &ignore_1, &ignore_2);
 }
 
 absl::Status FileInputByteStream::Open(absl::string_view path) {
   std::unique_ptr<::tensorflow::RandomAccessFile> file;
-  RETURN_IF_ERROR(ToUtilStatus(tensorflow::Env::Default()->NewRandomAccessFile(
-      std::string(path), &file)));
+  RETURN_IF_ERROR(tensorflow::Env::Default()->NewRandomAccessFile(
+      std::string(path), &file));
   file_ =
       std::make_unique<::tensorflow::RandomAccessFileWrapper>(file.release());
   offset_ = 0;
@@ -119,10 +123,10 @@ absl::StatusOr<int> FileInputByteStream::ReadUpTo(char* buffer, int max_read) {
   if (max_read > scrath_.size()) {
     scrath_.resize(max_read);
   }
-  const auto tf_status =
+  const auto status =
       file_->item()->Read(offset_, max_read, &result, &scrath_[0]);
-  if (!tf_status.ok() && tf_status.code() != tensorflow::error::OUT_OF_RANGE) {
-    return ToUtilStatus(tf_status);
+  if (!status.ok() && status.code() != absl::StatusCode::kOutOfRange) {
+    return status;
   }
   offset_ += result.size();
   std::memcpy(buffer, result.data(), result.size());
@@ -135,14 +139,14 @@ absl::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
   if (num_read > scrath_.size()) {
     scrath_.resize(num_read);
   }
-  const auto tf_status =
+  const auto status =
       file_->item()->Read(offset_, num_read, &result, &scrath_[0]);
-  if (!tf_status.ok()) {
-    if (tf_status.code() == tensorflow::error::OUT_OF_RANGE && result.empty() &&
+  if (!status.ok()) {
+    if (status.code() == absl::StatusCode::kOutOfRange && result.empty() &&
         num_read > 0) {
       return false;
     }
-    return ToUtilStatus(tf_status);
+    return status;
   }
   offset_ += result.size();
   std::memcpy(buffer, result.data(), result.size());
@@ -156,19 +160,17 @@ absl::Status FileInputByteStream::Close() {
 
 absl::Status FileOutputByteStream::Open(absl::string_view path) {
   std::unique_ptr<::tensorflow::WritableFile> file;
-  RETURN_IF_ERROR(ToUtilStatus(
-      tensorflow::Env::Default()->NewWritableFile(std::string(path), &file)));
+  RETURN_IF_ERROR(
+      tensorflow::Env::Default()->NewWritableFile(std::string(path), &file));
   file_ = std::make_unique<::tensorflow::WritableFileWrapper>(file.release());
   return absl::OkStatus();
 }
 
 absl::Status FileOutputByteStream::Write(absl::string_view chunk) {
-  return ToUtilStatus(file_->item()->Append(chunk));
+  return file_->item()->Append(chunk);
 }
 
-absl::Status FileOutputByteStream::Close() {
-  return ToUtilStatus(file_->item()->Close());
-}
+absl::Status FileOutputByteStream::Close() { return file_->item()->Close(); }
 
 absl::Status SetBinaryProto(absl::string_view path,
                             const google::protobuf::MessageLite& message, int unused) {
@@ -225,15 +227,15 @@ absl::StatusOr<bool> FileExists(absl::string_view path) {
   if (exist_status.ok()) {
     return true;
   }
-  if (exist_status.code() == tensorflow::error::NOT_FOUND) {
+  if (exist_status.code() == absl::StatusCode::kNotFound) {
     return false;
   }
-  return ToUtilStatus(exist_status);
+  return exist_status;
 }
 
 absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
-  return ToUtilStatus(tensorflow::Env::Default()->RenameFile(std::string(from),
-                                                             std::string(to)));
+  return tensorflow::Env::Default()->RenameFile(std::string(from),
+                                                std::string(to));
 }
 
 std::string GetBasename(absl::string_view path) {

@@ -136,7 +136,6 @@ cc_library_ydf(
         ":compatibility",
         ":logging",
         ":status_macros",
-        ":tensorflow",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/memory",
@@ -211,7 +210,6 @@ cc_library_ydf(
     deps = [
         ":sharded_io",
         ":status_macros",
-        ":tensorflow",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
@@ -670,23 +668,6 @@ cc_library_ydf(
 cc_library_ydf(
     name = "random",
     hdrs = ["random.h"],
-)
-
-cc_library_ydf(
-    name = "tensorflow",
-    hdrs = ["tensorflow.h"],
-    tags = ["tf_dep"],
-    deps = [
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
-    ] + select({
-        "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
-        ],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core/platform:status"],
-    }),
 )
 
 cc_library_ydf(
