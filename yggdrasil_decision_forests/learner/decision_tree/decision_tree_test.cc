@@ -31,6 +31,7 @@
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -81,20 +82,17 @@ struct FakeLabelStats : LabelStats {};
 // A fake consumer that persistently fails to find a valid attribute.
 SplitterWorkResponse FakeFindBestConditionConcurrentConsumerAlwaysInvalid(
     SplitterWorkRequest request) {
-  return SplitterWorkResponse{
-      .manager_data = request.manager_data,
-      .status = SplitSearchResult::kInvalidAttribute,
-  };
+  return SplitterWorkResponse(request.manager_data,
+                              SplitSearchResult::kInvalidAttribute, {});
 }
 
 // A fake consumer that sets the split score to 10 times the request index.
 SplitterWorkResponse FakeFindBestConditionConcurrentConsumerMultiplicative(
     SplitterWorkRequest request) {
-  SplitterWorkResponse response{
-      .manager_data = request.manager_data,
-      .status = SplitSearchResult::kBetterSplitFound,
-  };
-  request.condition->set_split_score(request.attribute_idx * 10.f);
+  SplitterWorkResponse response(request.manager_data,
+                                SplitSearchResult::kBetterSplitFound,
+                                absl::make_unique<proto::NodeCondition>());
+  response.condition->set_split_score(request.attribute_idx * 10.f);
   return response;
 }
 
@@ -102,14 +100,13 @@ SplitterWorkResponse FakeFindBestConditionConcurrentConsumerMultiplicative(
 // 10 times the attribute_idx otherwise.
 SplitterWorkResponse FakeFindBestConditionConcurrentConsumerAlternate(
     SplitterWorkRequest request) {
-  auto response = SplitterWorkResponse{
-      .manager_data = request.manager_data,
-      .status = SplitSearchResult::kBetterSplitFound,
-  };
+  auto response = SplitterWorkResponse(
+      request.manager_data, SplitSearchResult::kBetterSplitFound,
+      absl::make_unique<proto::NodeCondition>());
   if (request.attribute_idx % 2 == 0) {
     response.status = SplitSearchResult::kInvalidAttribute;
   }
-  request.condition->set_split_score(request.attribute_idx * 10.f);
+  response.condition->set_split_score(request.attribute_idx * 10.f);
   return response;
 }
 
@@ -2128,7 +2125,6 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
 
   EXPECT_EQ(cache.splitter_cache_list.size(), 2);
   EXPECT_EQ(cache.durable_response_list.size(), 20);
-  EXPECT_EQ(cache.condition_list.size(), 4);
   EXPECT_FALSE(result);
 }
 
@@ -2264,7 +2260,6 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
 
   EXPECT_EQ(cache.splitter_cache_list.size(), 10);
   EXPECT_EQ(cache.durable_response_list.size(), 100);
-  EXPECT_EQ(cache.condition_list.size(), 20);
   EXPECT_FALSE(result);
 
   random.seed(4321);

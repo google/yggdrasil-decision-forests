@@ -18,6 +18,7 @@
 #include <stddef.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -33,6 +34,7 @@
 
 #include "absl/base/optimization.h"
 #include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -388,7 +390,7 @@ proto::DecisionTreeTrainingConfig::Internal::SortingStrategy EffectiveStrategy(
 
     case proto::DecisionTreeTrainingConfig::Internal::AUTO:
       CHECK(false);  // The AUTO strategy should have been resolved before.
-      [[fallthrough]];
+      break;
     case proto::DecisionTreeTrainingConfig::Internal::PRESORTED: {
       DCHECK(internal_config.preprocessing);
       const auto num_total_examples =
@@ -405,7 +407,7 @@ proto::DecisionTreeTrainingConfig::Internal::SortingStrategy EffectiveStrategy(
 }  // namespace
 
 // Specialization in the case of classification.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionClassification(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -550,7 +552,7 @@ SplitSearchResult FindBestCondition(
   return result;
 }
 
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionRegressionHessianGain(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -750,7 +752,7 @@ SplitSearchResult FindBestCondition(
 }
 
 // Specialization in the case of regression.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionRegression(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -967,7 +969,7 @@ SplitSearchResult FindBestCondition(
 }
 
 // Specialization in the case of uplift with categorical outcome.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionUpliftCategorical(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1038,7 +1040,7 @@ SplitSearchResult FindBestCondition(
 }
 
 // Specialization in the case of uplift with numerical outcome.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionUpliftNumerical(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -1118,16 +1120,19 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
   response.manager_data = request.manager_data;
   request.splitter_cache->random.seed(request.seed);
 
-  if (request.num_oblique_projections_to_run.has_value()) {
+  response.condition = absl::make_unique<proto::NodeCondition>();
+  response.condition->set_split_score(request.best_score);
+
+  if (request.num_oblique_projections_to_run != -1) {
     DCHECK_EQ(request.attribute_idx, -1);
     const auto found_oblique_condition =
         FindBestConditionOblique(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, request.common->label_stats,
-            request.num_oblique_projections_to_run.value(),
-            request.common->constraints, request.condition,
-            &request.splitter_cache->random, request.splitter_cache)
+            request.num_oblique_projections_to_run, request.common->constraints,
+            response.condition.get(), &request.splitter_cache->random,
+            request.splitter_cache)
             .value();
 
     // An oblique split cannot be invalid.
@@ -1143,11 +1148,11 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
           utils::down_cast<const ClassificationLabelStats&>(
               request.common->label_stats);
 
-      response.status = FindBestCondition(
+      response.status = FindBestConditionClassification(
           request.common->train_dataset, request.common->selected_examples,
           weights, config, config_link, dt_config, request.common->parent,
           internal_config, label_stats, request.attribute_idx,
-          request.common->constraints, request.condition,
+          request.common->constraints, response.condition.get(),
           &request.splitter_cache->random, request.splitter_cache);
     } break;
     case model::proto::Task::REGRESSION:
@@ -1156,22 +1161,22 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
             utils::down_cast<const RegressionHessianLabelStats&>(
                 request.common->label_stats);
 
-        response.status = FindBestCondition(
+        response.status = FindBestConditionRegressionHessianGain(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, label_stats, request.attribute_idx,
-            request.common->constraints, request.condition,
+            request.common->constraints, response.condition.get(),
             &request.splitter_cache->random, request.splitter_cache);
 
       } else {
         const auto& label_stats = utils::down_cast<const RegressionLabelStats&>(
             request.common->label_stats);
 
-        response.status = FindBestCondition(
+        response.status = FindBestConditionRegression(
             request.common->train_dataset, request.common->selected_examples,
             weights, config, config_link, dt_config, request.common->parent,
             internal_config, label_stats, request.attribute_idx,
-            request.common->constraints, request.condition,
+            request.common->constraints, response.condition.get(),
             &request.splitter_cache->random, request.splitter_cache);
       }
       break;
@@ -1285,53 +1290,53 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
         const auto& class_label_stats =
             utils::down_cast<const ClassificationLabelStats&>(label_stats);
 
-        result = FindBestCondition(train_dataset, selected_examples, weights,
-                                   config, config_link, dt_config, parent,
-                                   internal_config, class_label_stats,
-                                   attribute_idx, constraints, best_condition,
-                                   random, &cache->splitter_cache_list[0]);
+        result = FindBestConditionClassification(
+            train_dataset, selected_examples, weights, config, config_link,
+            dt_config, parent, internal_config, class_label_stats,
+            attribute_idx, constraints, best_condition, random,
+            &cache->splitter_cache_list[0]);
       } break;
       case model::proto::Task::REGRESSION:
         if (internal_config.hessian_score) {
           const auto& reg_label_stats =
               utils::down_cast<const RegressionHessianLabelStats&>(label_stats);
 
-          result = FindBestCondition(train_dataset, selected_examples, weights,
-                                     config, config_link, dt_config, parent,
-                                     internal_config, reg_label_stats,
-                                     attribute_idx, constraints, best_condition,
-                                     random, &cache->splitter_cache_list[0]);
+          result = FindBestConditionRegressionHessianGain(
+              train_dataset, selected_examples, weights, config, config_link,
+              dt_config, parent, internal_config, reg_label_stats,
+              attribute_idx, constraints, best_condition, random,
+              &cache->splitter_cache_list[0]);
 
         } else {
           const auto& reg_label_stats =
               utils::down_cast<const RegressionLabelStats&>(label_stats);
 
-          result = FindBestCondition(train_dataset, selected_examples, weights,
-                                     config, config_link, dt_config, parent,
-                                     internal_config, reg_label_stats,
-                                     attribute_idx, constraints, best_condition,
-                                     random, &cache->splitter_cache_list[0]);
+          result = FindBestConditionRegression(
+              train_dataset, selected_examples, weights, config, config_link,
+              dt_config, parent, internal_config, reg_label_stats,
+              attribute_idx, constraints, best_condition, random,
+              &cache->splitter_cache_list[0]);
         }
         break;
 
       case model::proto::Task::CATEGORICAL_UPLIFT: {
         const auto& uplift_label_stats =
             utils::down_cast<const CategoricalUpliftLabelStats&>(label_stats);
-        result = FindBestCondition(train_dataset, selected_examples, weights,
-                                   config, config_link, dt_config, parent,
-                                   internal_config, uplift_label_stats,
-                                   attribute_idx, constraints, best_condition,
-                                   random, &cache->splitter_cache_list[0]);
+        result = FindBestConditionUpliftCategorical(
+            train_dataset, selected_examples, weights, config, config_link,
+            dt_config, parent, internal_config, uplift_label_stats,
+            attribute_idx, constraints, best_condition, random,
+            &cache->splitter_cache_list[0]);
       } break;
 
       case model::proto::Task::NUMERICAL_UPLIFT: {
         const auto& uplift_label_stats =
             utils::down_cast<const NumericalUpliftLabelStats&>(label_stats);
-        result = FindBestCondition(train_dataset, selected_examples, weights,
-                                   config, config_link, dt_config, parent,
-                                   internal_config, uplift_label_stats,
-                                   attribute_idx, constraints, best_condition,
-                                   random, &cache->splitter_cache_list[0]);
+        result = FindBestConditionUpliftNumerical(
+            train_dataset, selected_examples, weights, config, config_link,
+            dt_config, parent, internal_config, uplift_label_stats,
+            attribute_idx, constraints, best_condition, random,
+            &cache->splitter_cache_list[0]);
       } break;
 
       default:
@@ -1390,13 +1395,13 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   //
   // Note that next_job_to_process < next_job_to_schedule always holds.
 
-  int num_threads = splitter_concurrency_setup.num_threads;
-  int num_features = config_link.features().size();
+  const int num_threads = splitter_concurrency_setup.num_threads;
 
-  if (num_features == 0) {
+  if (config_link.features().empty()) {
     return false;
   }
 
+  // Constant and static part of the requests.
   SplitterWorkRequestCommon common{
       .train_dataset = train_dataset,
       .selected_examples = selected_examples,
@@ -1407,57 +1412,71 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
 
   // Computes the number of oblique projections to evaluate and how to group
   // them into requests.
-  bool oblique = false;
   int num_oblique_jobs = 0;
-  int num_oblique_projections = 0;
-  if (dt_config.split_axis_case() ==
-      proto::DecisionTreeTrainingConfig::kSparseObliqueSplit) {
-    num_oblique_projections =
-        GetNumProjections(dt_config, config_link.numerical_features_size());
+  int num_oblique_projections;
+  int num_oblique_projections_per_oblique_job;
 
-    // Arbitrary minimum number of oblique projections to test in each job.
-    // Because oblique jobs are expensive (more than non oblique jobs), it is
-    // not efficient to create a request with too little work to do.
-    //
-    // In most real cases, this parameter does not matter as the limit is
-    // effectively constraint by the number of threads.
-    const int min_projections_per_request = 10;
+  if (config_link.numerical_features_size() > 0) {
+    if (dt_config.split_axis_case() ==
+        proto::DecisionTreeTrainingConfig::kSparseObliqueSplit) {
+      num_oblique_projections =
+          GetNumProjections(dt_config, config_link.numerical_features_size());
 
-    DCHECK_GE(num_threads, 1);
-    num_oblique_jobs = std::min(num_threads, (num_oblique_projections +
-                                              min_projections_per_request - 1) /
-                                                 min_projections_per_request);
-    oblique = num_oblique_projections > 0;
-  } else if (config_link.numerical_features_size() > 0 &&
-             dt_config.split_axis_case() ==
-                 proto::DecisionTreeTrainingConfig::kMhldObliqueSplit) {
-    num_oblique_projections = 1;
-    num_oblique_jobs = 1;
-    oblique = true;
+      if (num_oblique_projections > 0) {
+        // Arbitrary minimum number of oblique projections to test in each job.
+        // Because oblique jobs are expensive (more than non oblique jobs), it
+        // is not efficient to create a request with too little work to do.
+        //
+        // In most real cases, this parameter does not matter as the limit is
+        // effectively constraint by the number of threads.
+        const int min_projections_per_request = 10;
+
+        DCHECK_GE(num_threads, 1);
+        num_oblique_jobs = std::min(
+            num_threads,
+            (num_oblique_projections + min_projections_per_request - 1) /
+                min_projections_per_request);
+        num_oblique_projections_per_oblique_job =
+            (num_oblique_projections + num_oblique_jobs - 1) / num_oblique_jobs;
+      }
+    } else if (dt_config.split_axis_case() ==
+               proto::DecisionTreeTrainingConfig::kMhldObliqueSplit) {
+      num_oblique_projections = 1;
+      num_oblique_projections_per_oblique_job = 1;
+      num_oblique_jobs = 1;
+    }
   }
 
   // Prepare caches.
   cache->splitter_cache_list.resize(num_threads);
-  cache->condition_list.resize(num_threads * kConditionPoolGrowthFactor);
-  const int num_jobs = num_features + num_oblique_jobs;
-  cache->durable_response_list.resize(num_jobs);
 
   // Get the ordered indices of the attributes to test.
   int min_num_jobs_to_test;
   std::vector<int32_t>& candidate_attributes = cache->candidate_attributes;
   GetCandidateAttributes(config, config_link, dt_config, &min_num_jobs_to_test,
                          &candidate_attributes, random);
-  // All the oblique requests need to be tested.
+
+  const int num_jobs = candidate_attributes.size() + num_oblique_jobs;
+  // All the oblique jobs need to be done.
+  // Note: When do look for oblique splits, we also run the classical numerical
+  // splitter.
   min_num_jobs_to_test += num_oblique_jobs;
 
-  // Marks all the caches and conditions as "available".
-  cache->available_cache_idxs.fill_iota(cache->splitter_cache_list.size(), 0);
-  cache->available_condition_idxs.fill_iota(cache->condition_list.size(), 0);
+  cache->durable_response_list.resize(num_jobs);
+
+  // Marks all the caches "available".
+  cache->available_cache_idxs.resize(cache->splitter_cache_list.size());
+  std::iota(cache->available_cache_idxs.begin(),
+            cache->available_cache_idxs.end(), 0);
 
   // Marks all the duration responses as "non set".
   for (auto& s : cache->durable_response_list) {
     s.set = false;
   }
+
+  // Score and value of the best found condition.
+  std::atomic<float> best_split_score = best_condition->split_score();
+  std::unique_ptr<proto::NodeCondition> best_condition_ptr;
 
   // Get Channel readers and writers.
   auto& processor = *splitter_concurrency_setup.split_finder_processor;
@@ -1469,78 +1488,64 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   // If attribute_idx is == -1 and num_oblique_projections_to_run != -1, create
   // a request for an oblique split.
   //
-  auto produce =
-      [&](const int job_idx, const float best_score, const int attribute_idx,
+  auto build_request =
+      [&](const int job_idx, const int attribute_idx,
           const int num_oblique_projections_to_run) -> SplitterWorkRequest {
-    // Get a cache and a condition.
+    DCHECK_NE(attribute_idx != -1, num_oblique_projections_to_run != -1);
     DCHECK(!cache->available_cache_idxs.empty());
-    DCHECK(!cache->available_condition_idxs.empty());
-    int32_t cache_idx = cache->available_cache_idxs.back();
+    const int32_t cache_idx = cache->available_cache_idxs.back();
     cache->available_cache_idxs.pop_back();
-    int32_t condition_idx = cache->available_condition_idxs.back();
-    DCHECK_GE(condition_idx, -1);
-    cache->available_condition_idxs.pop_back();
-
-    SplitterWorkRequest request;
-    request.manager_data.condition_idx = condition_idx;
-    request.manager_data.cache_idx = cache_idx;
-    request.manager_data.job_idx = job_idx;
-    DCHECK((attribute_idx == -1) != (num_oblique_projections_to_run == -1));
-    if (attribute_idx != -1) {
-      request.attribute_idx = attribute_idx;
-    } else {
-      request.num_oblique_projections_to_run = num_oblique_projections_to_run;
-      request.attribute_idx = -1;
-    }
-    request.condition = &cache->condition_list[condition_idx];
-    request.splitter_cache = &cache->splitter_cache_list[cache_idx];
-    request.condition->set_split_score(best_score);  // Best score so far.
-    request.common = &common;
-    request.seed = (*random)();  // Create a new seed.
-
-    return request;
+    return SplitterWorkRequest(
+        /*manager_data=*/
+        {
+            .cache_idx = cache_idx,
+            .job_idx = job_idx,
+        },
+        /*best_score=*/best_split_score,
+        /*attribute_idx=*/attribute_idx,
+        /*splitter_cache=*/&cache->splitter_cache_list[cache_idx],
+        /*common=*/&common,
+        /*seed=*/(*random)(),
+        /*num_oblique_projections_to_run=*/num_oblique_projections_to_run);
   };
 
   // Schedule all the oblique jobs.
   int next_job_to_schedule = 0;
-  if (oblique) {
-    const int num_oblique_projections_per_job =
-        (num_oblique_projections + num_oblique_jobs - 1) / num_oblique_jobs;
-
-    for (int oblique_job_idx = 0; oblique_job_idx < num_oblique_jobs;
-         oblique_job_idx++) {
-      const int num_projections_in_request =
-          std::min((oblique_job_idx + 1) * num_oblique_projections_per_job,
-                   num_oblique_projections) -
-          oblique_job_idx * num_oblique_projections_per_job;
-      processor.Submit(produce(
-          next_job_to_schedule++, best_condition->split_score(),
-          /*attribute_idx=*/-1,
-          /*num_oblique_projections_to_run=*/num_projections_in_request));
+  for (int oblique_job_idx = 0; oblique_job_idx < num_oblique_jobs;
+       oblique_job_idx++) {
+    int num_projections_in_request;
+    if (oblique_job_idx == num_oblique_jobs - 1) {
+      num_projections_in_request =
+          num_oblique_projections -
+          oblique_job_idx * num_oblique_projections_per_oblique_job;
+    } else {
+      num_projections_in_request = num_oblique_projections_per_oblique_job;
     }
+
+    processor.Submit(build_request(
+        next_job_to_schedule++,
+        /*attribute_idx=*/-1,
+        /*num_oblique_projections_to_run=*/num_projections_in_request));
   }
 
-  // Schedule some non-oblique jobs.
+  // Schedule some non-oblique jobs if threads are still available.
   while (next_job_to_schedule < std::min(num_threads, num_jobs) &&
-         !cache->available_condition_idxs.empty() &&
          !cache->available_cache_idxs.empty()) {
+    DCHECK_GE(next_job_to_schedule, num_oblique_jobs);
     const int attribute_idx =
         candidate_attributes[next_job_to_schedule - num_oblique_jobs];
-    processor.Submit(produce(next_job_to_schedule++,
-                             best_condition->split_score(),
-                             /*attribute_idx=*/attribute_idx,
-                             /*num_oblique_projections_to_run=*/-1));
+
+    processor.Submit(build_request(next_job_to_schedule,
+                                   /*attribute_idx=*/attribute_idx,
+                                   /*num_oblique_projections_to_run=*/-1));
+    next_job_to_schedule++;
   }
 
   int num_valid_job_tested = 0;
   int next_job_to_process = 0;
 
-  // Index of the best condition. -1 if not better condition was found.
-  int best_condition_idx = -1;
-  // Score of the best found condition, or minimum condition score to look for.
-  float best_split_score = best_condition->split_score();
-
   while (true) {
+    // Get a new result from a worker splitter.
     auto maybe_response = processor.GetResult();
     if (!maybe_response.has_value()) {
       break;
@@ -1551,73 +1556,36 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
       SplitterWorkResponse& response = maybe_response.value();
 
       // Release the cache immediately to be reused by other workers.
-      cache->available_cache_idxs.push_front(response.manager_data.cache_idx);
+      cache->available_cache_idxs.push_back(response.manager_data.cache_idx);
 
+      // Record response for further processing.
       auto& durable_response =
           cache->durable_response_list[response.manager_data.job_idx];
       durable_response.status = response.status;
       durable_response.set = true;
       if (response.status == SplitSearchResult::kBetterSplitFound) {
-        // The worker found a better solution compared from when the worker
-        // started working.
-
-        const float new_split_score =
-            cache->condition_list[response.manager_data.condition_idx]
-                .split_score();
-
-        if ((new_split_score > best_split_score) ||
-            (new_split_score == best_split_score &&
-             response.manager_data.condition_idx <
-                 durable_response.condition_idx)) {
-          // This is the best condition so far. Keep it for processing.
-          durable_response.condition_idx = response.manager_data.condition_idx;
-        } else {
-          // Acctually, a better condition was found by another worker and
-          // processed in the mean time. No need to keep the condition.
-          cache->available_condition_idxs.push_front(
-              response.manager_data.condition_idx);
-          durable_response.condition_idx = -1;
-          durable_response.status = SplitSearchResult::kNoBetterSplitFound;
-        }
-      } else {
-        // Return the condition to the condition pool.
-        cache->available_condition_idxs.push_front(
-            response.manager_data.condition_idx);
-        durable_response.condition_idx = -1;
+        // The worker found a potentially better solution.
+        durable_response.condition = std::move(response.condition);
       }
     }
 
-    // Process all the responses that can be processed.
-    // Simulate a deterministic sequential processing of the responses.
+    // Process new responses that can be processed.
     while (next_job_to_process < next_job_to_schedule &&
            num_valid_job_tested < min_num_jobs_to_test &&
            cache->durable_response_list[next_job_to_process].set) {
+      // Something to process.
       auto durable_response =
           &cache->durable_response_list[next_job_to_process];
       next_job_to_process++;
 
-      if (durable_response->status == SplitSearchResult::kNoBetterSplitFound) {
-        // Even if no better split was found, this is still a valid job.
+      if (durable_response->status != SplitSearchResult::kInvalidAttribute) {
         num_valid_job_tested++;
-      } else if (durable_response->status ==
-                 SplitSearchResult::kBetterSplitFound) {
-        num_valid_job_tested++;
-        DCHECK_NE(durable_response->condition_idx, -1);
-
-        const float process_split_score =
-            cache->condition_list[durable_response->condition_idx]
-                .split_score();
-
-        if (process_split_score > best_split_score) {
-          if (best_condition_idx != -1) {
-            cache->available_condition_idxs.push_front(best_condition_idx);
-          }
-          best_condition_idx = durable_response->condition_idx;
-          best_split_score = process_split_score;
-        } else {
-          // Return the condition to the condition pool.
-          cache->available_condition_idxs.push_front(
-              durable_response->condition_idx);
+      }
+      if (durable_response->status == SplitSearchResult::kBetterSplitFound) {
+        const float split_score = durable_response->condition->split_score();
+        if (split_score > best_split_score) {
+          best_condition_ptr = std::move(durable_response->condition);
+          best_split_score = split_score;
         }
       }
     }
@@ -1627,40 +1595,38 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
       break;
     }
 
-    // Schedule the testing of more conditions.
-
-    while (!cache->available_condition_idxs.empty() &&
-           !cache->available_cache_idxs.empty() &&
-           next_job_to_schedule < num_jobs) {
-      const int attribute_idx =
-          candidate_attributes[next_job_to_schedule - num_oblique_jobs];
-      processor.Submit(produce(next_job_to_schedule++, best_split_score,
-                               /*attribute_idx=*/attribute_idx,
-                               /*num_oblique_projections_to_run=*/-1));
+    if (next_job_to_process >= num_jobs) {
+      // We have processed all the jobs.
+      break;
     }
 
-    // The following condition means that no work is in the pipeline and no more
-    // work will be generated.
-    if (cache->available_cache_idxs.full()) {
-      break;
+    // Schedule the testing of more conditions.
+    while (!cache->available_cache_idxs.empty() &&
+           next_job_to_schedule < num_jobs) {
+      processor.Submit(build_request(
+          next_job_to_schedule,
+          /*attribute_idx=*/
+          candidate_attributes[next_job_to_schedule - num_oblique_jobs],
+          /*num_oblique_projections_to_run=*/-1));
+      next_job_to_schedule++;
     }
   }
 
   // Drain the response channel.
-  while (!cache->available_cache_idxs.full()) {
+  while (cache->available_cache_idxs.size() < num_threads) {
     auto maybe_response = processor.GetResult();
     if (!maybe_response.has_value()) {
       break;
     }
     SplitterWorkResponse& response = maybe_response.value();
-    cache->available_cache_idxs.push_front(response.manager_data.cache_idx);
+    cache->available_cache_idxs.push_back(response.manager_data.cache_idx);
   }
 
-  // Move the random generator state to facilitate deterministic behavior.
+  // Move the random generator state to make the behavior deterministic.
   random->discard(num_jobs - next_job_to_schedule);
 
-  if (best_condition_idx != -1) {
-    *best_condition = cache->condition_list[best_condition_idx];
+  if (best_condition_ptr) {
+    *best_condition = std::move(*best_condition_ptr);
     return true;
   }
   return false;
@@ -1679,19 +1645,20 @@ absl::StatusOr<bool> FindBestConditionManager(
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     PerThreadCache* cache) {
   if (splitter_concurrency_setup.concurrent_execution) {
+    // Multi-thread.
     return FindBestConditionConcurrentManager(
         train_dataset, selected_examples, weights, config, config_link,
         dt_config, splitter_concurrency_setup, parent, internal_config,
         label_stats, constraints, best_condition, random, cache);
   }
+
+  // Single thread.
   return FindBestConditionSingleThreadManager(
       train_dataset, selected_examples, weights, config, config_link, dt_config,
       parent, internal_config, label_stats, constraints, best_condition, random,
       cache);
 }
 
-// This is the entry point when searching for a condition.
-// All other "FindBestCondition*" functions are called by this one.
 absl::StatusOr<bool> FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -1706,13 +1673,11 @@ absl::StatusOr<bool> FindBestCondition(
   switch (config.task()) {
     case model::proto::Task::CLASSIFICATION: {
       STATUS_CHECK(!internal_config.hessian_score);
-      ClassificationLabelStats label_stat(
-          train_dataset
-              .ColumnWithCastWithStatus<
-                  dataset::VerticalDataset::CategoricalColumn>(
-                  config_link.label())
-              .value()
-              ->values());
+      ASSIGN_OR_RETURN(const auto labels,
+                       train_dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(
+                           config_link.label()));
+      ClassificationLabelStats label_stat(labels->values());
 
       const auto& label_column_spec =
           train_dataset.data_spec().columns(config_link.label());
@@ -1737,25 +1702,23 @@ absl::StatusOr<bool> FindBestCondition(
 
     case model::proto::Task::REGRESSION: {
       if (internal_config.hessian_score) {
-        DCHECK_NE(internal_config.gradient_col_idx, -1);
-        DCHECK_NE(internal_config.hessian_col_idx, -1);
+        STATUS_CHECK_NE(internal_config.gradient_col_idx, -1);
+        STATUS_CHECK_NE(internal_config.hessian_col_idx, -1);
+        STATUS_CHECK_EQ(internal_config.gradient_col_idx, config_link.label());
 
-        DCHECK_EQ(internal_config.gradient_col_idx, config_link.label());
-        RegressionHessianLabelStats label_stat(
-            train_dataset
-                .ColumnWithCastWithStatus<
-                    dataset::VerticalDataset::NumericalColumn>(
-                    internal_config.gradient_col_idx)
-                .value()
-                ->values(),
-            train_dataset
-                .ColumnWithCastWithStatus<
-                    dataset::VerticalDataset::NumericalColumn>(
-                    internal_config.hessian_col_idx)
-                .value()
-                ->values());
+        ASSIGN_OR_RETURN(const auto gradients,
+                         train_dataset.ColumnWithCastWithStatus<
+                             dataset::VerticalDataset::NumericalColumn>(
+                             internal_config.gradient_col_idx));
+        ASSIGN_OR_RETURN(const auto hessians,
+                         train_dataset.ColumnWithCastWithStatus<
+                             dataset::VerticalDataset::NumericalColumn>(
+                             internal_config.hessian_col_idx));
 
-        DCHECK(parent.regressor().has_sum_gradients());
+        RegressionHessianLabelStats label_stat(gradients->values(),
+                                               hessians->values());
+
+        STATUS_CHECK(parent.regressor().has_sum_gradients());
         label_stat.sum_gradient = parent.regressor().sum_gradients();
         label_stat.sum_hessian = parent.regressor().sum_hessians();
         label_stat.sum_weights = parent.regressor().sum_weights();
@@ -1765,15 +1728,13 @@ absl::StatusOr<bool> FindBestCondition(
             dt_config, splitter_concurrency_setup, parent, internal_config,
             label_stat, constraints, best_condition, random, cache);
       } else {
-        RegressionLabelStats label_stat(
-            train_dataset
-                .ColumnWithCastWithStatus<
-                    dataset::VerticalDataset::NumericalColumn>(
-                    config_link.label())
-                .value()
-                ->values());
+        ASSIGN_OR_RETURN(const auto labels,
+                         train_dataset.ColumnWithCastWithStatus<
+                             dataset::VerticalDataset::NumericalColumn>(
+                             config_link.label()));
+        RegressionLabelStats label_stat(labels->values());
 
-        DCHECK(parent.regressor().has_distribution());
+        STATUS_CHECK(parent.regressor().has_distribution());
         label_stat.label_distribution.Load(parent.regressor().distribution());
 
         return FindBestConditionManager(
@@ -1790,20 +1751,20 @@ absl::StatusOr<bool> FindBestCondition(
       const auto& treatment_spec =
           train_dataset.data_spec().columns(config_link.uplift_treatment());
 
+      ASSIGN_OR_RETURN(const auto labels,
+                       train_dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(
+                           config_link.label()));
+
+      ASSIGN_OR_RETURN(const auto treatments,
+                       train_dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(
+                           config_link.uplift_treatment()));
+
       CategoricalUpliftLabelStats label_stat(
-          train_dataset
-              .ColumnWithCastWithStatus<
-                  dataset::VerticalDataset::CategoricalColumn>(
-                  config_link.label())
-              .value()
-              ->values(),
+          labels->values(),
           outcome_spec.categorical().number_of_unique_values(),
-          train_dataset
-              .ColumnWithCastWithStatus<
-                  dataset::VerticalDataset::CategoricalColumn>(
-                  config_link.uplift_treatment())
-              .value()
-              ->values(),
+          treatments->values(),
           treatment_spec.categorical().number_of_unique_values());
 
       UpliftLeafToLabelDist(parent.uplift(), &label_stat.label_distribution);
@@ -1819,15 +1780,18 @@ absl::StatusOr<bool> FindBestCondition(
       const auto& treatment_spec =
           train_dataset.data_spec().columns(config_link.uplift_treatment());
 
+      ASSIGN_OR_RETURN(
+          const auto labels,
+          train_dataset.ColumnWithCastWithStatus<
+              dataset::VerticalDataset::NumericalColumn>(config_link.label()));
+
+      ASSIGN_OR_RETURN(const auto treatments,
+                       train_dataset.ColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(
+                           config_link.uplift_treatment()));
+
       NumericalUpliftLabelStats label_stat(
-          train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
-                  config_link.label())
-              ->values(),
-          train_dataset
-              .ColumnWithCast<dataset::VerticalDataset::CategoricalColumn>(
-                  config_link.uplift_treatment())
-              ->values(),
+          labels->values(), treatments->values(),
           treatment_spec.categorical().number_of_unique_values());
 
       UpliftLeafToLabelDist(parent.uplift(), &label_stat.label_distribution);
@@ -4148,20 +4112,35 @@ absl::Status DecisionTreeTrain(
     splitter_concurrency_setup.num_threads = internal_config.num_threads;
   }
 
-  splitter_concurrency_setup.split_finder_processor =
-      std::make_unique<SplitterFinderStreamProcessor>(
-          "SplitFinder", internal_config.num_threads,
-          [&](SplitterWorkRequest request) -> SplitterWorkResponse {
-            return FindBestConditionFromSplitterWorkRequest(
-                weights, config, config_link, dt_config,
-                splitter_concurrency_setup, internal_config, request);
-          });
-  splitter_concurrency_setup.split_finder_processor->StartWorkers();
+  RETURN_IF_ERROR(FindBestConditionStartWorkers(config, config_link, dt_config,
+                                                internal_config, weights,
+                                                &splitter_concurrency_setup));
 
   return DecisionTreeCoreTrain(train_dataset, *effective_selected_examples,
                                leaf_examples, config, config_link, dt_config,
                                deployment, splitter_concurrency_setup, weights,
                                random, internal_config, dt);
+}
+
+absl::Status FindBestConditionStartWorkers(
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const InternalTrainConfig& internal_config,
+    const std::vector<float>& weights,
+    SplitterConcurrencySetup* splitter_concurrency_setup) {
+  auto find_condition =
+      [&](SplitterWorkRequest request) -> SplitterWorkResponse {
+    return FindBestConditionFromSplitterWorkRequest(
+        weights, config, config_link, dt_config, *splitter_concurrency_setup,
+        internal_config, request);
+  };
+  splitter_concurrency_setup->split_finder_processor =
+      std::make_unique<SplitterFinderStreamProcessor>(
+          "SplitFinder", splitter_concurrency_setup->num_threads,
+          find_condition);
+  splitter_concurrency_setup->split_finder_processor->StartWorkers();
+  return absl::OkStatus();
 }
 
 absl::Status DecisionTreeCoreTrain(

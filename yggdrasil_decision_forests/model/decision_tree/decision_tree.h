@@ -47,13 +47,6 @@ namespace decision_tree {
 
 using row_t = dataset::VerticalDataset::row_t;
 
-// The total number of "conditions" allocated in PerThreadCache.condition_list
-// is equal to the number of threads times this factor.
-//
-// A larger value might increase the memory usage while a lower value might slow
-// down the training."
-constexpr int32_t kConditionPoolGrowthFactor = 2;
-
 // Variable importance names to be used for all decision tree based model.
 static constexpr char kVariableImportanceNumberOfNodes[] = "NUM_NODES";
 static constexpr char kVariableImportanceNumberOfTimesAsRoot[] = "NUM_AS_ROOT";

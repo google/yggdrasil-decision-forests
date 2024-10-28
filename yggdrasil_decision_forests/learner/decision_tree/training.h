@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_TRAINING_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_TRAINING_H_
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -38,7 +39,6 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/circular_buffer.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -104,8 +104,6 @@ struct SplitterWorkRequestCommon {
 // Data packed with the work request that can be used by the manager to pass
 // information to itself.
 struct SplitterWorkManagerData {
-  // Index of the condition in the condition pool.
-  int condition_idx;
   //  Index of the condition in the cache pool.
   int cache_idx;
   // Index of the job.
@@ -117,10 +115,11 @@ struct SplitterWorkManagerData {
 struct SplitterWorkRequest {
   SplitterWorkManagerData manager_data;
 
+  std::atomic<float>& best_score;
+
   // The attribute index to pass onto splitters.
   int attribute_idx;
-  // Non-owning pointer to a "condition" in PerThreadCache.condition_list.
-  proto::NodeCondition* condition;
+
   // Non-owning pointer to an entry in PerThreadCache.splitter_cache_list.
   SplitterPerThreadCache* splitter_cache;
 
@@ -128,9 +127,28 @@ struct SplitterWorkRequest {
   SplitterWorkRequestCommon* common;
   // Seed used to initialize the random generator.
   utils::RandomEngine::result_type seed;
-  // If set, search for oblique split. In this case "attribute_idx" should be
+  // If not -1, search for oblique split. In this case "attribute_idx" should be
   // -1.
-  std::optional<int> num_oblique_projections_to_run;
+  int num_oblique_projections_to_run;
+
+  // Copy is not allowed.
+  SplitterWorkRequest(SplitterWorkManagerData manager_data,
+                      std::atomic<float>& best_score, int attribute_idx,
+                      SplitterPerThreadCache* splitter_cache,
+                      SplitterWorkRequestCommon* common,
+                      utils::RandomEngine::result_type seed,
+                      int num_oblique_projections_to_run)
+      : manager_data(manager_data),
+        best_score(best_score),
+        attribute_idx(attribute_idx),
+        splitter_cache(splitter_cache),
+        common(common),
+        seed(seed),
+        num_oblique_projections_to_run(num_oblique_projections_to_run) {}
+  SplitterWorkRequest(const SplitterWorkRequest&) = delete;
+  SplitterWorkRequest& operator=(const SplitterWorkRequest&) = delete;
+  SplitterWorkRequest(SplitterWorkRequest&&) = default;
+  SplitterWorkRequest& operator=(SplitterWorkRequest&&) = default;
 };
 
 // Contains the result of a splitter.
@@ -139,6 +157,21 @@ struct SplitterWorkResponse {
 
   // The status returned by a splitter.
   SplitSearchResult status;
+
+  std::unique_ptr<proto::NodeCondition> condition;
+
+  // Copy is not allowed.
+  SplitterWorkResponse() = default;
+  SplitterWorkResponse(SplitterWorkManagerData manager_data,
+                       SplitSearchResult status,
+                       std::unique_ptr<proto::NodeCondition> condition)
+      : manager_data(manager_data),
+        status(status),
+        condition(std::move(condition)) {}
+  SplitterWorkResponse(const SplitterWorkResponse&) = delete;
+  SplitterWorkResponse& operator=(const SplitterWorkResponse&) = delete;
+  SplitterWorkResponse(SplitterWorkResponse&&) = default;
+  SplitterWorkResponse& operator=(SplitterWorkResponse&&) = default;
 };
 
 using SplitterFinderStreamProcessor =
@@ -149,8 +182,7 @@ using SplitterFinderStreamProcessor =
 // Part of the worker response (SplitterWorkResponse) that need to be kept in
 // order to simulate sequential feature splitting.
 struct SplitterWorkDurableResponse {
-  // Index of the condition if status==kBetterSplitFound.
-  int condition_idx;
+  std::unique_ptr<proto::NodeCondition> condition;
 
   // The status returned by a splitter.
   SplitSearchResult status;
@@ -189,12 +221,9 @@ struct PerThreadCache {
   // A set of objects that are used by FindBestCondition.
   std::vector<SplitterPerThreadCache> splitter_cache_list;
   std::vector<SplitterWorkDurableResponse> durable_response_list;
-  std::vector<proto::NodeCondition> condition_list;
 
   // List of available indices into splitter_cache_list.
-  utils::CircularBuffer<int32_t> available_cache_idxs;
-  // List of available indices into condition_list.
-  utils::CircularBuffer<int32_t> available_condition_idxs;
+  std::vector<int32_t> available_cache_idxs;
 };
 
 // In a concurrent setup, this structure encapsulates all the objects that are
@@ -215,10 +244,12 @@ typedef std::function<absl::Status(const decision_tree::proto::LabelStatistics&,
                                    decision_tree::proto::Node*)>
     SetLeafValueFromLabelStatsFunctor;
 
-// Find the best condition for this node. Return true iff a good condition has
-// been found.
-// This is the entry point when searching for a condition.
-// All other "FindBestCondition*" functions are called by this one.
+// Find the best condition for a leaf node. Return true if a condition better
+// than the one initially in `best_condition` was found. If `best_condition` is
+// a newly created object, return true if a condition was found (since
+// `best_condition` does not yet define a condition).
+//
+// This is the entry point / main function to call to find a condition.
 absl::StatusOr<bool> FindBestCondition(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -231,8 +262,11 @@ absl::StatusOr<bool> FindBestCondition(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, PerThreadCache* cache);
 
-// Contains logic to switch between a single-threaded splitter and a concurrent
-// implementation.
+// Following are the method to handle multithreading in FindBestCondition.
+// =============================================================================
+
+// Dispatches the condition search to either single thread or multithread
+// computation.
 absl::StatusOr<bool> FindBestConditionManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -246,8 +280,7 @@ absl::StatusOr<bool> FindBestConditionManager(
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     PerThreadCache* cache);
 
-// This is an implementation of FindBestConditionManager that is optimized for
-// execution in a single thread.
+// Single thread search for conditions.
 absl::StatusOr<bool> FindBestConditionSingleThreadManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -260,7 +293,7 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     PerThreadCache* cache);
 
-// This is a concurrent implementation of FindBestConditionManager.
+// Multi-thread search for conditions.
 absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
@@ -273,6 +306,15 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const LabelStats& label_stats, const NodeConstraints& constraints,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     PerThreadCache* cache);
+
+// Starts the worker threads needed for "FindBestConditionConcurrentManager".
+absl::Status FindBestConditionStartWorkers(
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const InternalTrainConfig& internal_config,
+    const std::vector<float>& weights,
+    SplitterConcurrencySetup* splitter_concurrency_setup);
 
 // A worker that receives splitter work requests and dispatches those to the
 // right specialized splitter function.
@@ -287,8 +329,10 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
     const InternalTrainConfig& internal_config,
     const SplitterWorkRequest& request);
 
-// Specialization in the case of classification.
-SplitSearchResult FindBestCondition(
+// Following are the "FindBestCondition" specialized for specific tasks.
+// =============================================================================
+
+SplitSearchResult FindBestConditionClassification(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -300,8 +344,7 @@ SplitSearchResult FindBestCondition(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-// Specialization in the case of regression.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionRegression(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -313,8 +356,7 @@ SplitSearchResult FindBestCondition(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-// Specialization in the case of regression with hessian gain.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionRegressionHessianGain(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -326,8 +368,7 @@ SplitSearchResult FindBestCondition(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-// Specialization in the case of uplift with categorical outcome.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionUpliftCategorical(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -339,8 +380,7 @@ SplitSearchResult FindBestCondition(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-// Specialization in the case of uplift with numerical outcome.
-SplitSearchResult FindBestCondition(
+SplitSearchResult FindBestConditionUpliftNumerical(
     const dataset::VerticalDataset& train_dataset,
     const std::vector<UnsignedExampleIdx>& selected_examples,
     const std::vector<float>& weights,
@@ -352,8 +392,13 @@ SplitSearchResult FindBestCondition(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-// Following are the split finder functions. Their name follow the patter:
+// Following are the "FindBestCondition" specialized for both a task (i.e. label
+// semantic) and feature semantic. The function names follow the pattern:
 // FindSplitLabel{label_type}Feature{feature_type}{algorithm_name}.
+//
+// Some splitters are only specialized on the feature, but not one the label
+// typee (e.g. "FindBestConditionOblique";
+// =============================================================================
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
 // missing") for classification.
@@ -362,10 +407,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
     const std::vector<float>& weights,
     const dataset::VerticalDataset::AbstractColumn* attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
-    const UnsignedExampleIdx min_num_obs,
+    UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
-    const int32_t attribute_idx, proto::NodeCondition* condition,
+    int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
@@ -762,6 +807,9 @@ absl::StatusOr<bool> FindBestConditionOblique(
     const std::optional<int>& override_num_projections,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
+
+// End of the FindBestCondition specialization.
+// =============================================================================
 
 // Returns the number of attributes to test ("num_attributes_to_test") and a
 // list of candidate attributes to test in order ("candidate_attributes").
