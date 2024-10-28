@@ -14,6 +14,7 @@
 
 import enum
 import os
+from typing import Optional
 import unittest
 
 from absl.testing import absltest
@@ -52,7 +53,31 @@ class GenericDatasetTest(parameterized.TestCase):
       (np.array(["a", np.nan], np.object_), Semantic.CATEGORICAL),
   )
   def test_infer_semantic(self, value, expected_semantic):
-    self.assertEqual(dataset.infer_semantic("", value), expected_semantic)
+    self.assertEqual(
+        dataset.infer_semantic("", value, discretize_numerical=False),
+        expected_semantic,
+    )
+
+  @parameterized.parameters(
+      (np.array([1], np.int8), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.int16), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.int32), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.int64), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.uint8), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.uint16), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.uint32), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.uint64), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.float32), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.float64), Semantic.DISCRETIZED_NUMERICAL),
+      (np.array([1], np.bool_), Semantic.BOOLEAN),
+      (np.array(["a"], np.bytes_), Semantic.CATEGORICAL),
+      (np.array(["a", np.nan], np.object_), Semantic.CATEGORICAL),
+  )
+  def test_infer_semantic_discretized(self, value, expected_semantic):
+    self.assertEqual(
+        dataset.infer_semantic("", value, discretize_numerical=True),
+        expected_semantic,
+    )
 
   @parameterized.parameters(
       np.float16,
@@ -2385,23 +2410,43 @@ class DiscretizedNumericalTest(parameterized.TestCase):
 
   def create_csv(self) -> str:
     tmp_dir = self.create_tempdir()
+    ds = self.create_inmemory_dataset()
     csv_file = self.create_tempfile(
-        content="""f1,f2
-101,120
-102,118
-103,116
-104,114
-105,112
-106,110
-107,108
-108,106
-109,104
-110,102""",
+        content=pd.DataFrame(ds).to_csv(index=False),
         file_path=os.path.join(tmp_dir.full_path, "file.csv"),
     )
     return csv_file.full_path
 
-  def col_spec_f1_discretized(self, is_manual_type):
+  def create_data(self, data_format: DataFormat):
+    if data_format == DiscretizedNumericalTest.DataFormat.CSV:
+      return self.create_csv()
+    elif data_format == DiscretizedNumericalTest.DataFormat.IN_MEMORY:
+      return self.create_inmemory_dataset()
+    else:
+      raise ValueError(f"Unknown data format ${data_format}")
+
+  def get_spec_options(
+      self, data_format: DataFormat, is_manual_type: Optional[bool]
+  ):
+    if data_format == self.DataFormat.CSV:
+      dtype = None  # Never set for CSV data.
+      count_nas = None  # Never set for CSV data.
+      if is_manual_type is None:
+        is_manual_type = False  # Always set for CSV data.
+    elif data_format == self.DataFormat.IN_MEMORY:
+      dtype = ds_pb.DType.DTYPE_INT64  # Always set for in-memory data.
+      count_nas = 0  # Always set for in-memory data.
+      is_manual_type = None  # Never set for in-memory data.
+    else:
+      raise ValueError("Not reached")
+    return dtype, count_nas, is_manual_type
+
+  def col_spec_f1_discretized(
+      self, data_format: DataFormat, is_manual_type: Optional[bool] = None
+  ):
+    dtype, count_nas, is_manual_type = self.get_spec_options(
+        data_format, is_manual_type
+    )
     col_spec = ds_pb.Column(
         name="f1",
         type=ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
@@ -2425,10 +2470,17 @@ class DiscretizedNumericalTest(parameterized.TestCase):
             maximum_num_bins=255,
             min_obs_in_bins=3,
         ),
+        dtype=dtype,
+        count_nas=count_nas,
     )
     return col_spec
 
-  def col_spec_f2_discretized(self, is_manual_type):
+  def col_spec_f2_discretized(
+      self, data_format: DataFormat, is_manual_type: Optional[bool] = None
+  ):
+    dtype, count_nas, is_manual_type = self.get_spec_options(
+        data_format, is_manual_type
+    )
     col_spec = ds_pb.Column(
         name="f2",
         type=ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
@@ -2452,10 +2504,17 @@ class DiscretizedNumericalTest(parameterized.TestCase):
             maximum_num_bins=255,
             min_obs_in_bins=3,
         ),
+        dtype=dtype,
+        count_nas=count_nas,
     )
     return col_spec
 
-  def col_spec_f1_numerical(self, is_manual_type):
+  def col_spec_f1_numerical(
+      self, data_format: DataFormat, is_manual_type: Optional[bool] = None
+  ):
+    dtype, count_nas, is_manual_type = self.get_spec_options(
+        data_format, is_manual_type
+    )
     col_spec = ds_pb.Column(
         name="f1",
         type=ds_pb.ColumnType.NUMERICAL,
@@ -2466,10 +2525,17 @@ class DiscretizedNumericalTest(parameterized.TestCase):
             max_value=110.0,
             standard_deviation=2.8722813232690143,
         ),
+        dtype=dtype,
+        count_nas=count_nas,
     )
     return col_spec
 
-  def col_spec_f2_numerical(self, is_manual_type):
+  def col_spec_f2_numerical(
+      self, data_format: DataFormat, is_manual_type: Optional[bool] = None
+  ):
+    dtype, count_nas, is_manual_type = self.get_spec_options(
+        data_format, is_manual_type
+    )
     col_spec = ds_pb.Column(
         name="f2",
         type=ds_pb.ColumnType.NUMERICAL,
@@ -2480,20 +2546,14 @@ class DiscretizedNumericalTest(parameterized.TestCase):
             max_value=120.0,
             standard_deviation=5.744562646538029,
         ),
+        dtype=dtype,
+        count_nas=count_nas,
     )
     return col_spec
 
-  def create_data(self, data_type: DataFormat):
-    if data_type == DiscretizedNumericalTest.DataFormat.CSV:
-      return self.create_csv()
-    elif data_type == DiscretizedNumericalTest.DataFormat.IN_MEMORY:
-      return self.create_inmemory_dataset()
-    else:
-      raise ValueError(f"Unknown data type ${data_type}")
-
-  @parameterized.parameters((DataFormat.CSV,))
-  def test_contents_inferred_dataspec(self, data_type):
-    data = self.create_data(data_type)
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
+  def test_contents_inferred_dataspec(self, data_format):
+    data = self.create_data(data_format)
     ds = dataset.create_vertical_dataset(
         data,
         discretize_numerical_columns=True,
@@ -2514,13 +2574,13 @@ class DiscretizedNumericalTest(parameterized.TestCase):
 """,
     )
 
-  @parameterized.parameters((DataFormat.CSV,))
-  def test_contents_explicit_dataspec(self, data_type):
-    data = self.create_data(data_type)
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
+  def test_contents_explicit_dataspec(self, data_format):
+    data = self.create_data(data_format)
     data_spec = ds_pb.DataSpecification(
         columns=[
-            self.col_spec_f1_discretized(True),
-            self.col_spec_f2_discretized(True),
+            self.col_spec_f1_discretized(data_format),
+            self.col_spec_f2_discretized(data_format),
         ],
         created_num_rows=10,
     )
@@ -2541,29 +2601,28 @@ class DiscretizedNumericalTest(parameterized.TestCase):
 """,
     )
 
-  @parameterized.parameters((DataFormat.CSV,))
-  def test_global_parameter_only(self, data_type):
-    data = self.create_data(data_type)
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
+  def test_global_parameter_only(self, data_format):
+    data = self.create_data(data_format)
     ds = dataset.create_vertical_dataset(
         data,
         discretize_numerical_columns=True,
     )
-    is_manual_type = False if data_type == self.DataFormat.CSV else None
     test_utils.assertProto2Equal(
         self,
         ds.data_spec(),
         ds_pb.DataSpecification(
             columns=[
-                self.col_spec_f1_discretized(is_manual_type),
-                self.col_spec_f2_discretized(is_manual_type),
+                self.col_spec_f1_discretized(data_format),
+                self.col_spec_f2_discretized(data_format),
             ],
             created_num_rows=10,
         ),
     )
 
-  @parameterized.parameters((DataFormat.CSV,))
-  def test_column_def(self, data_type):
-    data = self.create_data(data_type)
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
+  def test_column_def(self, data_format):
+    data = self.create_data(data_format)
     ds = dataset.create_vertical_dataset(
         data,
         columns=[("f1", Semantic.DISCRETIZED_NUMERICAL)],
@@ -2574,18 +2633,16 @@ class DiscretizedNumericalTest(parameterized.TestCase):
         ds.data_spec(),
         ds_pb.DataSpecification(
             columns=[
-                self.col_spec_f1_discretized(True),
-                self.col_spec_f2_numerical(
-                    False if data_type == self.DataFormat.CSV else None
-                ),
+                self.col_spec_f1_discretized(data_format, is_manual_type=True),
+                self.col_spec_f2_numerical(data_format),
             ],
             created_num_rows=10,
         ),
     )
 
-  @parameterized.parameters((DataFormat.CSV,))
-  def test_column_def_and_global(self, data_type):
-    data = self.create_data(data_type)
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
+  def test_column_def_and_global(self, data_format):
+    data = self.create_data(data_format)
     ds = dataset.create_vertical_dataset(
         data,
         columns=[("f1", Semantic.NUMERICAL)],
@@ -2597,24 +2654,22 @@ class DiscretizedNumericalTest(parameterized.TestCase):
         ds.data_spec(),
         ds_pb.DataSpecification(
             columns=[
-                self.col_spec_f1_numerical(True),
-                self.col_spec_f2_discretized(
-                    False if data_type == self.DataFormat.CSV else None
-                ),
+                self.col_spec_f1_numerical(data_format, is_manual_type=True),
+                self.col_spec_f2_discretized(data_format),
             ],
             created_num_rows=10,
         ),
     )
 
-  @parameterized.parameters((DataFormat.CSV,))
-  def test_num_bins_global(self, data_type):
-    data = self.create_data(data_type)
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
+  def test_num_bins_global(self, data_format):
+    data = self.create_data(data_format)
     ds = dataset.create_vertical_dataset(
         data,
         discretize_numerical_columns=True,
         num_discretized_numerical_bins=4,
     )
-    is_manual_type = False if data_type == self.DataFormat.CSV else None
+    dtype, count_nas, is_manual_type = self.get_spec_options(data_format, None)
     test_utils.assertProto2Equal(
         self,
         ds.data_spec(),
@@ -2640,6 +2695,8 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                         maximum_num_bins=4,
                         min_obs_in_bins=3,
                     ),
+                    count_nas=count_nas,
+                    dtype=dtype,
                 ),
                 ds_pb.Column(
                     name="f2",
@@ -2661,15 +2718,17 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                         maximum_num_bins=4,
                         min_obs_in_bins=3,
                     ),
+                    count_nas=count_nas,
+                    dtype=dtype,
                 ),
             ],
             created_num_rows=10,
         ),
     )
 
-  @parameterized.parameters((DataFormat.CSV,))
-  def test_num_bins_feature_def(self, data_type):
-    data = self.create_data(data_type)
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
+  def test_num_bins_feature_def(self, data_format):
+    data = self.create_data(data_format)
     ds = dataset.create_vertical_dataset(
         data,
         columns=[
@@ -2680,6 +2739,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
             )
         ],
     )
+    dtype, count_nas, is_manual_type = self.get_spec_options(data_format, True)
     test_utils.assertProto2Equal(
         self,
         ds.data_spec(),
@@ -2688,7 +2748,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                 ds_pb.Column(
                     name="f1",
                     type=ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
-                    is_manual_type=True,
+                    is_manual_type=is_manual_type,
                     numerical=ds_pb.NumericalSpec(
                         mean=105.5,
                         min_value=101.0,
@@ -2705,13 +2765,15 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                         maximum_num_bins=4,
                         min_obs_in_bins=3,
                     ),
+                    count_nas=count_nas,
+                    dtype=dtype,
                 ),
             ],
             created_num_rows=10,
         ),
     )
 
-  @parameterized.parameters((DataFormat.CSV,))
+  @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
   def test_respects_data_spec(self, data_format: DataFormat):
     data_spec = ds_pb.DataSpecification(
         columns=[
@@ -2735,7 +2797,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                     min_obs_in_bins=3,
                 ),
             ),
-            self.col_spec_f2_discretized(False),
+            self.col_spec_f2_discretized(data_format),
         ],
         created_num_rows=10,
     )

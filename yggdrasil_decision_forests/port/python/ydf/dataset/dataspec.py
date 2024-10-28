@@ -265,7 +265,8 @@ class Column(object):
       than "min_vocab_frequency" times in the training dataset are treated as
       "Out-of-vocabulary".
     num_discretized_numerical_bins: For DISCRETIZED_NUMERICAL columns only.
-      Number of bins used to discretize DISCRETIZED_NUMERICAL columns.
+      Number of bins used to discretize DISCRETIZED_NUMERICAL columns. Defaults
+      to 255 bins, i.e. 254 boundaries.
     monotonic: Monotonic constraints between the feature and the model output.
       Use `None` (default; or 0) for an unconstrained feature. Use
       `Monotonic.INCREASING` (or +1) to ensure the model is monotonically

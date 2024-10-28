@@ -57,6 +57,14 @@ class VerticalDataset:
       ydf_dtype: Optional[data_spec_pb2.DType],
       column_idx: Optional[int],
   ) -> None: ...
+  def PopulateColumnDiscretizedNumericalNPFloat32(
+      self,
+      name: str,
+      data: npt.NDArray[np.float32],
+      ydf_dtype: Optional[data_spec_pb2.DType],
+      maximum_num_bins: Optional[int],
+      column_idx: Optional[int],
+  ) -> None: ...
   def PopulateColumnBooleanNPBool(
       self,
       name: str,

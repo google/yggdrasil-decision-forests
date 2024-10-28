@@ -30,6 +30,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -64,6 +65,8 @@ namespace {
 
 using NumericalColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::NumericalColumn;
+using DiscretizedNumericalColumn = ::yggdrasil_decision_forests::dataset::
+    VerticalDataset::DiscretizedNumericalColumn;
 using BooleanColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::BooleanColumn;
 using CategoricalColumn =
@@ -105,9 +108,14 @@ absl::Status SetAndCheckNumRowsAndFillMissing(dataset::VerticalDataset& self,
   return absl::OkStatus();
 }
 
-// Creates a column spec for a numerical column.
-absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
-    const absl::string_view name, const StridedSpanFloat32 values) {
+// Collects statistics about a numerical column to use for the column spec. If
+// the `unique_counts` parameter is given, builds a map of unique values of the
+// column. The name set in `column` is used in the error messages.
+absl::Status CollectNumericalColumnStatistics(
+    const StridedSpanFloat32 values, dataset::proto::Column* column,
+    absl::flat_hash_map<float, int>* unique_counts) {
+  DCHECK(column->has_name());
+
   size_t num_valid_values = 0;
   double sum_values = 0;
   double sum_square_values = 0;
@@ -122,7 +130,15 @@ absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
     }
     if (std::isinf(value)) {
       return absl::InvalidArgumentError(absl::Substitute(
-          "Found infinite value for numerical feature $0", name));
+          "Found infinite value for numerical feature $0", column->name()));
+    }
+    if (unique_counts != nullptr) {
+      const auto iter = unique_counts->find(value);
+      if (iter != unique_counts->end()) {
+        iter->second++;
+      } else {
+        (*unique_counts)[value] = 1;
+      }
     }
 
     sum_values += value;
@@ -144,12 +160,9 @@ absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
     num_valid_values++;
   }
 
-  dataset::proto::Column column;
-  column.set_name(name);
-  column.set_type(dataset::proto::ColumnType::NUMERICAL);
-  column.set_count_nas(values.size() - num_valid_values);
+  column->set_count_nas(values.size() - num_valid_values);
 
-  auto* colum_num = column.mutable_numerical();
+  auto* colum_num = column->mutable_numerical();
   if (num_valid_values > 0) {
     const double mean = sum_values / num_valid_values;
     const double var = sum_square_values / num_valid_values - mean * mean;
@@ -159,6 +172,53 @@ absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
     colum_num->set_mean(mean);
     colum_num->set_standard_deviation(std::sqrt(var));
   }
+  return absl::OkStatus();
+}
+
+// Creates a column spec for a numerical column.
+absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
+    const absl::string_view name, const StridedSpanFloat32 values) {
+  dataset::proto::Column column;
+  column.set_name(name);
+  column.set_type(dataset::proto::ColumnType::NUMERICAL);
+  RETURN_IF_ERROR(CollectNumericalColumnStatistics(values, &column, nullptr));
+  return column;
+}
+
+// Creates a column spec for a discretized numerical column.
+absl::StatusOr<dataset::proto::Column> CreateDiscretizedNumericalColumnSpec(
+    const absl::string_view name, const StridedSpanFloat32 values,
+    std::optional<int64_t> maximum_num_bins) {
+  dataset::proto::Column column;
+  column.set_name(name);
+  column.set_type(dataset::proto::ColumnType::DISCRETIZED_NUMERICAL);
+  column.mutable_discretized_numerical()->set_maximum_num_bins(
+      maximum_num_bins.value_or(
+          column.discretized_numerical().maximum_num_bins()));
+  column.mutable_discretized_numerical()->set_min_obs_in_bins(
+      column.discretized_numerical().min_obs_in_bins());
+
+  absl::flat_hash_map<float, int> unique_counts;
+  RETURN_IF_ERROR(
+      CollectNumericalColumnStatistics(values, &column, &unique_counts));
+  column.mutable_discretized_numerical()->set_original_num_unique_values(
+      unique_counts.size());
+
+  std::vector<std::pair<float, int>> sorted_values_and_counts;
+  sorted_values_and_counts.reserve(unique_counts.size());
+  for (const auto& item : unique_counts) {
+    sorted_values_and_counts.emplace_back(item);
+  }
+  std::sort(sorted_values_and_counts.begin(), sorted_values_and_counts.end());
+
+  ASSIGN_OR_RETURN(const auto bounds,
+                   dataset::GenDiscretizedBoundaries(
+                       sorted_values_and_counts,
+                       column.discretized_numerical().maximum_num_bins(),
+                       column.discretized_numerical().min_obs_in_bins(),
+                       {0.f, static_cast<float>(column.numerical().mean())}));
+  *column.mutable_discretized_numerical()->mutable_boundaries() = {
+      bounds.begin(), bounds.end()};
   return column;
 }
 
@@ -201,6 +261,56 @@ absl::Status PopulateColumnNumericalNPFloat32(
   dst_values.resize(offset + src_values.size());
   for (size_t i = 0; i < src_values.size(); i++) {
     dst_values[i + offset] = src_values[i];
+  }
+
+  return absl::OkStatus();
+}
+
+// Append contents of `data` to a discretized numerical column. If no
+// `column_idx` is given, a new column is created.
+//
+// Note that this function only creates the columns and copies the data, it does
+// not set `num_rows` on the dataset. Before using the dataset, `num_rows` has
+// to be set (e.g. using SetAndCheckNumRows).
+absl::Status PopulateColumnDiscretizedNumericalNPFloat32(
+    dataset::VerticalDataset& self, const std::string& name,
+    py::array_t<float>& data, std::optional<dataset::proto::DType> ydf_dtype,
+    std::optional<int64_t> maximum_num_bins, std::optional<int> column_idx) {
+  StridedSpanFloat32 src_values(data);
+
+  DiscretizedNumericalColumn* column;
+  dataset::proto::Column column_spec;
+  if (!column_idx.has_value()) {
+    // Create column spec
+    ASSIGN_OR_RETURN(column_spec, CreateDiscretizedNumericalColumnSpec(
+                                      name, src_values, maximum_num_bins));
+
+    if (ydf_dtype.has_value()) {
+      column_spec.set_dtype(*ydf_dtype);
+    }
+
+    ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
+    // Import column data
+    ASSIGN_OR_RETURN(
+        column,
+        abstract_column->MutableCastWithStatus<DiscretizedNumericalColumn>());
+  } else {
+    // Note that when populating an existing vertical dataset column, we don't
+    // compute / update the dataspec.
+    ASSIGN_OR_RETURN(
+        column,
+        self.MutableColumnWithCastWithStatus<DiscretizedNumericalColumn>(
+            column_idx.value()));
+    column_spec = self.data_spec().columns(column_idx.value());
+  }
+
+  std::vector<dataset::DiscretizedNumericalIndex>& dst_values =
+      *column->mutable_values();
+  const size_t offset = dst_values.size();
+  dst_values.resize(offset + src_values.size());
+  for (size_t i = 0; i < src_values.size(); i++) {
+    dst_values[i + offset] =
+        dataset::NumericalToDiscretizedNumerical(column_spec, src_values[i]);
   }
 
   return absl::OkStatus();
@@ -879,6 +989,10 @@ void init_dataset(py::module_& m) {
            WithStatus(PopulateColumnNumericalNPFloat32), py::arg("name"),
            py::arg("data").noconvert(), py::arg("ydf_dtype"),
            py::arg("column_idx") = std::nullopt)
+      .def("PopulateColumnDiscretizedNumericalNPFloat32",
+           WithStatus(PopulateColumnDiscretizedNumericalNPFloat32),
+           py::arg("name"), py::arg("data").noconvert(), py::arg("ydf_dtype"),
+           py::arg("maximum_num_bins"), py::arg("column_idx") = std::nullopt)
       .def("PopulateColumnBooleanNPBool",
            WithStatus(PopulateColumnBooleanNPBool), py::arg("name"),
            py::arg("data").noconvert(), py::arg("ydf_dtype"),

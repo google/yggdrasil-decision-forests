@@ -1330,6 +1330,25 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     evaluation = model.evaluate(ds)
     self.assertEqual(evaluation.accuracy, 1)
 
+  def test_discretized_numerical(self):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        num_trees=100,
+        shrinkage=0.1,
+        max_depth=4,
+        discretize_numerical_columns=True,
+    )
+    model, evaluation, _ = self._check_adult_model(
+        learner=learner, use_pandas=True, minimum_accuracy=0.8552
+    )
+    age_spec = model.data_spec().columns[1]
+    self.assertEqual(age_spec.name, "age")
+    self.assertEqual(age_spec.type, ds_pb.ColumnType.DISCRETIZED_NUMERICAL)
+
+    self.assertLess(evaluation.accuracy, 0.8746)
+    self.assertGreater(evaluation.loss, 0.28042)
+    self.assertLess(evaluation.loss, 0.30802)
+
 
 class LoggingTest(parameterized.TestCase):
 

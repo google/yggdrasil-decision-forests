@@ -6,6 +6,7 @@
 
 -   Add support for Avro file for path / distributed training with the "avro:"
     prefix.
+-   Add support for discretized numerical features for in-memory datasets.
 
 ## HEAD
 

@@ -103,16 +103,21 @@ class VerticalDataset:
 
     original_column_data = column_data
 
-    if column.semantic == dataspec.Semantic.NUMERICAL:
+    if (
+        column.semantic == dataspec.Semantic.NUMERICAL
+        or column.semantic == dataspec.Semantic.DISCRETIZED_NUMERICAL
+    ):
+      assert column.semantic is not None  # Appease pylint.
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, np.float32)
       ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data.dtype != np.float32:
         log.warning(
-            "Column '%s' with NUMERICAL semantic has dtype %s. Casting value"
+            "Column '%s' with %s semantic has dtype %s. Casting value"
             " to float32.",
             column.name,
+            column.semantic.name,
             column_data.dtype.name,
             message_id=log.WarningMessage.CAST_NUMERICAL_TO_FLOAT32,
             is_strict=True,
@@ -122,20 +127,38 @@ class VerticalDataset:
           column_data = column_data.astype(np.float32)
         except ValueError as e:
           raise ValueError(
-              f"Cannot convert NUMERICAL column {column.name!r} of type"
-              f" {_type(column_data)} and with content={column_data!r} to"
+              f"Cannot convert {column.semantic.name} column {column.name!r} of"
+              f" type {_type(column_data)} and with content={column_data!r} to"
               " np.float32 values.\nNote: If the column is a label, make sure"
               " the training task is compatible. For example, you cannot train"
               " a regression model (task=ydf.Task.REGRESSION) on a string"
               " column."
           ) from e
 
-      self._dataset.PopulateColumnNumericalNPFloat32(
-          column.name,
-          column_data,
-          ydf_dtype=ydf_dtype,
-          column_idx=column_idx,  # `column_idx` may be None
-      )
+      if column.semantic == dataspec.Semantic.NUMERICAL:
+        self._dataset.PopulateColumnNumericalNPFloat32(
+            column.name,
+            column_data,
+            ydf_dtype=ydf_dtype,
+            column_idx=column_idx,  # `column_idx` may be None
+        )
+      elif column.semantic == dataspec.Semantic.DISCRETIZED_NUMERICAL:
+        if (
+            column.num_discretized_numerical_bins is None
+            and inference_args is not None
+        ):
+          column.num_discretized_numerical_bins = (
+              inference_args.num_discretized_numerical_bins
+          )
+        self._dataset.PopulateColumnDiscretizedNumericalNPFloat32(
+            column.name,
+            column_data,
+            ydf_dtype=ydf_dtype,
+            maximum_num_bins=column.num_discretized_numerical_bins,
+            column_idx=column_idx,  # `column_idx` may be None
+        )
+      else:
+        raise ValueError("Not reached")
       return
 
     elif column.semantic == dataspec.Semantic.BOOLEAN:
@@ -713,8 +736,14 @@ def create_vertical_dataset_from_dict_of_values(
       column_data = []
     else:
       column_data = data[column.name]
+
     if column.semantic is None:
-      infered_semantic = infer_semantic(column.name, column_data)
+      discretize_numerical = (
+          inference_args is None
+      ) or inference_args.discretize_numerical_columns
+      infered_semantic = infer_semantic(
+          column.name, column_data, discretize_numerical
+      )
       effective_column.semantic = infered_semantic
       columns_to_check.append(column_idx)
 
@@ -789,7 +818,11 @@ def look_numerical(v: str) -> bool:
     return False
 
 
-def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
+def infer_semantic(
+    name: str,
+    data: Any,
+    discretize_numerical: bool,
+) -> dataspec.Semantic:
   """Infers the semantic of a column from its data."""
 
   # If a column has no data, we assume it only contains missing values.
@@ -810,7 +843,10 @@ def infer_semantic(name: str, data: Any) -> dataspec.Semantic:
         data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
         or data.dtype.type in dataspec.NP_SUPPORTED_FLOAT_DTYPE
     ):
-      return dataspec.Semantic.NUMERICAL
+      if discretize_numerical:
+        return dataspec.Semantic.DISCRETIZED_NUMERICAL
+      else:
+        return dataspec.Semantic.NUMERICAL
 
     if data.dtype.type in [np.bytes_, np.str_]:
       return dataspec.Semantic.CATEGORICAL
