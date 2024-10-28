@@ -345,6 +345,7 @@ GBTVariations() {
 
       // Make sure PRESORTED is always used.
       // Note: Ideally, FORCE_PRESORTED should be renamed to PRESORTED.
+      /*
       {" force_presorted",
        [](model::gradient_boosted_trees::proto::
               GradientBoostedTreesTrainingConfig* gbt_config) {
@@ -354,6 +355,7 @@ GBTVariations() {
                  model::decision_tree::proto::DecisionTreeTrainingConfig::
                      Internal::FORCE_PRESORTED);
        }},
+       */
   };
 }
 
@@ -678,12 +680,13 @@ absl::Status Benchmark_GBT_Synthetic(std::vector<Result>* results) {
             .num_features = 200,
             .resolution = 1000,
             .use_discretized_numerical_features = true},
-           {.num_examples = 4'000'000, .num_features = 200},
-           {.num_examples = 4'000'000, .num_features = 200, .resolution = 1000},
-           {.num_examples = 4'000'000,
-            .num_features = 200,
-            .resolution = 1000,
-            .use_discretized_numerical_features = true},
+           //  {.num_examples = 4'000'000, .num_features = 200},
+           //  {.num_examples = 4'000'000, .num_features = 200, .resolution =
+           //  1000},
+           //  {.num_examples = 4'000'000,
+           //   .num_features = 200,
+           //   .resolution = 1000,
+           //   .use_discretized_numerical_features = true},
        }) {
     for (const auto& strategy : GBTVariations()) {
       // Configure benchmark.
