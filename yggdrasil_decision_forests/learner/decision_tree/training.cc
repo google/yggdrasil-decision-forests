@@ -4130,7 +4130,8 @@ absl::Status FindBestConditionStartWorkers(
     const std::vector<float>& weights,
     SplitterConcurrencySetup* splitter_concurrency_setup) {
   auto find_condition =
-      [&](SplitterWorkRequest request) -> SplitterWorkResponse {
+      [&, splitter_concurrency_setup](
+          SplitterWorkRequest request) -> SplitterWorkResponse {
     return FindBestConditionFromSplitterWorkRequest(
         weights, config, config_link, dt_config, *splitter_concurrency_setup,
         internal_config, request);
