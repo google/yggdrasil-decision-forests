@@ -33,8 +33,11 @@
 //    --dataset=csv:/path/to/dataset@10 \
 //    --output=csv:/path/to/predictions.csv
 //
+#include <algorithm>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/flags/flag.h"
@@ -44,8 +47,10 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/evaluation.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -178,7 +183,14 @@ void Predict() {
   }
 
   // Save the predictions.
-  const auto& label_column = model->data_spec().columns(model->label_col_idx());
+  dataset::proto::Column label_column;
+  if (model->task() == model::proto::ANOMALY_DETECTION) {
+    label_column = dataset::proto::Column();
+    label_column.set_type(dataset::proto::NUMERICAL);
+    label_column.set_name("Anomaly Score");
+  } else {
+    label_column = model->data_spec().columns(model->label_col_idx());
+  }
 
   std::optional<std::string> optional_prediction_key;
   if (key_col_idx.has_value()) {

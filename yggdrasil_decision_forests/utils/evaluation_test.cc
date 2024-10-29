@@ -15,6 +15,10 @@
 
 // clang-format off
 #include <memory>
+#include <utility>
+#include <vector>
+#include <string>
+
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #ifdef YDF_EVAL_TFRECORD
@@ -24,11 +28,8 @@
 
 #include "yggdrasil_decision_forests/utils/evaluation.h"
 
-#include <string>
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "yggdrasil_decision_forests/dataset/example_reader.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -98,6 +99,33 @@ TEST(Evaluation, PredictionToExampleRegression) {
   dataset::proto::Example expected_prediction_as_example = PARSE_TEST_PROTO(
       R"pb(
         attributes { numerical: 5 }
+      )pb");
+  EXPECT_THAT(prediction_as_example,
+              EqualsProto(expected_prediction_as_example));
+}
+
+TEST(Evaluation, PredictionToExampleAnomalyDetection) {
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "label" }
+  )pb");
+  dataset::proto::DataSpecification expected_dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "label" }
+  )pb");
+  EXPECT_THAT(PredictionDataspec(model::proto::Task::ANOMALY_DETECTION,
+                                 dataspec.columns(0))
+                  .value(),
+              EqualsProto(expected_dataspec));
+
+  model::proto::Prediction prediction = PARSE_TEST_PROTO(R"pb(
+    anomaly_detection { value: 42.123 }
+  )pb");
+  dataset::proto::Example prediction_as_example;
+  EXPECT_OK(PredictionToExample(model::proto::Task::ANOMALY_DETECTION,
+                                dataspec.columns(0), prediction,
+                                &prediction_as_example));
+  dataset::proto::Example expected_prediction_as_example = PARSE_TEST_PROTO(
+      R"pb(
+        attributes { numerical: 42.123 }
       )pb");
   EXPECT_THAT(prediction_as_example,
               EqualsProto(expected_prediction_as_example));

@@ -1175,7 +1175,6 @@ cc_test(
         ":test",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:csv_example_writer",
-        "//yggdrasil_decision_forests/dataset:example_reader",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",

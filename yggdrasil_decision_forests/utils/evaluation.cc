@@ -15,6 +15,9 @@
 
 #include <memory>
 #include <optional>
+#include <string>
+#include <tuple>
+#include <vector>
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
@@ -178,6 +181,10 @@ absl::Status PredictionToExample(
             prediction.uplift().treatment_effect(effect_idx));
       }
     } break;
+    case model::proto::Task::ANOMALY_DETECTION:
+      prediction_as_example->add_attributes()->set_numerical(
+          prediction.anomaly_detection().value());
+      break;
     default:
       return absl::InvalidArgumentError("Non supported class");
   }
@@ -307,6 +314,7 @@ absl::StatusOr<dataset::proto::DataSpecification> PredictionDataspec(
     } break;
     case model::proto::Task::REGRESSION:
     case model::proto::Task::RANKING:
+    case model::proto::Task::ANOMALY_DETECTION:
       dataset::AddColumn(label_col.name(),
                          dataset::proto::ColumnType::NUMERICAL, &dataspec);
       break;
