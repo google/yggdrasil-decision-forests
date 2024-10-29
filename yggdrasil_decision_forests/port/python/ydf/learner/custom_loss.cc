@@ -120,7 +120,8 @@ absl::Status Check2DArrayShape(const py::array_t<float>& arr,
 // longer referenced when `data` is removed.
 template <typename T>
 py::array_t<T> SpanToUnsafeNumpyArray(absl::Span<T> data) {
-  auto arr = py::array_t<T>(data.size(), data.data(),
+  auto arr = py::array_t<T>(/*shape=*/{data.size()}, /*strides=*/{sizeof(T)},
+                            /*ptr=*/data.data(),
                             py::capsule(data.data(), [](void* v) {}));
   py::detail::array_proxy(arr.ptr())->flags &=
       ~py::detail::npy_api::NPY_ARRAY_WRITEABLE_;
