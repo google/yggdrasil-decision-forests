@@ -452,6 +452,7 @@ absl::Status AbstractDataSpecCreator::CreateDataspec(
     proto::DataSpecification* data_spec) {
   // Detect the column names and semantics.
   RETURN_IF_ERROR(InferColumnsAndTypes(paths, guide, data_spec));
+
   FinalizeInferTypes(guide, data_spec);
   LOG(INFO) << data_spec->columns_size() << " column(s) found";
 
