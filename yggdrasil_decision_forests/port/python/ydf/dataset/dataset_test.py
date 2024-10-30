@@ -1561,6 +1561,45 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
           columns=[("f1", dataspec.Semantic.BOOLEAN)],
       )
 
+  def test_multidim_numerical_list(self):
+    data = {
+        "f1": [[1, 2], [3, 4], [5, 6]],
+    }
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*Unrolling multi-dimensional columns is only supported for numpy"
+        " arrays.*",
+    ):
+      _ = dataset.create_vertical_dataset(
+          data, columns=[("f1", dataspec.Semantic.NUMERICAL)]
+      )
+
+  def test_multidim_boolean_list(self):
+    data = {
+        "f1": [[True, False], [True, False], [True, False]],
+    }
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*Unrolling multi-dimensional columns is only supported for numpy"
+        " arrays.*",
+    ):
+      _ = dataset.create_vertical_dataset(
+          data, columns=[("f1", dataspec.Semantic.BOOLEAN)]
+      )
+
+  def test_multidim_categorical_list(self):
+    data = {
+        "f1": [[1, 2], [3, 4], [5, 6]],
+    }
+    with self.assertRaisesRegex(
+        ValueError,
+        ".*Unrolling multi-dimensional columns is only supported for numpy"
+        " arrays.*",
+    ):
+      _ = dataset.create_vertical_dataset(
+          data, columns=[("f1", dataspec.Semantic.CATEGORICAL)]
+      )
+
 
 class CategoricalSetTest(absltest.TestCase):
 
