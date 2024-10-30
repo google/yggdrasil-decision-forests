@@ -16,6 +16,7 @@ py_binary(
     name = "worker_main",
     srcs = ["worker_main.py"],
     python_version = "PY3",
+    visibility = ["//visibility:public"],
     deps = [
         # absl:app dep,
         # absl/flags dep,
