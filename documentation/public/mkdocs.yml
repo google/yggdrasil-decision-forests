@@ -47,6 +47,12 @@ nav:
   - 📖 Glossary: glossary.md
   - 🤸 For Googlers: http://go/ydf
   - ✒️ Blog: blog/index.md
+  - Guides:
+    - What are decision forests?: https://developers.google.com/machine-learning/decision-forests
+    - How to define model features: guide_feature_semantics.md
+    - How to improve a model?: guide_how_to_improve_model.md
+    - How to train a model faster?: guide_how_to_improve_learner.md
+    - Migrating from TF-DF: tutorial/migrating_to_ydf.ipynb
   - Tasks solved by YDF:
     - Classification: tutorial/classification.ipynb
     - Regression: tutorial/regression.ipynb
@@ -87,11 +93,6 @@ nav:
   - Evaluation:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb
-  - Guides:
-    - What are decision forests?: https://developers.google.com/machine-learning/decision-forests
-    - How to improve a model?: guide_how_to_improve_model.md
-    - How to train a model faster?: guide_how_to_improve_learner.md
-    - Migrating from TF-DF: tutorial/migrating_to_ydf.ipynb
   - Advanced:
     - Inspecting trees: tutorial/inspecting_trees.ipynb
     - Editing trees: tutorial/editing_trees.ipynb
@@ -130,6 +131,8 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.arithmatex:
       generic: true
+  - toc:
+      permalink: true
 
 extra_javascript:
   - js/mathjax.js
