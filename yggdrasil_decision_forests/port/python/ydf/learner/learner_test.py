@@ -1349,6 +1349,46 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     self.assertGreater(evaluation.loss, 0.28042)
     self.assertLess(evaluation.loss, 0.30802)
 
+  @parameterized.parameters(
+      (np.array([0, 0, 0, 1, 1]),),
+      (np.array([0, 0, 1, 1, 1]),),
+      (np.array([1, 1, 0, 0, 0]),),
+      (np.array([1, 1, 1, 0, 0]),),
+      (np.array([2, 2, 2, 1, 1]),),
+      (np.array([2, 2, 1, 1, 1]),),
+      (np.array([1, 1, 2, 2, 2]),),
+      (np.array([1, 1, 1, 2, 2]),),
+      (np.array([20, 20, 20, -10, -10]),),
+      (np.array([20, 20, 20, -10, -10]),),
+      (np.array([-10, -10, 20, 20, 20]),),
+      (np.array([-10, -10, 20, 20, 20]),),
+  )
+  def test_label_classes_order_int(self, label_data):
+    data = {"f": np.arange(5), "label": label_data}
+    model_1 = specialized_learners.GradientBoostedTreesLearner(
+        label="label",
+        min_examples=1,
+        num_trees=1,
+        validation_ratio=0.0,
+    ).train(data)
+    npt.assert_equal(model_1.label_classes(), np.unique(label_data).astype(str))
+
+  @parameterized.parameters(
+      (np.array(["f", "f", "f", "x", "x"]),),
+      (np.array(["f", "f", "x", "x", "x"]),),
+      (np.array(["x", "x", "f", "f", "f"]),),
+      (np.array(["x", "x", "x", "f", "f"]),),
+  )
+  def test_label_classes_order_str(self, label_data):
+    data = {"f": np.arange(5), "label": label_data}
+    model_1 = specialized_learners.GradientBoostedTreesLearner(
+        label="label",
+        min_examples=1,
+        num_trees=1,
+        validation_ratio=0.0,
+    ).train(data)
+    npt.assert_equal(model_1.label_classes(), np.unique(label_data).astype(str))
+
 
 class LoggingTest(parameterized.TestCase):
 

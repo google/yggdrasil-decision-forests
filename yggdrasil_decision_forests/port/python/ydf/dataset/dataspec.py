@@ -14,7 +14,6 @@
 
 """Dataspec utilities."""
 
-import copy
 import dataclasses
 import enum
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
@@ -298,13 +297,15 @@ class Column(object):
     ]:
       if self.max_vocab_count is not None:
         raise ValueError(
-            "Argment max_vocab_count requires semantic=CATEGORICAL "
-            " or semantic=CATEGORICAL_SET."
+            "Argument max_vocab_count requires semantic=CATEGORICAL "
+            " or semantic=CATEGORICAL_SET. Got"
+            f" semantic={self.semantic!r} instead."
         )
       if self.min_vocab_frequency is not None:
         raise ValueError(
-            "Argment min_vocab_frequency requires semantic=CATEGORICAL "
-            " or semantic=CATEGORICAL_SET."
+            "Argument min_vocab_frequency requires semantic=CATEGORICAL "
+            " or semantic=CATEGORICAL_SET. Got"
+            f" semantic={self.semantic!r} instead."
         )
 
     self._normalized_monotonic = _normalize_monotonic_constraint(self.monotonic)

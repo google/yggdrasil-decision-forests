@@ -1,19 +1,19 @@
 # Changelog
 
-## NEXT HEAD
+## HEAD
+
+### Breaking
+
+-   Classification Label classes are now consistently ordered lexicographically
+     (for string labels) or increasingly (for integer labels).
+-   Change typo partial_depepence_plot to partial_dependence_plot on
+    model.analyze().
 
 ### Feature
 
 -   Add support for Avro file for path / distributed training with the "avro:"
     prefix.
 -   Add support for discretized numerical features for in-memory datasets.
-
-## HEAD
-
-### Breaking
-
--   Change typo partial_depepence_plot to partial_dependence_plot on
-    model.analyze().
 
 ### Feature
 

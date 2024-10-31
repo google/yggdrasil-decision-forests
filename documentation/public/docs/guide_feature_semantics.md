@@ -88,8 +88,8 @@ CATEGORICAL features represent categories,
 enum values, tags, or more generally, any unordered values. For example,
 *species* (among cat, bird, or fish), *blood type* (among A, B, AB, O),
 *country,* language, and *project status (in planning, in progress, done,
-canceled)*.YDF automatically recognizes string features as CATEGORICAL. \
-\
+canceled)*.YDF automatically recognizes string features as CATEGORICAL.
+
 Additional considerations for categorical features are:
 
 *   **Don’t bucket**: With Neural networks, numerical features are sometimes
@@ -344,7 +344,8 @@ a feature semantic.
 
 [3]: YDF internally casts numerical values to float32.
 
-[4]: Internally, the values are cast to string and sorted lexicographically.
+[4]: Internally, the values are cast to string and sorted by frequency. Label
+values are ordered lexicographically (for strings) or increasing (for integers).
 
 [5]: Internally, the values are cast to “false” and “true”, with “false” coming
 first.
@@ -527,8 +528,9 @@ information:
 
 *   For NUMERICAL and DISCRETIZED_NUMERICAL features, statistical information
     and, if relevant, bucketization.
-*   For CATEGORICAL and CATEGORICAL_SET features, the values seen during
-    training and their frequency.
+*   For CATEGORICAL and CATEGORICAL_SET features, the dictionary of values seen
+    during training and their frequency. Note that the ordering is not
+    guaranteed to be stable across versions and should not be relied upon.
 *   For BOOLEAN values, the frequency of true and false values seen during
     training.
 

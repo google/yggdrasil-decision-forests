@@ -215,19 +215,22 @@ class VerticalDataset:
         column_data = np.full_like(bool_column_data, b"false", "|S5")
         column_data[bool_column_data] = b"true"
         force_dictionary = [dataspec.YDF_OOD_BYTES, b"false", b"true"]
-      elif (
-          is_label
-          and column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
-          and (dictionary_size := dense_integer_dictionary_size(column_data))
-      ):
-        column_data = column_data.astype(np.bytes_)
-        force_dictionary = [dataspec.YDF_OOD_BYTES, *range(dictionary_size)]
+      elif column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE:
+        if is_label:
+          # Sort increasing.
+          dictionary = np.unique(column_data)
+          column_data = column_data.astype(np.bytes_)
+          force_dictionary = [dataspec.YDF_OOD_BYTES, *dictionary]
+        else:
+          column_data = column_data.astype(np.bytes_)
       elif column_data.dtype.type in [np.object_, np.str_]:
         column_data = self._normalize_categorical_string_values(
             column, column_data, original_column_data
         )
-      elif column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE:
-        column_data = column_data.astype(np.bytes_)
+        if is_label:
+          # Sort lexicographically (as opposed to by frequency as for features).
+          dictionary = np.unique(column_data)
+          force_dictionary = [dataspec.YDF_OOD_BYTES, *dictionary]
       elif np.issubdtype(column_data.dtype, np.floating):
         message = (
             f"Cannot import column {column.name!r} with"
