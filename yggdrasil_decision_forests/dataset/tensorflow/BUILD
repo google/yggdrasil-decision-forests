@@ -45,17 +45,13 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-    ] + select({
-        "//yggdrasil_decision_forests:use_absl_anyinvocable": [
-            "@com_google_absl//absl/functional:any_invocable",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 cc_library_ydf(
@@ -71,16 +67,12 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/serving:tf_example",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-    ] + select({
-        "//yggdrasil_decision_forests:use_absl_anyinvocable": [
-            "@com_google_absl//absl/functional:any_invocable",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 cc_library_ydf(
@@ -99,16 +91,12 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:sharded_io_tfrecord",
+        "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-    ] + select({
-        "//yggdrasil_decision_forests:use_absl_anyinvocable": [
-            "@com_google_absl//absl/functional:any_invocable",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     alwayslink = 1,
 )
 
@@ -134,15 +122,11 @@ cc_test(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
-    ] + select({
-        "//yggdrasil_decision_forests:use_absl_anyinvocable": [
-            "@com_google_absl//absl/functional:any_invocable",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 cc_test(

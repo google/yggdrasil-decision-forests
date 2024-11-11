@@ -136,6 +136,7 @@ cc_library_ydf(
         ":compatibility",
         ":logging",
         ":status_macros",
+        "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/memory",
@@ -154,11 +155,6 @@ cc_library_ydf(
             "@org_tensorflow//tensorflow/core:lib",
             "@org_tensorflow//tensorflow/core/platform:path",
         ],
-    }) + select({
-        "//yggdrasil_decision_forests:use_absl_anyinvocable": [
-            "@com_google_absl//absl/functional:any_invocable",
-        ],
-        "//conditions:default": [],
     }),
 )
 

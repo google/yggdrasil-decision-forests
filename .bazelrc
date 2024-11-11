@@ -124,10 +124,6 @@ build:wasm --cxxopt=-std=c++17
 build:wasm --host_cxxopt=-std=c++17
 build:wasm --host_cxxopt="-fno-exceptions"
 
-# Use absl::anyInvocable. This breaks builds with TF <= 2.12 but is required 
-# for builds with TF >= 2.13.
-build:use_absl_anyinvocable --define=use_absl_anyinvocable=1
-
 # Optional. Just to make it compatible with dynamic linking and TensorFlow.
 # build --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 # build --host_cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"

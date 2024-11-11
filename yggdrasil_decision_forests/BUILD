@@ -40,12 +40,6 @@ selects.config_setting_group(
     ],
 )
 
-# TF-nightly uses absl::anyinvocable, while stable TF uses an Abseil version that does not use it.
-config_setting(
-    name = "use_absl_anyinvocable",
-    values = {"define": "use_absl_anyinvocable=1"},
-)
-
 # TensorFlow is used for reading TFRecord dataset, and serializing models (if
 # TFRecord is selected as the format container). If
 # tensorflow_with_header_lib=1, TensorFlow is linked with "head only"
