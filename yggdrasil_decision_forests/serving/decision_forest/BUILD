@@ -252,11 +252,13 @@ cc_test(
     srcs = ["quick_scorer_extended_test.cc"],
     deps = [
         ":quick_scorer_extended",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/log",
-        "@com_google_absl//absl/log:check",
         "@com_google_googletest//:gtest_main",
     ],
 )
