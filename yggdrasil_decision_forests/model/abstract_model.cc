@@ -1408,6 +1408,9 @@ AbstractModel::BuildFastEngine(
 }
 
 size_t AbstractModel::AbstractAttributesSizeInBytes() const {
+#ifdef YGG_PROTOBUF_LITE
+  return 0;
+#else
   size_t size = sizeof(*this) + name_.size() + data_spec_.SpaceUsedLong();
   size +=
       input_features_.size() * sizeof(decltype(input_features_)::value_type);
@@ -1418,6 +1421,7 @@ size_t AbstractModel::AbstractAttributesSizeInBytes() const {
     size += sizeof(v) + v.first.size() + v.second.SpaceUsedLong();
   }
   return size;
+#endif  // YGG_PROTOBUF_LITE
 }
 
 absl::Status AbstractModel::ValidateModelIOOptions(

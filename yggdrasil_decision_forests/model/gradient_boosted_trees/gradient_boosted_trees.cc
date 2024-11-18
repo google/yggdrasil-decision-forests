@@ -233,8 +233,12 @@ absl::Status GradientBoostedTreesModel::Validate() const {
 }
 
 std::optional<size_t> GradientBoostedTreesModel::ModelSizeInBytes() const {
+#ifdef YGG_PROTOBUF_LITE
+  return std::nullopt;
+#else
   return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
+#endif  // YGG_PROTOBUF_LITE
 }
 
 int64_t GradientBoostedTreesModel::NumNodes() const {

@@ -189,8 +189,12 @@ absl::Status IsolationForestModel::Validate() const {
 }
 
 std::optional<size_t> IsolationForestModel::ModelSizeInBytes() const {
+#ifdef YGG_PROTOBUF_LITE
+  return std::nullopt;
+#else
   return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
+#endif  // YGG_PROTOBUF_LITE
 }
 
 void IsolationForestModel::PredictLambda(

@@ -82,8 +82,29 @@ class ProtoWriterInterface {
 // the full message (unredacted) is to be serialized in a way that can be
 // deserialized with ParseTextProto(). single_line_mode controls whether the
 // output is in single-line or multi-line (default).
-absl::StatusOr<std::string> SerializeTextProto(const google::protobuf::Message& message,
-                                               bool single_line_mode = false);
+template <typename T>
+absl::StatusOr<std::string> SerializeTextProto(const T& message,
+                                               bool single_line_mode = false) {
+#ifdef YGG_PROTOBUF_LITE
+  return absl::UnimplementedError(
+      "YDF has been compiled with YGG_PROTOBUF_LITE. Cannot serialize proto "
+      "message.");
+#else
+  std::string serialized_message;
+  google::protobuf::TextFormat::Printer printer;
+  if (single_line_mode) {
+    printer.SetSingleLineMode(true);
+  }
+  if (!printer.PrintToString(message, &serialized_message)) {
+    return absl::InvalidArgumentError("Cannot serialize proto message.");
+  }
+  if (single_line_mode && !serialized_message.empty() &&
+      serialized_message.back() == ' ') {
+    serialized_message.pop_back();
+  }
+  return serialized_message;
+#endif  // YGG_PROTOBUF_LITE
+}
 
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests

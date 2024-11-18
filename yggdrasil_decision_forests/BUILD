@@ -64,6 +64,15 @@ config_setting(
     values = {"cpu": "wasm"},
 )
 
+# With this option, YDF uses Lite protobuffers. This will disable any features based on reflection,
+# notably model size estimation and model sharding.
+#
+# This setting makes YDF compatible with Android builds.
+config_setting(
+    name = "ydf_protobuf_lite",
+    values = {"define": "ydf_protobuf_lite=1"},
+)
+
 # Number of bits required to represent the number of examples in a training
 # dataset for "{Unsigned,Signed}ExampleIdx" in "learner/types.h".
 #

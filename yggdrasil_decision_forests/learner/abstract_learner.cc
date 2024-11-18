@@ -491,6 +491,14 @@ absl::Status AbstractLearner::CheckConfiguration(
     return absl::OkStatus();
   }
 
+#ifdef YGG_PROTOBUF_LITE
+  if (config.has_maximum_model_size_in_memory_in_bytes()) {
+    return absl::InvalidArgumentError(
+        "YDF has been compiled with YGG_PROTOBUF_LITE. Model size "
+        "cannot be estimated.");
+  }
+#endif  // YGG_PROTOBUF_LITE
+
   const auto& label_col_spec = data_spec.columns(config_link.label());
   // Check the type of the label column.
   switch (config.task()) {
@@ -655,6 +663,11 @@ absl::Status AbstractLearner::SetHyperParametersImpl(
     const auto hparam =
         generic_hyper_params->Get(kHParamMaximumModelSizeInMemoryInBytes);
     if (hparam.has_value()) {
+#ifdef YGG_PROTOBUF_LITE
+      return absl::InvalidArgumentError(
+          "YDF has been compiled with YGG_PROTOBUF_LITE. Model size "
+          "cannot be estimated.");
+#endif  // YGG_PROTOBUF_LITE
       if (hparam.value().value().real() >= 0) {
         training_config_.set_maximum_model_size_in_memory_in_bytes(
             hparam.value().value().real());
@@ -915,6 +928,14 @@ absl::Status AbstractLearner::CheckCapabilities() const {
                          "\"maximum_model_size_in_memory_in_bytes\" flag.",
                          training_config().learner()));
   }
+
+#ifdef YGG_PROTOBUF_LITE
+  if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+    return absl::InvalidArgumentError(
+        "YDF has been compiled with YGG_PROTOBUF_LITE. Model size "
+        "cannot be estimated.");
+  }
+#endif  // YGG_PROTOBUF_LITE
 
   // Monotonic constraints
   if (!capabilities.support_monotonic_constraints() &&

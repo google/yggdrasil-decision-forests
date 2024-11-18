@@ -284,8 +284,12 @@ absl::Status RandomForestModel::Validate() const {
 }
 
 std::optional<size_t> RandomForestModel::ModelSizeInBytes() const {
+#ifdef YGG_PROTOBUF_LITE
+  return std::nullopt;
+#else
   return AbstractAttributesSizeInBytes() +
          decision_tree::EstimateSizeInByte(decision_trees_);
+#endif  // YGG_PROTOBUF_LITE
 }
 
 int64_t RandomForestModel::NumNodes() const {

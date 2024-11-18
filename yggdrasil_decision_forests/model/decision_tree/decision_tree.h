@@ -347,6 +347,7 @@ typedef std::vector<std::unique_ptr<DecisionTree>> DecisionForest;
 void SetLeafIndices(DecisionForest* trees);
 
 // Estimate the size (in bytes) of a list of decision trees.
+// Returns 0 if the size cannot be estimated.
 size_t EstimateSizeInByte(const DecisionForest& trees);
 
 // Number of nodes in a list of decision trees.

@@ -47,7 +47,6 @@ absl::Status SaveTreesToDisk(
     const std::vector<std::unique_ptr<DecisionTree>>& trees,
     absl::string_view format, int* num_shards) {
   ASSIGN_OR_RETURN(const auto format_impl, GetFormatImplementation(format));
-
   // FutureWork(gbm): The current function is fully sequential. If speed
   // becomes an issue, make it so that the shards are written in parallel.
   *num_shards =

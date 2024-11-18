@@ -345,6 +345,11 @@ MultitaskerLearner::BuildSubTrainingConfig(const int learner_idx) const {
 
   if (training_config().has_maximum_model_size_in_memory_in_bytes() &&
       !sub_learner_config.has_maximum_model_size_in_memory_in_bytes()) {
+#ifdef YGG_PROTOBUF_LITE
+    return absl::InvalidArgumentError(
+        "YDF has been compiled with YGG_PROTOBUF_LITE. Model size "
+        "cannot be estimated.");
+#endif  // YGG_PROTOBUF_LITE
     sub_learner_config.set_maximum_model_size_in_memory_in_bytes(
         training_config().maximum_model_size_in_memory_in_bytes());
   }

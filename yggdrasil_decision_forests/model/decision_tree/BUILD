@@ -20,6 +20,12 @@ cc_library_ydf(
         "decision_tree_io.h",
         "structure_analysis.h",
     ],
+    defines = select({
+        "//yggdrasil_decision_forests:ydf_protobuf_lite": [
+            "YGG_PROTOBUF_LITE",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":decision_tree_cc_proto",
         ":decision_tree_io_blob_sequence",

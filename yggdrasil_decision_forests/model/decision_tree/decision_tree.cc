@@ -331,20 +331,28 @@ void AppendConditionDescription(
 }
 
 size_t DecisionTree::EstimateModelSizeInBytes() const {
+#ifdef YGG_PROTOBUF_LITE
+  return 0;
+#else
   if (root_) {
     return root_->EstimateSizeInByte() + sizeof(DecisionTree);
   } else {
     return sizeof(DecisionTree);
   }
+#endif  // YGG_PROTOBUF_LITE
 }
 
 size_t NodeWithChildren::EstimateSizeInByte() const {
+#ifdef YGG_PROTOBUF_LITE
+  return 0;
+#else
   size_t size = node_.SpaceUsedLong();
   if (!IsLeaf()) {
     size += children_[0]->EstimateSizeInByte();
     size += children_[1]->EstimateSizeInByte();
   }
   return size;
+#endif  // YGG_PROTOBUF_LITE
 }
 
 int64_t NodeWithChildren::NumNodes() const {
@@ -1530,11 +1538,15 @@ void SetLeafIndices(DecisionForest* trees) {
 
 size_t EstimateSizeInByte(
     const std::vector<std::unique_ptr<DecisionTree>>& trees) {
+#ifdef YGG_PROTOBUF_LITE
+  return 0;
+#else
   size_t size = 0;
   for (const auto& tree : trees) {
     size += tree->EstimateModelSizeInBytes();
   }
   return size;
+#endif  // YGG_PROTOBUF_LITE
 }
 
 // Number of nodes in a list of decision trees.

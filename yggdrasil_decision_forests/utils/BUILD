@@ -235,9 +235,6 @@ cc_library_ydf(
 
 cc_library_ydf(
     name = "protobuf",
-    srcs = [
-        "protobuf.cc",
-    ],
     hdrs = [
         "protobuf.h",
     ],
