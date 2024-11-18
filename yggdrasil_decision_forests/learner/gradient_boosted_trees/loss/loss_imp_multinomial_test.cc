@@ -179,7 +179,8 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLoss) {
       {}, model::proto::Task::CLASSIFICATION, label_column);
   LossResults loss_results;
   if (threaded) {
-    utils::concurrency::ThreadPool thread_pool("", 4);
+    utils::concurrency::ThreadPool thread_pool(
+        4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp.Loss(dataset,
@@ -226,7 +227,8 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
       {}, model::proto::Task::CLASSIFICATION, label_column);
   LossResults loss_results;
   if (threaded) {
-    utils::concurrency::ThreadPool thread_pool("", 4);
+    utils::concurrency::ThreadPool thread_pool(
+        4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(
         loss_results,

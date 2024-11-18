@@ -226,7 +226,8 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
   utils::RandomEngine random(1234);
 
   if (threaded) {
-    utils::concurrency::ThreadPool thread_pool("", 4);
+    utils::concurrency::ThreadPool thread_pool(
+        4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
     ASSERT_OK(loss_imp.UpdateGradients(
         labels, predictions,
@@ -263,7 +264,8 @@ TEST_P(PoissonLossTest, ComputeLoss) {
                              dataset.data_spec().columns(0));
   LossResults loss_results;
   if (threaded) {
-    utils::concurrency::ThreadPool thread_pool("", 4);
+    utils::concurrency::ThreadPool thread_pool(
+        4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp.Loss(dataset,

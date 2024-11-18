@@ -34,14 +34,16 @@ namespace {
 using ::testing::TestWithParam;
 
 TEST(ThreadPool, Empty) {
-  { ThreadPool pool("MyPool", 1); }
+  {
+    ThreadPool pool(1, {.name_prefix = std::string("MyPool")});
+  }
 }
 
 TEST(ThreadPool, Simple) {
   std::atomic<int> counter{0};
   const int n = 100;
   {
-    ThreadPool pool("MyPool", 1);
+    ThreadPool pool(1, {.name_prefix = std::string("MyPool")});
     pool.StartWorkers();
     for (int i = 1; i <= n; i++) {
       pool.Schedule([&, i]() { counter += i; });
@@ -146,7 +148,7 @@ TEST(Utils, ConcurrentForLoop) {
   std::atomic<int> sum{0};
   std::vector<int> items(500, 2);
   {
-    ThreadPool pool("", 5);
+    ThreadPool pool(5, {.name_prefix = std::string("")});
     pool.StartWorkers();
     ConcurrentForLoop(
         4, &pool, items.size(),

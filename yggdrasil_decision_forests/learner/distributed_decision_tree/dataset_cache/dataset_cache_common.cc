@@ -207,8 +207,9 @@ bool HasAllRequiredFiles(absl::string_view cache_path, const int num_columns,
 
   std::atomic<bool> is_valid{true};
   {
-    utils::concurrency::ThreadPool thread_pool("HasAllRequiredFiles",
-                                               /*num_threads=*/20);
+    utils::concurrency::ThreadPool thread_pool(
+        /*num_threads=*/20,
+        {.name_prefix = std::string("HasAllRequiredFiles")});
 
     // Parse all the metadata.pb files.
     thread_pool.StartWorkers();

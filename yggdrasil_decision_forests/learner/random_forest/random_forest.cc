@@ -578,7 +578,7 @@ RandomForestLearner::TrainWithStatusImpl(
   std::atomic<int> num_trained_trees{0};
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
-        "TrainRF", deployment().num_threads());
+        deployment().num_threads(), {.name_prefix = std::string("TrainRF")});
 
     pool.StartWorkers();
     for (int tree_idx = 0; tree_idx < rf_config.num_trees(); tree_idx++) {

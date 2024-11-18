@@ -258,8 +258,9 @@ MultitaskerLearner::TrainWithStatusImpl(
               << secondary_task_idxs.size() << " model(s)";
 
     {
-      utils::concurrency::ThreadPool pool("multitasker",
-                                          deployment().num_threads());
+      utils::concurrency::ThreadPool pool(
+          deployment().num_threads(),
+          {.name_prefix = std::string("multitasker")});
       pool.StartWorkers();
       for (const auto subtask_idx : secondary_task_idxs) {
         pool.Schedule([train_subtask_nostatus, subtask_idx]() {
@@ -288,8 +289,9 @@ MultitaskerLearner::TrainWithStatusImpl(
   if (!primary_task_idxs.empty()) {
     LOG(INFO) << "Train multitasker primary tasks with "
               << primary_task_idxs.size() << " model(s)";
-    utils::concurrency::ThreadPool pool("multitasker",
-                                        deployment().num_threads());
+    utils::concurrency::ThreadPool pool(
+        deployment().num_threads(),
+        {.name_prefix = std::string("multitasker")});
     pool.StartWorkers();
     for (const auto subtask_idx : primary_task_idxs) {
       pool.Schedule([train_subtask_nostatus, subtask_idx]() {

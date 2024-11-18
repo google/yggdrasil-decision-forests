@@ -1487,7 +1487,8 @@ TEST(Metric, RMSE) {
 }
 
 TEST(Metric, RMSEThreaded) {
-  utils::concurrency::ThreadPool thread_pool("", 4);
+  utils::concurrency::ThreadPool thread_pool(4,
+                                             {.name_prefix = std::string("")});
   thread_pool.StartWorkers();
   // R> sqrt(mean((c(1,2,3)-c(1,3,4))^2))
   // 0.8164966
@@ -1518,7 +1519,8 @@ TEST_P(MAETest, MAE) {
   const bool threaded = GetParam();
   const double test_precision = 0.0001;
 
-  utils::concurrency::ThreadPool thread_pool("", 4);
+  utils::concurrency::ThreadPool thread_pool(4,
+                                             {.name_prefix = std::string("")});
   if (threaded) {
     thread_pool.StartWorkers();
   }

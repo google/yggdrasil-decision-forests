@@ -416,7 +416,8 @@ absl::Status ShardedMultiBitmap::SaveToFile(const std::string& base_path,
   utils::concurrency::Mutex status_mutex;
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
-        "ShardedMultiBitmap::SaveToFile", num_threads);
+        num_threads,
+        {.name_prefix = std::string("ShardedMultiBitmap::SaveToFile")});
     pool.StartWorkers();
     for (uint64_t shard_idx = 0; shard_idx < shards_.size(); shard_idx++) {
       pool.Schedule([shard_idx, base_path, &status, &status_mutex, this]() {

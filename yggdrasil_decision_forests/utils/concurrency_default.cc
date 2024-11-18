@@ -25,8 +25,8 @@ Thread::Thread(std::function<void(void)> call) : thread_(std::move(call)) {}
 
 void Thread::Join() { thread_.join(); }
 
-ThreadPool::ThreadPool(std::string name, int num_threads)
-    : name_(std::move(name)), num_threads_(num_threads) {}
+ThreadPool::ThreadPool(int num_threads, Options options)
+    : name_(std::move(options.name_prefix)), num_threads_(num_threads) {}
 
 ThreadPool::~ThreadPool() { JoinAllAndStopThreads(); }
 

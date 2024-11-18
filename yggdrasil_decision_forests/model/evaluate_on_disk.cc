@@ -99,7 +99,8 @@ absl::Status AppendEvaluation(const AbstractModel& model,
 
     {
       const int num_threads = std::min<int>(shards.size(), 20);
-      utils::concurrency::ThreadPool thread_pool("evaluation", num_threads);
+      utils::concurrency::ThreadPool thread_pool(
+          num_threads, {.name_prefix = std::string("evaluation")});
       thread_pool.StartWorkers();
       for (const auto& shard : shards) {
         thread_pool.Schedule([&shard, &mutex, &process_shard, &worker_status,

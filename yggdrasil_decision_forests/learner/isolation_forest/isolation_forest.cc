@@ -896,7 +896,7 @@ IsolationForestLearner::TrainWithStatusImpl(
   utils::concurrency::Mutex global_mutex;
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
-        "TrainIF", deployment().num_threads());
+        deployment().num_threads(), {.name_prefix = std::string("TrainIF")});
     pool.StartWorkers();
     const auto num_trees = config.if_config->num_trees();
     model->mutable_decision_trees()->resize(num_trees);

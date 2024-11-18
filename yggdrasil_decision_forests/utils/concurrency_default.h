@@ -40,10 +40,16 @@ class Thread {
 
 class ThreadPool {
  public:
+  struct Options {
+    std::string name_prefix;
+  };
   // Creates the thread pool. Don't start any thread yet.
   // If "num_threads==0", callback are executed synchronously without threading
   // during "Schedule" calls.
-  ThreadPool(std::string name, int num_threads);
+  ThreadPool(int num_threads, Options options);
+  ThreadPool(int num_threads) : ThreadPool(num_threads, {}) {}
+  [[deprecated]] ThreadPool(std::string name, int num_threads)
+      : ThreadPool(num_threads, {std::move(name)}) {}
 
   // Ensure all the jobs are done and all the threads have been joined.
   ~ThreadPool();

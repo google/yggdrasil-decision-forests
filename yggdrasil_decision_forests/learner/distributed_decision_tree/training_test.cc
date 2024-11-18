@@ -42,7 +42,8 @@ namespace {
 template <typename LabelAccessor, typename Tester>
 void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
                          const int num_threads = 2) {
-  utils::concurrency::ThreadPool thread_pool("", num_threads);
+  utils::concurrency::ThreadPool thread_pool(num_threads,
+                                             {.name_prefix = std::string("")});
   thread_pool.StartWorkers();
 
   auto example_to_node =
@@ -243,7 +244,8 @@ class AdultClassificationDataset : public ::testing::Test {
 };
 
 TEST_F(AdultClassificationDataset, AggregateLabelStatisticsClassification) {
-  utils::concurrency::ThreadPool thread_pool("", 2);
+  utils::concurrency::ThreadPool thread_pool(2,
+                                             {.name_prefix = std::string("")});
   thread_pool.StartWorkers();
 
   auto example_to_node = CreateExampleToNodeMap(dataset_->num_examples());
@@ -273,7 +275,8 @@ TEST_F(AdultClassificationDataset, AggregateLabelStatisticsClassification) {
 }
 
 TEST_F(AdultClassificationDataset, ManualCheck) {
-  utils::concurrency::ThreadPool thread_pool("", 2);
+  utils::concurrency::ThreadPool thread_pool(2,
+                                             {.name_prefix = std::string("")});
   thread_pool.StartWorkers();
 
   auto example_to_node = CreateExampleToNodeMap(dataset_->num_examples());

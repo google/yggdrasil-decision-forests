@@ -486,7 +486,8 @@ TEST(DISABLED_LargeDataset, Base) {
     };
 
     {
-      ThreadPool pool("create_dataset", /*num_threads=*/5);
+      ThreadPool pool(
+          /*num_threads=*/5, {.name_prefix = std::string("create_dataset")});
       pool.StartWorkers();
       for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
         pool.Schedule([shard_idx, create_shard]() { create_shard(shard_idx); });

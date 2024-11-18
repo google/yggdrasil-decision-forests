@@ -818,7 +818,8 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
       evaluation_options, label_col_spec, &aggregated_evaluation));
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
-        "Evaluator", deployment_evaluation.num_threads());
+        deployment_evaluation.num_threads(),
+        {.name_prefix = std::string("Evaluator")});
     pool.StartWorkers();
     for (int fold_idx = 0; fold_idx < num_folds; fold_idx++) {
       pool.Schedule([&train_and_evaluate, fold_idx, seed{rnd()}]() {

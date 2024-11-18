@@ -270,7 +270,8 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
   int exported_columns = 0;
 
   {
-    utils::concurrency::ThreadPool thread_pool("ExportColumns", kNumThreads);
+    utils::concurrency::ThreadPool thread_pool(
+        kNumThreads, {.name_prefix = std::string("ExportColumns")});
     thread_pool.StartWorkers();
     for (const auto column_idx : request.columns()) {
       thread_pool.Schedule([&, column_idx]() {

@@ -142,7 +142,8 @@ TEST_P(MeanSquareErrorLossTest, ComputeRegressionLoss) {
                                       dataset.data_spec().columns(0));
   LossResults loss_results;
   if (threaded) {
-    utils::concurrency::ThreadPool thread_pool("", 4);
+    utils::concurrency::ThreadPool thread_pool(
+        4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp.Loss(dataset,
@@ -184,7 +185,8 @@ TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
   EXPECT_OK(index.Initialize(dataset, 0, 1));
   LossResults loss_results;
   if (threaded) {
-    utils::concurrency::ThreadPool thread_pool("", 4);
+    utils::concurrency::ThreadPool thread_pool(
+        4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp.Loss(dataset,
