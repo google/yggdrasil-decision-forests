@@ -224,6 +224,36 @@ void AddMinimumDepthPerPath(const NodeWithChildren& node, const int depth,
   }
 }
 
+std::string AnchorToString(
+    const proto::Condition::NumericalVectorSequence::Anchor& anchor) {
+  std::string result;
+  absl::StrAppend(&result, "[");
+  for (int i = 0; i < anchor.grounded_size(); ++i) {
+    if (i > 0) {
+      absl::StrAppend(&result, ", ");
+    }
+    absl::StrAppendFormat(&result, "%.5g", anchor.grounded(i));
+  }
+  absl::StrAppend(&result, "]");
+  return result;
+}
+
+absl::Span<const float> AnchorToVector(
+    const proto::Condition::NumericalVectorSequence::Anchor& anchor) {
+  return absl::Span<const float>(anchor.grounded());
+}
+
+float SquaredDistance(const absl::Span<const float> a,
+                      const absl::Span<const float> b) {
+  DCHECK_EQ(a.size(), b.size());
+  float acc = 0;
+  for (size_t i = 0; i < a.size(); i++) {
+    const float v = a[i] - b[i];
+    acc += v * v;
+  }
+  return acc;
+}
+
 }  // namespace
 
 std::vector<int32_t> ExactElementsFromContainsCondition(
@@ -320,6 +350,22 @@ void AppendConditionDescription(
       }
       absl::StrAppend(description, ">=", oblique.threshold());
     } break;
+
+    case proto::Condition::kNumericalVectorSequence:
+      switch (node.condition().numerical_vector_sequence().type_case()) {
+        case proto::Condition::NumericalVectorSequence::kCloserThan: {
+          const auto& closer_than =
+              node.condition().numerical_vector_sequence().closer_than();
+          absl::StrAppend(description, " contains X with | X - ",
+                          AnchorToString(closer_than.anchor()),
+                          " | <= ", closer_than.threshold());
+        } break;
+        case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
+          absl::StrAppend(description, "Invalid vector sequence condition");
+          break;
+      }
+      break;
+
     case proto::Condition::TYPE_NOT_SET:
       absl::StrAppend(description, "Unknown-type");
       break;
@@ -463,6 +509,10 @@ bool NodeWithChildren::CheckStructure(
         return false;
       }
       break;
+
+    case proto::Condition::kNumericalVectorSequence:
+      break;
+
     case proto::Condition::TYPE_NOT_SET:
       break;
   }
@@ -589,7 +639,7 @@ void NodeWithChildren::TurnIntoLeaf() {
 }
 
 struct EvalConditionTrueValue {
-  bool operator()(
+  absl::StatusOr<bool> operator()(
       const std::vector<dataset::VerticalDataset::BooleanColumn::Format>& data,
       UnsignedExampleIdx example_idx, const bool na_value) {
     const auto value = data[example_idx];
@@ -606,7 +656,7 @@ struct EvalConditionDiscretizedHigher {
       const proto::Condition::DiscretizedHigher& condition)
       : threshold(condition.threshold()) {}
 
-  bool operator()(
+  absl::StatusOr<bool> operator()(
       const std::vector<
           dataset::VerticalDataset::DiscretizedNumericalColumn::Format>& data,
       UnsignedExampleIdx example_idx, const bool na_value) {
@@ -626,9 +676,10 @@ struct EvalConditionHigher {
   EvalConditionHigher(const proto::Condition::Higher condition)
       : threshold(condition.threshold()) {}
 
-  bool operator()(const std::vector<
-                      dataset::VerticalDataset::NumericalColumn::Format>& data,
-                  UnsignedExampleIdx example_idx, const bool na_value) {
+  absl::StatusOr<bool> operator()(
+      const std::vector<dataset::VerticalDataset::NumericalColumn::Format>&
+          data,
+      UnsignedExampleIdx example_idx, const bool na_value) {
     const float value = data[example_idx];
     if (ABSL_PREDICT_FALSE(std::isnan(value))) {
       return na_value;
@@ -644,7 +695,7 @@ struct EvalConditionContainsCategorical {
       const proto::Condition::ContainsVector& condition)
       : mask(condition.elements().begin(), condition.elements().end()) {}
 
-  bool operator()(
+  absl::StatusOr<bool> operator()(
       const std::vector<dataset::VerticalDataset::CategoricalColumn::Format>&
           data,
       UnsignedExampleIdx example_idx, const bool na_value) {
@@ -664,8 +715,9 @@ struct EvalConditionContainsCategoricalSet {
       const proto::Condition::ContainsVector& condition)
       : mask(condition.elements().begin(), condition.elements().end()) {}
 
-  bool operator()(const dataset::VerticalDataset::CategoricalSetColumn& data,
-                  UnsignedExampleIdx example_idx, const bool na_value) {
+  absl::StatusOr<bool> operator()(
+      const dataset::VerticalDataset::CategoricalSetColumn& data,
+      UnsignedExampleIdx example_idx, const bool na_value) {
     if (ABSL_PREDICT_FALSE(data.IsNa(example_idx))) {
       return na_value;
     }
@@ -682,7 +734,7 @@ struct EvalConditionContainsBitmapCategorical {
       const proto::Condition::ContainsBitmap& condition)
       : mask_bitmap(condition.elements_bitmap()) {}
 
-  bool operator()(
+  absl::StatusOr<bool> operator()(
       const std::vector<dataset::VerticalDataset::CategoricalColumn::Format>&
           data,
       UnsignedExampleIdx example_idx, const bool na_value) {
@@ -701,8 +753,9 @@ struct EvalConditionContainsBitmapCategoricalSet {
       const proto::Condition::ContainsBitmap& condition)
       : mask_bitmap(condition.elements_bitmap()) {}
 
-  bool operator()(const dataset::VerticalDataset::CategoricalSetColumn& data,
-                  UnsignedExampleIdx example_idx, const bool na_value) {
+  absl::StatusOr<bool> operator()(
+      const dataset::VerticalDataset::CategoricalSetColumn& data,
+      UnsignedExampleIdx example_idx, const bool na_value) {
     if (ABSL_PREDICT_FALSE(data.IsNa(example_idx))) {
       return na_value;
     }
@@ -748,8 +801,9 @@ struct EvalConditionOblique {
         na_replacements(condition.na_replacements().begin(),
                         condition.na_replacements().end()) {}
 
-  bool operator()(const Data& data, UnsignedExampleIdx example_idx,
-                  const bool na_value) {
+  absl::StatusOr<bool> operator()(const Data& data,
+                                  UnsignedExampleIdx example_idx,
+                                  const bool na_value) {
     float sum = 0.f;
     for (size_t item_idx = 0; item_idx < attributes.size(); item_idx++) {
       float value = (*data.attribute_data[item_idx])[example_idx];
@@ -770,30 +824,61 @@ struct EvalConditionOblique {
   std::vector<float> na_replacements;
 };
 
+struct EvalConditionVectorSequenceCloserThan {
+  EvalConditionVectorSequenceCloserThan(
+      const proto::Condition::NumericalVectorSequence::CloserThan& condition)
+      : condition_(condition),
+        threshold2_(condition_.threshold() * condition_.threshold()) {}
+
+  absl::StatusOr<bool> operator()(
+      const dataset::VerticalDataset::NumericalVectorSequenceColumn& col,
+      UnsignedExampleIdx example_idx, const bool na_value) {
+    if (col.IsNa(example_idx)) {
+      return na_value;
+    }
+
+    const auto anchor_value = AnchorToVector(condition_.anchor());
+    const auto sequence_len = col.SequenceLength(example_idx);
+    for (int vector_idx = 0; vector_idx < sequence_len; vector_idx++) {
+      ASSIGN_OR_RETURN(const auto vector,
+                       col.GetVector(example_idx, vector_idx));
+      const float distance2 = SquaredDistance(vector, anchor_value);
+      if (distance2 <= threshold2_) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const proto::Condition::NumericalVectorSequence::CloserThan& condition_;
+  float threshold2_;
+};
+
 template <typename EvalFn, typename T>
-void EvalConditionTemplate(EvalFn eval_fn,
-                           const std::vector<UnsignedExampleIdx>& examples,
-                           const T& data, const bool dataset_is_dense,
-                           const bool na_value,
-                           std::vector<UnsignedExampleIdx>* positive_examples,
-                           std::vector<UnsignedExampleIdx>* negative_examples) {
+absl::Status EvalConditionTemplate(
+    EvalFn eval_fn, const std::vector<UnsignedExampleIdx>& examples,
+    const T& data, const bool dataset_is_dense, const bool na_value,
+    std::vector<UnsignedExampleIdx>* positive_examples,
+    std::vector<UnsignedExampleIdx>* negative_examples) {
   std::vector<UnsignedExampleIdx>* example_sets[2] = {negative_examples,
                                                       positive_examples};
   if (!dataset_is_dense) {
     for (const UnsignedExampleIdx example_idx : examples) {
-      const bool eval = eval_fn(data, example_idx, na_value);
+      ASSIGN_OR_RETURN(const bool eval, eval_fn(data, example_idx, na_value));
       const auto dst = example_sets[eval];
       dst->push_back(example_idx);
     }
   } else {
     UnsignedExampleIdx dense_example_idx = 0;
     for (const UnsignedExampleIdx example_idx : examples) {
-      const bool eval = eval_fn(data, dense_example_idx, na_value);
+      ASSIGN_OR_RETURN(const bool eval,
+                       eval_fn(data, dense_example_idx, na_value));
       const auto dst = example_sets[eval];
       dense_example_idx++;
       dst->push_back(example_idx);
     }
   }
+  return absl::OkStatus();
 }
 
 void EvalConditionIsNaTemplate(
@@ -845,9 +930,9 @@ absl::Status EvalConditionOnDataset(
           dataset.ColumnWithCastWithStatus<
               dataset::VerticalDataset::BooleanColumn>(condition.attribute()));
       const auto& data = column_data->values();
-      EvalConditionTemplate(EvalConditionTrueValue(), examples, data,
-                            dataset_is_dense, condition.na_value(),
-                            positive_examples, negative_examples);
+      RETURN_IF_ERROR(EvalConditionTemplate(
+          EvalConditionTrueValue(), examples, data, dataset_is_dense,
+          condition.na_value(), positive_examples, negative_examples));
     } break;
 
     case proto::Condition::TypeCase::kDiscretizedHigherCondition: {
@@ -857,11 +942,11 @@ absl::Status EvalConditionOnDataset(
               dataset::VerticalDataset::DiscretizedNumericalColumn>(
               condition.attribute()));
       const auto& data = column_data->values();
-      EvalConditionTemplate(
+      RETURN_IF_ERROR(EvalConditionTemplate(
           EvalConditionDiscretizedHigher(
               condition.condition().discretized_higher_condition()),
           examples, data, dataset_is_dense, condition.na_value(),
-          positive_examples, negative_examples);
+          positive_examples, negative_examples));
     } break;
 
     case proto::Condition::TypeCase::kHigherCondition: {
@@ -870,10 +955,10 @@ absl::Status EvalConditionOnDataset(
                            dataset::VerticalDataset::NumericalColumn>(
                            condition.attribute()));
       const auto& data = column_data->values();
-      EvalConditionTemplate(
+      RETURN_IF_ERROR(EvalConditionTemplate(
           EvalConditionHigher(condition.condition().higher_condition()),
           examples, data, dataset_is_dense, condition.na_value(),
-          positive_examples, negative_examples);
+          positive_examples, negative_examples));
     } break;
 
     case proto::Condition::TypeCase::kContainsCondition: {
@@ -884,22 +969,22 @@ absl::Status EvalConditionOnDataset(
                              dataset::VerticalDataset::CategoricalColumn>(
                              condition.attribute()));
         const auto& data = column_data->values();
-        EvalConditionTemplate(EvalConditionContainsCategorical(
-                                  condition.condition().contains_condition()),
-                              examples, data, dataset_is_dense,
-                              condition.na_value(), positive_examples,
-                              negative_examples);
+        RETURN_IF_ERROR(EvalConditionTemplate(
+            EvalConditionContainsCategorical(
+                condition.condition().contains_condition()),
+            examples, data, dataset_is_dense, condition.na_value(),
+            positive_examples, negative_examples));
       } else if (column_data->type() ==
                  dataset::proto::ColumnType::CATEGORICAL_SET) {
         ASSIGN_OR_RETURN(const auto* column_data,
                          dataset.ColumnWithCastWithStatus<
                              dataset::VerticalDataset::CategoricalSetColumn>(
                              condition.attribute()));
-        EvalConditionTemplate(EvalConditionContainsCategoricalSet(
-                                  condition.condition().contains_condition()),
-                              examples, *column_data, dataset_is_dense,
-                              condition.na_value(), positive_examples,
-                              negative_examples);
+        RETURN_IF_ERROR(EvalConditionTemplate(
+            EvalConditionContainsCategoricalSet(
+                condition.condition().contains_condition()),
+            examples, *column_data, dataset_is_dense, condition.na_value(),
+            positive_examples, negative_examples));
       } else {
         return absl::InternalError(absl::StrCat(
             "Non supported column type for kContainsCondition condition: ",
@@ -915,22 +1000,22 @@ absl::Status EvalConditionOnDataset(
                              dataset::VerticalDataset::CategoricalColumn>(
                              condition.attribute()));
         const auto& data = column_data->values();
-        EvalConditionTemplate(
+        RETURN_IF_ERROR(EvalConditionTemplate(
             EvalConditionContainsBitmapCategorical(
                 condition.condition().contains_bitmap_condition()),
             examples, data, dataset_is_dense, condition.na_value(),
-            positive_examples, negative_examples);
+            positive_examples, negative_examples));
       } else if (column_data->type() ==
                  dataset::proto::ColumnType::CATEGORICAL_SET) {
         ASSIGN_OR_RETURN(const auto* column_data,
                          dataset.ColumnWithCastWithStatus<
                              dataset::VerticalDataset::CategoricalSetColumn>(
                              condition.attribute()));
-        EvalConditionTemplate(
+        RETURN_IF_ERROR(EvalConditionTemplate(
             EvalConditionContainsBitmapCategoricalSet(
                 condition.condition().contains_bitmap_condition()),
             examples, *column_data, dataset_is_dense, condition.na_value(),
-            positive_examples, negative_examples);
+            positive_examples, negative_examples));
       } else {
         return absl::InternalError(
             absl::StrCat("Non supported column type for "
@@ -943,16 +1028,38 @@ absl::Status EvalConditionOnDataset(
       const auto& ob_condition = condition.condition().oblique_condition();
       ASSIGN_OR_RETURN(const auto data, EvalConditionOblique::Data::Create(
                                             dataset, ob_condition));
-      EvalConditionTemplate(EvalConditionOblique(ob_condition), examples, data,
-                            dataset_is_dense, condition.na_value(),
-                            positive_examples, negative_examples);
+      RETURN_IF_ERROR(EvalConditionTemplate(
+          EvalConditionOblique(ob_condition), examples, data, dataset_is_dense,
+          condition.na_value(), positive_examples, negative_examples));
+    } break;
+
+    case proto::Condition::TypeCase::kNumericalVectorSequence: {
+      ASSIGN_OR_RETURN(
+          const auto* column_data,
+          dataset.ColumnWithCastWithStatus<
+              dataset::VerticalDataset::NumericalVectorSequenceColumn>(
+              condition.attribute()));
+      switch (condition.condition().numerical_vector_sequence().type_case()) {
+        case proto::Condition::NumericalVectorSequence::kCloserThan: {
+          RETURN_IF_ERROR(EvalConditionTemplate(
+              EvalConditionVectorSequenceCloserThan(
+                  condition.condition()
+                      .numerical_vector_sequence()
+                      .closer_than()),
+              examples, *column_data, dataset_is_dense, condition.na_value(),
+              positive_examples, negative_examples));
+
+        } break;
+        case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
+          return absl::InvalidArgumentError("No vector sequence condition set");
+      }
     } break;
   }
 
   return absl::OkStatus();
 }
 
-bool EvalConditionFromColumn(
+absl::StatusOr<bool> EvalConditionFromColumn(
     const proto::NodeCondition& condition,
     const dataset::VerticalDataset::AbstractColumn* column_data,
     const dataset::VerticalDataset& dataset, const row_t example_idx) {
@@ -1079,15 +1186,43 @@ bool EvalConditionFromColumn(
       return sum >= oblique.threshold();
     }
 
+    case proto::Condition::TypeCase::kNumericalVectorSequence: {
+      const auto* col = static_cast<
+          const dataset::VerticalDataset::NumericalVectorSequenceColumn* const>(
+          column_data);
+
+      switch (condition.condition().numerical_vector_sequence().type_case()) {
+        case proto::Condition::NumericalVectorSequence::kCloserThan: {
+          const auto& closer_than =
+              condition.condition().numerical_vector_sequence().closer_than();
+          const auto anchor_value = AnchorToVector(closer_than.anchor());
+          const auto sequence_len = col->SequenceLength(example_idx);
+          for (int vector_idx = 0; vector_idx < sequence_len; vector_idx++) {
+            ASSIGN_OR_RETURN(const auto vector,
+                             col->GetVector(example_idx, vector_idx));
+            const float distance2 = SquaredDistance(vector, anchor_value);
+            DCHECK_GT(closer_than.threshold(), 0);
+            if (distance2 <=
+                closer_than.threshold() * closer_than.threshold()) {
+              return true;
+            }
+          }
+          return false;
+        } break;
+        case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
+          LOG(FATAL) << "Non implemented";
+      }
+    } break;
+
     default:
       LOG(FATAL) << "Non implemented";
   }
   return false;
 }
 
-bool EvalCondition(const proto::NodeCondition& condition,
-                   const dataset::VerticalDataset& dataset,
-                   const row_t example_idx) {
+absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
+                                   const dataset::VerticalDataset& dataset,
+                                   const row_t example_idx) {
   DCHECK_GE(condition.attribute(), 0);
   DCHECK_LT(condition.attribute(), dataset.ncol());
 
@@ -1105,8 +1240,8 @@ bool EvalCondition(const proto::NodeCondition& condition,
   return EvalConditionFromColumn(condition, column_data, dataset, example_idx);
 }
 
-bool EvalCondition(const proto::NodeCondition& condition,
-                   const dataset::proto::Example& example) {
+absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
+                                   const dataset::proto::Example& example) {
   DCHECK_GE(condition.attribute(), 0);
   DCHECK_LT(condition.attribute(), example.attributes_size());
   const auto& attribute = example.attributes(condition.attribute());
@@ -1203,6 +1338,30 @@ bool EvalCondition(const proto::NodeCondition& condition,
       return sum >= condition.condition().oblique_condition().threshold();
     }
 
+    case proto::Condition::TypeCase::kNumericalVectorSequence: {
+      switch (condition.condition().numerical_vector_sequence().type_case()) {
+        case proto::Condition::NumericalVectorSequence::kCloserThan: {
+          const auto& closer_than =
+              condition.condition().numerical_vector_sequence().closer_than();
+          const auto anchor_value = AnchorToVector(closer_than.anchor());
+          for (const auto& proto_vector :
+               attribute.numerical_vector_sequence().vectors()) {
+            const absl::Span<const float> vector(proto_vector.values());
+            const float distance2 = SquaredDistance(vector, anchor_value);
+            if (distance2 <=
+                closer_than.threshold() * closer_than.threshold()) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        default:
+          DCHECK(false);
+          break;
+      }
+    } break;
+
     default:
       LOG(FATAL) << "Non implemented";
   }
@@ -1240,7 +1399,8 @@ const NodeWithChildren& DecisionTree::GetLeafAlt(
   const NodeWithChildren* current_node = root_.get();
   while (!current_node->IsLeaf()) {
     const bool condition_result =
-        EvalCondition(current_node->node().condition(), dataset, row_idx);
+        EvalCondition(current_node->node().condition(), dataset, row_idx)
+            .value();
     current_node = condition_result ? current_node->pos_child()
                                     : current_node->neg_child();
   }
@@ -1266,7 +1426,8 @@ const proto::Node& DecisionTree::GetLeafWithSwappedAttribute(
             ? row_id_for_selected_attribute
             : row_idx;
     const bool condition_result =
-        EvalCondition(current_node->node().condition(), dataset, node_row_idx);
+        EvalCondition(current_node->node().condition(), dataset, node_row_idx)
+            .value();
     current_node = condition_result ? current_node->pos_child()
                                     : current_node->neg_child();
   }
@@ -1280,7 +1441,7 @@ const NodeWithChildren& DecisionTree::GetLeafAlt(
   const auto* current_node = root_.get();
   while (!current_node->IsLeaf()) {
     const bool condition_result =
-        EvalCondition(current_node->node().condition(), example);
+        EvalCondition(current_node->node().condition(), example).value();
     current_node = condition_result ? current_node->pos_child()
                                     : current_node->neg_child();
   }
@@ -1301,7 +1462,8 @@ void DecisionTree::GetPath(const dataset::VerticalDataset& dataset,
   while (!current_node->IsLeaf()) {
     path->push_back(current_node);
     const bool condition_result =
-        EvalCondition(current_node->node().condition(), dataset, row_idx);
+        EvalCondition(current_node->node().condition(), dataset, row_idx)
+            .value();
     current_node = condition_result ? current_node->pos_child()
                                     : current_node->neg_child();
   }
@@ -1324,6 +1486,8 @@ std::string ConditionTypeToString(proto::Condition::TypeCase type) {
       return "DiscretizedHigherCondition";
     case proto::Condition::kObliqueCondition:
       return "ObliqueCondition";
+    case proto::Condition::kNumericalVectorSequence:
+      return "VectorSequence";
     case proto::Condition::TYPE_NOT_SET:
       CHECK(false);
   }
@@ -1461,6 +1625,8 @@ absl::Status NodeWithChildren::Validate(
               "Non matching attribute in oblique condition");
         }
         break;
+      case proto::Condition::kNumericalVectorSequence:
+        return absl::InvalidArgumentError("Not implemented");
       case proto::Condition::TYPE_NOT_SET:
         return absl::InvalidArgumentError("Unknown condition");
     }

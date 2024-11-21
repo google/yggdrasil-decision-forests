@@ -143,16 +143,22 @@ class EvalConditions : public ::testing::Test {
   std::string CheckCondition(absl::string_view text_proto_condition,
                              const int dataset_row,
                              const bool expected_result) {
-    const proto::NodeCondition condition =
+    const proto::NodeCondition proto_condition =
         PARSE_TEST_PROTO(text_proto_condition);
+    return CheckCondition(proto_condition, dataset_row, expected_result);
+  }
 
+  std::string CheckCondition(const proto::NodeCondition& condition,
+                             const int dataset_row,
+                             const bool expected_result) {
     // Evaluate on single example on dataset
-    EXPECT_EQ(EvalCondition(condition, dataset_, dataset_row), expected_result);
+    EXPECT_EQ(EvalCondition(condition, dataset_, dataset_row).value(),
+              expected_result);
 
     // Evaluate on single proto example
     dataset::proto::Example example;
     dataset_.ExtractExample(dataset_row, &example);
-    EXPECT_EQ(EvalCondition(condition, example), expected_result);
+    EXPECT_EQ(EvalCondition(condition, example).value(), expected_result);
 
     // Evaluate on full dataset
     std::vector<UnsignedExampleIdx> positive_examples;
@@ -166,6 +172,12 @@ class EvalConditions : public ::testing::Test {
     EXPECT_EQ(positive_examples.size() == 1, expected_result);
     EXPECT_EQ(negative_examples.size() == 1, !expected_result);
 
+    std::string description;
+    AppendConditionDescription(dataset_.data_spec(), condition, &description);
+    return description;
+  }
+
+  std::string DescribeCondition(const proto::NodeCondition& condition) {
     std::string description;
     AppendConditionDescription(dataset_.data_spec(), condition, &description);
     return description;
@@ -425,6 +437,45 @@ TEST_F(EvalConditions, EvalConditionOblique) {
       }
       )",
       0, false);
+}
+
+TEST_F(EvalConditions, EvalConditionSequenceVector) {
+  dataset_ = dataset::VerticalDataset();
+  auto* col_spec = dataset::AddColumn(
+      "f1", dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+      dataset_.mutable_data_spec());
+  col_spec->mutable_numerical_vector_sequence()->set_vector_length(2);
+  EXPECT_OK(dataset_.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(
+      auto* col,
+      dataset_.MutableColumnWithCastWithStatus<
+          dataset::VerticalDataset::NumericalVectorSequenceColumn>(0));
+
+  col->AddNA();
+  col->Add({0.f, 0.f, 1.f, 0.f});
+  col->Add({0.f, 0.f, 1.f, 0.f, 1.f, 1.f});
+  dataset_.set_nrow(3);
+
+  const proto::NodeCondition condition_1 = PARSE_TEST_PROTO(R"pb(
+    na_value: false
+    attribute: 0
+    condition {
+      numerical_vector_sequence {
+        closer_than {
+          threshold: 0.2
+          anchor { grounded: 0.95 grounded: 0.95 }
+        }
+      }
+    }
+  )pb");
+
+  EXPECT_EQ(
+      DescribeCondition(condition_1),
+      R"("f1" contains X with | X - [0.95, 0.95] | <= 0.2 [s:0 n:0 np:0 miss:0])");
+
+  CheckCondition(condition_1, 0, false);
+  CheckCondition(condition_1, 1, false);
+  CheckCondition(condition_1, 2, true);
 }
 
 TEST(DecisionTree, ScaleRegressorOutput) {

@@ -36,6 +36,7 @@
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
@@ -60,17 +61,17 @@ static constexpr char kVariableImportanceInvMeanMinDepth[] =
 std::string ConditionTypeToString(proto::Condition::TypeCase type);
 
 // Evaluate a condition on an example contained in a vertical dataset.
-bool EvalCondition(const proto::NodeCondition& condition,
-                   const dataset::VerticalDataset& dataset,
-                   dataset::VerticalDataset::row_t example_idx);
+absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
+                                   const dataset::VerticalDataset& dataset,
+                                   dataset::VerticalDataset::row_t example_idx);
 
-bool EvalConditionFromColumn(
+absl::StatusOr<bool> EvalConditionFromColumn(
     const proto::NodeCondition& condition,
     const dataset::VerticalDataset::AbstractColumn* column_data,
     const dataset::VerticalDataset& dataset, row_t example_idx);
 
-bool EvalCondition(const proto::NodeCondition& condition,
-                   const dataset::proto::Example& example);
+absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
+                                   const dataset::proto::Example& example);
 
 absl::Status EvalConditionOnDataset(
     const dataset::VerticalDataset& dataset,

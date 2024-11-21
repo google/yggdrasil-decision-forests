@@ -130,6 +130,23 @@ message Condition {
     repeated float na_replacements = 4 [packed = true];
   }
 
+  message NumericalVectorSequence {
+    message Anchor {
+      // Static / direct value of the anchor.
+      repeated float grounded = 1 [packed = true];
+    }
+
+    message CloserThan {
+      // Condition of the type \exits a \in Obs; |a - anchor|_2 >= threshold.
+      optional Anchor anchor = 1;
+      optional float threshold = 2;
+    }
+
+    oneof type {
+      CloserThan closer_than = 1;
+    }
+  }
+
   // Type of condition.
   oneof type {
     NA na_condition = 1;
@@ -139,6 +156,7 @@ message Condition {
     ContainsBitmap contains_bitmap_condition = 5;
     DiscretizedHigher discretized_higher_condition = 6;
     Oblique oblique_condition = 7;
+    NumericalVectorSequence numerical_vector_sequence = 8;
     // Make sure to update "kNumConditionTypes" in "decision_tree.h"
     // accordingly.
   }

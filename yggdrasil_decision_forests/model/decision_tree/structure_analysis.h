@@ -31,7 +31,7 @@ namespace decision_tree {
 
 // Number of type of conditions.
 // Should be 1 + the higher field in proto::Condition.
-constexpr int kNumConditionTypes = 8;
+constexpr int kNumConditionTypes = 9;
 
 // Statistics about a forest.
 struct ForestStructureStatistics {
