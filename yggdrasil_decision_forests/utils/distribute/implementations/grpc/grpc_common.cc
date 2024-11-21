@@ -27,7 +27,8 @@ bool IsTransientError(const grpc::Status& status) {
           status.error_message() == "Broken pipe" ||
           status.error_message() == "keepalive watchdog timeout" ||
           absl::StartsWith(status.error_message(),
-                           "failed to connect to all addresses"));
+                           "failed to connect to all addresses") ||
+          absl::StrContains(status.error_message(), "empty address list"));
 }
 
 void ConfigureClientContext(grpc::ClientContext* context) {
