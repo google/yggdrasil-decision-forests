@@ -115,6 +115,7 @@ py_library(
     name = "generic_learner",
     srcs = ["generic_learner.py"],
     deps = [
+        ":abstract_feature_selector",
         ":custom_loss_py",
         ":hyperparameters",
         ":tuner",
@@ -134,6 +135,30 @@ py_library(
         "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_py_proto",
+    ],
+)
+
+py_library(
+    name = "abstract_feature_selector",
+    srcs = ["abstract_feature_selector.py"],
+    deps = [
+        "//ydf/dataset",
+        "//ydf/metric",
+        "//ydf/model:generic_model",
+    ],
+)
+
+py_library(
+    name = "feature_selector",
+    srcs = ["feature_selector.py"],
+    deps = [
+        ":abstract_feature_selector",
+        ":generic_learner",
+        "//ydf/dataset",
+        "//ydf/dataset:dataspec",
+        "//ydf/model:feature_selector_logs",
+        "//ydf/model:generic_model",
+        "//ydf/utils:log",
     ],
 )
 
@@ -164,6 +189,7 @@ py_library(
     name = "specialized_learners_pre_generated",
     srcs = ["specialized_learners_pre_generated.py"],
     deps = [
+        ":abstract_feature_selector",
         ":custom_loss_py",
         ":generic_learner",
         ":hyperparameters",
@@ -357,6 +383,23 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
+        "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
+    name = "feature_selector_test",
+    srcs = ["feature_selector_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    python_version = "PY3",
+    shard_count = 5,
+    deps = [
+        ":feature_selector",
+        ":specialized_learners",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
         "//ydf/utils:test_utils",
     ],
 )

@@ -18,7 +18,7 @@ import copy
 import datetime
 import os
 import re
-from typing import Optional, Sequence, Set, Union
+from typing import List, Optional, Sequence, Set, Union
 
 from absl import logging
 
@@ -30,6 +30,7 @@ from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
+from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
 from ydf.learner import custom_loss
 from ydf.learner import hyperparameters as hp_lib
 from ydf.learner import tuner as tuner_lib
@@ -63,6 +64,9 @@ class GenericLearner:
       explicit_learner_arguments: Optional[Set[str]],
       deployment_config: abstract_learner_pb2.DeploymentConfig,
       tuner: Optional[tuner_lib.AbstractTuner],
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ],
   ):
     # TODO: Refactor to a single hyperparameter dictionary with edit
     # access to these options.
@@ -77,6 +81,7 @@ class GenericLearner:
     self._data_spec_args = data_spec_args
     self._deployment_config = deployment_config
     self._tuner = tuner
+    self._feature_selector = feature_selector
 
     if self._label is not None and not isinstance(label, str):
       raise ValueError("The 'label' should be a string")
@@ -119,6 +124,10 @@ class GenericLearner:
       )
 
     self.validate_hyperparameters()
+
+  @property
+  def learner_name(self) -> str:
+    return self._learner_name
 
   @property
   def hyperparameters(self) -> hp_lib.HyperParameters:
@@ -233,37 +242,45 @@ class GenericLearner:
       A trained model.
     """
 
+    # Check arguments
     if valid is not None:
-      if not self.__class__.capabilities().support_validation_dataset:
+      if (
+          self._feature_selector is None
+          and not self.__class__.capabilities().support_validation_dataset
+      ):
         raise ValueError(
             f"The learner {self.__class__.__name__!r} does not use a"
             " validation dataset. If you can, add the validation examples to"
             " the training dataset."
         )
 
-    if isinstance(ds, str):
-      if valid is not None and not isinstance(valid, str):
+      if isinstance(ds, str) and not isinstance(valid, str):
         raise ValueError(
             "If the training dataset is a path, the validation dataset must"
             " also be a path."
         )
-      return self._train_from_path(ds, valid)
-    if valid is not None and isinstance(valid, str):
-      raise ValueError(
-          "The validation dataset may only be a path if the training dataset is"
-          " a path."
-      )
-
+      if not isinstance(ds, str) and isinstance(valid, str):
+        raise ValueError(
+            "The validation dataset may only be a path if the training dataset"
+            " is a path."
+        )
     self.validate_hyperparameters()
 
+    if self._feature_selector is not None:
+      return self._feature_selector.run(
+          learner=self, ds=ds, valid=valid, verbose=verbose
+      )
+
+    # Training
     saved_verbose = log.verbose(verbose) if verbose is not None else None
     try:
-      model = self._train_from_dataset(ds, valid)
+      if isinstance(ds, str):
+        return self._train_from_path(ds, valid)
+      else:
+        return self._train_from_dataset(ds, valid)
     finally:
       if saved_verbose is not None:
         log.verbose(saved_verbose)
-
-    return model
 
   def __str__(self) -> str:
     return f"""\
@@ -405,6 +422,20 @@ Hyper-parameters: ydf.{self._hyperparameters}
         training_config, hp_proto, self._deployment_config, cc_custom_loss
     )
 
+  def _non_input_feature_columns(self) -> List[str]:
+    """Lists columns that should not be used as input features."""
+
+    single_dim_columns = []
+    for column in [
+        self._label,
+        self._weights,
+        self._ranking_group,
+        self._uplift_treatment,
+    ]:
+      if column:
+        single_dim_columns.append(column)
+    return single_dim_columns
+
   def _get_vertical_dataset(
       self, ds: dataset.InputDataset
   ) -> dataset.VerticalDataset:
@@ -436,14 +467,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     else:
 
       # List of columns that cannot be unrolled.
-      single_dim_columns = [self._label]
-      for column in [
-          self._weights,
-          self._ranking_group,
-          self._uplift_treatment,
-      ]:
-        if column:
-          single_dim_columns.append(column)
+      single_dim_columns = self._non_input_feature_columns()
 
       effective_data_spec_args = None
       if self._data_spec is None:

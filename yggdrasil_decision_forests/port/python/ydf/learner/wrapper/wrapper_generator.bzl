@@ -76,6 +76,7 @@ def py_wrap_yggdrasil_learners(
             "//ydf/learner:generic_learner",
             "//ydf/learner:hyperparameters",
             "//ydf/learner:tuner",
+            "//ydf/learner:abstract_feature_selector",
             "//ydf/model/gradient_boosted_trees_model",
             "//ydf/model/isolation_forest_model",
             "//ydf/model/random_forest_model",

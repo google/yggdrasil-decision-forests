@@ -270,6 +270,7 @@ from $1learner import custom_loss
 from $1learner import generic_learner
 from $1learner import hyperparameters
 from $1learner import tuner as tuner_lib
+from $1learner import abstract_feature_selector as abstract_feature_selector_lib
 from $1model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from $1model.isolation_forest_model import isolation_forest_model
 from $1model.random_forest_model import random_forest_model
@@ -654,6 +655,9 @@ $2
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    feature_selector: If set, automatically select the input features of the
+      model using automated feature selection using the specified feature
+      selector.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -664,6 +668,9 @@ $3
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ] = None,
       explicit_args: Optional[Set[str]] = None,
       ):
 
@@ -700,6 +707,7 @@ $8
       explicit_learner_arguments=explicit_args,
       deployment_config=deployment_config,
       tuner=tuner,
+      feature_selector=feature_selector,
     )
 
   def train(

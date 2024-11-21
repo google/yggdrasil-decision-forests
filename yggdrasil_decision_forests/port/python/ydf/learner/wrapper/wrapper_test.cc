@@ -233,6 +233,9 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    feature_selector: If set, automatically select the input features of the
+      model using automated feature selection using the specified feature
+      selector.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -263,6 +266,9 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ] = None,
       explicit_args: Optional[Set[str]] = None,
       ):
 
@@ -306,6 +312,7 @@ class FakeAlgorithmLearner(generic_learner.GenericLearner):
       explicit_learner_arguments=explicit_args,
       deployment_config=deployment_config,
       tuner=tuner,
+      feature_selector=feature_selector,
     )
 
   def train(

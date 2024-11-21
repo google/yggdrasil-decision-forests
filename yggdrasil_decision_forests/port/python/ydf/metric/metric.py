@@ -365,7 +365,9 @@ class Evaluation:
             .transpose()
         )
 
-        return safe_div(np.trace(raw_confusion), np.sum(raw_confusion))
+        return safe_div(
+            np.trace(raw_confusion).item(), np.sum(raw_confusion).item()
+        )
     return None
 
   @property

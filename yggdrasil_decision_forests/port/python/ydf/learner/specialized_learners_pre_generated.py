@@ -38,6 +38,7 @@ from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
+from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
 from ydf.learner import custom_loss
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters
@@ -393,6 +394,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    feature_selector: If set, automatically select the input features of the
+      model using automated feature selection using the specified feature
+      selector.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -459,6 +463,9 @@ class RandomForestLearner(generic_learner.GenericLearner):
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -555,6 +562,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
         explicit_learner_arguments=explicit_args,
         deployment_config=deployment_config,
         tuner=tuner,
+        feature_selector=feature_selector,
     )
 
   def train(
@@ -823,6 +831,9 @@ class IsolationForestLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    feature_selector: If set, automatically select the input features of the
+      model using automated feature selection using the specified feature
+      selector.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -859,6 +870,9 @@ class IsolationForestLearner(generic_learner.GenericLearner):
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -909,6 +923,7 @@ class IsolationForestLearner(generic_learner.GenericLearner):
         explicit_learner_arguments=explicit_args,
         deployment_config=deployment_config,
         tuner=tuner,
+        feature_selector=feature_selector,
     )
 
   def train(
@@ -1428,6 +1443,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    feature_selector: If set, automatically select the input features of the
+      model using automated feature selection using the specified feature
+      selector.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -1515,6 +1533,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -1634,6 +1655,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
         explicit_learner_arguments=explicit_args,
         deployment_config=deployment_config,
         tuner=tuner,
+        feature_selector=feature_selector,
     )
 
   def train(
@@ -1920,6 +1942,9 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    feature_selector: If set, automatically select the input features of the
+      model using automated feature selection using the specified feature
+      selector.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -1963,6 +1988,9 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -2022,6 +2050,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
         explicit_learner_arguments=explicit_args,
         deployment_config=deployment_config,
         tuner=tuner,
+        feature_selector=feature_selector,
     )
 
   def train(
@@ -2400,6 +2429,9 @@ class CartLearner(generic_learner.GenericLearner):
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
       distributed.
+    feature_selector: If set, automatically select the input features of the
+      model using automated feature selection using the specified feature
+      selector.
     explicit_args: Helper argument for internal use. Throws if supplied
       explicitly by the user.
   """
@@ -2458,6 +2490,9 @@ class CartLearner(generic_learner.GenericLearner):
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
+      feature_selector: Optional[
+          abstract_feature_selector_lib.AbstractFeatureSelector
+      ] = None,
       explicit_args: Optional[Set[str]] = None,
   ):
 
@@ -2542,6 +2577,7 @@ class CartLearner(generic_learner.GenericLearner):
         explicit_learner_arguments=explicit_args,
         deployment_config=deployment_config,
         tuner=tuner,
+        feature_selector=feature_selector,
     )
 
   def train(

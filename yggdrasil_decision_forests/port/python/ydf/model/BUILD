@@ -226,6 +226,12 @@ py_library(
     ],
 )
 
+py_library(
+    name = "feature_selector_logs",
+    srcs = ["feature_selector_logs.py"],
+    deps = ["//ydf/metric"],
+)
+
 # Tests
 # =====
 

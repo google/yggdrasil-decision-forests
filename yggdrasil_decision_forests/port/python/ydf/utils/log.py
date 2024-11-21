@@ -105,6 +105,14 @@ def verbose(level: Union[int, bool] = 2) -> int:
   return old
 
 
+def reduce_verbose(v: Union[int, bool]) -> int:
+  """Reduces verbose by "one level"."""
+  if isinstance(v, int):
+    return max(0, v - 1)
+  else:
+    return 0
+
+
 def current_log_level() -> int:
   """Returns the log level currently set."""
   return _VERBOSE_LEVEL
