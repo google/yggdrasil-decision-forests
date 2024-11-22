@@ -29,6 +29,7 @@ void SetLoggingLevel(const int level, const bool print_file) {
 }
 
 void init_log(py::module_& m) {
+  logging::InitLoggingLib();
   m.def("SetLoggingLevel", SetLoggingLevel, py::arg("level"),
         py::arg("print_file"));
 }

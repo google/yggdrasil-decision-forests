@@ -785,8 +785,12 @@ def create_vertical_dataset_from_dict_of_values(
     dataset._dataset.SetMultiDimDataspec(effective_unroll_feature_info)  # pylint: disable=protected-access
 
     warnings = validate_dataspec(dataset.data_spec(), columns_to_check)
-    for warning in warnings:
-      log.warning("%s", warning)
+    if warnings:
+      log.warning(
+          "%s",
+          "\n".join(warnings),
+          message_id=log.WarningMessage.CATEGORICAL_LOOK_LIKE_NUMERICAL,
+      )
 
   dataset._finalize(set_num_rows_in_data_spec=(data_spec is None))  # pylint: disable=protected-access
   return dataset

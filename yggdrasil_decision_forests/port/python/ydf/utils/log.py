@@ -63,6 +63,7 @@ class WarningMessage(enum.Enum):
   UNNECESSARY_TASK_ARGUMENT = 9
   UNNECESSARY_LABEL_ARGUMENT = 10
   TFE_READING_IN_PYTHON_IS_SLOW = 11
+  CATEGORICAL_LOOK_LIKE_NUMERICAL = 12
 
 
 # List of already showed warning message that should not be displayed again.

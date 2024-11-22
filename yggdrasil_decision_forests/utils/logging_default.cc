@@ -26,8 +26,13 @@
 
 ABSL_FLAG(bool, alsologtostderr, false, "Log all messages to stderr");
 
+namespace yggdrasil_decision_forests::logging {
+void InitLoggingLib() { absl::InitializeLog(); }
+}  // namespace yggdrasil_decision_forests::logging
+
 void InitLogging(const char* usage, int* argc, char*** argv,
                  bool remove_flags) {
+  absl::InitializeLog();
   absl::SetProgramUsageMessage(usage);
   absl::ParseCommandLine(*argc, *argv);
 
@@ -35,6 +40,4 @@ void InitLogging(const char* usage, int* argc, char*** argv,
     absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
     absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
   }
-
-  absl::InitializeLog();
 }

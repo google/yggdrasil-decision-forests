@@ -31,13 +31,27 @@ void InitLogging(const char* usage, int* argc, char*** argv, bool remove_flags);
 namespace yggdrasil_decision_forests {
 namespace logging {
 
+// Initialize logging for a library.
+void InitLoggingLib();
+
 // Sets the amount of logging:
 // 0: Only fatal i.e. before a crash of the program.
 // 1: Only warning and fatal.
 // 2: Info, warning and fatal i.e. all logging. Default.
 inline void SetLoggingLevel(int level) {
-  absl::log_internal::RawSetMinLogLevel(
-      static_cast<absl::LogSeverityAtLeast>(level));
+  absl::LogSeverityAtLeast absl_level;
+  switch (level) {
+    case 0:
+      absl_level = absl::LogSeverityAtLeast::kFatal;
+      break;
+    case 1:
+      absl_level = absl::LogSeverityAtLeast::kWarning;
+      break;
+    default:
+      absl_level = absl::LogSeverityAtLeast::kInfo;
+      break;
+  }
+  absl::log_internal::RawSetMinLogLevel(absl_level);
 }
 
 // If true, logging messages include the timestamp, filename and line. True by
