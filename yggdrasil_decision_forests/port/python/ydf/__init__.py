@@ -58,6 +58,11 @@ CARTModel = RandomForestModel
 # Tuner
 from ydf.learner.tuner import RandomSearchTuner
 from ydf.learner.tuner import VizierTuner
+from ydf.model.optimizer_logs import OptimizerLogs
+
+# Feature selector
+from ydf.learner.feature_selector import BackwardSelectionFeatureSelector
+from ydf.model.feature_selector_logs import FeatureSelectorLogs
 
 # Utilities
 from ydf.utils.log import verbose

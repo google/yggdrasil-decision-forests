@@ -1496,7 +1496,7 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
     )
     self.assertStartsWith(
         dataset.validate_dataspec(bad_dataspec, [0])[0],
-        "Column 'f' is CATEGORICAL but",
+        "Column 'f' is detected as CATEGORICAL",
     )
 
     # Bad column not selected

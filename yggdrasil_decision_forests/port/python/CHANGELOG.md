@@ -2,10 +2,16 @@
 
 ## HEAD
 
+### Feature
+
+-   Add support for automatic feature selection with the `feature_selector`
+    learner constructor argument. See the [feature selection tutorial]() for
+    more details.
+
 ### Breaking
 
 -   Classification Label classes are now consistently ordered lexicographically
-     (for string labels) or increasingly (for integer labels).
+    (for string labels) or increasingly (for integer labels).
 -   Change typo partial_depepence_plot to partial_dependence_plot on
     model.analyze().
 
@@ -14,9 +20,6 @@
 -   Add support for Avro file for path / distributed training with the "avro:"
     prefix.
 -   Add support for discretized numerical features for in-memory datasets.
-
-### Feature
-
 -   Expose MRR for ranking models.
 -   Add `model.predict_class` to generate the most likely predicted class of
     classification models.
