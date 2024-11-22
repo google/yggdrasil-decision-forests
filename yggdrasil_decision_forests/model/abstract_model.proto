@@ -88,6 +88,9 @@ message AbstractModel {
   // Logs of the automated hyper-parameter tuning of the model.
   optional HyperparametersOptimizerLogs hyperparameter_optimizer_logs = 11;
 
+  // Logs of the automated feature selection of the model.
+  optional FeatureSelectionLogs feature_selection_logs = 13;
+
   // Indicate if a model is pure for serving i.e. the model was tripped of all
   // information not required for serving.
   optional bool is_pure_model = 12 [default = false];
@@ -153,6 +156,18 @@ message HyperparametersOptimizerLogs {
     // A NaN value indicates that the hyperparameters are unfeasible.
     optional float score = 3;
   }
+}
+
+message FeatureSelectionLogs {
+  // Logs of a feature selection algorithm.
+  message Iteration {
+    optional float score = 1;
+    repeated string features = 2;
+    map<string, float> metrics = 3;
+  }
+
+  repeated Iteration iterations = 1;
+  optional int32 best_iteration_idx = 2;
 }
 
 // Proto used to serialize / deserialize the model to / from string. See

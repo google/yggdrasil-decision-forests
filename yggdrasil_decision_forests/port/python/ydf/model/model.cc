@@ -161,7 +161,10 @@ void init_model(py::module_& m) {
       .def("ForceEngine", &GenericCCModel::ForceEngine, py::arg("engine_name"))
       .def("ListCompatibleEngines", &GenericCCModel::ListCompatibleEngines)
       // TODO: Remove when solved.
-      .def("weighted_training", &GenericCCModel::weighted_training);
+      .def("weighted_training", &GenericCCModel::weighted_training)
+      .def("set_feature_selection_logs",
+           &GenericCCModel::set_feature_selection_logs)
+      .def("feature_selection_logs", &GenericCCModel::feature_selection_logs);
 
   py::class_<BenchmarkInferenceCCResult>(m, "BenchmarkInferenceCCResult")
       .def_readwrite("duration_per_example",

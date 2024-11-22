@@ -103,6 +103,27 @@ class BackwardSelectionFeatureSelectorTest(LearnerTest):
         num_trees=_NUM_TREES,
     )
     model = learner.train(self.adult.train_pd)
+    logs = model.feature_selection_logs()
+    logging.info("Feature selection logs:\n%s", logs)
+
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.iterations, 14)
+    self.assertLen(logs.iterations[0].features, 14)
+    self.assertAlmostEqual(logs.iterations[0].score, -0.762, delta=0.1)
+    self.assertLen(logs.iterations[-1].features, 1)
+    self.assertAlmostEqual(logs.iterations[-1].score, -1, delta=0.1)
+    self.assertSetEqual(
+        set(logs.iterations[0].metrics.keys()), set(["accuracy", "loss"])
+    )
+
+    self.assertSetEqual(
+        set(model.input_feature_names()),
+        set(logs.iterations[logs.best_iteration_idx].features),
+    )
+
+    # At least one feature was removed
+    self.assertLess(len(model.input_feature_names()), 14)
+
     evaluation = model.evaluate(self.adult.test_pd)
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, _MIN_ACCURACY_ADULT)

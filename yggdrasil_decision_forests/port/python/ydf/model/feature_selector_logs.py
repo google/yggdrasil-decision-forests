@@ -16,6 +16,7 @@
 
 import dataclasses
 from typing import Dict, List, Optional
+from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.metric import metric
 
 
@@ -30,3 +31,35 @@ class Iteration:
 class FeatureSelectorLogs:
   iterations: List[Iteration] = dataclasses.field(default_factory=list)
   best_iteration_idx: Optional[int] = None
+
+
+def proto_to_value(
+    proto: abstract_model_pb2.FeatureSelectionLogs,
+) -> FeatureSelectorLogs:
+  return FeatureSelectorLogs(
+      iterations=[
+          Iteration(
+              score=iteration.score,
+              features=iteration.features[:],
+              metrics=dict(iteration.metrics),
+          )
+          for iteration in proto.iterations
+      ],
+      best_iteration_idx=proto.best_iteration_idx,
+  )
+
+
+def value_to_proto(
+    value: FeatureSelectorLogs,
+) -> abstract_model_pb2.FeatureSelectionLogs:
+  return abstract_model_pb2.FeatureSelectionLogs(
+      iterations=[
+          abstract_model_pb2.FeatureSelectionLogs.Iteration(
+              score=iteration.score,
+              features=iteration.features,
+              metrics=iteration.metrics,
+          )
+          for iteration in value.iterations
+      ],
+      best_iteration_idx=value.best_iteration_idx,
+  )

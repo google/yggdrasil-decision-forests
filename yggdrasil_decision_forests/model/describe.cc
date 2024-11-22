@@ -16,16 +16,22 @@
 #include "yggdrasil_decision_forests/model/describe.h"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <numeric>
 #include <string>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -37,6 +43,7 @@
 #include "yggdrasil_decision_forests/utils/html_content.h"
 #include "yggdrasil_decision_forests/utils/plot.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::model {
 namespace {
@@ -61,6 +68,10 @@ void AddKeyMultiLinesValue(utils::html::Html* dst, const absl::string_view key,
 
 bool HasTuner(const AbstractModel& model) {
   return model.hyperparameter_optimizer_logs().has_value();
+}
+
+bool HasFeatureSelector(const AbstractModel& model) {
+  return model.feature_selection_logs().has_value();
 }
 
 utils::html::Html Model(const model::AbstractModel& model) {
@@ -164,6 +175,11 @@ utils::html::Html TuningLogs(const model::AbstractModel& model) {
            " automatically selects the hyper-parameters of a learner.");
   content.Append(help);
 
+  content.Append(h::P(h::B("Note:"),
+                      "The hyper-parameters tuning logs are accessible "
+                      "programmatically in python with "
+                      "`model.hyperparameter_optimizer_logs()`."));
+
   const auto& logs = *model.hyperparameter_optimizer_logs();
 
   // Index the possible fields and scores.
@@ -235,6 +251,206 @@ utils::html::Html TuningLogs(const model::AbstractModel& model) {
   }
 
   content.Append(h::Table(h::Class("ydf_tuning_table"), rows));
+  return content;
+}
+
+// Creates a plot of the feature selector logs.
+absl::StatusOr<utils::plot::MultiPlot> FeatureSelectorLogsPlot(
+    const proto::FeatureSelectionLogs& logs,
+    const std::vector<std::string>& metric_keys) {
+  utils::plot::MultiPlot multiplot;
+  // Creates a plot for each metric, for the score and for the number of
+  // features.
+  ASSIGN_OR_RETURN(auto placer, utils::plot::PlotPlacer::Create(
+                                    2 + metric_keys.size(), 2, &multiplot));
+
+  std::vector<double> iteration_idxs(logs.iterations_size());
+  std::iota(iteration_idxs.begin(), iteration_idxs.end(), 0);
+
+  const auto update_min_max_value = [](const float value, float& min_value,
+                                       float& max_value) {
+    min_value = std::min(min_value, value);
+    max_value = std::max(max_value, value);
+  };
+
+  const auto add_best_iteration_vertical_line =
+      [&logs](const float min_value, const float max_value,
+              utils::plot::Plot* plot) {
+        if (!std::isinf(min_value)) {
+          // Adds a 10% extra
+          float margin = (max_value - min_value) / 10;
+
+          auto* vertical = plot->AddCurve();
+          vertical->xs.push_back(logs.best_iteration_idx());
+          vertical->xs.push_back(logs.best_iteration_idx());
+          vertical->ys.push_back(min_value - margin);
+          vertical->ys.push_back(max_value + margin);
+        }
+      };
+
+  // Score plot
+  {
+    ASSIGN_OR_RETURN(auto* plot, placer.NewPlot());
+    plot->show_legend = false;
+    plot->x_axis.label = "iteration";
+    plot->y_axis.label = "score";
+    auto* curve = plot->AddCurve();
+    curve->xs = iteration_idxs;
+    curve->ys.reserve(logs.iterations_size());
+    float min_value = +std::numeric_limits<float>::infinity();
+    float max_value = -std::numeric_limits<float>::infinity();
+    for (const auto& iteration : logs.iterations()) {
+      curve->ys.push_back(iteration.score());
+      update_min_max_value(iteration.score(), min_value, max_value);
+    }
+    add_best_iteration_vertical_line(min_value, max_value, plot);
+  }
+
+  // Number of features plot
+  {
+    ASSIGN_OR_RETURN(auto* plot, placer.NewPlot());
+    plot->show_legend = false;
+    plot->x_axis.label = "iteration";
+    plot->y_axis.label = "number of features";
+    auto* curve = plot->AddCurve();
+    curve->xs = iteration_idxs;
+    curve->ys.reserve(logs.iterations_size());
+    float min_value = +std::numeric_limits<float>::infinity();
+    float max_value = -std::numeric_limits<float>::infinity();
+    for (const auto& iteration : logs.iterations()) {
+      curve->ys.push_back(iteration.features_size());
+      update_min_max_value(iteration.features_size(), min_value, max_value);
+    }
+    add_best_iteration_vertical_line(min_value, max_value, plot);
+  }
+
+  for (const auto& metric_key : metric_keys) {
+    ASSIGN_OR_RETURN(auto* plot, placer.NewPlot());
+    plot->show_legend = false;
+    plot->x_axis.label = "iteration";
+    plot->y_axis.label = metric_key;
+    auto* curve = plot->AddCurve();
+    curve->xs = iteration_idxs;
+    curve->ys.reserve(logs.iterations_size());
+    float min_value = +std::numeric_limits<float>::infinity();
+    float max_value = -std::numeric_limits<float>::infinity();
+    for (const auto& iteration : logs.iterations()) {
+      const auto it_metric = iteration.metrics().find(metric_key);
+      if (it_metric != iteration.metrics().end()) {
+        curve->ys.push_back(it_metric->second);
+        update_min_max_value(it_metric->second, min_value, max_value);
+      } else {
+        curve->ys.push_back(std::numeric_limits<double>::quiet_NaN());
+      }
+    }
+
+    add_best_iteration_vertical_line(min_value, max_value, plot);
+  }
+
+  RETURN_IF_ERROR(placer.Finalize());
+  return multiplot;
+}
+
+// Creates a table of the feature selector logs.
+absl::StatusOr<utils::html::Html> FeatureSelectorLogsTable(
+    const proto::FeatureSelectionLogs& logs,
+    const std::vector<std::string>& metric_keys) {
+  namespace h = utils::html;
+
+  h::Html rows;
+  {
+    // Create header
+    h::Html row;
+    row.Append(h::Th("Iteration"));
+    row.Append(h::Th("Score"));
+    row.Append(h::Th("Metrics"));
+    row.Append(h::Th("Num features"));
+    row.Append(h::Th("Features"));
+    rows.Append(h::Tr(row));
+  }
+
+  // Fill table content
+  for (int iteration_idx = 0; iteration_idx < logs.iterations_size();
+       iteration_idx++) {
+    const auto& iteration = logs.iterations(iteration_idx);
+
+    h::Html row;
+    row.Append(h::Td(absl::StrCat(iteration_idx)));
+    row.Append(h::Td(absl::StrCat(iteration.score())));
+
+    std::string str_metrics;
+    for (const auto& metric_key : metric_keys) {
+      const auto& it_metric = iteration.metrics().find(metric_key);
+      if (it_metric == iteration.metrics().end()) {
+        continue;
+      }
+      absl::StrAppendFormat(&str_metrics, " %s:%g", it_metric->first,
+                            it_metric->second);
+    }
+    row.Append(h::Td(str_metrics));
+    row.Append(h::Td(absl::StrCat(iteration.features_size())));
+    row.Append(h::Td(absl::StrJoin(iteration.features(), " ")));
+
+    if (iteration_idx == logs.best_iteration_idx()) {
+      rows.Append(h::Tr(h::Class("best"), row));
+    } else {
+      rows.Append(h::Tr(row));
+    }
+  }
+  return h::Table(h::Class("ydf_tuning_table"), rows);
+}
+
+// Creates a HTML section for the feature selector logs.
+absl::StatusOr<utils::html::Html> FeatureSelectorLogs(
+    const model::AbstractModel& model, const absl::string_view block_id) {
+  namespace h = utils::html;
+  h::Html content;
+
+  const auto help =
+      h::P(h::A(h::Target("_blank"),
+                h::HRef(utils::documentation::GlossaryFeatureSelection()),
+                "Feature selection"),
+           " automatically identify and remove unnecessary input features of "
+           "the model.");
+  content.Append(help);
+  content.Append(h::P(
+      "The plots below show the score, number of features, and metric values "
+      "for each iteration of the feature selection process.  The orange "
+      "vertical line marks the highest score; which defines the features "
+      "are used in the final model. The table below gives the detailed logs."));
+
+  content.Append(h::P(
+      h::B("Note:"),
+      "The feature selection logs are accessible "
+      "programmatically in Python with "
+      "`model.feature_selection_logs()`. The selected features are accessible "
+      "programmatically in Python with `model.input_feature_names()`"));
+
+  const auto& logs = *model.feature_selection_logs();
+
+  // Find the metric keys.
+  absl::flat_hash_set<std::string> metric_keys_set;
+  for (const auto& metric : logs.iterations(0).metrics()) {
+    metric_keys_set.insert(metric.first);
+  }
+  std::vector<std::string> metric_keys(metric_keys_set.begin(),
+                                       metric_keys_set.end());
+  std::sort(metric_keys.begin(), metric_keys.end());
+
+  // Plot with the results
+  ASSIGN_OR_RETURN(const auto plot, FeatureSelectorLogsPlot(logs, metric_keys));
+  ASSIGN_OR_RETURN(
+      const auto html_plot,
+      utils::plot::ExportToHtml(plot, {.html_id_prefix = absl::StrCat(
+                                           block_id, "feature_selector")}));
+  content.Append(h::P(h::B("Plots")));
+  content.AppendRaw(html_plot);
+
+  // Table with the results.
+  ASSIGN_OR_RETURN(const auto table,
+                   FeatureSelectorLogsTable(logs, metric_keys));
+  content.Append(h::P(h::B("Table")));
+  content.Append(table);
   return content;
 }
 
@@ -446,6 +662,13 @@ absl::StatusOr<std::string> DescribeModelHtml(
 
   if (HasTuner(model)) {
     tabbar.AddTab("tuning", "Tuning", TuningLogs(model));
+  }
+
+  if (HasFeatureSelector(model)) {
+    ASSIGN_OR_RETURN(const auto feature_selector_html,
+                     FeatureSelectorLogs(model, block_id));
+    tabbar.AddTab("feature_selector", "Feature selection",
+                  feature_selector_html);
   }
 
   ASSIGN_OR_RETURN(const auto str_training, SelfEvaluation(model, block_id));

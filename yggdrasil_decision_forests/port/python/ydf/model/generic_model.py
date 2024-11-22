@@ -30,6 +30,7 @@ from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.metric import metric
 from ydf.model import analysis
+from ydf.model import feature_selector_logs
 from ydf.model import model_metadata
 from ydf.model import optimizer_logs
 from ydf.model import template_cpp_export
@@ -194,6 +195,27 @@ class GenericModel:
   def set_metadata(self, metadata: model_metadata.ModelMetadata):
     """Sets the model metadata."""
     self._model.set_metadata(metadata._to_proto_type())  # pylint:disable=protected-access
+
+  def set_feature_selection_logs(
+      self, value: Optional[feature_selector_logs.FeatureSelectorLogs]
+  ) -> None:
+    """Records the feature selection logs."""
+    if value is None:
+      self._model.set_feature_selection_logs(None)
+    else:
+      self._model.set_feature_selection_logs(
+          feature_selector_logs.value_to_proto(value)
+      )
+
+  def feature_selection_logs(
+      self,
+  ) -> Optional[feature_selector_logs.FeatureSelectorLogs]:
+    """Gets the feature selection logs."""
+    proto = self._model.feature_selection_logs()
+    if proto is None:
+      return None
+    else:
+      return feature_selector_logs.proto_to_value(proto)
 
   def describe(
       self,

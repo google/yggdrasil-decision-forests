@@ -38,6 +38,7 @@ DOC(GlossaryConfusionMatrix, "/glossary#confusion-matrix");
 DOC(GlossaryNumExamples, "/glossary#number-of-examples");
 DOC(GlossaryWeightedNumExamples, "/glossary#weighted-number-of-examples");
 DOC(GlossaryTuner, "/glossary#tuner");  // TODO: Write
+DOC(GlossaryFeatureSelection, "/glossary#feature_selection");
 DOC(VariableImportance, "/cli_user_manual#variable-importances");
 
 }  // namespace yggdrasil_decision_forests::utils::documentation

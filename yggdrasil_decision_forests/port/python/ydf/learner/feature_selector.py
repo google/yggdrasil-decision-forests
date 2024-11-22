@@ -350,5 +350,5 @@ class BackwardSelectionFeatureSelector(
         len(input_features),
     )
 
-    # TODO: Save logs in the model.
+    best_model.set_feature_selection_logs(logs)
     return best_model

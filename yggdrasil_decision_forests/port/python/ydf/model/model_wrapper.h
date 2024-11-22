@@ -175,6 +175,16 @@ class GenericCCModel {
   // TODO: Remove when solved.
   bool weighted_training() const { return model_->weights().has_value(); }
 
+  std::optional<model::proto::FeatureSelectionLogs> feature_selection_logs()
+      const {
+    return model_->feature_selection_logs();
+  }
+
+  void set_feature_selection_logs(
+      std::optional<model::proto::FeatureSelectionLogs> value) {
+    *model_->mutable_feature_selection_logs() = value;
+  }
+
  protected:
   std::unique_ptr<model::AbstractModel> model_;
   utils::concurrency::Mutex engine_mutex_;

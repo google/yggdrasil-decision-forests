@@ -261,3 +261,10 @@ The **default NDCG** is computed by averaging the gain over all the examples.
 See section 3 of
 [From RankNet to LambdaRank to LambdaMART: An Overview](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/MSR-TR-2010-82.pdf)
 for more details.
+
+## Feature selection
+
+Feature selection algorithms identify and remove unnecessary input features,
+improving model quality, and speeding up subsequent training. See the
+[Wikipedia article](https://en.wikipedia.org/wiki/Feature_selection) for more
+details.

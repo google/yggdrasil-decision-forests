@@ -424,6 +424,15 @@ class AbstractModel {
     return &hyperparameter_optimizer_logs_;
   }
 
+  // Feature selection logs
+  const std::optional<proto::FeatureSelectionLogs>& feature_selection_logs()
+      const {
+    return feature_selection_logs_;
+  }
+  std::optional<proto::FeatureSelectionLogs>* mutable_feature_selection_logs() {
+    return &feature_selection_logs_;
+  }
+
   // Clear the model from any information that is not required for model
   // serving. This function is called when the model is trained with
   // "pure_serving_model=true", or when using the "--pure_serving" operation in
@@ -494,6 +503,9 @@ class AbstractModel {
   // Prints information about the hyper-parameter optimizer logs.
   void AppendHyperparameterOptimizerLogs(std::string* description) const;
 
+  // Prints information about the feature selection logs.
+  void AppendFeatureSelectionLogs(std::string* description) const;
+
   // Checks if the ModelIOOptions are sufficient to load the model.
   //
   // At this time, this function checks if a prefix if given.
@@ -543,6 +555,8 @@ class AbstractModel {
 
   std::optional<proto::HyperparametersOptimizerLogs>
       hyperparameter_optimizer_logs_;
+
+  std::optional<proto::FeatureSelectionLogs> feature_selection_logs_;
 
   // Indicate if a model is pure for serving i.e. the model was tripped of all
   // information not required for serving.

@@ -167,7 +167,7 @@ def warning(
     _ALREADY_DISPLAYED_WARNING_IDS.add(message_id)
 
   if _VERBOSE_LEVEL >= 1:
-    print("Warning:", msg % args, flush=True, file=sys.stderr)
+    print("[Warning]", msg % args, flush=True, file=sys.stderr)
 
 
 def strict(value: bool = True) -> None:
