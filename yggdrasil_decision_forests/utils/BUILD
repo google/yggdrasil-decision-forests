@@ -235,9 +235,13 @@ cc_library_ydf(
 
 cc_library_ydf(
     name = "protobuf",
-    hdrs = [
-        "protobuf.h",
-    ],
+    hdrs = ["protobuf.h"],
+    defines = select({
+        "//yggdrasil_decision_forests:ydf_protobuf_lite": [
+            "YGG_PROTOBUF_LITE",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         ":logging",
         "@com_google_absl//absl/status",

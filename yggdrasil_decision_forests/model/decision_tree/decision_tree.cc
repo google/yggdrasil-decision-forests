@@ -376,29 +376,27 @@ void AppendConditionDescription(
       node.num_pos_training_examples_without_weight(), node.na_value());
 }
 
-size_t DecisionTree::EstimateModelSizeInBytes() const {
-#ifdef YGG_PROTOBUF_LITE
-  return 0;
-#else
+std::optional<size_t> DecisionTree::EstimateModelSizeInBytes() const {
+  if (!utils::ProtoSizeInBytesIsAvailable()) {
+    return {};
+  }
   if (root_) {
-    return root_->EstimateSizeInByte() + sizeof(DecisionTree);
+    return root_->EstimateSizeInByte().value_or(0) + sizeof(DecisionTree);
   } else {
     return sizeof(DecisionTree);
   }
-#endif  // YGG_PROTOBUF_LITE
 }
 
-size_t NodeWithChildren::EstimateSizeInByte() const {
-#ifdef YGG_PROTOBUF_LITE
-  return 0;
-#else
-  size_t size = node_.SpaceUsedLong();
+std::optional<size_t> NodeWithChildren::EstimateSizeInByte() const {
+  if (!utils::ProtoSizeInBytesIsAvailable()) {
+    return 0;
+  }
+  size_t size = utils::ProtoSizeInBytes(node_).value_or(0);
   if (!IsLeaf()) {
-    size += children_[0]->EstimateSizeInByte();
-    size += children_[1]->EstimateSizeInByte();
+    size += children_[0]->EstimateSizeInByte().value_or(0);
+    size += children_[1]->EstimateSizeInByte().value_or(0);
   }
   return size;
-#endif  // YGG_PROTOBUF_LITE
 }
 
 int64_t NodeWithChildren::NumNodes() const {
@@ -1702,17 +1700,16 @@ void SetLeafIndices(DecisionForest* trees) {
   }
 }
 
-size_t EstimateSizeInByte(
+std::optional<size_t> EstimateSizeInByte(
     const std::vector<std::unique_ptr<DecisionTree>>& trees) {
-#ifdef YGG_PROTOBUF_LITE
-  return 0;
-#else
+  if (!utils::ProtoSizeInBytesIsAvailable()) {
+    return {};
+  }
   size_t size = 0;
   for (const auto& tree : trees) {
-    size += tree->EstimateModelSizeInBytes();
+    size += tree->EstimateModelSizeInBytes().value_or(0);
   }
   return size;
-#endif  // YGG_PROTOBUF_LITE
 }
 
 // Number of nodes in a list of decision trees.

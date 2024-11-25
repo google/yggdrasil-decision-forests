@@ -20,9 +20,9 @@
   ASSERT_OK_AND_ASSIGN_IMPL(             \
       STATUS_MACROS_CONCAT_NAME(_status_or_value, __COUNTER__), lhs, rexpr);
 
-#define ASSERT_OK_AND_ASSIGN_IMPL(statusor, lhs, rexpr)     \
-  auto statusor = (rexpr);                                  \
-  ASSERT_TRUE(statusor.status().ok()) << statusor.status(); \
+#define ASSERT_OK_AND_ASSIGN_IMPL(statusor, lhs, rexpr)               \
+  auto statusor = (rexpr);                                            \
+  ASSERT_TRUE(statusor.status().ok()) << statusor.status().message(); \
   lhs = std::move(statusor).value()
 
 #define STATUS_MACROS_CONCAT_NAME(x, y) STATUS_MACROS_CONCAT_IMPL(x, y)

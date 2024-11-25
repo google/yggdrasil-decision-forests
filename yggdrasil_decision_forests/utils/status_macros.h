@@ -45,4 +45,11 @@
   TypeName& operator=(const TypeName&) = delete
 
 
+#define OPTIONAL_ASSIGN_OR_RETURN(lhs,rexpr) \
+  if(!(rexpr).has_value()){ \
+    return {}; \
+  } \
+  lhs = std::move((rexpr)).value();
+
+
 #endif  // YGGDRASIL_DECISION_FORESTS_UTILS_STATUS_MACROS_H_

@@ -24,7 +24,9 @@
 #include "absl/log/initialize.h"
 #include "absl/log/log.h"
 
+#ifndef YDF_NO_ALSOLOGTOSTDERR_FLAG
 ABSL_FLAG(bool, alsologtostderr, false, "Log all messages to stderr");
+#endif
 
 namespace yggdrasil_decision_forests::logging {
 void InitLoggingLib() { absl::InitializeLog(); }
@@ -35,9 +37,10 @@ void InitLogging(const char* usage, int* argc, char*** argv,
   absl::InitializeLog();
   absl::SetProgramUsageMessage(usage);
   absl::ParseCommandLine(*argc, *argv);
-
+#ifndef YDF_NO_ALSOLOGTOSTDERR_FLAG
   if (absl::GetFlag(FLAGS_alsologtostderr)) {
     absl::SetStderrThreshold(absl::LogSeverityAtLeast::kInfo);
     absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfo);
   }
+#endif
 }

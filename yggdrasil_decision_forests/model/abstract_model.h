@@ -370,9 +370,8 @@ class AbstractModel {
   virtual std::optional<size_t> ModelSizeInBytes() const { return {}; }
 
   // Estimates the memory usage of the attributes defined in the "AbstractModel"
-  // object.
-  // Returns 0 if the model is compiled with YGG_PROTOBUF_LITE.
-  size_t AbstractAttributesSizeInBytes() const;
+  // object. Returns {} if the model size is not available.
+  std::optional<size_t> AbstractAttributesSizeInBytes() const;
 
   // List of input features of the model.
   const std::vector<int>& input_features() const { return input_features_; }

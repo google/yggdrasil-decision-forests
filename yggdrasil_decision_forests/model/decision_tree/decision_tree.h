@@ -123,7 +123,7 @@ class NodeWithChildren {
  public:
   // Approximate size in memory (expressed in bytes) of the node and all its
   // children.
-  size_t EstimateSizeInByte() const;
+  std::optional<size_t> EstimateSizeInByte() const;
 
   // Exports the node (and its children) to a RecordIO writer. The nodes are
   // stored sequentially with a depth-first exploration.
@@ -237,7 +237,7 @@ class DecisionTree {
  public:
   // Estimates the memory usage of the model in RAM. The serialized or the
   // compiled version of the model can be much smaller.
-  size_t EstimateModelSizeInBytes() const;
+  std::optional<size_t> EstimateModelSizeInBytes() const;
 
   // Number of nodes in the tree.
   int64_t NumNodes() const;
@@ -349,7 +349,7 @@ void SetLeafIndices(DecisionForest* trees);
 
 // Estimate the size (in bytes) of a list of decision trees.
 // Returns 0 if the size cannot be estimated.
-size_t EstimateSizeInByte(const DecisionForest& trees);
+std::optional<size_t> EstimateSizeInByte(const DecisionForest& trees);
 
 // Number of nodes in a list of decision trees.
 int64_t NumberOfNodes(const DecisionForest& trees);

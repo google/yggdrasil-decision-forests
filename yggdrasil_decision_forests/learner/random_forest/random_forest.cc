@@ -570,7 +570,7 @@ RandomForestLearner::TrainWithStatusImpl(
     concurrent_fields.num_nodes_completed_trees.assign(rf_config.num_trees(),
                                                        -1);
     concurrent_fields.model_size_in_bytes =
-        mdl->AbstractAttributesSizeInBytes();
+        mdl->AbstractAttributesSizeInBytes().value_or(0);
   }
 
   // Note: "num_trained_trees" is defined outside of the following brackets so
@@ -699,7 +699,8 @@ RandomForestLearner::TrainWithStatusImpl(
           if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
             const auto tree_size_in_bytes =
                 decision_tree->EstimateModelSizeInBytes();
-            concurrent_fields.model_size_in_bytes += tree_size_in_bytes;
+            concurrent_fields.model_size_in_bytes +=
+                tree_size_in_bytes.value_or(0);
             // Note: A model should contain at least one tree.
             if (num_trained_trees > 0 &&
                 concurrent_fields.model_size_in_bytes >

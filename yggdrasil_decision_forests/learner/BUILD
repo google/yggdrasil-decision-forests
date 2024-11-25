@@ -76,6 +76,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:fold_generator_cc_proto",
         "//yggdrasil_decision_forests/utils:hyper_parameters",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",

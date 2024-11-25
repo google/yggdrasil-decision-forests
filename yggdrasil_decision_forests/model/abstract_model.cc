@@ -1443,21 +1443,22 @@ AbstractModel::BuildFastEngine(
   return engine_or;
 }
 
-size_t AbstractModel::AbstractAttributesSizeInBytes() const {
-#ifdef YGG_PROTOBUF_LITE
-  return 0;
-#else
-  size_t size = sizeof(*this) + name_.size() + data_spec_.SpaceUsedLong();
+std::optional<size_t> AbstractModel::AbstractAttributesSizeInBytes() const {
+  if (!utils::ProtoSizeInBytesIsAvailable()) {
+    return {};
+  }
+  size_t size = sizeof(*this) + name_.size() +
+                utils::ProtoSizeInBytes(data_spec_).value_or(0);
   size +=
       input_features_.size() * sizeof(decltype(input_features_)::value_type);
   if (weights_.has_value()) {
-    size += weights_->ByteSizeLong();
+    size += utils::ProtoSizeInBytes(weights_.value()).value_or(0);
   }
   for (const auto& v : precomputed_variable_importances_) {
-    size += sizeof(v) + v.first.size() + v.second.SpaceUsedLong();
+    size += sizeof(v) + v.first.size() +
+            utils::ProtoSizeInBytes(v.second).value_or(0);
   }
   return size;
-#endif  // YGG_PROTOBUF_LITE
 }
 
 absl::Status AbstractModel::ValidateModelIOOptions(

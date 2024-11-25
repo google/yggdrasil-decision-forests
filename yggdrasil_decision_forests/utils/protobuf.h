@@ -18,6 +18,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_PROTOBUF_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_PROTOBUF_H_
 
+#include <cstddef>
+#include <optional>
 #include <string>
 
 #include "absl/status/status.h"
@@ -104,6 +106,27 @@ absl::StatusOr<std::string> SerializeTextProto(const T& message,
   }
   return serialized_message;
 #endif  // YGG_PROTOBUF_LITE
+}
+
+// Returns the approximate size of a proto in bytes. If the proto size cannot be
+// computed (e.g., if compiled with ProtoLite, returns {}).
+template <typename T>
+std::optional<std::size_t> ProtoSizeInBytes(const T& message) {
+#ifdef YGG_PROTOBUF_LITE
+  return {};
+#else
+  return message.SpaceUsedLong();
+#endif
+}
+
+// Tells if it is possible to compute the size of a proto i.e. will
+// ProtoSizeInBytes return a value.
+inline bool ProtoSizeInBytesIsAvailable() {
+#ifdef YGG_PROTOBUF_LITE
+  return false;
+#else
+  return true;
+#endif
 }
 
 }  // namespace utils
