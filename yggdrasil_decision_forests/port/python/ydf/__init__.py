@@ -14,6 +14,7 @@
 
 """(P)YDF - Yggdrasil Decision Forests in Python."""
 
+# pylint: disable=g-statement-before-imports,g-importing-member,g-import-not-at-top,g-bad-import-order,reimported
 
 def _check_install():
   from yggdrasil_decision_forests.dataset import data_spec_pb2
@@ -28,8 +29,6 @@ Please, reinstall YDF with the "--force" argument, restart the notebook runtime 
 
 _check_install()
 
-
-# pylint: disable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported
 
 # Version
 from ydf.version import version as __version__
@@ -85,6 +84,7 @@ from ydf.model.model_metadata import ModelMetadata
 from ydf.model.model_lib import from_tensorflow_decision_forests
 from ydf.model.generic_model import from_sklearn
 from ydf.model.generic_model import NodeFormat
+from ydf.metric.evaluate import evaluate_predictions
 
 # Custom Loss
 from ydf.learner.custom_loss import RegressionLoss

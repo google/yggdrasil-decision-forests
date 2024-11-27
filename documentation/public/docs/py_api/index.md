@@ -50,6 +50,13 @@ A **Feature Selector** finds the optimal set of input features for the model.
 -   [BackwardSelectionFeatureSelector](BackwardSelectionFeatureSelector.md)
 -   [FeatureSelectorLogs](FeatureSelectorLogs.md)
 
+## Prediction Evaluation
+
+**Prediction Evaluation** allows evaluating arbitrary predictions with YDF's
+tools. 
+
+-   [Prediction evaluation](evaluate.md)
+
 ## Other
 
 -   [verbose](utilities.md#ydf.verbose): Control the amount of logging.

@@ -368,6 +368,15 @@ def ValidateHyperparameters(
 
 def EvaluationToStr(evaluation: metric_pb2.EvaluationResults) -> str: ...
 def EvaluationPlotToHtml(evaluation: metric_pb2.EvaluationResults) -> str: ...
+def EvaluatePredictions(
+    predictions: npt.NDArray[np.float32],
+    labels: Union[npt.NDArray[np.float32], npt.NDArray[np.int32]],
+    options: metric_pb2.EvaluationOptions,
+    weights: npt.NDArray[np.float32],
+    label_classes: Optional[list[str]],
+    ranking_groups: npt.NDArray[np.uint64],
+    random_seed: int,
+) -> metric_pb2.EvaluationResults: ...
 
 # Log bindings
 # ================

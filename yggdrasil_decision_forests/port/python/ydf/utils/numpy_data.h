@@ -57,6 +57,8 @@ class StridedSpan {
   // Number of values.
   size_t size() const { return size_; }
 
+  bool empty() const { return size_ == 0; }
+
   // Accesses to a value. "index" should be in [0, size).
   T operator[](const size_t index) const {
     DCHECK_LT(index, size_);
@@ -70,6 +72,7 @@ class StridedSpan {
 };
 
 typedef StridedSpan<float> StridedSpanFloat32;
+typedef StridedSpan<int> StridedSpanInt32;
 
 // Non owning accessor to a Numpy bytes array.
 struct NPByteArray {

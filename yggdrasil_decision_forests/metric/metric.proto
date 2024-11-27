@@ -80,7 +80,7 @@ message EvaluationOptions {
     Uplift uplift = 8;
     AnomalyDetection anomaly_detection = 9;
   }
-  // Percentage of sampled predictions. If no predictions need to be sampled
+  // Fraction of sampled predictions. If no predictions need to be sampled
   // (i.e. no part of the configuration needs it), this parameter is ignored and
   // no prediction is sampled.
   optional float prediction_sampling = 4 [default = 1];

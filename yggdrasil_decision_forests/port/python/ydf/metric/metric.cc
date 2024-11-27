@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
 #include <string>
@@ -22,6 +23,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "ydf/utils/status_casters.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace py = ::pybind11;
 
@@ -36,12 +38,13 @@ absl::StatusOr<std::string> EvaluationToStr(
 absl::StatusOr<std::string> EvaluationPlotToHtml(
     const metric::proto::EvaluationResults& evaluation) {
   std::string html;
-  metric::HtmlReportOptions options;
-  options.plot_width = 500;
-  options.plot_height = 400;
-  options.include_text_report = false;
-  options.include_title = false;
-  options.num_plots_per_columns = 2;
+  metric::HtmlReportOptions options = {
+      .include_title = false,
+      .include_text_report = false,
+      .plot_width = 500,
+      .plot_height = 400,
+      .num_plots_per_columns = 2,
+  };
   RETURN_IF_ERROR(metric::AppendHtmlReport(evaluation, &html, options));
   return html;
 }

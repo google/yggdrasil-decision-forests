@@ -2,12 +2,6 @@
 
 ## HEAD
 
-### Feature
-
--   Add support for automatic feature selection with the `feature_selector`
-    learner constructor argument. See the [feature selection tutorial]() for
-    more details.
-
 ### Breaking
 
 -   Classification Label classes are now consistently ordered lexicographically
@@ -23,6 +17,10 @@
 -   Expose MRR for ranking models.
 -   Add `model.predict_class` to generate the most likely predicted class of
     classification models.
+-   Add support for automatic feature selection with the `feature_selector`
+    learner constructor argument. See the [feature selection tutorial]() for
+    more details.
+-   Add standalone prediction evaluation `ydf.evaluate_predictions()`.
 
 ### Fix
 

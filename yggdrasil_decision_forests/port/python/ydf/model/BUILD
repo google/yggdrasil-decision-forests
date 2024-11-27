@@ -279,7 +279,6 @@ py_test(
     tags = ["manual"],
     deps = [
         ":export_tf",
-        ":generic_model",
         ":model_lib",
         # absl/logging dep,
         # absl/testing:absltest dep,

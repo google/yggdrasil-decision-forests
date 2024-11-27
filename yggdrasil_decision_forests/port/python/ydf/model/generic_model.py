@@ -744,9 +744,9 @@ Use `model.describe()` for more details
       bootstrapping_samples = bootstrapping
     else:
       raise ValueError(
-          "bootstrapping argument should be boolean or an integer greater"
-          " than 100 as bootstrapping will not yield useful results. Got"
-          f" {bootstrapping!r} instead"
+          "bootstrapping argument should be boolean or an integer greater than"
+          " 100 as bootstrapping will not yield useful results otherwise. Got"
+          f" {bootstrapping!r}"
       )
     if task is None:
       task = self.task()
