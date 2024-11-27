@@ -16,9 +16,12 @@
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -32,6 +35,7 @@
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -46,6 +50,7 @@
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.h"
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.pb.h"
 #include "yggdrasil_decision_forests/utils/plot.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -114,6 +119,16 @@ absl::Status Set1DCurveData(
   }
   for (int bin_idx = 0; bin_idx < pdp.pdp_bins_size(); bin_idx++) {
     const auto& bin = pdp.pdp_bins(bin_idx);
+    double observations_scaling = 1. / pdp.num_observations();
+    if (pdp.type() == PartialDependencePlotSet::PartialDependencePlot::CEP) {
+      if (pdp.attribute_info(0).num_observations_per_bins(bin_idx) != 0) {
+        observations_scaling =
+            1. / pdp.attribute_info(0).num_observations_per_bins(bin_idx);
+      } else {
+        observations_scaling = 0.;
+      }
+    }
+    DCHECK(!std::isnan(observations_scaling));
     switch (attribute_type) {
       case dataset::proto::ColumnType::NUMERICAL:
         STATUS_CHECK(bin.center_input_feature_values(0).has_numerical());
@@ -160,19 +175,19 @@ absl::Status Set1DCurveData(
         switch (target_type) {
           case CurveTargetType::kPrediction:
             target_dst->push_back(
-                bin.prediction().sum_of_regression_predictions() /
-                pdp.num_observations());
+                bin.prediction().sum_of_regression_predictions() *
+                observations_scaling);
 
             break;
           case CurveTargetType::kGroundTruth:
             target_dst->push_back(
-                bin.ground_truth().sum_of_regression_predictions() /
-                pdp.num_observations());
+                bin.ground_truth().sum_of_regression_predictions() *
+                observations_scaling);
 
             break;
           case CurveTargetType::kEvaluation:
-            target_dst->push_back(sqrt(bin.evaluation().sum_squared_error() /
-                                       pdp.num_observations()));
+            target_dst->push_back(sqrt(bin.evaluation().sum_squared_error() *
+                                       observations_scaling));
             break;
         }
         break;
@@ -182,8 +197,8 @@ absl::Status Set1DCurveData(
         switch (target_type) {
           case CurveTargetType::kPrediction:
             target_dst->push_back(
-                bin.prediction().sum_of_ranking_predictions() /
-                pdp.num_observations());
+                bin.prediction().sum_of_ranking_predictions() *
+                observations_scaling);
             break;
           default:
             return absl::InvalidArgumentError("Not implemented.");
@@ -195,8 +210,8 @@ absl::Status Set1DCurveData(
         switch (target_type) {
           case CurveTargetType::kPrediction:
             target_dst->push_back(
-                bin.prediction().sum_of_anomaly_detection_predictions() /
-                pdp.num_observations());
+                bin.prediction().sum_of_anomaly_detection_predictions() *
+                observations_scaling);
             break;
           default:
             return absl::InvalidArgumentError("Not implemented.");
@@ -1122,7 +1137,7 @@ absl::StatusOr<std::vector<FeatureVariationOutput>> ListOutputs(
       outputs.push_back(
           {.label = "output",
            .compute = [](const model::proto::Prediction& prediction) -> float {
-             DCHECK(prediction.uplift().treatment_effect_size() == 1);
+             DCHECK_EQ(prediction.uplift().treatment_effect_size(), 1);
              return prediction.uplift().treatment_effect(0);
            }});
       break;

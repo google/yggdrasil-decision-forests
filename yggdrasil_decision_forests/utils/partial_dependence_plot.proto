@@ -97,6 +97,14 @@ message PartialDependencePlotSet {
     }
 
     repeated AttributeInfo attribute_info = 4;
+
+    // The type of plot this represents.
+    optional Type type = 5;
+    enum Type {
+      UNKNOWN = 0;
+      PDP = 1;
+      CEP = 2;
+    }
   }
 
   repeated PartialDependencePlot pdps = 1;

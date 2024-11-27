@@ -24,6 +24,10 @@
 -   Add `model.predict_class` to generate the most likely predicted class of
     classification models.
 
+### Fix
+
+-   Regression and Ranking CEPs scaling corrected.
+
 ## 0.8.0 - 2024-09-23
 
 ### Breaking

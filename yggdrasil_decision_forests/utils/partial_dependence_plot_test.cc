@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.h"
 
+#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -22,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/strings/str_cat.h"
@@ -33,6 +35,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -271,19 +274,21 @@ class PartialDependencePlotTest : public testing::Test {
 
   dataset::proto::DataSpecification data_spec_;
   dataset::VerticalDataset dataset_;
+  proto::PartialDependencePlotSet cep_set_;
   proto::PartialDependencePlotSet pdp_set_;
   dataset::proto::Example example_;
 };
 
 TEST_F(PartialDependencePlotTest, InitializePDPSetClassification) {
-  pdp_set_ =
+  ASSERT_OK_AND_ASSIGN(
+      pdp_set_,
       InitializePartialDependencePlotSet(
           data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::CLASSIFICATION,
-          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_)
-          .value();
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
   const proto::PartialDependencePlotSet expected_pdp_set = PARSE_TEST_PROTO(
       R"pb(
         pdps {
+          type: PDP
           pdp_bins {
             prediction {
               classification_class_distribution { counts: 0 counts: 0 sum: 0 }
@@ -305,6 +310,7 @@ TEST_F(PartialDependencePlotTest, InitializePDPSetClassification) {
           }
         }
         pdps {
+          type: PDP
           pdp_bins {
             prediction {
               classification_class_distribution { counts: 0 counts: 0 sum: 0 }
@@ -332,6 +338,7 @@ TEST_F(PartialDependencePlotTest, InitializePDPSetClassification) {
           }
         }
         pdps {
+          type: PDP
           pdp_bins {
             prediction {
               classification_class_distribution { counts: 0 counts: 0 sum: 0 }
@@ -394,13 +401,15 @@ TEST_F(PartialDependencePlotTest, InitializePDPSetClassification) {
 }
 
 TEST_F(PartialDependencePlotTest, InitializePDPSetRegression) {
-  pdp_set_ = InitializePartialDependencePlotSet(
-                 data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::REGRESSION,
-                 /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_)
-                 .value();
+  ASSERT_OK_AND_ASSIGN(
+      pdp_set_,
+      InitializePartialDependencePlotSet(
+          data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::REGRESSION,
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
   const proto::PartialDependencePlotSet expected_pdp_set = PARSE_TEST_PROTO(
       R"pb(
         pdps {
+          type: PDP
           pdp_bins {
             prediction { sum_of_regression_predictions: 0 }
             center_input_feature_values { numerical: 249.75 }
@@ -418,6 +427,7 @@ TEST_F(PartialDependencePlotTest, InitializePDPSetRegression) {
           }
         }
         pdps {
+          type: PDP
           pdp_bins {
             prediction { sum_of_regression_predictions: 0 }
             center_input_feature_values { categorical: 0 }
@@ -439,6 +449,7 @@ TEST_F(PartialDependencePlotTest, InitializePDPSetRegression) {
           }
         }
         pdps {
+          type: PDP
           pdp_bins {
             prediction { sum_of_regression_predictions: 0 }
             center_input_feature_values { numerical: 249.75 }
@@ -489,11 +500,11 @@ TEST_F(PartialDependencePlotTest, InitializePDPSetRegression) {
 }
 
 TEST_F(PartialDependencePlotTest, UpdatePDPSetClassification) {
-  pdp_set_ =
+  ASSERT_OK_AND_ASSIGN(
+      pdp_set_,
       InitializePartialDependencePlotSet(
           data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::CLASSIFICATION,
-          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_)
-          .value();
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
   auto model = CreateSimpleModel(model::proto::Task::CLASSIFICATION);
   const auto example = CreateExample();
   EXPECT_OK(UpdatePartialDependencePlotSet(*model, example, &pdp_set_));
@@ -515,6 +526,7 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetClassification) {
   const proto::PartialDependencePlotSet expected_pdp_set = PARSE_TEST_PROTO(
       R"pb(
         pdps {
+          type: PDP
           num_observations: 1
           pdp_bins {
             prediction {
@@ -545,6 +557,7 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetClassification) {
           }
         }
         pdps {
+          type: PDP
           num_observations: 1
           pdp_bins {
             prediction {
@@ -577,6 +590,7 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetClassification) {
           }
         }
         pdps {
+          type: PDP
           num_observations: 1
           pdp_bins {
             prediction {
@@ -648,10 +662,11 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetClassification) {
 }
 
 TEST_F(PartialDependencePlotTest, UpdatePDPSetRegression) {
-  pdp_set_ = InitializePartialDependencePlotSet(
-                 data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::REGRESSION,
-                 /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_)
-                 .value();
+  ASSERT_OK_AND_ASSIGN(
+      pdp_set_,
+      InitializePartialDependencePlotSet(
+          data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::REGRESSION,
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
   auto model = CreateSimpleModel(model::proto::Task::REGRESSION);
   const auto example = CreateExample();
   EXPECT_OK(UpdatePartialDependencePlotSet(*model, example, &pdp_set_));
@@ -673,6 +688,7 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetRegression) {
   const proto::PartialDependencePlotSet expected_pdp_set = PARSE_TEST_PROTO(
       R"pb(
         pdps {
+          type: PDP
           num_observations: 1
           pdp_bins {
             prediction { sum_of_regression_predictions: 0.5 }
@@ -691,6 +707,7 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetRegression) {
           }
         }
         pdps {
+          type: PDP
           num_observations: 1
           pdp_bins {
             prediction { sum_of_regression_predictions: 0.5 }
@@ -713,6 +730,7 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetRegression) {
           }
         }
         pdps {
+          type: PDP
           num_observations: 1
           pdp_bins {
             prediction { sum_of_regression_predictions: 0 }
@@ -785,11 +803,11 @@ TEST_F(PartialDependencePlotTest, AppendAttributesCombinations2D) {
 }
 
 TEST_F(PartialDependencePlotTest, ExampleToBinIndex) {
-  pdp_set_ = InitializePartialDependencePlotSet(
-                 data_spec_, {{0}, {1}, {2}, {0, 1}},
-                 model::proto::Task::CLASSIFICATION,
-                 /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_)
-                 .value();
+  ASSERT_OK_AND_ASSIGN(
+      pdp_set_, InitializePartialDependencePlotSet(
+                    data_spec_, {{0}, {1}, {2}, {0, 1}},
+                    model::proto::Task::CLASSIFICATION,
+                    /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
 
   auto model = CreateSimpleModel(model::proto::Task::CLASSIFICATION);
   const auto example = CreateExample();
@@ -831,10 +849,9 @@ TEST(GetBinsForOneAttribute, Numerical) {
     }));
   }
 
-  const auto bins =
-      internal::GetBinsForOneAttribute(data_spec, /*attribute_idx=*/0,
-                                       /*num_numerical_bins=*/5, dataset)
-          .value();
+  ASSERT_OK_AND_ASSIGN(const auto bins, internal::GetBinsForOneAttribute(
+                                            data_spec, /*attribute_idx=*/0,
+                                            /*num_numerical_bins=*/5, dataset));
   EXPECT_FALSE(bins.is_log);
 
   const float error = 0.1f;
@@ -871,10 +888,9 @@ TEST(GetBinsForOneAttribute, NumericalLog) {
     }));
   }
 
-  const auto bins =
-      internal::GetBinsForOneAttribute(data_spec, /*attribute_idx=*/0,
-                                       /*num_numerical_bins=*/5, dataset)
-          .value();
+  ASSERT_OK_AND_ASSIGN(const auto bins, internal::GetBinsForOneAttribute(
+                                            data_spec, /*attribute_idx=*/0,
+                                            /*num_numerical_bins=*/5, dataset));
   EXPECT_TRUE(bins.is_log);
 
   const float error = 0.1f;
@@ -902,6 +918,560 @@ TEST(SortedUniqueCounts, Basic) {
   const auto nan = std::numeric_limits<float>::quiet_NaN();
   EXPECT_EQ((std::vector<std::pair<float, int>>{{1, 2}, {2, 1}, {5, 1}}),
             internal::SortedUniqueCounts({1, nan, 5, nan, 1, 2}));
+}
+
+TEST_F(PartialDependencePlotTest, InitializeCEPSetClassification) {
+  ASSERT_OK_AND_ASSIGN(
+      cep_set_,
+      InitializeConditionalExpectationPlotSet(
+          data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::CLASSIFICATION,
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
+  const proto::PartialDependencePlotSet expected_cep_set = PARSE_TEST_PROTO(
+      R"pb(
+        pdps {
+          type: CEP
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+        }
+        pdps {
+          type: CEP
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+          }
+        }
+        pdps {
+          type: CEP
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 2 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+          }
+        }
+      )pb");
+  EXPECT_THAT(cep_set_, EqualsProto(expected_cep_set));
+}
+
+TEST_F(PartialDependencePlotTest, InitializeCEPSetRegression) {
+  ASSERT_OK_AND_ASSIGN(
+      cep_set_,
+      InitializeConditionalExpectationPlotSet(
+          data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::REGRESSION,
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
+  const proto::PartialDependencePlotSet expected_cep_set = PARSE_TEST_PROTO(
+      R"pb(
+        pdps {
+          type: CEP
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+        }
+        pdps {
+          type: CEP
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+          }
+        }
+        pdps {
+          type: CEP
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 2 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 0
+          }
+        }
+      )pb");
+  EXPECT_THAT(cep_set_, EqualsProto(expected_cep_set));
+}
+
+TEST_F(PartialDependencePlotTest, UpdateCEPSetClassification) {
+  ASSERT_OK_AND_ASSIGN(
+      cep_set_,
+      InitializeConditionalExpectationPlotSet(
+          data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::CLASSIFICATION,
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
+  auto model = CreateSimpleModel(model::proto::Task::CLASSIFICATION);
+  const auto example = CreateExample();
+  EXPECT_OK(UpdateConditionalExpectationPlotSet(*model, example, &cep_set_));
+
+  // Example has attribute 1 = 2.9, attribute 0 = 1, attribute 2 = true
+  //             label = 0
+  const proto::PartialDependencePlotSet expected_cep_set = PARSE_TEST_PROTO(
+      R"pb(
+        pdps {
+          type: CEP
+          num_observations: 1
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 1 sum: 1 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 1 counts: 0 sum: 1 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+        }
+        pdps {
+          type: CEP
+          num_observations: 1
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 1 sum: 1 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 1 counts: 0 sum: 1 }
+            }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+          }
+        }
+        pdps {
+          type: CEP
+          num_observations: 1
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 1 sum: 1 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 1 counts: 0 sum: 1 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 2 }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            ground_truth {
+              classification_class_distribution { counts: 0 counts: 0 sum: 0 }
+            }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+          }
+        }
+      )pb");
+  EXPECT_THAT(cep_set_, EqualsProto(expected_cep_set));
+}
+
+TEST_F(PartialDependencePlotTest, UpdateCEPSetRegression) {
+  ASSERT_OK_AND_ASSIGN(
+      cep_set_,
+      InitializeConditionalExpectationPlotSet(
+          data_spec_, {{0}, {1}, {0, 1}}, model::proto::Task::REGRESSION,
+          /*label_col_idx=*/3, /*num_numerical_bins=*/2, dataset_));
+  auto model = CreateSimpleModel(model::proto::Task::REGRESSION);
+  const auto example = CreateExample();
+  EXPECT_OK(UpdateConditionalExpectationPlotSet(*model, example, &cep_set_));
+
+  // Example has attribute 1 = 2.9 and attribute 0 = 1
+  //             label = 0
+  // Bin (Attribute 1: 2.5) -> Prediction 2 -> 0, 1 -> 1
+  // Bin (Attribute 1: 3.5) -> Prediction 5 -> 0.5, 0.5 -> 0.5
+  //
+  // Bin (Attribute 2: 0) -> Prediction 1 -> 0.5, 0.5 -> 0.5
+  // Bin (Attribute 2: 1) -> Prediction 2 -> 0, 1 -> 1
+  // Bin (Attribute 2: 2) -> Prediction 3 -> 0, 1 -> 1
+  //
+  // Bin (Attribute 1 : 2.5, Attribute 2: 0) -> Prediction 1 -> 0.5, 0.5 -> 0.5
+  // Bin (Attribute 1 : 2.5, Attribute 2: 1) -> Prediction 2 -> 0, 1 -> 1
+  // Bin (Attribute 1 : 2.5, Attribute 2: 2) -> Prediction 3 -> 0, 1 -> 1
+  // Bin (Attribute 1 : 3.5, Attribute 2: 0) -> Prediction 4 -> 1, 0 -> 0
+  // Bin (Attribute 1 : 3.5, Attribute 2: 1) -> Prediction 5 -> 0.5, 0.5 -> 0.5
+  // Bin (Attribute 1 : 3.5, Attribute 2: 2) -> Prediction 5 -> 0, 1 -> 1
+  const proto::PartialDependencePlotSet expected_cep_set = PARSE_TEST_PROTO(
+      R"pb(
+        pdps {
+          type: CEP
+          num_observations: 1
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 1 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+            evaluation { sum_squared_error: 1 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+        }
+        pdps {
+          type: CEP
+          num_observations: 1
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 1 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { categorical: 1 }
+            evaluation { sum_squared_error: 1 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+          }
+        }
+        pdps {
+          type: CEP
+          num_observations: 1
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 0 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 1 }
+            ground_truth { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 1 }
+            evaluation { sum_squared_error: 1 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 1 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 249.75 }
+            center_input_feature_values { categorical: 2 }
+          }
+          pdp_bins {
+            prediction { sum_of_regression_predictions: 0 }
+            center_input_feature_values { numerical: 749.25 }
+            center_input_feature_values { categorical: 2 }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+            numerical_boundaries: 499.5
+          }
+          attribute_info {
+            num_bins_per_input_feature: 3
+            attribute_idx: 1
+            num_observations_per_bins: 0
+            num_observations_per_bins: 1
+            num_observations_per_bins: 0
+          }
+        }
+      )pb");
+  EXPECT_THAT(cep_set_, EqualsProto(expected_cep_set));
 }
 
 }  // namespace

@@ -15,8 +15,10 @@
 
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 
+#include <cstdlib>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 #include "gmock/gmock.h"
@@ -28,6 +30,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
@@ -71,6 +74,35 @@ TEST(ModelAnalysis, Classification) {
   LOG(INFO) << "Load dataset";
   dataset::VerticalDataset dataset;
   CHECK_OK(dataset::LoadVerticalDataset(
+      dataset_path, model->data_spec(), &dataset,
+      /*required_columns=*/model->input_features()));
+
+  proto::Options options;
+  options.mutable_pdp()->set_example_sampling(0.01f);
+  options.mutable_cep()->set_example_sampling(0.1f);
+  options.set_num_threads(1);
+  options.set_html_id_prefix("my_report");
+  options.mutable_report_header()->set_enabled(false);
+  const auto report_path = file::JoinPath(test::TmpDirectory(), "analysis");
+
+  ASSERT_OK_AND_ASSIGN(const auto analysis,
+                       Analyse(*model.get(), dataset, options));
+  ASSERT_OK_AND_ASSIGN(const auto report,
+                       CreateHtmlReport(*model.get(), dataset, "MODEL_PATH",
+                                        "DATASET_PATH", analysis, options));
+}
+
+TEST(ModelAnalysis, Regression) {
+  const std::string dataset_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "abalone.csv"));
+  const std::string model_path =
+      file::JoinPath(ModelDir(), "abalone_regression_gbdt");
+
+  std::unique_ptr<model::AbstractModel> model;
+  ASSERT_OK(model::LoadModel(model_path, &model));
+
+  dataset::VerticalDataset dataset;
+  ASSERT_OK(dataset::LoadVerticalDataset(
       dataset_path, model->data_spec(), &dataset,
       /*required_columns=*/model->input_features()));
 

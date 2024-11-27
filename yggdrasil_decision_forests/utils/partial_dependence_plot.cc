@@ -358,6 +358,7 @@ absl::StatusOr<PartialDependencePlotSet> InitializePartialDependencePlotSet(
   PartialDependencePlotSet pdp_set;
   for (const auto& set_of_attribute_idxs : attribute_idxs) {
     auto* pdp = pdp_set.add_pdps();
+    pdp->set_type(PartialDependencePlotSet::PartialDependencePlot::PDP);
     RETURN_IF_ERROR(InitializePartialDependence(
         data_spec, set_of_attribute_idxs, task, label_col_idx,
         num_numerical_bins, false, dataset, pdp));
@@ -374,6 +375,7 @@ InitializeConditionalExpectationPlotSet(
   PartialDependencePlotSet pdp_set;
   for (const auto& set_of_attribute_idxs : attribute_idxs) {
     auto* pdp = pdp_set.add_pdps();
+    pdp->set_type(PartialDependencePlotSet::PartialDependencePlot::CEP);
     RETURN_IF_ERROR(InitializePartialDependence(
         data_spec, set_of_attribute_idxs, task, label_col_idx,
         num_numerical_bins, true, dataset, pdp));
