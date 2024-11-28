@@ -14,6 +14,7 @@
 
 """Generic YDF model definition."""
 
+import abc
 import dataclasses
 import enum
 import os
@@ -152,33 +153,36 @@ class InputFeature:
   column_idx: int
 
 
-class GenericModel:
+class GenericModel(abc.ABC):
   """Abstract superclass for all YDF models."""
 
-  def __init__(self, raw_model: ydf.GenericCCModel):
-    self._model = raw_model
+  def __str__(self) -> str:
+    return f"""\
+Model: {self.name()}
+Task: {self.task().name}
+Class: ydf.{self.__class__.__name__}
+Use `model.describe()` for more details
+"""
 
+  @abc.abstractmethod
   def name(self) -> str:
     """Returns the name of the model type."""
-    return self._model.name()
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def __getstate__(self):
-    log.warning(
-        "Model pickling is discouraged. To save a model on disk, use"
-        " `model.save(path)` and `... = ydf.load_model(path)` instead. To"
-        " serialize a model to bytes, use `data = model.serialize()` and"
-        " `... = ydf.deserialize_model(data)` instead.",
-        message_id=log.WarningMessage.DONT_USE_PICKLE,
-    )
-    return self._model.Serialize()
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def __setstate__(self, state):
-    self._model = ydf.DeserializeModel(state)
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def task(self) -> Task:
     """Task solved by the model."""
-    return Task._from_proto_type(self._model.task())  # pylint: disable=protected-access
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def metadata(self) -> model_metadata.ModelMetadata:
     """Metadata associated with the model.
 
@@ -190,33 +194,27 @@ class GenericModel:
     Returns:
       The model's metadata.
     """
-    return model_metadata.ModelMetadata._from_proto_type(self._model.metadata())  # pylint:disable=protected-access
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def set_metadata(self, metadata: model_metadata.ModelMetadata):
     """Sets the model metadata."""
-    self._model.set_metadata(metadata._to_proto_type())  # pylint:disable=protected-access
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def set_feature_selection_logs(
       self, value: Optional[feature_selector_logs.FeatureSelectorLogs]
   ) -> None:
     """Records the feature selection logs."""
-    if value is None:
-      self._model.set_feature_selection_logs(None)
-    else:
-      self._model.set_feature_selection_logs(
-          feature_selector_logs.value_to_proto(value)
-      )
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def feature_selection_logs(
       self,
   ) -> Optional[feature_selector_logs.FeatureSelectorLogs]:
     """Gets the feature selection logs."""
-    proto = self._model.feature_selection_logs()
-    if proto is None:
-      return None
-    else:
-      return feature_selector_logs.proto_to_value(proto)
 
+  @abc.abstractmethod
   def describe(
       self,
       output_format: Literal["auto", "text", "notebook", "html"] = "auto",
@@ -235,29 +233,26 @@ class GenericModel:
     Returns:
       The model description.
     """
+    raise NotImplementedError
 
-    if output_format == "auto":
-      output_format = "text" if log.is_direct_output() else "notebook"
-
-    with log.cc_log_context():
-      description = self._model.Describe(full_details, output_format == "text")
-      if output_format == "notebook":
-        return html.HtmlNotebookDisplay(description)
-      else:
-        return description
-
+  @abc.abstractmethod
   def data_spec(self) -> data_spec_pb2.DataSpecification:
     """Returns the data spec used for train the model."""
-    return self._model.data_spec()
+    raise NotImplementedError
 
-  def __str__(self) -> str:
-    return f"""\
-Model: {self.name()}
-Task: {self.task().name}
-Class: ydf.{self.__class__.__name__}
-Use `model.describe()` for more details
-"""
+  def set_data_spec(self, data_spec: data_spec_pb2.DataSpecification) -> None:
+    """Changes the dataspec of the model.
 
+    This operation is tageret to advances user.
+
+    Args:
+      data_spec: New dataspec.
+    """
+    raise NotImplementedError(
+        "This model does not support for the dataspec to be updated"
+    )
+
+  @abc.abstractmethod
   def benchmark(
       self,
       ds: dataset.InputDataset,
@@ -291,40 +286,9 @@ Use `model.describe()` for more details
     Returns:
       Benchmark results.
     """
+    raise NotImplementedError
 
-    if num_threads is None:
-      num_threads = concurrency.determine_optimal_num_threads(training=False)
-
-    if benchmark_duration <= 0:
-      raise ValueError(
-          "The duration of the benchmark must be positive, got"
-          f" {benchmark_duration}"
-      )
-    if warmup_duration <= 0:
-      raise ValueError(
-          "The duration of the warmup phase must be positive, got"
-          f" {warmup_duration}."
-      )
-    if batch_size <= 0:
-      raise ValueError(
-          f"The batch size of the benchmark must be positive, got {batch_size}."
-      )
-
-    with log.cc_log_context():
-      vds = dataset.create_vertical_dataset(
-          ds,
-          data_spec=self._model.data_spec(),
-          required_columns=self.input_feature_names(),
-      )
-      result = self._model.Benchmark(
-          vds._dataset,  # pylint: disable=protected-access
-          benchmark_duration,
-          warmup_duration,
-          batch_size,
-          num_threads,
-      )
-    return result
-
+  @abc.abstractmethod
   def save(self, path: str, advanced_options=ModelIOOptions()) -> None:
     """Save the model to disk.
 
@@ -358,24 +322,9 @@ Use `model.describe()` for more details
       path: Path to directory to store the model in.
       advanced_options: Advanced options for saving models.
     """
-    # Warn if the user is trying to save to a nonempty directory without
-    # prefixing the model.
-    if advanced_options.file_prefix is not None:
-      if os.path.exists(path):
-        if os.path.isdir(path):
-          with os.scandir(path) as it:
-            if any(it):
-              logging.warning(
-                  "The directory %s to save the model to is not empty,"
-                  " which can lead to model corruption. Specify an empty or"
-                  " non-existing directory to save the model to, or use"
-                  " `advanced_options` to specify a file prefix for the model.",
-                  path,
-              )
+    raise NotImplementedError
 
-    with log.cc_log_context():
-      self._model.Save(path, advanced_options.file_prefix)
-
+  @abc.abstractmethod
   def serialize(self) -> bytes:
     """Serializes a model to a sequence of bytes (i.e. `bytes`).
 
@@ -410,9 +359,9 @@ Use `model.describe()` for more details
     Returns:
       The serialized model.
     """
-    with log.cc_log_context():
-      return self._model.Serialize()
+    raise NotImplementedError
 
+  @abc.abstractmethod
   def predict(
       self,
       data: dataset.InputDataset,
@@ -520,88 +469,9 @@ Use `model.describe()` for more details
     Returns:
       The predictions of the model on the given dataset.
     """
+    raise NotImplementedError
 
-    if num_threads is None:
-      num_threads = concurrency.determine_optimal_num_threads(training=False)
-
-    with log.cc_log_context():
-      # The data spec contains the label / weights /  ranking group / uplift
-      # treatment column, but those are not required for making predictions.
-      ds = dataset.create_vertical_dataset(
-          data,
-          data_spec=self._model.data_spec(),
-          required_columns=self.input_feature_names(),
-      )
-      result = self._model.Predict(
-          ds._dataset, use_slow_engine, num_threads=num_threads  # pylint: disable=protected-access
-      )
-    return result
-
-  def predict_class(
-      self,
-      data: dataset.InputDataset,
-      *,
-      use_slow_engine=False,
-      num_threads: Optional[int] = None,
-  ) -> np.ndarray:
-    """Returns the most likely predicted class for a classification model.
-
-    Usage example:
-
-    ```python
-    import pandas as pd
-    import ydf
-
-    # Train model
-    train_ds = pd.read_csv("train.csv")
-    model = ydf.RandomForestLearner(label="label").train(train_ds)
-
-    test_ds = pd.read_csv("test.csv")
-    predictions = model.predict_class(test_ds)
-    ```
-
-    This method returns a numpy array of string of shape `[num_examples]`. Each
-    value represents the most likely class for the corresponding example. This
-    method can only be used for classification models.
-
-    In case of ties, the first class in`model.label_classes()` is returned.
-
-    See `model.predict` to generate the full prediction probabilities.
-
-    Args:
-      data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
-        (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
-        PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
-        string to NumPy array or lists. If the dataset contains the label
-        column, that column is ignored.
-      use_slow_engine: If true, uses the slow engine for making predictions. The
-        slow engine of YDF is an order of magnitude slower than the other
-        prediction engines. There exist very rare edge cases where predictions
-        with the regular engines fail, e.g., models with a very large number of
-        categorical conditions. It is only in these cases that users should use
-        the slow engine and report the issue to the YDF developers.
-      num_threads: Number of threads used to run the model.
-
-    Returns:
-      The most likely predicted class for each example.
-    """
-
-    if self.task() != Task.CLASSIFICATION:
-      raise ValueError(
-          "predict_class is only supported for classification models."
-      )
-
-    label_classes = self.label_classes()
-    prediction_proba = self.predict(
-        data, use_slow_engine=use_slow_engine, num_threads=num_threads
-    )
-
-    if len(label_classes) == 2:
-      return np.take(label_classes, prediction_proba > 0.5)
-    else:
-      prediction_class_idx = np.argmax(prediction_proba, axis=1)
-      return np.take(label_classes, prediction_class_idx)
-
+  @abc.abstractmethod
   def evaluate(
       self,
       data: dataset.InputDataset,
@@ -698,93 +568,9 @@ Use `model.describe()` for more details
     Returns:
       Model evaluation.
     """
+    raise NotImplementedError
 
-    if num_threads is None:
-      num_threads = concurrency.determine_optimal_num_threads(training=False)
-
-    # Warning about deprecation of "evaluation_task"
-    if evaluation_task is not None:
-      log.warning(
-          "The `evaluation_task` argument is deprecated. Use `task` instead.",
-          message_id=log.WarningMessage.DEPRECATED_EVALUATION_TASK,
-      )
-      if task is not None:
-        raise ValueError("Cannot specify both `task` and `evaluation_task`")
-      task = evaluation_task
-
-    # Warning about change default value of "weighted")
-    if weighted is None and self._model.weighted_training():
-      # TODO: Change default to true and remove warning.
-      log.warning(
-          "Non-weighted evaluation of a model trained with weighted training."
-          " Are you sure you don't want to do a weighted evaluation? Set"
-          " `model.evaluate(weighted=True, ...)` or"
-          " `model.evaluate(weighted=False, ...)` accordingly.",
-          message_id=log.WarningMessage.WEIGHTED_NOT_SET_IN_EVAL,
-      )
-      weighted = False
-
-    # Warning about unnecessary arguments
-    if task is not None and task == self.task():
-      log.warning(
-          "No need to set the `task` argument in `model.evaluate` if the model"
-          " is evaluated the same way it was trained.",
-          message_id=log.WarningMessage.UNNECESSARY_TASK_ARGUMENT,
-      )
-    if label is not None and label == self.label():
-      log.warning(
-          "No need to set the `task` argument in `model.evaluate` if the model"
-          " is evaluated the same way it was trained.",
-          message_id=log.WarningMessage.UNNECESSARY_LABEL_ARGUMENT,
-      )
-
-    if isinstance(bootstrapping, bool):
-      bootstrapping_samples = 2000 if bootstrapping else -1
-    elif isinstance(bootstrapping, int) and bootstrapping >= 100:
-      bootstrapping_samples = bootstrapping
-    else:
-      raise ValueError(
-          "bootstrapping argument should be boolean or an integer greater than"
-          " 100 as bootstrapping will not yield useful results otherwise. Got"
-          f" {bootstrapping!r}"
-      )
-    if task is None:
-      task = self.task()
-
-    with log.cc_log_context():
-
-      effective_dataspec, label_col_idx, group_col_idx = (
-          self._build_evaluation_dataspec(
-              override_task=task._to_proto_type(),  # pylint: disable=protected-access
-              override_label=label,
-              override_group=group,
-          )
-      )
-
-      ds = dataset.create_vertical_dataset(data, data_spec=effective_dataspec)
-
-      options_proto = metric_pb2.EvaluationOptions(
-          bootstrapping_samples=bootstrapping_samples,
-          task=task._to_proto_type(),  # pylint: disable=protected-access
-          ranking=metric_pb2.EvaluationOptions.Ranking(
-              ndcg_truncation=ndcg_truncation, mrr_truncation=mrr_truncation
-          )
-          if task == Task.RANKING
-          else None,
-          num_threads=num_threads,
-      )
-
-      evaluation_proto = self._model.Evaluate(
-          ds._dataset,  # pylint: disable=protected-access
-          options_proto,
-          weighted=weighted,
-          label_col_idx=label_col_idx,
-          group_col_idx=group_col_idx,
-          use_slow_engine=use_slow_engine,
-          num_threads=num_threads,
-      )
-    return metric.Evaluation(evaluation_proto)
-
+  @abc.abstractmethod
   def analyze_prediction(
       self,
       single_example: dataset.InputDataset,
@@ -823,16 +609,9 @@ Use `model.describe()` for more details
     Returns:
       Prediction explanation.
     """
+    raise NotImplementedError
 
-    with log.cc_log_context():
-      ds = dataset.create_vertical_dataset(
-          single_example, data_spec=self._model.data_spec()
-      )
-
-      options_proto = model_analysis_pb2.PredictionAnalysisOptions()
-      analysis_proto = self._model.AnalyzePrediction(ds._dataset, options_proto)  # pylint: disable=protected-access
-      return analysis.PredictionAnalysis(analysis_proto, options_proto)
-
+  @abc.abstractmethod
   def analyze(
       self,
       data: dataset.InputDataset,
@@ -900,38 +679,9 @@ Use `model.describe()` for more details
     Returns:
       Model analysis.
     """
+    raise NotImplementedError
 
-    if num_threads is None:
-      num_threads = concurrency.determine_optimal_num_threads(training=False)
-
-    with log.cc_log_context():
-      ds = dataset.create_vertical_dataset(
-          data, data_spec=self._model.data_spec()
-      )
-
-      options_proto = model_analysis_pb2.Options(
-          num_threads=num_threads,
-          maximum_duration_seconds=maximum_duration,
-          pdp=model_analysis_pb2.Options.PlotConfig(
-              enabled=partial_dependence_plot,
-              example_sampling=sampling,
-              num_numerical_bins=num_bins,
-          ),
-          cep=model_analysis_pb2.Options.PlotConfig(
-              enabled=conditional_expectation_plot,
-              example_sampling=sampling,
-              num_numerical_bins=num_bins,
-          ),
-          permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
-              enabled=permutation_variable_importance_rounds > 0,
-              num_rounds=permutation_variable_importance_rounds,
-          ),
-          include_model_structural_variable_importances=True,
-      )
-
-      analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access
-      return analysis.Analysis(analysis_proto, options_proto)
-
+  @abc.abstractmethod
   def to_cpp(self, key: str = "my_model") -> str:
     """Generates the code of a .h file to run the model in C++.
 
@@ -966,11 +716,9 @@ Use `model.describe()` for more details
     Returns:
       String containing an example header for running the model in C++.
     """
-    return template_cpp_export.template(
-        key, self._model.data_spec(), self._model.input_features()
-    )
+    raise NotImplementedError
 
-  # TODO: Change default value of "mode" before 1.0 release.
+  @abc.abstractmethod
   def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value
       self,
       path: str,
@@ -1196,31 +944,9 @@ Use `model.describe()` for more details
       force: Try to export even in currently unsupported environments. WARNING:
         Setting this to true may crash the Python runtime.
     """
+    raise NotImplementedError
 
-    if mode == "keras":
-      log.warning(
-          "Calling `to_tensorflow_saved_model(mode='keras', ...)`. Use"
-          " `to_tensorflow_saved_model(mode='tf', ...)` instead. mode='tf' is"
-          " more efficient, has better compatibility, and offers more options."
-          " Starting June 2024, `mode='tf'` will become the default value.",
-          message_id=log.WarningMessage.TO_TF_SAVED_MODEL_KERAS_MODE,
-      )
-
-    _get_export_tf().ydf_model_to_tensorflow_saved_model(
-        ydf_model=self,
-        path=path,
-        input_model_signature_fn=input_model_signature_fn,
-        mode=mode,
-        feature_dtypes=feature_dtypes,
-        servo_api=servo_api,
-        feed_example_proto=feed_example_proto,
-        pre_processing=pre_processing,
-        post_processing=post_processing,
-        temp_dir=temp_dir,
-        tensor_specs=tensor_specs,
-        feature_specs=feature_specs,
-    )
-
+  @abc.abstractmethod
   def to_tensorflow_function(  # pytype: disable=name-error
       self,
       temp_dir: Optional[str] = None,
@@ -1288,14 +1014,9 @@ Use `model.describe()` for more details
     Returns:
       A TensorFlow @tf.function.
     """
+    raise NotImplementedError
 
-    return _get_export_tf().ydf_model_to_tf_function(
-        ydf_model=self,
-        temp_dir=temp_dir,
-        can_be_saved=can_be_saved,
-        squeeze_binary_classification=squeeze_binary_classification,
-    )
-
+  @abc.abstractmethod
   def to_jax_function(  # pytype: disable=name-error
       self,
       jit: bool = True,
@@ -1346,15 +1067,9 @@ Use `model.describe()` for more details
       optionnaly the model parameteres (`params`) and feature encoder
       (`encoder`).
     """
+    raise NotImplementedError
 
-    return _get_export_jax().to_jax_function(
-        model=self,
-        jit=jit,
-        apply_activation=apply_activation,
-        leaves_as_params=leaves_as_params,
-        compatibility=compatibility,
-    )
-
+  @abc.abstractmethod
   def update_with_jax_params(self, params: Dict[str, Any]):
     """Updates the model with JAX params as created by `to_jax_function`.
 
@@ -1395,6 +1110,630 @@ Use `model.describe()` for more details
     Args:
       params: Learnable parameter of the model generated with `to_jax_function`.
     """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def hyperparameter_optimizer_logs(
+      self,
+  ) -> Optional[optimizer_logs.OptimizerLogs]:
+    """Returns the logs of the hyper-parameter tuning.
+
+    If the model is not trained with hyper-parameter tuning, returns None.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def variable_importances(self) -> Dict[str, List[Tuple[float, str]]]:
+    """Variable importances to measure the impact of features on the model.
+
+    Variable importances generally indicates how much a variable (feature)
+    contributes to the model predictions or quality. Different Variable
+    importances have different semantics and are generally not comparable.
+
+    The variable importances returned by `variable_importances()` depends on the
+    learning algorithm and its hyper-parameters. For example, the hyperparameter
+    `compute_oob_variable_importances=True` of the Random Forest learner enables
+    the computation of permutation out-of-bag variable importances.
+
+    # TODO: Add variable importances to documentation.
+
+    Features are sorted by decreasing importance.
+
+    Usage example:
+
+    ```python
+    # Train a Random Forest. Enable the computation of OOB (out-of-bag) variable
+    # importances.
+    model = ydf.RandomForestModel(compute_oob_variable_importances=True,
+                                  label=...).train(ds)
+    # List the available variable importances.
+    print(model.variable_importances().keys())
+
+    # Show a specific variable importance.
+    model.variable_importances()["MEAN_DECREASE_IN_ACCURACY"]
+    >> [("bill_length_mm", 0.0713061951754389),
+        ("island", 0.007298519736842035),
+        ("flipper_length_mm", 0.004505893640351366),
+    ...
+    ```
+
+    Returns:
+      Variable importances.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def label_col_idx(self) -> int:
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def input_features_col_idxs(self) -> Sequence[int]:
+    raise NotImplementedError
+
+  def self_evaluation(self) -> metric.Evaluation:
+    """Returns the model's self-evaluation.
+
+    Different models use different methods for self-evaluation. Notably, Random
+    Forests use OOB evaluation and Gradient Boosted Trees use evaluation on the
+    validation dataset. Therefore, self-evaluations are not comparable between
+    different model types.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.GradientBoostedTreesLearner(label="label").train(train_ds)
+
+    self_evaluation = model.self_evaluation()
+    # In an interactive Python environment, print a rich evaluation report.
+    self_evaluation
+    ```
+    """
+    raise NotImplementedError(
+        "Self-evaluation is not available for this model type."
+    )
+
+  @abc.abstractmethod
+  def list_compatible_engines(self) -> Sequence[str]:
+    """Lists the inference engines compatible with the model.
+
+    The engines are sorted to likely-fastest to  likely-slowest.
+
+    Returns:
+      List of compatible engines.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def force_engine(self, engine_name: Optional[str]) -> None:
+    """Forces the engines used by the model.
+
+    If not specified (i.e., None; default value), the fastest compatible engine
+    (i.e., the first value returned from "list_compatible_engines") is used for
+    all model inferences (e.g., model.predict, model.evaluate).
+
+    If passing a non-existing or non-compatible engine, the next model inference
+    (e.g., model.predict, model.evaluate) will fail.
+
+    Args:
+      engine_name: Name of a compatible engine or None to automatically select
+        the fastest engine.
+    """
+    raise NotImplementedError
+
+  def input_features(self) -> Sequence[InputFeature]:
+    """Returns the input features of the model.
+
+    The features are sorted in increasing order of column_idx.
+    """
+    dataspec_columns = self.data_spec().columns
+    return [
+        InputFeature(
+            name=dataspec_columns[column_idx].name,
+            semantic=dataspec.Semantic.from_proto_type(
+                dataspec_columns[column_idx].type
+            ),
+            column_idx=column_idx,
+        )
+        for column_idx in self.input_features_col_idxs()
+    ]
+
+  def input_feature_names(self) -> List[str]:
+    """Returns the names of the input features.
+
+    The features are sorted in increasing order of column_idx.
+    """
+
+    return [f.name for f in self.input_features()]
+
+  def label(self) -> str:
+    """Name of the label column."""
+    return self.data_spec().columns[self.label_col_idx()].name
+
+  def label_classes(self) -> List[str]:
+    """Returns the label classes for a classification model; fails otherwise."""
+    if self.task() != Task.CLASSIFICATION:
+      raise ValueError(
+          "Label classes are only available for classification models. This"
+          f" model has type {self.task().name}"
+      )
+    label_column = self.data_spec().columns[self.label_col_idx()]
+    if label_column.type != data_spec_pb2.CATEGORICAL:
+      semantic = dataspec.Semantic.from_proto_type(label_column.type)
+      raise ValueError(
+          "Categorical type expected for classification label."
+          f" Got {semantic} instead."
+      )
+
+    if label_column.categorical.is_already_integerized:
+      log.info(
+          "The label column is integerized. This is expected for models trained"
+          " with TensorFlow Decision Forests."
+      )
+
+    # The first element is the "out-of-vocabulary" that is not used in labels.
+    return dataspec.categorical_column_dictionary_to_list(label_column)[1:]
+
+  def predict_class(
+      self,
+      data: dataset.InputDataset,
+      *,
+      use_slow_engine=False,
+      num_threads: Optional[int] = None,
+  ) -> np.ndarray:
+    """Returns the most likely predicted class for a classification model.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
+
+    test_ds = pd.read_csv("test.csv")
+    predictions = model.predict_class(test_ds)
+    ```
+
+    This method returns a numpy array of string of shape `[num_examples]`. Each
+    value represents the most likely class for the corresponding example. This
+    method can only be used for classification models.
+
+    In case of ties, the first class in`model.label_classes()` is returned.
+
+    See `model.predict` to generate the full prediction probabilities.
+
+    Args:
+      data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
+        (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
+        PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
+        string to NumPy array or lists. If the dataset contains the label
+        column, that column is ignored.
+      use_slow_engine: If true, uses the slow engine for making predictions. The
+        slow engine of YDF is an order of magnitude slower than the other
+        prediction engines. There exist very rare edge cases where predictions
+        with the regular engines fail, e.g., models with a very large number of
+        categorical conditions. It is only in these cases that users should use
+        the slow engine and report the issue to the YDF developers.
+      num_threads: Number of threads used to run the model.
+
+    Returns:
+      The most likely predicted class for each example.
+    """
+
+    if self.task() != Task.CLASSIFICATION:
+      raise ValueError(
+          "predict_class is only supported for classification models."
+      )
+
+    label_classes = self.label_classes()
+    prediction_proba = self.predict(
+        data, use_slow_engine=use_slow_engine, num_threads=num_threads
+    )
+
+    if len(label_classes) == 2:
+      return np.take(label_classes, prediction_proba > 0.5)
+    else:
+      prediction_class_idx = np.argmax(prediction_proba, axis=1)
+      return np.take(label_classes, prediction_class_idx)
+
+
+class GenericCCModel(GenericModel):
+  """Abstract superclass for the YDF models implemented in C++."""
+
+  def __init__(self, raw_model: ydf.GenericCCModel):
+    self._model = raw_model
+
+  def name(self) -> str:
+    return self._model.name()
+
+  def __getstate__(self):
+    log.warning(
+        "Model pickling is discouraged. To save a model on disk, use"
+        " `model.save(path)` and `... = ydf.load_model(path)` instead. To"
+        " serialize a model to bytes, use `data = model.serialize()` and"
+        " `... = ydf.deserialize_model(data)` instead.",
+        message_id=log.WarningMessage.DONT_USE_PICKLE,
+    )
+    return self._model.Serialize()
+
+  def __setstate__(self, state):
+    self._model = ydf.DeserializeModel(state)
+
+  def task(self) -> Task:
+    return Task._from_proto_type(self._model.task())  # pylint: disable=protected-access
+
+  def metadata(self) -> model_metadata.ModelMetadata:
+    return model_metadata.ModelMetadata._from_proto_type(self._model.metadata())  # pylint:disable=protected-access
+
+  def set_metadata(self, metadata: model_metadata.ModelMetadata):
+    self._model.set_metadata(metadata._to_proto_type())  # pylint:disable=protected-access
+
+  def set_feature_selection_logs(
+      self, value: Optional[feature_selector_logs.FeatureSelectorLogs]
+  ) -> None:
+    if value is None:
+      self._model.set_feature_selection_logs(None)
+    else:
+      self._model.set_feature_selection_logs(
+          feature_selector_logs.value_to_proto(value)
+      )
+
+  def feature_selection_logs(
+      self,
+  ) -> Optional[feature_selector_logs.FeatureSelectorLogs]:
+    proto = self._model.feature_selection_logs()
+    if proto is None:
+      return None
+    else:
+      return feature_selector_logs.proto_to_value(proto)
+
+  def describe(
+      self,
+      output_format: Literal["auto", "text", "notebook", "html"] = "auto",
+      full_details: bool = False,
+  ) -> Union[str, html.HtmlNotebookDisplay]:
+    if output_format == "auto":
+      output_format = "text" if log.is_direct_output() else "notebook"
+
+    with log.cc_log_context():
+      description = self._model.Describe(full_details, output_format == "text")
+      if output_format == "notebook":
+        return html.HtmlNotebookDisplay(description)
+      else:
+        return description
+
+  def data_spec(self) -> data_spec_pb2.DataSpecification:
+    return self._model.data_spec()
+
+  def set_data_spec(self, data_spec: data_spec_pb2.DataSpecification) -> None:
+    self._model.set_data_spec(data_spec)
+
+  def benchmark(
+      self,
+      ds: dataset.InputDataset,
+      benchmark_duration: float = 3,
+      warmup_duration: float = 1,
+      batch_size: int = 100,
+      num_threads: Optional[int] = None,
+  ) -> ydf.BenchmarkInferenceCCResult:
+    if num_threads is None:
+      num_threads = concurrency.determine_optimal_num_threads(training=False)
+
+    if benchmark_duration <= 0:
+      raise ValueError(
+          "The duration of the benchmark must be positive, got"
+          f" {benchmark_duration}"
+      )
+    if warmup_duration <= 0:
+      raise ValueError(
+          "The duration of the warmup phase must be positive, got"
+          f" {warmup_duration}."
+      )
+    if batch_size <= 0:
+      raise ValueError(
+          f"The batch size of the benchmark must be positive, got {batch_size}."
+      )
+
+    with log.cc_log_context():
+      vds = dataset.create_vertical_dataset(
+          ds,
+          data_spec=self._model.data_spec(),
+          required_columns=self.input_feature_names(),
+      )
+      result = self._model.Benchmark(
+          vds._dataset,  # pylint: disable=protected-access
+          benchmark_duration,
+          warmup_duration,
+          batch_size,
+          num_threads,
+      )
+    return result
+
+  def save(self, path: str, advanced_options=ModelIOOptions()) -> None:
+    # Warn if the user is trying to save to a nonempty directory without
+    # prefixing the model.
+    if advanced_options.file_prefix is not None:
+      if os.path.exists(path):
+        if os.path.isdir(path):
+          with os.scandir(path) as it:
+            if any(it):
+              logging.warning(
+                  "The directory %s to save the model to is not empty,"
+                  " which can lead to model corruption. Specify an empty or"
+                  " non-existing directory to save the model to, or use"
+                  " `advanced_options` to specify a file prefix for the model.",
+                  path,
+              )
+
+    with log.cc_log_context():
+      self._model.Save(path, advanced_options.file_prefix)
+
+  def serialize(self) -> bytes:
+    with log.cc_log_context():
+      return self._model.Serialize()
+
+  def predict(
+      self,
+      data: dataset.InputDataset,
+      *,
+      use_slow_engine: bool = False,
+      num_threads: Optional[int] = None,
+  ) -> np.ndarray:
+    if num_threads is None:
+      num_threads = concurrency.determine_optimal_num_threads(training=False)
+
+    with log.cc_log_context():
+      # The data spec contains the label / weights /  ranking group / uplift
+      # treatment column, but those are not required for making predictions.
+      ds = dataset.create_vertical_dataset(
+          data,
+          data_spec=self._model.data_spec(),
+          required_columns=self.input_feature_names(),
+      )
+      result = self._model.Predict(
+          ds._dataset, use_slow_engine, num_threads=num_threads  # pylint: disable=protected-access
+      )
+    return result
+
+  def evaluate(
+      self,
+      data: dataset.InputDataset,
+      *,
+      weighted: Optional[bool] = None,
+      task: Optional[Task] = None,
+      label: Optional[str] = None,
+      group: Optional[str] = None,
+      bootstrapping: Union[bool, int] = False,
+      ndcg_truncation: int = 5,
+      mrr_truncation: int = 5,
+      evaluation_task: Optional[Task] = None,
+      use_slow_engine: bool = False,
+      num_threads: Optional[int] = None,
+  ) -> metric.Evaluation:
+    if num_threads is None:
+      num_threads = concurrency.determine_optimal_num_threads(training=False)
+
+    # Warning about deprecation of "evaluation_task"
+    if evaluation_task is not None:
+      log.warning(
+          "The `evaluation_task` argument is deprecated. Use `task` instead.",
+          message_id=log.WarningMessage.DEPRECATED_EVALUATION_TASK,
+      )
+      if task is not None:
+        raise ValueError("Cannot specify both `task` and `evaluation_task`")
+      task = evaluation_task
+
+    # Warning about change default value of "weighted")
+    if weighted is None and self._model.weighted_training():
+      # TODO: Change default to true and remove warning.
+      log.warning(
+          "Non-weighted evaluation of a model trained with weighted training."
+          " Are you sure you don't want to do a weighted evaluation? Set"
+          " `model.evaluate(weighted=True, ...)` or"
+          " `model.evaluate(weighted=False, ...)` accordingly.",
+          message_id=log.WarningMessage.WEIGHTED_NOT_SET_IN_EVAL,
+      )
+      weighted = False
+
+    # Warning about unnecessary arguments
+    if task is not None and task == self.task():
+      log.warning(
+          "No need to set the `task` argument in `model.evaluate` if the model"
+          " is evaluated the same way it was trained.",
+          message_id=log.WarningMessage.UNNECESSARY_TASK_ARGUMENT,
+      )
+    if label is not None and label == self.label():
+      log.warning(
+          "No need to set the `task` argument in `model.evaluate` if the model"
+          " is evaluated the same way it was trained.",
+          message_id=log.WarningMessage.UNNECESSARY_LABEL_ARGUMENT,
+      )
+
+    if isinstance(bootstrapping, bool):
+      bootstrapping_samples = 2000 if bootstrapping else -1
+    elif isinstance(bootstrapping, int) and bootstrapping >= 100:
+      bootstrapping_samples = bootstrapping
+    else:
+      raise ValueError(
+          "bootstrapping argument should be boolean or an integer greater than"
+          " 100 as bootstrapping will not yield useful results otherwise. Got"
+          f" {bootstrapping!r}"
+      )
+    if task is None:
+      task = self.task()
+
+    with log.cc_log_context():
+
+      effective_dataspec, label_col_idx, group_col_idx = (
+          self._build_evaluation_dataspec(
+              override_task=task._to_proto_type(),  # pylint: disable=protected-access
+              override_label=label,
+              override_group=group,
+          )
+      )
+
+      ds = dataset.create_vertical_dataset(data, data_spec=effective_dataspec)
+
+      options_proto = metric_pb2.EvaluationOptions(
+          bootstrapping_samples=bootstrapping_samples,
+          task=task._to_proto_type(),  # pylint: disable=protected-access
+          ranking=metric_pb2.EvaluationOptions.Ranking(
+              ndcg_truncation=ndcg_truncation, mrr_truncation=mrr_truncation
+          )
+          if task == Task.RANKING
+          else None,
+          num_threads=num_threads,
+      )
+
+      evaluation_proto = self._model.Evaluate(
+          ds._dataset,  # pylint: disable=protected-access
+          options_proto,
+          weighted=weighted,
+          label_col_idx=label_col_idx,
+          group_col_idx=group_col_idx,
+          use_slow_engine=use_slow_engine,
+          num_threads=num_threads,
+      )
+    return metric.Evaluation(evaluation_proto)
+
+  def analyze_prediction(
+      self,
+      single_example: dataset.InputDataset,
+  ) -> analysis.PredictionAnalysis:
+    with log.cc_log_context():
+      ds = dataset.create_vertical_dataset(
+          single_example, data_spec=self._model.data_spec()
+      )
+
+      options_proto = model_analysis_pb2.PredictionAnalysisOptions()
+      analysis_proto = self._model.AnalyzePrediction(ds._dataset, options_proto)  # pylint: disable=protected-access
+      return analysis.PredictionAnalysis(analysis_proto, options_proto)
+
+  def analyze(
+      self,
+      data: dataset.InputDataset,
+      sampling: float = 1.0,
+      num_bins: int = 50,
+      partial_dependence_plot: bool = True,
+      conditional_expectation_plot: bool = True,
+      permutation_variable_importance_rounds: int = 1,
+      num_threads: Optional[int] = None,
+      maximum_duration: Optional[float] = 20,
+  ) -> analysis.Analysis:
+    if num_threads is None:
+      num_threads = concurrency.determine_optimal_num_threads(training=False)
+
+    with log.cc_log_context():
+      ds = dataset.create_vertical_dataset(
+          data, data_spec=self._model.data_spec()
+      )
+
+      options_proto = model_analysis_pb2.Options(
+          num_threads=num_threads,
+          maximum_duration_seconds=maximum_duration,
+          pdp=model_analysis_pb2.Options.PlotConfig(
+              enabled=partial_dependence_plot,
+              example_sampling=sampling,
+              num_numerical_bins=num_bins,
+          ),
+          cep=model_analysis_pb2.Options.PlotConfig(
+              enabled=conditional_expectation_plot,
+              example_sampling=sampling,
+              num_numerical_bins=num_bins,
+          ),
+          permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
+              enabled=permutation_variable_importance_rounds > 0,
+              num_rounds=permutation_variable_importance_rounds,
+          ),
+          include_model_structural_variable_importances=True,
+      )
+
+      analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access
+      return analysis.Analysis(analysis_proto, options_proto)
+
+  def to_cpp(self, key: str = "my_model") -> str:
+    return template_cpp_export.template(
+        key, self._model.data_spec(), self._model.input_features()
+    )
+
+  # TODO: Change default value of "mode" before 1.0 release.
+  def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value
+      self,
+      path: str,
+      input_model_signature_fn: Any = None,
+      *,
+      mode: Literal["keras", "tf"] = "keras",
+      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
+      servo_api: bool = False,
+      feed_example_proto: bool = False,
+      pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
+      post_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
+      temp_dir: Optional[str] = None,
+      tensor_specs: Optional[Dict[str, Any]] = None,
+      feature_specs: Optional[Dict[str, Any]] = None,
+      force: bool = False,
+  ) -> None:
+    if mode == "keras":
+      log.warning(
+          "Calling `to_tensorflow_saved_model(mode='keras', ...)`. Use"
+          " `to_tensorflow_saved_model(mode='tf', ...)` instead. mode='tf' is"
+          " more efficient, has better compatibility, and offers more options."
+          " Starting June 2024, `mode='tf'` will become the default value.",
+          message_id=log.WarningMessage.TO_TF_SAVED_MODEL_KERAS_MODE,
+      )
+
+    _get_export_tf().ydf_model_to_tensorflow_saved_model(
+        ydf_model=self,
+        path=path,
+        input_model_signature_fn=input_model_signature_fn,
+        mode=mode,
+        feature_dtypes=feature_dtypes,
+        servo_api=servo_api,
+        feed_example_proto=feed_example_proto,
+        pre_processing=pre_processing,
+        post_processing=post_processing,
+        temp_dir=temp_dir,
+        tensor_specs=tensor_specs,
+        feature_specs=feature_specs,
+    )
+
+  def to_tensorflow_function(  # pytype: disable=name-error
+      self,
+      temp_dir: Optional[str] = None,
+      can_be_saved: bool = True,
+      squeeze_binary_classification: bool = True,
+      force: bool = False,
+  ) -> "tensorflow.Module":
+    return _get_export_tf().ydf_model_to_tf_function(
+        ydf_model=self,
+        temp_dir=temp_dir,
+        can_be_saved=can_be_saved,
+        squeeze_binary_classification=squeeze_binary_classification,
+    )
+
+  def to_jax_function(  # pytype: disable=name-error
+      self,
+      jit: bool = True,
+      apply_activation: bool = True,
+      leaves_as_params: bool = False,
+      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",
+  ) -> "export_jax.JaxModel":
+    return _get_export_jax().to_jax_function(
+        model=self,
+        jit=jit,
+        apply_activation=apply_activation,
+        leaves_as_params=leaves_as_params,
+        compatibility=compatibility,
+    )
+
+  def update_with_jax_params(self, params: Dict[str, Any]):
     _get_export_jax().update_with_jax_params(model=self, params=params)
 
   def to_docker(
@@ -1446,52 +1785,12 @@ Use `model.describe()` for more details
   def hyperparameter_optimizer_logs(
       self,
   ) -> Optional[optimizer_logs.OptimizerLogs]:
-    """Returns the logs of the hyper-parameter tuning.
-
-    If the model is not trained with hyper-parameter tuning, returns None.
-    """
     proto_logs = self._model.hyperparameter_optimizer_logs()
     if proto_logs is None:
       return None
     return optimizer_logs.proto_optimizer_logs_to_optimizer_logs(proto_logs)
 
   def variable_importances(self) -> Dict[str, List[Tuple[float, str]]]:
-    """Variable importances to measure the impact of features on the model.
-
-    Variable importances generally indicates how much a variable (feature)
-    contributes to the model predictions or quality. Different Variable
-    importances have different semantics and are generally not comparable.
-
-    The variable importances returned by `variable_importances()` depends on the
-    learning algorithm and its hyper-parameters. For example, the hyperparameter
-    `compute_oob_variable_importances=True` of the Random Forest learner enables
-    the computation of permutation out-of-bag variable importances.
-
-    # TODO: Add variable importances to documentation.
-
-    Features are sorted by decreasing importance.
-
-    Usage example:
-
-    ```python
-    # Train a Random Forest. Enable the computation of OOB (out-of-bag) variable
-    # importances.
-    model = ydf.RandomForestModel(compute_oob_variable_importances=True,
-                                  label=...).train(ds)
-    # List the available variable importances.
-    print(model.variable_importances().keys())
-
-    # Show a specific variable importance.
-    model.variable_importances()["MEAN_DECREASE_IN_ACCURACY"]
-    >> [("bill_length_mm", 0.0713061951754389),
-        ("island", 0.007298519736842035),
-        ("flipper_length_mm", 0.004505893640351366),
-    ...
-    ```
-
-    Returns:
-      Variable importances.
-    """
     variable_importances = {}
     # Collect the variable importances stored in the model.
     for (
@@ -1507,111 +1806,13 @@ Use `model.describe()` for more details
   def label_col_idx(self) -> int:
     return self._model.label_col_idx()
 
-  def label(self) -> str:
-    """Name of the label column."""
-    return self.data_spec().columns[self.label_col_idx()].name
-
-  def label_classes(self) -> List[str]:
-    """Returns the label classes for a classification model; fails otherwise."""
-    if self.task() != Task.CLASSIFICATION:
-      raise ValueError(
-          "Label classes are only available for classification models. This"
-          f" model has type {self.task().name}"
-      )
-    label_column = self.data_spec().columns[self._model.label_col_idx()]
-    if label_column.type != data_spec_pb2.CATEGORICAL:
-      semantic = dataspec.Semantic.from_proto_type(label_column.type)
-      raise ValueError(
-          "Categorical type expected for classification label."
-          f" Got {semantic} instead."
-      )
-
-    if label_column.categorical.is_already_integerized:
-      log.info(
-          "The label column is integerized. This is expected for models trained"
-          " with TensorFlow Decision Forests."
-      )
-
-    # The first element is the "out-of-vocabulary" that is not used in labels.
-    return dataspec.categorical_column_dictionary_to_list(label_column)[1:]
-
-  def input_feature_names(self) -> List[str]:
-    """Returns the names of the input features.
-
-    The features are sorted in increasing order of column_idx.
-    """
-
-    dataspec_columns = self.data_spec().columns
-    return [dataspec_columns[idx].name for idx in self._model.input_features()]
-
-  def input_features(self) -> Sequence[InputFeature]:
-    """Returns the input features of the model.
-
-    The features are sorted in increasing order of column_idx.
-    """
-    dataspec_columns = self.data_spec().columns
-    return [
-        InputFeature(
-            name=dataspec_columns[column_idx].name,
-            semantic=dataspec.Semantic.from_proto_type(
-                dataspec_columns[column_idx].type
-            ),
-            column_idx=column_idx,
-        )
-        for column_idx in self._model.input_features()
-    ]
-
-  def self_evaluation(self) -> metric.Evaluation:
-    """Returns the model's self-evaluation.
-
-    Different models use different methods for self-evaluation. Notably, Random
-    Forests use OOB evaluation and Gradient Boosted Trees use evaluation on the
-    validation dataset. Therefore, self-evaluations are not comparable between
-    different model types.
-
-    Usage example:
-
-    ```python
-    import pandas as pd
-    import ydf
-
-    # Train model
-    train_ds = pd.read_csv("train.csv")
-    model = ydf.GradientBoostedTreesLearner(label="label").train(train_ds)
-
-    self_evaluation = model.self_evaluation()
-    # In an interactive Python environment, print a rich evaluation report.
-    self_evaluation
-    ```
-    """
-    raise NotImplementedError(
-        "Self-evaluation is not available for this model type."
-    )
+  def input_features_col_idxs(self) -> Sequence[int]:
+    return self._model.input_features()
 
   def list_compatible_engines(self) -> Sequence[str]:
-    """Lists the inference engines compatible with the model.
-
-    The engines are sorted to likely-fastest to  likely-slowest.
-
-    Returns:
-      List of compatible engines.
-    """
     return self._model.ListCompatibleEngines()
 
   def force_engine(self, engine_name: Optional[str]) -> None:
-    """Forces the engines used by the model.
-
-    If not specified (i.e., None; default value), the fastest compatible engine
-    (i.e., the first value returned from "list_compatible_engines") is used for
-    all model inferences (e.g., model.predict, model.evaluate).
-
-    If passing a non-existing or non-compatible engine, the next model inference
-    (e.g., model.predict, model.evaluate) will fail.
-
-    Args:
-      engine_name: Name of a compatible engine or None to automatically select
-        the fastest engine.
-    """
     self._model.ForceEngine(engine_name)
 
   def _build_evaluation_dataspec(

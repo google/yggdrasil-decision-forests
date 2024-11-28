@@ -26,7 +26,7 @@ from ydf.model.tree import plot as plot_lib
 from ydf.model.tree import tree as tree_lib
 
 
-class DecisionForestModel(generic_model.GenericModel):
+class DecisionForestModel(generic_model.GenericCCModel):
   """A generic decision forest model for prediction and inspection."""
 
   _model: ydf.DecisionForestCCModel

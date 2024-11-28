@@ -164,7 +164,7 @@ def load_cc_model(cc_model: ydf_cc.GenericCCModel) -> generic_model.ModelType:
       " tasks (e.g. inference) are possible",
       model_name,
   )
-  return generic_model.GenericModel(cc_model)
+  return generic_model.GenericCCModel(cc_model)
 
 
 def from_tensorflow_decision_forests(directory: str) -> generic_model.ModelType:
