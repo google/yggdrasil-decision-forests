@@ -211,13 +211,7 @@ class BackwardSelectionFeatureSelector(
     # and to reuse it at each iteration.
 
     # List the input features
-    dataspec = learner._get_vertical_dataset(ds).data_spec()  # pylint: disable=protected-access
-    non_input_feature_columns = set(learner._non_input_feature_columns())  # pylint: disable=protected-access
-    input_features = [
-        col.name
-        for col in dataspec.columns
-        if col.name not in non_input_feature_columns
-    ]
+    input_features = learner.extract_input_feature_names(ds)
     log.info(
         "Run backward feature selection on %d features", len(input_features)
     )

@@ -614,7 +614,7 @@ absl::StatusOr<std::string> GenSingleLearnerWrapper(
   const auto nice_learner_name = LearnerKeyToNiceLearnerName(learner_key);
 
   absl::SubstituteAndAppend(&wrapper, R"(
-class $0(generic_learner.GenericLearner):
+class $0(generic_learner.GenericCCLearner):
   r"""$6 learning algorithm.
 
   $5

@@ -49,7 +49,7 @@ from ydf.model.random_forest_model import random_forest_model
 from ydf.utils import func_helpers
 
 
-class RandomForestLearner(generic_learner.GenericLearner):
+class RandomForestLearner(generic_learner.GenericCCLearner):
   r"""Random Forest learning algorithm.
 
   A [Random Forest](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf)
@@ -674,7 +674,7 @@ class RandomForestLearner(generic_learner.GenericLearner):
     }
 
 
-class IsolationForestLearner(generic_learner.GenericLearner):
+class IsolationForestLearner(generic_learner.GenericCCLearner):
   r"""Isolation Forest learning algorithm.
 
   An [Isolation Forest](https://ieeexplore.ieee.org/abstract/document/4781136)
@@ -999,7 +999,7 @@ class IsolationForestLearner(generic_learner.GenericLearner):
     return {}
 
 
-class GradientBoostedTreesLearner(generic_learner.GenericLearner):
+class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
   r"""Gradient Boosted Trees learning algorithm.
 
   A [Gradient Boosted Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf)
@@ -1767,7 +1767,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericLearner):
     }
 
 
-class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
+class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
   r"""Distributed Gradient Boosted Trees learning algorithm.
 
   Exact distributed version of the Gradient Boosted Tree learning algorithm. See
@@ -2126,7 +2126,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericLearner):
     return {}
 
 
-class CartLearner(generic_learner.GenericLearner):
+class CartLearner(generic_learner.GenericCCLearner):
   r"""Cart learning algorithm.
 
   A CART (Classification and Regression Trees) a decision tree. The non-leaf

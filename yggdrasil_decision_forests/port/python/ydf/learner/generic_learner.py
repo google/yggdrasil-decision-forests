@@ -14,9 +14,9 @@
 
 """Definitions for Generic learners."""
 
+import abc
 import copy
 import datetime
-import os
 import re
 from typing import List, Optional, Sequence, Set, Union
 
@@ -47,7 +47,7 @@ Task = generic_model.Task
 _FRAMEWORK_NAME = "Python YDF"
 
 
-class GenericLearner:
+class GenericLearner(abc.ABC):
   """A generic YDF learner."""
 
   def __init__(
@@ -82,6 +82,7 @@ class GenericLearner:
     self._deployment_config = deployment_config
     self._tuner = tuner
     self._feature_selector = feature_selector
+    self._explicit_learner_arguments = explicit_learner_arguments
 
     if self._label is not None and not isinstance(label, str):
       raise ValueError("The 'label' should be a string")
@@ -118,32 +119,28 @@ class GenericLearner:
     if tuner:
       tuner.set_base_learner(learner_name)
 
-    if explicit_learner_arguments is not None:
-      self._hyperparameters = self._clean_up_hyperparameters(
-          explicit_learner_arguments
-      )
+    self.post_init()
 
-    self.validate_hyperparameters()
+  # === Following are the virtual methods that a learner should implement ===
 
-  @property
-  def learner_name(self) -> str:
-    return self._learner_name
+  @abc.abstractmethod
+  def post_init(self):
+    """Called after __init__."""
+    raise NotImplementedError
 
-  @property
-  def hyperparameters(self) -> hp_lib.HyperParameters:
-    """A (mutable) dictionary of this learner's hyperparameters.
+  @abc.abstractmethod
+  def train_imp(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset],
+      verbose: Optional[Union[int, bool]],
+  ) -> generic_model.ModelType:
+    """Trains a model."""
+    raise NotImplementedError
 
-    This object can be used to inspect or modify hyperparameters after creating
-    the learner. Modifying hyperparameters after constructing the learner is
-    suitable for some advanced use cases. Since this approach bypasses some
-    feasibility checks for the given set of hyperparameters, it generally better
-    to re-create the learner for each model. The current set of hyperparameters
-    can be validated manually with `validate_hyperparameters()`.
-    """
-    return self._hyperparameters
-
-  def validate_hyperparameters(self):
-    """Returns None if the hyperparameters are valid, raises otherwise.
+  @abc.abstractmethod
+  def validate_hyperparameters(self) -> None:
+    """Raises an exception if the hyperparameters are invalid.
 
     This method is called automatically before training, but users may call it
     to fail early. It makes sense to call this method when changing manually the
@@ -165,22 +162,72 @@ class GenericLearner:
     evaluation = model.evaluate(test_ds)
     ```
     """
-    return hp_lib.validate_hyperparameters(
-        self._hyperparameters,
-        self._get_training_config(),
-        self._deployment_config,
-    )
+    raise NotImplementedError
 
-  def _clean_up_hyperparameters(
-      self, explicit_parameters: Set[str]
-  ) -> hp_lib.HyperParameters:
-    """Returns the hyperparameters purged from the mutually exlusive ones."""
-    return hp_lib.fix_hyperparameters(
-        self._hyperparameters,
-        explicit_parameters,
-        self._get_training_config(),
-        self._deployment_config,
-    )
+  @abc.abstractmethod
+  def cross_validation(
+      self,
+      ds: dataset.InputDataset,
+      folds: int = 10,
+      bootstrapping: Union[bool, int] = False,
+      parallel_evaluations: int = 1,
+  ) -> metric.Evaluation:
+    """Cross-validates the learner and return the evaluation.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    dataset = pd.read_csv("my_dataset.csv")
+    learner = ydf.RandomForestLearner(label="label")
+    evaluation = learner.cross_validation(dataset)
+
+    # In a notebook, display an interractive evaluation
+    evaluation
+
+    # Print the evaluation
+    print(evaluation)
+
+    # Look at specific metrics
+    print(evaluation.accuracy)
+    ```
+
+    Args:
+      ds: Dataset for the cross-validation.
+      folds: Number of cross-validation folds.
+      bootstrapping: Controls whether bootstrapping is used to evaluate the
+        confidence intervals and statistical tests (i.e., all the metrics ending
+        with "[B]"). If set to false, bootstrapping is disabled. If set to true,
+        bootstrapping is enabled and 2000 bootstrapping samples are used. If set
+        to an integer, it specifies the number of bootstrapping samples to use.
+        In this case, if the number is less than 100, an error is raised as
+        bootstrapping will not yield useful results.
+      parallel_evaluations: Number of model to train and evaluate in parallel
+        using multi-threading. Note that each model is potentially already
+        trained with multithreading (see `num_threads` argument of Learner
+        constructor).
+
+    Returns:
+      The cross-validation evaluation.
+    """
+    raise NotImplementedError
+
+  @classmethod
+  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def extract_input_feature_names(self, ds: dataset.InputDataset) -> List[str]:
+    """Extracts the input features available in a dataset."""
+    raise NotImplementedError
+
+  # === Following are the non virtual and general methods for all learners ===
+
+  @property
+  def learner_name(self) -> str:
+    return self._learner_name
 
   def train(
       self,
@@ -274,13 +321,23 @@ class GenericLearner:
     # Training
     saved_verbose = log.verbose(verbose) if verbose is not None else None
     try:
-      if isinstance(ds, str):
-        return self._train_from_path(ds, valid)
-      else:
-        return self._train_from_dataset(ds, valid)
+      return self.train_imp(ds, valid, verbose)
     finally:
       if saved_verbose is not None:
         log.verbose(saved_verbose)
+
+  @property
+  def hyperparameters(self) -> hp_lib.HyperParameters:
+    """A (mutable) dictionary of this learner's hyperparameters.
+
+    This object can be used to inspect or modify hyperparameters after creating
+    the learner. Modifying hyperparameters after constructing the learner is
+    suitable for some advanced use cases. Since this approach bypasses some
+    feasibility checks for the given set of hyperparameters, it generally better
+    to re-create the learner for each model. The current set of hyperparameters
+    can be validated manually with `validate_hyperparameters()`.
+    """
+    return self._hyperparameters
 
   def __str__(self) -> str:
     return f"""\
@@ -289,6 +346,46 @@ Task: {self._task}
 Class: ydf.{self.__class__.__name__}
 Hyper-parameters: ydf.{self._hyperparameters}
 """
+
+
+class GenericCCLearner(GenericLearner):
+  """A generic YDF learner using YDF C++ for training."""
+
+  def post_init(self):
+    if self._explicit_learner_arguments is not None:
+      self._hyperparameters = self._clean_up_hyperparameters(
+          self._explicit_learner_arguments
+      )
+    self.validate_hyperparameters()
+
+  def train_imp(
+      self,
+      ds: dataset.InputDataset,
+      valid: Optional[dataset.InputDataset],
+      verbose: Optional[Union[int, bool]],
+  ) -> generic_model.ModelType:
+    if isinstance(ds, str):
+      return self._train_from_path(ds, valid)
+    else:
+      return self._train_from_dataset(ds, valid)
+
+  def validate_hyperparameters(self) -> None:
+    return hp_lib.validate_hyperparameters(
+        self._hyperparameters,
+        self._get_training_config(),
+        self._deployment_config,
+    )
+
+  def _clean_up_hyperparameters(
+      self, explicit_parameters: Set[str]
+  ) -> hp_lib.HyperParameters:
+    """Returns the hyperparameters purged from the mutually exlusive ones."""
+    return hp_lib.fix_hyperparameters(
+        self._hyperparameters,
+        explicit_parameters,
+        self._get_training_config(),
+        self._deployment_config,
+    )
 
   def _train_from_path(
       self, ds: str, valid: Optional[str]
@@ -366,7 +463,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
         weight_definition=self._build_weight_definition(),
         ranking_group=self._ranking_group,
         uplift_treatment=self._uplift_treatment,
-        task=self._task._to_proto_type(),
+        task=self._task._to_proto_type(),  # pylint: disable=protected-access
         metadata=abstract_model_pb2.Metadata(framework=_FRAMEWORK_NAME),
     )
 
@@ -439,6 +536,8 @@ Hyper-parameters: ydf.{self._hyperparameters}
   def _get_vertical_dataset(
       self, ds: dataset.InputDataset
   ) -> dataset.VerticalDataset:
+    """Gets the vertical dataset (i.e., dataset in raw) or a dataset."""
+
     if isinstance(ds, dataset.VerticalDataset):
       if self._data_spec is not None:
         raise ValueError(
@@ -503,47 +602,6 @@ Hyper-parameters: ydf.{self._hyperparameters}
       bootstrapping: Union[bool, int] = False,
       parallel_evaluations: int = 1,
   ) -> metric.Evaluation:
-    """Cross-validates the learner and return the evaluation.
-
-    Usage example:
-
-    ```python
-    import pandas as pd
-    import ydf
-
-    dataset = pd.read_csv("my_dataset.csv")
-    learner = ydf.RandomForestLearner(label="label")
-    evaluation = learner.cross_validation(dataset)
-
-    # In a notebook, display an interractive evaluation
-    evaluation
-
-    # Print the evaluation
-    print(evaluation)
-
-    # Look at specific metrics
-    print(evaluation.accuracy)
-    ```
-
-    Args:
-      ds: Dataset for the cross-validation.
-      folds: Number of cross-validation folds.
-      bootstrapping: Controls whether bootstrapping is used to evaluate the
-        confidence intervals and statistical tests (i.e., all the metrics ending
-        with "[B]"). If set to false, bootstrapping is disabled. If set to true,
-        bootstrapping is enabled and 2000 bootstrapping samples are used. If set
-        to an integer, it specifies the number of bootstrapping samples to use.
-        In this case, if the number is less than 100, an error is raised as
-        bootstrapping will not yield useful results.
-      parallel_evaluations: Number of model to train and evaluate in parallel
-        using multi-threading. Note that each model is potentially already
-        trained with multithreading (see `num_threads` argument of Learner
-        constructor).
-
-    Returns:
-      The cross-validation evaluation.
-    """
-
     fold_generator = fold_generator_pb2.FoldGenerator(
         cross_validation=fold_generator_pb2.FoldGenerator.CrossValidation(
             num_folds=folds,
@@ -562,7 +620,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       )
     evaluation_options = metric_pb2.EvaluationOptions(
         bootstrapping_samples=bootstrapping_samples,
-        task=self._task._to_proto_type(),
+        task=self._task._to_proto_type(),  # pylint: disable=protected-access
     )
 
     deployment_evaluation = abstract_learner_pb2.DeploymentConfig(
@@ -725,9 +783,14 @@ Hyper-parameters: ydf.{self._hyperparameters}
 
     return config
 
-  @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
-    raise NotImplementedError("Not implemented")
+  def extract_input_feature_names(self, ds: dataset.InputDataset) -> List[str]:
+    spec = self._get_vertical_dataset(ds).data_spec()
+    non_input_feature_columns = set(self._non_input_feature_columns())
+    return [
+        col.name
+        for col in spec.columns
+        if col.name not in non_input_feature_columns
+    ]
 
 
 def _feature_name_to_regex(name: str) -> str:

@@ -119,7 +119,7 @@ TEST(LearnerWrappers, Base) {
   LOG(INFO) << "content:\n" << content;
 
   EXPECT_EQ(content, R"(
-class FakeAlgorithmLearner(generic_learner.GenericLearner):
+class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
   r"""Fake Algorithm learning algorithm.
 
   
