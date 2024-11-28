@@ -23,6 +23,7 @@ cc_library_ydf(
         ":metric_cc_proto",
         ":ranking",
         ":ranking_utils",
+        "//third_party/boost/allowed",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
@@ -42,7 +43,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-        "@org_boost_math//:boost_math",
     ] + select({
         "//conditions:default": [
         ],
@@ -85,6 +85,7 @@ cc_library_ydf(
         ":metric",
         ":metric_cc_proto",
         ":ranking",
+        "//third_party/boost/allowed",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
@@ -94,7 +95,6 @@ cc_library_ydf(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@org_boost_math//:boost_math",
     ],
 )
 
@@ -176,10 +176,10 @@ cc_test(
         ":comparison",
         ":metric",
         ":metric_cc_proto",
+        "//third_party/boost/allowed",
         "//yggdrasil_decision_forests/utils:random",
         "@com_google_absl//absl/log:check",
         "@com_google_googletest//:gtest_main",
-        "@org_boost_math//:boost_math",
     ],
 )
 
