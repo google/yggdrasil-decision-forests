@@ -16,11 +16,12 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_CLI_WORKER_H_
 
+#include <atomic>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
-#include "yggdrasil_decision_forests/utils/distribute/distribute.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli.pb.h"
 
@@ -44,8 +45,8 @@ class Worker : public distribute::AbstractWorker {
   absl::Status Command(const proto::Request::Command& request,
                        proto::Result::Command* result);
 
-  absl::Status RunCommand(const absl::string_view command,
-                          const absl::string_view log_path);
+  absl::Status RunCommand(absl::string_view command, absl::string_view log_path,
+                          absl::string_view cmd_path);
 
   proto::Welcome welcome_;
 

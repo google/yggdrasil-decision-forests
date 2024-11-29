@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/utils/distribute_cli/distribute_cli_worker.h"
 
 #include "absl/log/log.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
@@ -153,10 +154,14 @@ absl::StatusOr<bool> Run(const std::string& command,
 #endif
 
 absl::Status Worker::RunCommand(const absl::string_view command,
-                                const absl::string_view log_path) {
+                                const absl::string_view log_path,
+                                const absl::string_view cmd_path) {
   file::RecursivelyDelete(log_path, file::Defaults()).IgnoreError();
+
+  std::string str_command(command);
+
   ASSIGN_OR_RETURN(const bool command_worked,
-                   Run(std::string(command), std::string(log_path),
+                   Run(str_command, std::string(log_path),
                        welcome_.display_commands_output()));
   if (command_worked) {
     return absl::OkStatus();
@@ -180,10 +185,23 @@ absl::Status Worker::RunCommand(const absl::string_view command,
   }
 
   std::string error_message = absl::Substitute(
-      "The following command failed:\n\n$0\n\nLog files: "
-      "$1\n\nLast 5k "
-      "characters of logs:\n\n$2",
-      command, log_path, end_of_logs);
+      R"(The following command failed:
+
+$0
+
+Log files: $1
+
+Command in a text file:
+$2
+
+Last 5k characters of logs:
+===========================
+
+$3
+
+===========================
+)",
+      command, log_path, cmd_path, end_of_logs);
   return absl::InvalidArgumentError(error_message);
 }
 
@@ -211,7 +229,7 @@ absl::Status Worker::Command(const proto::Request::Command& request,
   const auto base_path = file::JoinPath(output_dir, output_base_filename);
   const auto done_path = absl::StrCat(base_path, ".done");
   const auto fail_path = absl::StrCat(base_path, ".fail");
-  const auto progress_path = absl::StrCat(base_path, ".progress");
+  const auto cmd_path = absl::StrCat(base_path, ".cmd");
   const auto log_path = absl::StrCat(base_path, ".log");
 
   // Check if the command was already run.
@@ -225,8 +243,8 @@ absl::Status Worker::Command(const proto::Request::Command& request,
   }
 
   // Note: The tf-filesystem does not support well empty files.
-  file::RecursivelyDelete(progress_path, file::Defaults()).IgnoreError();
-  RETURN_IF_ERROR(file::SetContent(progress_path, request.command()));
+  file::RecursivelyDelete(cmd_path, file::Defaults()).IgnoreError();
+  RETURN_IF_ERROR(file::SetContent(cmd_path, request.command()));
 
   // Effectively run the command.
   if (welcome_.display_output()) {
@@ -236,7 +254,7 @@ absl::Status Worker::Command(const proto::Request::Command& request,
   const auto begin_time = absl::Now();
 
   const auto status = RunCommand(request.command(),
-                                 /*log_path*/ log_path);
+                                 /*log_path=*/log_path, /*cmd_path=*/cmd_path);
 
   if (!status.ok()) {
     if (welcome_.display_output()) {

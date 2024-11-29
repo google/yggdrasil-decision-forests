@@ -15,9 +15,10 @@
 
 #include "yggdrasil_decision_forests/utils/distribute_cli/common.h"
 
+#include <string>
+
 #include "absl/log/check.h"
-#include "absl/numeric/int128.h"
-#include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hash.h"
@@ -29,23 +30,29 @@ namespace distribute_cli {
 const char kWorkerKey[] = "DISTRIBUTE_CLI";
 
 std::string CommandToInternalCommandId(const absl::string_view command) {
-  const auto int128_hash = utils::hash::HashStringViewToUint128(command);
-  return absl::StrCat(absl::Uint128Low64(int128_hash), "-",
-                      absl::Uint128High64(int128_hash));
+  const auto int64_hash = utils::hash::HashStringViewToUint64(command);
+  return absl::StrFormat("%016x", int64_hash);
 }
 
 void BaseOutput(const absl::string_view log_dir,
                 const absl::string_view internal_command_id,
                 std::string* output_dir, std::string* output_base_filename) {
   // Number of characters in each intermediate subdirectory.
-  constexpr int sub_directory_name_length = 3;
+  constexpr int sub_directory_name_length = 4;
+  constexpr int max_depth = 1;
+
   *output_dir = std::string(log_dir);
   int idx = 0;
+  int depth = 0;
   while (idx + sub_directory_name_length < internal_command_id.size()) {
+    if (depth >= max_depth) {
+      break;
+    }
     *output_dir = file::JoinPath(
         *output_dir,
         internal_command_id.substr(idx, sub_directory_name_length));
     idx += sub_directory_name_length;
+    depth++;
   }
   *output_base_filename = std::string(internal_command_id.substr(idx));
   DCHECK_GT(output_base_filename->size(), 0);
