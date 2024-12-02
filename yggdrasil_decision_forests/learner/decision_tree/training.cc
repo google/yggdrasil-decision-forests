@@ -4074,14 +4074,34 @@ absl::Status DecisionTreeTrain(
   }
 
   // Check if oblique splits are correctly specified
-  if (dt_config.sparse_oblique_split().has_binary_weight() &&
-      dt_config.sparse_oblique_split().weights_case() !=
-          dt_config.sparse_oblique_split().WEIGHTS_NOT_SET) {
-    return absl::InvalidArgumentError(
-        "Both sparse_oblique_split.binary_weights and "
-        "sparse_oblique_split.weights are set. Setting "
-        "sparse_oblique_split.binary_weights is deprecated and replaced by "
-        "just setting sparse_oblique_split.weights.");
+  if (dt_config.has_sparse_oblique_split()) {
+    if (dt_config.sparse_oblique_split().has_binary_weight() &&
+        dt_config.sparse_oblique_split().weights_case() !=
+            dt_config.sparse_oblique_split().WEIGHTS_NOT_SET) {
+      return absl::InvalidArgumentError(
+          "Both sparse_oblique_split.binary_weights and "
+          "sparse_oblique_split.weights are set. Setting "
+          "sparse_oblique_split.binary_weights is deprecated and replaced by "
+          "just setting sparse_oblique_split.weights.");
+    }
+    if (dt_config.sparse_oblique_split().power_of_two().max_exponent() > 31) {
+      return absl::InvalidArgumentError(
+          "The maximum exponent for sparse oblique power-of-two weights cannot "
+          "be larger than 31.");
+    }
+    if (dt_config.sparse_oblique_split().power_of_two().min_exponent() < -31) {
+      return absl::InvalidArgumentError(
+          "The minimum exponent for sparse oblique power-of-two weights cannot "
+          "be smaller than -31.");
+    }
+    if (dt_config.sparse_oblique_split().power_of_two().min_exponent() >
+        dt_config.sparse_oblique_split().power_of_two().max_exponent()) {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "The minimum exponent for sparse oblique power-of-two weights cannot "
+          "be larger than the maximum exponent. Got minimum: $0, maximum: $1",
+          dt_config.sparse_oblique_split().power_of_two().min_exponent(),
+          dt_config.sparse_oblique_split().power_of_two().max_exponent()));
+    }
   }
 
   if (dt_config.has_honest()) {

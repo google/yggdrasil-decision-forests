@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "absl/log/log.h"
+#include "absl/random/random.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
@@ -673,13 +674,20 @@ void SampleProjection(const absl::Span<const int>& features,
   projection->reserve(projection_density * features.size());
   std::uniform_real_distribution<float> unif01;
   std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
+  const auto& oblique_config = dt_config.sparse_oblique_split();
 
   const auto gen_weight = [&](const int feature) -> float {
     float weight = unif1m1(*random);
-    if (dt_config.sparse_oblique_split().has_binary() ||
-        dt_config.sparse_oblique_split().weights_case() ==
-            dt_config.sparse_oblique_split().WEIGHTS_NOT_SET) {
+    if (oblique_config.has_binary() ||
+        oblique_config.weights_case() == oblique_config.WEIGHTS_NOT_SET) {
       weight = (weight >= 0) ? 1.f : -1.f;
+    } else if (oblique_config.has_power_of_two()) {
+      float sign = (weight >= 0) ? 1.f : -1.f;
+      int exponent =
+          absl::Uniform<int>(absl::IntervalClosed, *random,
+                             oblique_config.power_of_two().min_exponent(),
+                             oblique_config.power_of_two().max_exponent());
+      weight = sign * std::pow(2, exponent);
     }
 
     if (config_link.per_columns_size() > 0 &&
@@ -696,7 +704,7 @@ void SampleProjection(const absl::Span<const int>& features,
     }
 
     const auto& spec = data_spec.columns(feature).numerical();
-    switch (dt_config.sparse_oblique_split().normalization()) {
+    switch (oblique_config.normalization()) {
       case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::NONE:
         return weight;
       case proto::DecisionTreeTrainingConfig::SparseObliqueSplit::

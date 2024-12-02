@@ -233,6 +233,7 @@ message DecisionTreeTrainingConfig {
     oneof weights {
       BinaryWeights binary = 7;
       ContinuousWeights continuous = 8;
+      PowerOfTwoWeights power_of_two = 9;
     }
 
     // Weights sample in {-1, 1} (default in "Sparse Projection Oblique Random
@@ -242,6 +243,12 @@ message DecisionTreeTrainingConfig {
     // Weights sample in [-1, 1]. Consistently gives better quality models than
     // binary weights.
     message ContinuousWeights {}
+
+    // Weights sample in powers of two.
+    message PowerOfTwoWeights {
+      optional int32 min_exponent = 1 [default = -3];
+      optional int32 max_exponent = 2 [default = 3];
+    }
 
     // Normalization applied on the features, before applying the sparse oblique
     // projections.

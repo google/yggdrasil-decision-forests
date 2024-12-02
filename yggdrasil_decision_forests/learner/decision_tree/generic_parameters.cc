@@ -25,6 +25,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
@@ -313,13 +314,53 @@ Increasing this value increases training and inference time (on average). This v
         kHParamSplitAxisSparseObliqueWeightsBinary);
     param->mutable_categorical()->add_possible_values(
         kHParamSplitAxisSparseObliqueWeightsContinuous);
+    param->mutable_categorical()->add_possible_values(
+        kHParamSplitAxisSparseObliqueWeightsPowerOfTwo);
     param->mutable_conditional()->set_control_field(kHParamSplitAxis);
     param->mutable_conditional()->mutable_categorical()->add_values(
         kHParamSplitAxisSparseOblique);
-    param->mutable_documentation()->set_description(
-        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Possible values:
+    param->mutable_documentation()->set_description(absl::Substitute(
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. 
+Note that normalization is applied after sampling the weights, e.g.
+binary weights are only guaranteed binary if normalization is NONE.
+
+Possible values:
 - `BINARY`: The oblique weights are sampled in {-1,1} (default).
-- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].)");
+- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].
+- `POWER_OF_TWO`: The oblique weights are powers of two. The exponents are sampled
+                  uniformly in [$0, $1], the sign is uniformly sampled)",
+        kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+        kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent));
+  }
+
+  {
+    ASSIGN_OR_RETURN(
+        auto param,
+        get_params(kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent));
+    param->mutable_integer()->set_default_value(
+        config.sparse_oblique_split().power_of_two().min_exponent());
+    param->mutable_conditional()->set_control_field(
+        kHParamSplitAxisSparseObliqueWeights);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        (kHParamSplitAxisSparseObliqueWeightsPowerOfTwo));
+    param->mutable_documentation()->set_description(
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE` with 
+power-of-two weights i.e. `sparse_oblique_weights=POWER_OF_TWO`. Minimum exponent of the weights)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(
+        auto param,
+        get_params(kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent));
+    param->mutable_integer()->set_default_value(
+        config.sparse_oblique_split().power_of_two().max_exponent());
+    param->mutable_conditional()->set_control_field(
+        kHParamSplitAxisSparseObliqueWeights);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        (kHParamSplitAxisSparseObliqueWeightsPowerOfTwo));
+    param->mutable_documentation()->set_description(
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE` with 
+power-of-two weights i.e. `sparse_oblique_weights=POWER_OF_TWO`. Maximum exponent of the weights)");
   }
 
   {
@@ -745,18 +786,61 @@ absl::Status SetHyperParameters(
           dt_config->mutable_sparse_oblique_split()->mutable_binary();
         } else if (value == kHParamSplitAxisSparseObliqueWeightsContinuous) {
           dt_config->mutable_sparse_oblique_split()->mutable_continuous();
+        } else if (value == kHParamSplitAxisSparseObliqueWeightsPowerOfTwo) {
+          dt_config->mutable_sparse_oblique_split()->mutable_power_of_two();
         } else {
           return absl::InvalidArgumentError(absl::StrCat(
               "Unknown value for parameter ",
               kHParamSplitAxisSparseObliqueWeights, ". Possible values are: ",
-              kHParamSplitAxisSparseObliqueWeightsBinary, " and ",
-              kHParamSplitAxisSparseObliqueWeightsContinuous, "."));
+              kHParamSplitAxisSparseObliqueWeightsBinary, ", ",
+              kHParamSplitAxisSparseObliqueWeightsContinuous, " and ",
+              kHParamSplitAxisSparseObliqueWeightsPowerOfTwo, "."));
         }
       } else {
         return absl::InvalidArgumentError(
             absl::StrCat(kHParamSplitAxisSparseObliqueWeights,
                          " only works with sparse oblique trees "
                          "(split_axis=SPARSE_OBLIQUE)"));
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent);
+    if (hparam.has_value()) {
+      const auto hparam_value = hparam.value().value().integer();
+      if (dt_config->has_sparse_oblique_split() &&
+          dt_config->sparse_oblique_split().has_power_of_two()) {
+        dt_config->mutable_sparse_oblique_split()
+            ->mutable_power_of_two()
+            ->set_min_exponent(hparam_value);
+      } else {
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+            " only works with sparse oblique trees "
+            "(`split_axis=SPARSE_OBLIQUE`) and power of two weights "
+            "(`sparse_oblique_weights=POWER_OF_TWO`)"));
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent);
+    if (hparam.has_value()) {
+      const auto hparam_value = hparam.value().value().integer();
+      if (dt_config->has_sparse_oblique_split() &&
+          dt_config->sparse_oblique_split().has_power_of_two()) {
+        dt_config->mutable_sparse_oblique_split()
+            ->mutable_power_of_two()
+            ->set_max_exponent(hparam_value);
+      } else {
+        return absl::InvalidArgumentError(absl::StrCat(
+            kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent,
+            " only works with sparse oblique trees "
+            "(`split_axis=SPARSE_OBLIQUE`) and power of two weights "
+            "(`sparse_oblique_weights=POWER_OF_TWO`)"));
       }
     }
   }

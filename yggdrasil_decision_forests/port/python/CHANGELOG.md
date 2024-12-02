@@ -21,6 +21,7 @@
     learner constructor argument. See the [feature selection tutorial]() for
     more details.
 -   Add standalone prediction evaluation `ydf.evaluate_predictions()`.
+-   Add option "POWER_OF_TWO" for sparse oblique weights.
 
 ### Fix
 

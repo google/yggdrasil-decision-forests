@@ -1096,6 +1096,32 @@ class CARTLearnerTest(LearnerTest):
     root_weights = model.get_tree(0).root.condition.weights
     self.assertFalse(all(x in (-1.0, 1.0) for x in root_weights))
 
+  def test_oblique_weights_power_of_two(self):
+    learner = specialized_learners.CartLearner(
+        label="label",
+        max_depth=2,
+        split_axis="SPARSE_OBLIQUE",
+        sparse_oblique_weights="POWER_OF_TWO",
+    )
+    f1 = np.linspace(-1, 1, 50) ** 2
+    f2 = np.linspace(1.5, -0.5, 50) ** 2
+    label = (0.2 * f1 + 0.7 * f2 >= 0.25).astype(int)
+    ds = {"f1": f1, "f2": f2, "label": label}
+    model = learner.train(ds)
+    root_weights = model.get_tree(0).root.condition.weights
+    acceptable_weights = [x * 2**y for x in (1.0, -1.0) for y in range(-3, 4)]
+    self.assertTrue(all(x in acceptable_weights for x in root_weights))
+    learner.hyperparameters[
+        "sparse_oblique_weights_power_of_two_min_exponent"
+    ] = 4
+    learner.hyperparameters[
+        "sparse_oblique_weights_power_of_two_max_exponent"
+    ] = 7
+    model_2 = learner.train(ds)
+    root_weights_2 = model_2.get_tree(0).root.condition.weights
+    acceptable_weights_2 = [x * 2**y for x in (1.0, -1.0) for y in range(4, 8)]
+    self.assertTrue(all(x in acceptable_weights_2 for x in root_weights_2))
+
 
 class GradientBoostedTreesLearnerTest(LearnerTest):
 

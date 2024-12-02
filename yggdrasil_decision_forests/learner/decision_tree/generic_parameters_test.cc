@@ -69,7 +69,9 @@ TEST(GenericParameters, GiveValidAndInvalidHyperparameters) {
       kHParamUpliftMinExamplesInTreatment,
       kHParamHonest,
       kHParamHonestRatioLeafExamples,
-      kHParamHonestFixedSeparation};
+      kHParamHonestFixedSeparation,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent};
   EXPECT_OK(GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters));
   EXPECT_EQ(hparam_def.fields().size(), 2);
@@ -110,7 +112,9 @@ TEST(GenericParameters, MissingValidHyperparameters) {
       kHParamUpliftMinExamplesInTreatment,
       kHParamHonest,
       kHParamHonestRatioLeafExamples,
-      kHParamHonestFixedSeparation};
+      kHParamHonestFixedSeparation,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent};
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
   EXPECT_THAT(status, test::StatusIs(absl::StatusCode::kInternal,
@@ -149,7 +153,9 @@ TEST(GenericParameters, MissingInvalidHyperparameters) {
       kHParamUpliftMinExamplesInTreatment,
       kHParamHonest,
       kHParamHonestRatioLeafExamples,
-      kHParamHonestFixedSeparation};
+      kHParamHonestFixedSeparation,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent};
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
   EXPECT_THAT(status, test::StatusIs(
@@ -189,7 +195,9 @@ TEST(GenericParameters, UnknownValidHyperparameter) {
       kHParamUpliftMinExamplesInTreatment,
       kHParamHonest,
       kHParamHonestRatioLeafExamples,
-      kHParamHonestFixedSeparation};
+      kHParamHonestFixedSeparation,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent};
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
   EXPECT_THAT(
@@ -230,6 +238,8 @@ TEST(GenericParameters, UnknownInvalidHyperparameter) {
       kHParamHonest,
       kHParamHonestRatioLeafExamples,
       kHParamHonestFixedSeparation,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent,
       "does_not_exist_invalid"};
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -271,7 +281,9 @@ TEST(GenericParameters, ExistingHyperparameter) {
       kHParamUpliftMinExamplesInTreatment,
       kHParamHonest,
       kHParamHonestRatioLeafExamples,
-      kHParamHonestFixedSeparation};
+      kHParamHonestFixedSeparation,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
+      kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent};
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
   EXPECT_THAT(
