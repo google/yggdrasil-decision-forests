@@ -15,6 +15,8 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 -   Add support for distributed training for ranking gradient boosted tree
     models.
 -   Add support for AVRO data file using the "avro:" prefix.
+-   Deprecated `SparseObliqueSplit.binary_weights` hyperparameter in favor of
+    `SparseObliqueSplit.weights`.
 
 ### Misc
 

@@ -1052,6 +1052,50 @@ class CARTLearnerTest(LearnerTest):
     self.assertIsNotNone(logs)
     self.assertLen(logs.trials, 5)
 
+  def test_oblique_weights_default(self):
+    learner = specialized_learners.CartLearner(
+        label="label",
+        max_depth=2,
+        split_axis="SPARSE_OBLIQUE",
+    )
+    f1 = np.linspace(-1, 1, 50) ** 2
+    f2 = np.linspace(1.5, -0.5, 50) ** 2
+    label = (0.2 * f1 + 0.7 * f2 >= 0.25).astype(int)
+    ds = {"f1": f1, "f2": f2, "label": label}
+    model = learner.train(ds)
+    root_weights = model.get_tree(0).root.condition.weights
+    self.assertTrue(all(x in (-1.0, 1.0) for x in root_weights))
+
+  def test_oblique_weights_binary(self):
+    learner = specialized_learners.CartLearner(
+        label="label",
+        max_depth=2,
+        split_axis="SPARSE_OBLIQUE",
+        sparse_oblique_weights="BINARY",
+    )
+    f1 = np.linspace(-1, 1, 50) ** 2
+    f2 = np.linspace(1.5, -0.5, 50) ** 2
+    label = (0.2 * f1 + 0.7 * f2 >= 0.25).astype(int)
+    ds = {"f1": f1, "f2": f2, "label": label}
+    model = learner.train(ds)
+    root_weights = model.get_tree(0).root.condition.weights
+    self.assertTrue(all(x in (-1.0, 1.0) for x in root_weights))
+
+  def test_oblique_weights_continuous(self):
+    learner = specialized_learners.CartLearner(
+        label="label",
+        max_depth=2,
+        split_axis="SPARSE_OBLIQUE",
+        sparse_oblique_weights="CONTINUOUS",
+    )
+    f1 = np.linspace(-1, 1, 50) ** 2
+    f2 = np.linspace(1.5, -0.5, 50) ** 2
+    label = (0.2 * f1 + 0.7 * f2 >= 0.25).astype(int)
+    ds = {"f1": f1, "f2": f2, "label": label}
+    model = learner.train(ds)
+    root_weights = model.get_tree(0).root.condition.weights
+    self.assertFalse(all(x in (-1.0, 1.0) for x in root_weights))
+
 
 class GradientBoostedTreesLearnerTest(LearnerTest):
 

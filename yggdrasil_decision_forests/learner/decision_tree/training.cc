@@ -3836,6 +3836,15 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
   }
 
   config->mutable_internal()->set_sorting_strategy(sorting_strategy);
+
+  if (config->sparse_oblique_split().has_binary_weight()) {
+    if (config->sparse_oblique_split().binary_weight()) {
+      config->mutable_sparse_oblique_split()->mutable_binary();
+    } else {
+      config->mutable_sparse_oblique_split()->mutable_continuous();
+    }
+    config->mutable_sparse_oblique_split()->clear_binary_weight();
+  }
 }
 
 template <class T, class S, class C>
@@ -4062,6 +4071,17 @@ absl::Status DecisionTreeTrain(
         "monotonic constraints. To minimize the size of your serving model "
         "(with or without monotonic constraints), use "
         "pure_serving_model=true.");
+  }
+
+  // Check if oblique splits are correctly specified
+  if (dt_config.sparse_oblique_split().has_binary_weight() &&
+      dt_config.sparse_oblique_split().weights_case() !=
+          dt_config.sparse_oblique_split().WEIGHTS_NOT_SET) {
+    return absl::InvalidArgumentError(
+        "Both sparse_oblique_split.binary_weights and "
+        "sparse_oblique_split.weights are set. Setting "
+        "sparse_oblique_split.binary_weights is deprecated and replaced by "
+        "just setting sparse_oblique_split.weights.");
   }
 
   if (dt_config.has_honest()) {

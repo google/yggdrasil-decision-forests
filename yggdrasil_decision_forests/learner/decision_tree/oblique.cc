@@ -676,7 +676,9 @@ void SampleProjection(const absl::Span<const int>& features,
 
   const auto gen_weight = [&](const int feature) -> float {
     float weight = unif1m1(*random);
-    if (dt_config.sparse_oblique_split().binary_weight()) {
+    if (dt_config.sparse_oblique_split().has_binary() ||
+        dt_config.sparse_oblique_split().weights_case() ==
+            dt_config.sparse_oblique_split().WEIGHTS_NOT_SET) {
       weight = (weight >= 0) ? 1.f : -1.f;
     }
 

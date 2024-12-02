@@ -308,9 +308,7 @@ Increasing this value increases training and inference time (on average). This v
     ASSIGN_OR_RETURN(auto param,
                      get_params(kHParamSplitAxisSparseObliqueWeights));
     param->mutable_categorical()->set_default_value(
-        config.sparse_oblique_split().binary_weight()
-            ? kHParamSplitAxisSparseObliqueWeightsBinary
-            : kHParamSplitAxisSparseObliqueWeightsContinuous);
+        kHParamSplitAxisSparseObliqueWeightsBinary);
     param->mutable_categorical()->add_possible_values(
         kHParamSplitAxisSparseObliqueWeightsBinary);
     param->mutable_categorical()->add_possible_values(
@@ -744,9 +742,9 @@ absl::Status SetHyperParameters(
       if (dt_config->has_sparse_oblique_split()) {
         const auto& value = hparam.value().value().categorical();
         if (value == kHParamSplitAxisSparseObliqueWeightsBinary) {
-          dt_config->mutable_sparse_oblique_split()->set_binary_weight(true);
+          dt_config->mutable_sparse_oblique_split()->mutable_binary();
         } else if (value == kHParamSplitAxisSparseObliqueWeightsContinuous) {
-          dt_config->mutable_sparse_oblique_split()->set_binary_weight(false);
+          dt_config->mutable_sparse_oblique_split()->mutable_continuous();
         } else {
           return absl::InvalidArgumentError(absl::StrCat(
               "Unknown value for parameter ",

@@ -220,10 +220,28 @@ message DecisionTreeTrainingConfig {
     // This value is best tuned for each dataset.
     optional float projection_density_factor = 3 [default = 2];
 
+    // Deprecated, use `weights` instead.
+    //
     // If true, the weight will be sampled in {-1,1} (default in  "Sparse
     // Projection Oblique Random Forests" (Tomita et al, 2020)). If false, the
     // weight will be sampled in [-1,1].
-    optional bool binary_weight = 4 [default = true];
+    optional bool binary_weight = 4 [default = true, deprecated = true];
+
+    // Weights to apply to the projections.
+    //
+    // Continuous weights generally give better performance.
+    oneof weights {
+      BinaryWeights binary = 7;
+      ContinuousWeights continuous = 8;
+    }
+
+    // Weights sample in {-1, 1} (default in "Sparse Projection Oblique Random
+    // Forests" (Tomita et al, 2020))).
+    message BinaryWeights {}
+
+    // Weights sample in [-1, 1]. Consistently gives better quality models than
+    // binary weights.
+    message ContinuousWeights {}
 
     // Normalization applied on the features, before applying the sparse oblique
     // projections.
