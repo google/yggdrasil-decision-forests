@@ -1,6 +1,8 @@
 # Changelog
 
-## HEAD
+## 0.9.0 - 2024-12-02
+
+### Feature
 
 ### Breaking
 
@@ -23,10 +25,15 @@
 -   Add standalone prediction evaluation `ydf.evaluate_predictions()`.
 -   Add new hyperparameter `sparse_oblique_max_num_projections`.
 -   Add options "POWER_OF_TWO" and "INTEGER" for sparse oblique weights.
+-   Emit proper errors when using lists for multi-dimensional features.
 
 ### Fix
 
 -   Regression and Ranking CEPs scaling corrected.
+
+### Release music
+
+The John B. Sails. Traditional
 
 ## 0.8.0 - 2024-09-23
 

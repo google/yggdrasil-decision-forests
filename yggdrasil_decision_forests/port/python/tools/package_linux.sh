@@ -108,13 +108,13 @@ function test_package() {
   local scaled_new_file_size=$(($new_file_size * 10))
   if [ "$scaled_new_file_size" -gt "$scaled_old_file_size" ]; then
     echo "New package is 20% larger than the previous one."
-    echo "This may indicates an issue with the wheel, aborting."
+    echo "This may indicate an issue with the wheel, aborting."
     exit 1
   fi
   scaled_old_file_size=$(($old_file_size * 8))
   if [ "$scaled_new_file_size" -lt "$scaled_old_file_size" ]; then
     echo "New package is 20% smaller than the previous one."
-    echo "This may indicates an issue with the wheel, aborting."
+    echo "This may indicate an issue with the wheel, aborting."
     exit 1
   fi
   rm -r previous_package
