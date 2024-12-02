@@ -3837,6 +3837,8 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
 
   config->mutable_internal()->set_sorting_strategy(sorting_strategy);
 
+  // The binary weight hyperparameter is deprecated for the more general weights
+  // hyperparameter.
   if (config->sparse_oblique_split().has_binary_weight()) {
     if (config->sparse_oblique_split().binary_weight()) {
       config->mutable_sparse_oblique_split()->mutable_binary();
@@ -3844,6 +3846,14 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
       config->mutable_sparse_oblique_split()->mutable_continuous();
     }
     config->mutable_sparse_oblique_split()->clear_binary_weight();
+  }
+
+  // By default, we use binary weights.
+  if (config->has_sparse_oblique_split() &&
+      config->sparse_oblique_split().weights_case() ==
+          proto::DecisionTreeTrainingConfig::SparseObliqueSplit::
+              WEIGHTS_NOT_SET) {
+    config->mutable_sparse_oblique_split()->mutable_binary();
   }
 }
 
@@ -4101,6 +4111,14 @@ absl::Status DecisionTreeTrain(
           "be larger than the maximum exponent. Got minimum: $0, maximum: $1",
           dt_config.sparse_oblique_split().power_of_two().min_exponent(),
           dt_config.sparse_oblique_split().power_of_two().max_exponent()));
+    }
+    if (dt_config.sparse_oblique_split().integer().minimum() >
+        dt_config.sparse_oblique_split().integer().maximum()) {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "The minimum value for sparse oblique integer weights cannot "
+          "be larger than the maximum value. Got minimum: $0, maximum: $1",
+          dt_config.sparse_oblique_split().integer().minimum(),
+          dt_config.sparse_oblique_split().integer().maximum()));
     }
   }
 

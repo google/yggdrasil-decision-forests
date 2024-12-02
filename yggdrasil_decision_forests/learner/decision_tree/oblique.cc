@@ -678,16 +678,33 @@ void SampleProjection(const absl::Span<const int>& features,
 
   const auto gen_weight = [&](const int feature) -> float {
     float weight = unif1m1(*random);
-    if (oblique_config.has_binary() ||
-        oblique_config.weights_case() == oblique_config.WEIGHTS_NOT_SET) {
-      weight = (weight >= 0) ? 1.f : -1.f;
-    } else if (oblique_config.has_power_of_two()) {
-      float sign = (weight >= 0) ? 1.f : -1.f;
-      int exponent =
-          absl::Uniform<int>(absl::IntervalClosed, *random,
-                             oblique_config.power_of_two().min_exponent(),
-                             oblique_config.power_of_two().max_exponent());
-      weight = sign * std::pow(2, exponent);
+    switch (oblique_config.weights_case()) {
+      case (proto::DecisionTreeTrainingConfig::SparseObliqueSplit::WeightsCase::
+                kBinary): {
+        weight = (weight >= 0) ? 1.f : -1.f;
+        break;
+      }
+      case (proto::DecisionTreeTrainingConfig::SparseObliqueSplit::WeightsCase::
+                kPowerOfTwo): {
+        float sign = (weight >= 0) ? 1.f : -1.f;
+        int exponent =
+            absl::Uniform<int>(absl::IntervalClosed, *random,
+                               oblique_config.power_of_two().min_exponent(),
+                               oblique_config.power_of_two().max_exponent());
+        weight = sign * std::pow(2, exponent);
+        break;
+      }
+      case (proto::DecisionTreeTrainingConfig::SparseObliqueSplit::WeightsCase::
+                kInteger): {
+        weight = absl::Uniform(absl::IntervalClosed, *random,
+                               oblique_config.integer().minimum(),
+                               oblique_config.integer().maximum());
+        break;
+      }
+      default: {
+        // Return continuous weights.
+        break;
+      }
     }
 
     if (config_link.per_columns_size() > 0 &&
@@ -698,8 +715,8 @@ void SampleProjection(const absl::Span<const int>& features,
       if (direction_increasing == (weight < 0)) {
         weight = -weight;
       }
-      // As soon as one selected feature is monotonic, the oblique split becomes
-      // monotonic.
+      // As soon as one selected feature is monotonic, the oblique split
+      // becomes monotonic.
       *monotonic_direction = 1;
     }
 

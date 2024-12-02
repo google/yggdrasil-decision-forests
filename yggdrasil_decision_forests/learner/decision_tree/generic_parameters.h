@@ -80,6 +80,11 @@ constexpr char kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent[] =
     "sparse_oblique_weights_power_of_two_min_exponent";
 constexpr char kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent[] =
     "sparse_oblique_weights_power_of_two_max_exponent";
+constexpr char kHParamSplitAxisSparseObliqueWeightsInteger[] = "INTEGER";
+constexpr char kHParamSplitAxisSparseObliqueWeightsIntegerMinimum[] =
+    "sparse_oblique_weights_integer_minimum";
+constexpr char kHParamSplitAxisSparseObliqueWeightsIntegerMaximum[] =
+    "sparse_oblique_weights_integer_maximum";
 
 constexpr char kHParamSplitAxisSparseObliqueNormalization[] =
     "sparse_oblique_normalization";

@@ -763,6 +763,8 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamSplitAxisSparseObliqueWeights,
       decision_tree::kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
       decision_tree::kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent,
+      decision_tree::kHParamSplitAxisSparseObliqueWeightsIntegerMinimum,
+      decision_tree::kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
   };
   // Remove not yet implemented hyperparameters
   // TODO: b/345425508 - Implement more hyperparameters for isolation forests.
