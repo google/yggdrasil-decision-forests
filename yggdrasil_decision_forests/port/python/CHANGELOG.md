@@ -21,6 +21,7 @@
     learner constructor argument. See the [feature selection tutorial]() for
     more details.
 -   Add standalone prediction evaluation `ydf.evaluate_predictions()`.
+-   Add new hyperparameter `sparse_oblique_max_num_projections`.
 -   Add options "POWER_OF_TWO" and "INTEGER" for sparse oblique weights.
 
 ### Fix

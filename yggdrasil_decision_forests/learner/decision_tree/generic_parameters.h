@@ -98,6 +98,9 @@ constexpr char kHParamSplitAxisMhldObliqueMaxNumAttributes[] =
 constexpr char kHParamSplitAxisMhldObliqueSampleAttributes[] =
     "mhld_oblique_sample_attributes";
 
+constexpr char kHParamSplitAxisSparseObliqueMaxNumFeatures[] =
+    "sparse_oblique_max_num_features";
+
 constexpr char kHParamSortingStrategy[] = "sorting_strategy";
 constexpr char kHParamSortingStrategyInNode[] = "IN_NODE";
 constexpr char kHParamSortingStrategyPresort[] = "PRESORT";

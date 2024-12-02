@@ -761,6 +761,7 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamSplitAxisSparseObliqueProjectionDensityFactor,
       decision_tree::kHParamSplitAxisSparseObliqueNormalization,
       decision_tree::kHParamSplitAxisSparseObliqueWeights,
+      decision_tree::kHParamSplitAxisSparseObliqueMaxNumFeatures,
       decision_tree::kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMinExponent,
       decision_tree::kHParamSplitAxisSparseObliqueWeightsPowerOfTwoMaxExponent,
       decision_tree::kHParamSplitAxisSparseObliqueWeightsIntegerMinimum,

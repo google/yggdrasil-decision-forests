@@ -23,9 +23,12 @@
 #include <optional>
 #include <random>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "absl/container/btree_set.h"
 #include "absl/log/log.h"
+#include "absl/random/distributions.h"
 #include "absl/random/random.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -745,6 +748,31 @@ void SampleProjection(const absl::Span<const int>& features,
          /*.weight =*/1.f});
   } else if (projection->size() == 1) {
     projection->front().weight = 1.f;
+  }
+
+  int max_num_features = dt_config.sparse_oblique_split().max_num_features();
+  int cur_num_projections = projection->size();
+
+  if (max_num_features > 0 && cur_num_projections > max_num_features) {
+    internal::Projection resampled_projection;
+    resampled_projection.reserve(max_num_features);
+    // For a small number of features, a boolean vector is more efficient.
+    // Re-evaluate if this becomes a bottleneck.
+    absl::btree_set<size_t> sampled_features;
+    // Floyd's sampling algorithm.
+    for (size_t j = cur_num_projections - max_num_features;
+         j < cur_num_projections; j++) {
+      size_t t = absl::Uniform<size_t>(*random, 0, j + 1);
+      if (!sampled_features.insert(t).second) {
+        // t was already sampled, so insert j instead.
+        sampled_features.insert(j);
+        resampled_projection.push_back((*projection)[j]);
+      } else {
+        // t was not yet sampled.
+        resampled_projection.push_back((*projection)[t]);
+      }
+    }
+    *projection = std::move(resampled_projection);
   }
 }
 

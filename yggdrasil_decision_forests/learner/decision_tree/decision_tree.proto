@@ -277,6 +277,14 @@ message DecisionTreeTrainingConfig {
       // entire train dataset.
       MIN_MAX = 2;
     }
+
+    // Maximum number of features in a projection. Set to -1 or not provided for
+    // no maximum.
+    //
+    // Use only if a hard maximum on the number of variables is  needed,
+    // otherwise prefer `projection_density_factor` for controlling the number
+    // of features per projection.
+    optional int32 max_num_features = 11 [default = -1];
   }
 
   message MHLDObliqueSplit {

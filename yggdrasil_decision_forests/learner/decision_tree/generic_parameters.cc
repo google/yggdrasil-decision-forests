@@ -399,6 +399,22 @@ integer weights i.e. `sparse_oblique_weights=INTEGER`. Maximum value of the weig
   }
 
   {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamSplitAxisSparseObliqueMaxNumFeatures));
+    param->mutable_integer()->set_default_value(
+        config.sparse_oblique_split().max_num_features());
+    param->mutable_conditional()->set_control_field(kHParamSplitAxis);
+    param->mutable_integer()->set_minimum(-1);
+    param->mutable_documentation()->set_proto_field("max_num_features");
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kHParamSplitAxisSparseOblique);
+    param->mutable_documentation()->set_description(
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. 
+Controls the maximum number of features in a split.Set to -1 for no maximum.
+Use only if a hard maximum on the number of variables is needed, otherwise prefer `projection_density_factor` for controlling the number of features per projection.)");
+  }
+
+  {
     ASSIGN_OR_RETURN(
         auto param, get_params(kHParamSplitAxisSparseObliqueMaxNumProjections));
     param->mutable_integer()->set_default_value(
@@ -805,6 +821,23 @@ absl::Status SetHyperParameters(
       } else {
         return absl::InvalidArgumentError(
             absl::StrCat(kHParamSplitAxisSparseObliqueNormalization,
+                         " only works with sparse oblique trees "
+                         "(split_axis=SPARSE_OBLIQUE)"));
+      }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamSplitAxisSparseObliqueMaxNumFeatures);
+    if (hparam.has_value()) {
+      const auto hparam_value = hparam.value().value().integer();
+      if (dt_config->has_sparse_oblique_split()) {
+        dt_config->mutable_sparse_oblique_split()->set_max_num_features(
+            hparam_value);
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueMaxNumFeatures,
                          " only works with sparse oblique trees "
                          "(split_axis=SPARSE_OBLIQUE)"));
       }
