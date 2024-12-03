@@ -16,6 +16,8 @@
 
 ::: ydf.Semantic
 
+::: ydf.evaluate_predictions
+
 ::: ydf.start_worker
 
 ::: ydf.strict

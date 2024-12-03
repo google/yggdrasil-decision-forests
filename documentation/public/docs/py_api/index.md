@@ -50,16 +50,8 @@ A **Feature Selector** finds the optimal set of input features for the model.
 -   [BackwardSelectionFeatureSelector](BackwardSelectionFeatureSelector.md)
 -   [FeatureSelectorLogs](FeatureSelectorLogs.md)
 
-## Prediction Evaluation
-
-**Prediction Evaluation** allows evaluating arbitrary predictions with YDF's
-tools. 
-
--   [Prediction evaluation](evaluate.md)
-
 ## Other
 
--   [verbose](utilities.md#ydf.verbose): Control the amount of logging.
 -   [load_model](utilities.md#ydf.load_model): Load a model from disk.
 -   [Feature](utilities.md#ydf.Feature): Input feature specific hyper-parameters
     e.g. semantic, constraints.
@@ -68,6 +60,8 @@ tools.
     classification.
 -   [Semantic](utilities.md#ydf.Semantic): How an input feature in interpreted
     e.g. numerical, categorical.
+-   [evaluate_predictions](utilities.md#ydf.evaluate_predictions): Evaluates predictions of YDF and non-YDF models.
+-   [verbose](utilities.md#ydf.verbose): Control the amount of logging.
 -   [start_worker](utilities.md#ydf.start_worker): Start a worker for
     distributed training.
 -   [strict](utilities.md#ydf.strict): Show more logs.

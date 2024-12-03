@@ -11,7 +11,7 @@ example, a feature represented by 64-bit integers might have a numerical
 semantic or a categorical semantic.
 
 In basic cases, YDF detects the semantics of a feature automatically, so you
-only need to check them after the training (e.g. use [model.describe()](/py_api/GenericModel/#ydf.GenericModel.describe)). If YDF
+only need to check them after the training (e.g. use [model.describe()](py_api/GenericModel/#ydf.GenericModel.describe)). If YDF
 does not detect the correct semantic, you can manually override it. Using the
 wrong semantic negatively impacts the training speed and quality of a model.
 Also, YDF is not able to consume all the types of features. In such cases,
@@ -22,7 +22,7 @@ select them, and gives recommendations on how to feed different types of
 features into the model.
 
 This guide assumes basic familiarity with YDF, e.g. the
-[Getting Started](/tutorial/getting_started)
+[Getting Started](tutorial/getting_started)
 tutorial.
 
 ## Introduction: How to specify feature semantics
@@ -248,7 +248,7 @@ YDF “unrolls” each entry of the vector to an individual feature. These
 features are named `text.0_of_512`, `text.1_of_512`, etc. Note that all
 vectors must have the exact same size - if the vectors have different sizes,
 consider the CATEGORICAL_SET semantic. See
-[here](/tutorial/multidimensional_feature)
+[here](tutorial/multidimensional_feature)
 for a more detailed example.
 
 ```python
@@ -297,7 +297,7 @@ numerical unix time generally does not work well.
 
 Time series datasets require advanced feature preprocessing for good model
 quality. Check the
-[special guide](/tutorial/time_sequences)
+[special guide](tutorial/time_sequences)
 in the YDF documentation for more information.
 
 !!! warning
@@ -464,7 +464,7 @@ are considered, and how the algorithm finds the best split.
     thresholds (e.g., "age >= 30").
 
     For even more powerful models,
-    [enable oblique splits](/guide_how_to_improve_model/#use-oblique-trees).
+    [enable oblique splits](guide_how_to_improve_model/#use-oblique-trees).
     This allows YDF to learn splits that combine multiple numerical features
     (e.g., "0.3 \* age + 0.7 \* income >= 50"). This is particularly helpful for
     smaller datasets but requires more training time.

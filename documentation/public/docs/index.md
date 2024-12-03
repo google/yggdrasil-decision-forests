@@ -172,7 +172,7 @@ model.save("/tmp/my_model")
 
 -   Compose YDF models with Neural Network models in
     [TensorFlow, Keras](tutorial/compose_with_tf.ipynb), and
-    [JAX](compose_with_jax.ipynb).
+    [JAX](tutorial/compose_with_jax.ipynb).
 -   [Distributed training](tutorial/distributed_training.ipynb) over billions of
     examples and hundreds of machines.
 -   Use cutting-edge learning algorithm such as oblique splits, honest trees,
