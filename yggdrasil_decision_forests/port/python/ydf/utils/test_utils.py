@@ -15,6 +15,7 @@
 """Utilities for unit tests."""
 
 import dataclasses
+import enum
 import logging
 import os
 import pathlib
@@ -22,6 +23,7 @@ from typing import Optional, Sequence
 
 from absl import flags
 from absl.testing import absltest
+import jax
 import numpy as np
 import pandas as pd
 
@@ -173,20 +175,23 @@ def test_almost_equal(a, b) -> Optional[str]:
 
   elif isinstance(a, np.ndarray):
     if a.dtype != b.dtype:
-      return f"numpy array type mismatch: {a} != {b}"
+      return f"numpy array type mismatch: {a!r} != {b!r}"
 
     if a.dtype.type in [np.bytes_, np.str_]:
       if not np.array_equal(a, b):
-        return f"numpy array mismatch: {a} != {b}"
+        return f"numpy array mismatch: {a!r} != {b!r}"
     else:
       if not np.allclose(a, b):
-        return f"numpy array mismatch: {a} != {b}"
+        return f"numpy array mismatch: {a!r} != {b!r}"
 
-  elif isinstance(a, (bool, str, bytes, int, float, type(None))):
+  elif isinstance(a, jax.Array):
+    return test_almost_equal(np.array(a), np.array(b))
+
+  elif isinstance(a, (enum.Enum, bool, str, bytes, int, float, type(None))):
     if a != b:
-      return f"primitive mismatch: {a} != {b}"
+      return f"primitive mismatch: {a!r} != {b!r} of type {type(a)}"
 
-  elif isinstance(a, list):
+  elif isinstance(a, (list, tuple)):
     if len(a) != len(b):
       return f"list len mismatch: {len(a)} != {len(b)}"
 
@@ -202,6 +207,11 @@ def test_almost_equal(a, b) -> Optional[str]:
       sub_msg = test_almost_equal(a[field], b[field])
       if sub_msg is not None:
         return sub_msg
+
+  elif dataclasses.is_dataclass(a):
+    fields_a = dataclasses.asdict(a)
+    fields_b = dataclasses.asdict(a)
+    test_almost_equal(fields_a, fields_b)
 
   else:
     raise ValueError(f"Non implemented comparison for type: {type(a)}")

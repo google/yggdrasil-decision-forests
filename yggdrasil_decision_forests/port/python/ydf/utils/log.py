@@ -134,6 +134,21 @@ def info(msg: str, *args: Any) -> None:
     print(msg % args, flush=True)
 
 
+def debug(msg: str, *args: Any) -> None:
+  """Print an info message visible when verbose >=2.
+
+  Usage example:
+    debug("Hello %s", "world")
+
+  Args:
+    msg: String message with replacement placeholders e.g. %s.
+    *args: Placeholder replacement values.
+  """
+
+  if _VERBOSE_LEVEL >= 2:
+    print(msg % args, flush=True)
+
+
 def warning(
     msg: str,
     *args: Any,

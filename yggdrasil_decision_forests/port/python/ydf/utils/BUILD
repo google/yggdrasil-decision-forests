@@ -36,6 +36,7 @@ py_library(
     deps = [
         # absl/flags dep,
         # absl/testing:absltest dep,
+        # jax dep,
         # numpy dep,
         # pandas dep,
         "//ydf/dataset",
