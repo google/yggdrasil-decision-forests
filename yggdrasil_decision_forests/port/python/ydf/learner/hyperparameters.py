@@ -13,9 +13,10 @@
 # limitations under the License.
 
 """Utility functions for YDF Hyperparameters."""
+
 from collections.abc import Mapping
 import dataclasses
-from typing import Dict, Set, Union
+from typing import Dict, Optional, Set, Union
 
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import hyperparameter_pb2
@@ -24,7 +25,7 @@ from ydf.learner import custom_loss
 
 
 HyperParameters = Dict[
-    str, Union[int, float, str, bool, custom_loss.AbstractCustomLoss]
+    str, Optional[Union[int, float, str, bool, custom_loss.AbstractCustomLoss]]
 ]
 
 
