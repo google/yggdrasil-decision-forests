@@ -263,24 +263,22 @@ absl::Status Inflate(absl::string_view input, std::string* output,
   stream.next_in = reinterpret_cast<const Bytef*>(input.data());
   stream.avail_in = input.size();
 
-  while (true) {
+  int zlib_error;
+  do {
     stream.next_out = reinterpret_cast<Bytef*>(&(*working_buffer)[0]);
     stream.avail_out = working_buffer->size();
-    const auto zlib_error = inflate(&stream, Z_NO_FLUSH);
+    zlib_error = inflate(&stream, Z_NO_FLUSH);
     if (zlib_error != Z_OK && zlib_error != Z_STREAM_END) {
       inflateEnd(&stream);
       return absl::InternalError(absl::StrCat("Internal error", zlib_error));
     }
     const size_t produced_bytes = working_buffer->size() - stream.avail_out;
-    if (produced_bytes == 0 && zlib_error != Z_STREAM_END) {
-      continue;
+    if (produced_bytes != 0) {
+      absl::StrAppend(
+          output, absl::string_view{working_buffer->data(), produced_bytes});
     }
-    absl::StrAppend(output,
-                    absl::string_view{working_buffer->data(), produced_bytes});
-    if (zlib_error == Z_STREAM_END) {
-      break;
-    }
-  }
+  } while (zlib_error != Z_STREAM_END);
+
   inflateEnd(&stream);
 
   return absl::OkStatus();
