@@ -89,9 +89,27 @@ TEST(GRPC, WorkerError) {
   all.Join();
 }
 
+TEST(GRPC, AsyncError) {
+  auto all = CreateGrpcManager();
+  TestAsyncError(all.manager.get());
+  all.Join();
+}
+
+TEST(GRPC, AsyncErrorInPool) {
+  auto all = CreateGrpcManager();
+  TestAsyncErrorInPool(all.manager.get());
+  all.Join();
+}
+
 TEST(GRPC, BlockingRequest) {
   auto all = CreateGrpcManager();
   TestBlockingRequest(all.manager.get());
+  all.Join();
+}
+
+TEST(GRPC, LongBlockingRequest) {
+  auto all = CreateGrpcManager();
+  TestLongBlockingRequest(all.manager.get());
   all.Join();
 }
 

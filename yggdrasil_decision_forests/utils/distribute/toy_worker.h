@@ -16,6 +16,9 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_TOY_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_TOY_WORKER_H_
 
+#include <atomic>
+#include <string>
+
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/strings/match.h"
@@ -27,6 +30,7 @@
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
@@ -113,6 +117,9 @@ class ToyWorker final : public AbstractWorker {
     } else if (absl::StartsWith(blob, "sleep")) {
       absl::SleepFor(absl::Seconds(5));
       return "";
+    } else if (absl::StartsWith(blob, "short_sleep_and_error")) {
+      absl::SleepFor(absl::Seconds(2));
+      return absl::InvalidArgumentError("Some error");
     } else if (absl::StartsWith(blob, "num_existing_toy_workers")) {
       return absl::StrCat(num_existing_toy_workers_.load());
     } else if (absl::StartsWith(blob, "max_num_existing_toy_workers")) {

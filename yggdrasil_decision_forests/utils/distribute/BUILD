@@ -94,6 +94,7 @@ cc_library_ydf(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -114,6 +115,7 @@ cc_library_ydf(
     deps = [
         ":core",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",

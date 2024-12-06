@@ -18,6 +18,8 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <string>
+#include <vector>
 
 #include "grpcpp/create_channel.h"
 #include "grpcpp/support/channel_arguments.h"
@@ -239,9 +241,9 @@ absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
   if (worker->expected_address != worker->connected_address) {
     // The worker has moved.
 
-    LOG(INFO) << "Update address of worker #" << worker->worker_idx << " from"
-              << worker->connected_address << " to "
-              << worker->expected_address;
+    LOG(INFO) << "Update address of worker #" << worker->worker_idx
+              << " from \"" << worker->connected_address << "\" to \""
+              << worker->expected_address << "\"";
 
     worker->connected_address = worker->expected_address;
 
@@ -294,9 +296,16 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
 
   proto::Answer answer;
   while (true) {
+    // Run the job remotely and wait for the result.
     grpc::ClientContext context;
     ConfigureClientContext(&context);
+
     const auto status = stub->Run(&context, query, &answer);
+    if (done_was_called_) {
+      return absl::InvalidArgumentError("Job interrupted");
+    }
+
+    // Check the result.
     if (!status.ok()) {
       if (status.error_message() == "UNAVAILABLE: worker config required") {
         // The worker received the request, but the worker is lacking the worker
@@ -441,9 +450,9 @@ absl::Status GRPCManager::Done(std::optional<bool> kill_worker_manager) {
 
   for (auto& worker : workers_) {
     worker->async_pending_queries_.Close();
-    worker->async_pending_queries_.Clear();
-
     worker->peer_worker_update_workers_.Close();
+
+    worker->async_pending_queries_.Clear();
     worker->peer_worker_update_workers_.Clear();
   }
 
