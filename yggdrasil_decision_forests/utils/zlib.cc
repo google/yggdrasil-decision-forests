@@ -148,7 +148,8 @@ absl::Status GZipInputByteStream::CloseDeflateStream() {
 
 absl::StatusOr<std::unique_ptr<GZipOutputByteStream>>
 GZipOutputByteStream::Create(std::unique_ptr<utils::OutputByteStream>&& stream,
-                             int compression_level, size_t buffer_size) {
+                             int compression_level, size_t buffer_size,
+                             bool raw_deflate) {
   if (compression_level != Z_DEFAULT_COMPRESSION) {
     STATUS_CHECK_GT(compression_level, Z_NO_COMPRESSION);
     STATUS_CHECK_LT(compression_level, Z_BEST_COMPRESSION);
@@ -157,8 +158,10 @@ GZipOutputByteStream::Create(std::unique_ptr<utils::OutputByteStream>&& stream,
       std::make_unique<GZipOutputByteStream>(std::move(stream), buffer_size);
   std::memset(&gz_stream->deflate_stream_, 0,
               sizeof(gz_stream->deflate_stream_));
+  // Note: A negative window size indicate to use the raw deflate algorithm (!=
+  // zlib or gzip).
   if (deflateInit2(&gz_stream->deflate_stream_, compression_level, Z_DEFLATED,
-                   MAX_WBITS + 16,
+                   raw_deflate ? -15 : (MAX_WBITS + 16),
                    /*memLevel=*/8,  // 8 is the recommended default
                    Z_DEFAULT_STRATEGY) != Z_OK) {
     return absl::InternalError("Cannot initialize gzip stream");
@@ -212,6 +215,7 @@ absl::Status GZipOutputByteStream::WriteImpl(absl::string_view chunk,
     const size_t compressed_bytes = buffer_size_ - deflate_stream_.avail_out;
 
     if (compressed_bytes > 0) {
+      DCHECK(stream_);
       RETURN_IF_ERROR(stream_->Write(absl::string_view{
           reinterpret_cast<char*>(output_buffer_.data()), compressed_bytes}));
     }
@@ -244,7 +248,7 @@ absl::Status GZipOutputByteStream::CloseInflateStream() {
 }
 
 absl::Status Inflate(absl::string_view input, std::string* output,
-                     std::string* working_buffer) {
+                     std::string* working_buffer, bool raw_deflate) {
   if (working_buffer->size() < 1024) {
     return absl::InvalidArgumentError(
         "worker buffer should be at least 1024 bytes");
@@ -253,7 +257,7 @@ absl::Status Inflate(absl::string_view input, std::string* output,
   std::memset(&stream, 0, sizeof(stream));
   // Note: A negative window size indicate to use the raw deflate algorithm (!=
   // zlib or gzip).
-  if (inflateInit2(&stream, -15) != Z_OK) {
+  if (inflateInit2(&stream, raw_deflate ? -15 : (MAX_WBITS + 16)) != Z_OK) {
     return absl::InternalError("Cannot initialize gzip stream");
   }
   stream.next_in = reinterpret_cast<const Bytef*>(input.data());
@@ -267,10 +271,10 @@ absl::Status Inflate(absl::string_view input, std::string* output,
       inflateEnd(&stream);
       return absl::InternalError(absl::StrCat("Internal error", zlib_error));
     }
-    if (stream.avail_out == 0) {
-      break;
-    }
     const size_t produced_bytes = working_buffer->size() - stream.avail_out;
+    if (produced_bytes == 0 && zlib_error != Z_STREAM_END) {
+      continue;
+    }
     absl::StrAppend(output,
                     absl::string_view{working_buffer->data(), produced_bytes});
     if (zlib_error == Z_STREAM_END) {

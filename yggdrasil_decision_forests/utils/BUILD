@@ -1319,6 +1319,7 @@ cc_test(
     srcs = ["zlib_test.cc"],
     data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
+        ":bytestream",
         ":filesystem",
         ":logging",
         ":test",

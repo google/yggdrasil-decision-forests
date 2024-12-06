@@ -358,9 +358,12 @@ absl::StatusOr<bool> AvroReader::ReadNextBlock() {
       current_block_reader_ = utils::StringViewInputByteStream(current_block_);
       break;
     case AvroCodec::kDeflate:
+      // TODO: Multi-thread decompression.
       zlib_working_buffer_.resize(1024 * 1024);
-      RETURN_IF_ERROR(utils::Inflate(
-          current_block_, &current_block_decompressed_, &zlib_working_buffer_));
+      current_block_decompressed_.clear();
+      RETURN_IF_ERROR(
+          utils::Inflate(current_block_, &current_block_decompressed_,
+                         &zlib_working_buffer_, /*raw_deflate=*/true));
       current_block_reader_ =
           utils::StringViewInputByteStream(current_block_decompressed_);
       break;
@@ -388,6 +391,7 @@ absl::StatusOr<bool> AvroReader::ReadNextRecord() {
     }
   }
   next_object_in_current_block_++;
+  DCHECK_LE(next_object_in_current_block_, num_objects_in_current_block_);
   return true;
 }
 
