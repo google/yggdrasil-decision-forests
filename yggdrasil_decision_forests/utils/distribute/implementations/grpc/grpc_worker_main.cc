@@ -30,6 +30,7 @@ namespace grpc_worker {
 void GRPCWorker() {
   const auto port = absl::GetFlag(FLAGS_port);
   LOG(INFO) << "Start GRPC worker on port " << port;
+  QCHECK_NE(port, -1);
   QCHECK_OK(WorkerMain(port, absl::GetFlag(FLAGS_use_loas)));
   LOG(INFO) << "Stop GRPC worker";
 }

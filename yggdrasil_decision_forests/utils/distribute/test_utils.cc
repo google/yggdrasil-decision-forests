@@ -14,6 +14,9 @@
  */
 
 #include "yggdrasil_decision_forests/utils/distribute/test_utils.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
@@ -28,11 +31,59 @@ void TestWorkerError(AbstractManager* manager, bool call_done) {
   }
 }
 
+void TestAsyncError(AbstractManager* manager, bool call_done) {
+  const int n = 100;
+  for (int i = 0; i < n; i++) {
+    EXPECT_OK(manager->AsynchronousRequest("gen_error"));
+  }
+  for (int i = 0; i < n; i++) {
+    EXPECT_FALSE(manager->NextAsynchronousAnswer().status().ok());
+  }
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
+}
+
+void TestAsyncErrorInPool(AbstractManager* manager, bool call_done) {
+  EXPECT_OK(manager->AsynchronousRequest("sleep"));
+  EXPECT_OK(manager->AsynchronousRequest("sleep"));
+  EXPECT_OK(manager->AsynchronousRequest("sleep"));
+  EXPECT_OK(manager->AsynchronousRequest("short_sleep_and_error"));
+  EXPECT_OK(manager->AsynchronousRequest("sleep"));
+
+  int normal_results = 0;
+  int errors = 0;
+  for (int i = 0; i < 5; i++) {
+    const auto result = manager->NextAsynchronousAnswer();
+    if (result.status().ok()) {
+      normal_results++;
+    } else {
+      errors++;
+    }
+  }
+  EXPECT_EQ(normal_results, 4);
+  EXPECT_EQ(errors, 1);
+
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
+}
+
 void TestBlockingRequest(AbstractManager* manager, bool call_done) {
   for (int i = 0; i <= 100; i++) {
     auto result =
         manager->BlockingRequest(absl::StrCat("identity:", i)).value();
     EXPECT_EQ(result, absl::StrCat(i));
+  }
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
+}
+
+void TestLongBlockingRequest(AbstractManager* manager, bool call_done) {
+  for (int i = 0; i <= 3; i++) {
+    auto result = manager->BlockingRequest("sleep").value();
+    EXPECT_EQ(result, "");
   }
   if (call_done) {
     EXPECT_OK(manager->Done(true));

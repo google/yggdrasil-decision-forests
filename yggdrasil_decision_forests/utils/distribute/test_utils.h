@@ -70,7 +70,10 @@ struct ManagerCreatorAndWorkers {
 
 // Various tests.
 void TestWorkerError(AbstractManager* manager, bool call_done = true);
+void TestAsyncError(AbstractManager* manager, bool call_done = true);
+void TestAsyncErrorInPool(AbstractManager* manager, bool call_done = true);
 void TestBlockingRequest(AbstractManager* manager, bool call_done = true);
+void TestLongBlockingRequest(AbstractManager* manager, bool call_done = true);
 void TestBlockingRequestWithSpecificWorker(AbstractManager* manager,
                                            bool call_done = true);
 void TestAsynchronousRequest(AbstractManager* manager, bool call_done = true);
