@@ -68,10 +68,17 @@ class GZipInputByteStream : public utils::InputByteStream {
 
 class GZipOutputByteStream : public utils::OutputByteStream {
  public:
+  // Creates a gzip compression stream.
+  // Args:
+  //   stream: Stream of non-compressed data to compress.
+  //   compression_level: Compression level between 0 (not compressed) and 9.
+  //   buffer_size: Size of the working buffer. The minimum size depends on the
+  //     compressed data, but 1MB should work in most cases.
+  //   raw_deflate: If true, uses the raw deflate algorithm (!= zlib or gzip).
   static absl::StatusOr<std::unique_ptr<GZipOutputByteStream>> Create(
       std::unique_ptr<utils::OutputByteStream>&& stream,
       int compression_level = Z_DEFAULT_COMPRESSION,
-      size_t buffer_size = 1024 * 1024);
+      size_t buffer_size = 1024 * 1024, bool raw_deflate = false);
 
   GZipOutputByteStream(std::unique_ptr<utils::OutputByteStream>&& stream,
                        size_t buffer_size);
@@ -79,6 +86,7 @@ class GZipOutputByteStream : public utils::OutputByteStream {
 
   absl::Status Write(absl::string_view chunk) override;
   absl::Status Close() override;
+  utils::OutputByteStream& stream() { return *stream_; }
 
  private:
   absl::Status CloseInflateStream();
@@ -96,8 +104,9 @@ class GZipOutputByteStream : public utils::OutputByteStream {
   bool deflate_stream_is_allocated_ = false;
 };
 
+// Inflates (i.e. decompress) "input" and appends it to "output".
 absl::Status Inflate(absl::string_view input, std::string* output,
-                     std::string* working_buffer);
+                     std::string* working_buffer, bool raw_deflate = false);
 
 }  // namespace yggdrasil_decision_forests::utils
 
