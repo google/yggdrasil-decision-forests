@@ -550,6 +550,8 @@ TrainWithCache(
       if (!resync_iter_idx_status.ok()) {
         LOG(WARNING) << "No existing snapshot. Restart training from start.";
         // TODO: Restart training without rebooting the trainer.
+        return absl::CancelledError(
+            "A worker was restarted before any checkpoint was done.");
       }
       auto resync_iter_idx = resync_iter_idx_status.value();
 
@@ -938,6 +940,10 @@ absl::Status RestoreManagerCheckpoint(
 bool ShouldCreateCheckpoint(
     int iter_idx, const absl::Time& time_last_checkpoint,
     const proto::DistributedGradientBoostedTreesTrainingConfig& spe_config) {
+  if (iter_idx == 0) {
+    return true;
+  }
+
   if (spe_config.checkpoint_interval_trees() >= 0 &&
       (iter_idx % spe_config.checkpoint_interval_trees()) == 0) {
     return true;
