@@ -15,11 +15,13 @@
 """Connectors for loading data from Pandas dataframes."""
 
 import sys
-from typing import Dict
+from typing import Any, Dict, Iterator, Optional
 
 from absl import logging
+import numpy as np
 
 from ydf.dataset.io import dataset_io_types
+from ydf.dataset.io import generator as generator_lib
 
 
 def import_pd():
@@ -66,3 +68,46 @@ def to_dict(
   data_dict = {k: clean(v) for k, v in data_dict.items()}
 
   return data_dict
+
+
+class PandasBatchedExampleGenerator(generator_lib.BatchedExampleGenerator):
+  """Class to consume Pandas Dataframes."""
+
+  def __init__(self, dataframe: Any):
+    pd = import_pd()
+    assert isinstance(dataframe, pd.DataFrame)
+    self._dataframe = dataframe
+    super().__init__(num_examples=len(dataframe))
+
+  def generate(
+      self,
+      batch_size: int,
+      shuffle: bool,
+      seed: Optional[int] = None,
+  ) -> Iterator[generator_lib.NumpyExampleBatch]:
+    assert self._num_examples is not None
+    if not shuffle:
+      i = 0
+      while i < self._num_examples:
+        begin_idx = i
+        end_idx = min(i + batch_size, self._num_examples)
+        yield {
+            str(k): v[begin_idx:end_idx].to_numpy()
+            for k, v in self._dataframe.items()
+        }
+        i += batch_size
+    else:
+      if seed is None:
+        raise ValueError("seed is required if shuffle=True")
+      rng = np.random.default_rng(seed)
+      idxs = rng.permutation(self._num_examples)
+      i = 0
+      while i < self._num_examples:
+        begin_idx = i
+        end_idx = min(i + batch_size, self._num_examples)
+        selected_idxs = idxs[begin_idx:end_idx]
+        yield {
+            str(k): v[selected_idxs].to_numpy()
+            for k, v in self._dataframe.items()
+        }
+        i += batch_size
