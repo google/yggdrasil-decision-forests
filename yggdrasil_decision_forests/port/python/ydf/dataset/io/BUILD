@@ -25,6 +25,7 @@ py_library(
     srcs = ["dataset_io.py"],
     deps = [
         ":dataset_io_types",
+        ":numpy_io",
         ":pandas_io",
         ":polars_io",
         ":pygrain_io",
@@ -39,8 +40,9 @@ py_library(
     srcs = ["pandas_io.py"],
     deps = [
         ":dataset_io_types",
+        ":generator",
         # absl/logging dep,
-        # pandas dep,
+        # numpy dep,
     ],
 )
 
@@ -79,17 +81,36 @@ py_library(
     ],
 )
 
+py_library(
+    name = "generator",
+    srcs = ["generator.py"],
+    deps = [
+        # numpy dep,
+    ],
+)
+
+py_library(
+    name = "numpy_io",
+    srcs = ["numpy_io.py"],
+    deps = [
+        ":generator",
+        # numpy dep,
+    ],
+)
+
 # Tests
 # =====
 
 py_test(
     name = "pandas_io_test",
     srcs = ["pandas_io_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     deps = [
         ":pandas_io",
         # absl/testing:absltest dep,
         # pandas dep,
         # polars dep,
+        "//ydf/utils:test_utils",
     ],
 )
 
@@ -141,5 +162,16 @@ py_test(
         ":dataset_io",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
+    ],
+)
+
+py_test(
+    name = "numpy_io_test",
+    srcs = ["numpy_io_test.py"],
+    deps = [
+        ":numpy_io",
+        # absl/testing:absltest dep,
+        # numpy dep,
+        "//ydf/utils:test_utils",
     ],
 )

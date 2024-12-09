@@ -19,9 +19,14 @@ import pandas as pd
 import polars as pl
 
 from ydf.dataset.io import pandas_io
+from ydf.utils import test_utils
 
 
 class PandasIOTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.adult = test_utils.load_datasets("adult")
 
   def test_is_pandas(self):
     self.assertTrue(pandas_io.is_pandas_dataframe(pd.DataFrame()))
@@ -29,6 +34,37 @@ class PandasIOTest(absltest.TestCase):
 
   def test_polars_is_not_pandas(self):
     self.assertFalse(pandas_io.is_pandas_dataframe(pl.DataFrame()))
+
+  def test_pandas_generator(self):
+    ds = pandas_io.PandasBatchedExampleGenerator(self.adult.train_pd)
+    self.assertEqual(ds.num_batches(100), 228)
+    num_batches = 0
+    for batch in ds.generate(batch_size=100, shuffle=False):
+      self.assertSameElements(
+          batch.keys(),
+          [
+              "age",
+              "capital_gain",
+              "capital_loss",
+              "education",
+              "education_num",
+              "fnlwgt",
+              "hours_per_week",
+              "income",
+              "marital_status",
+              "native_country",
+              "occupation",
+              "race",
+              "relationship",
+              "sex",
+              "workclass",
+          ],
+      )
+      num_batches += 1
+      if num_batches < 228:
+        self.assertEqual(batch["age"].shape, (100,))
+
+    self.assertEqual(num_batches, 228)
 
 
 if __name__ == "__main__":

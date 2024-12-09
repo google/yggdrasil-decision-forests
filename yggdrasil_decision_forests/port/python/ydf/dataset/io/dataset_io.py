@@ -21,11 +21,13 @@ from typing import Iterator, Optional, Sequence, Tuple
 import numpy as np
 
 from ydf.dataset.io import dataset_io_types
+from ydf.dataset.io import numpy_io
 from ydf.dataset.io import pandas_io
 from ydf.dataset.io import polars_io
 from ydf.dataset.io import pygrain_io
 from ydf.dataset.io import tensorflow_io
 from ydf.dataset.io import xarray_io
+
 
 def unrolled_feature_names(name: str, num_dims: int) -> Sequence[str]:
   """Returns the names of an unrolled feature."""
@@ -206,4 +208,39 @@ def cast_input_dataset_to_dict(
     raise ValueError(
         "Unsupported dataset type: "
         f"{type(data)}\n{dataset_io_types.SUPPORTED_INPUT_DATA_DESCRIPTION}"
+    )
+
+
+def build_batched_example_generator(
+    data: dataset_io_types.IODataset,
+):
+  """Converts any support dataset format into a batched example generator.
+
+  Usage example:
+
+  ```python
+  generator = build_batched_example_generator({
+      "a":np.array([1, 2, 3]),
+      "b":np.array(["x", "y", "z"]),
+      })
+  for batch in generator.generate(batch_size=2, shuffle=False):
+    print(batch)
+    >> { "a":np.array([1, 2]), "b":np.array(["x", "y"]) }
+    >> { "a":np.array([3]), "b":np.array(["z"]) }
+  ```
+
+  Args:
+    data: Support dataset format.
+
+  Returns:
+    Example generator.
+  """
+  if pandas_io.is_pandas_dataframe(data):
+    return pandas_io.PandasBatchedExampleGenerator(data)
+  elif isinstance(data, dict):
+    return numpy_io.NumpyDictBatchedExampleGenerator(data)
+  else:
+    # TODO: Add support for other YDF dataset formats.
+    raise ValueError(
+        f"Unsupported dataset type to train a Deep YDF model: {type(data)}"
     )
