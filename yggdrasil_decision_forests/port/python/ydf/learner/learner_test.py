@@ -1481,6 +1481,18 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     ).train(data)
     npt.assert_equal(model_1.label_classes(), np.unique(label_data).astype(str))
 
+  def test_adult_poison(self):
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="hours_per_week",
+        growing_strategy="BEST_FIRST_GLOBAL",
+        task=generic_learner.Task.REGRESSION,
+        loss="POISSON",
+        split_axis="SPARSE_OBLIQUE",
+        validation_ratio=0.2,
+        num_trees=10,
+    ).train(self.adult.train_pd)
+    _ = model.analyze(self.adult.test_pd, sampling=0.1)
+
 
 class LoggingTest(parameterized.TestCase):
 

@@ -1574,6 +1574,21 @@ TEST_F(GradientBoostedTreesOnAdult, MakingAModelPurePureServingModel) {
   EXPECT_LE(static_cast<float>(post_pruning_size) / pre_pruning_size, 0.80);
 }
 
+TEST_F(GradientBoostedTreesOnAdult, PoissonLoss) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
+
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::POISSON);
+  train_config_.set_label("hours_per_week");
+  train_config_.set_task(model::proto::Task::REGRESSION);
+  gbt_config->set_num_trees(10);
+  gbt_config->mutable_decision_tree()
+      ->mutable_growing_strategy_best_first_global();
+  gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  TrainAndEvaluateModel();
+}
+
 // Helper for the training and testing on two non-overlapping samples from the
 // Abalone dataset.
 class GradientBoostedTreesOnAbalone : public utils::TrainAndTestTester {

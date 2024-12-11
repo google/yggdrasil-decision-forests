@@ -58,6 +58,10 @@ class GradientBoostedTreesModel : public AbstractModel,
  public:
   static constexpr char kRegisteredName[] = "GRADIENT_BOOSTED_TREES";
 
+  // The prediction of a model trained with a poisson loss is computed as:
+  // p := e^clamp(acc, -kPoissonLossClampBounds, kPoissonLossClampBounds)
+  static constexpr float kPoissonLossClampBounds = 19.;
+
   GradientBoostedTreesModel() : AbstractModel(kRegisteredName) {}
   absl::Status Save(absl::string_view directory,
                     const ModelIOOptions& io_options) const override;

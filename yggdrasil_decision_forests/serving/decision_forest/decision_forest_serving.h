@@ -445,6 +445,18 @@ struct GenericGradientBoostedTreesRanking : ExampleSetModel<NodeOffsetRep> {
 };
 using GradientBoostedTreesRanking = GenericGradientBoostedTreesRanking<>;
 
+// GBDT model for poisson regression.
+template <typename NodeOffsetRep = uint16_t>
+struct GenericGradientBoostedTreesPoissonRegression
+    : ExampleSetModel<NodeOffsetRep> {
+  static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
+  // Output of the model before any tree is applied, and before the final
+  // activation function.
+  float initial_predictions = 0.f;
+};
+using GradientBoostedTreesPoissonRegression =
+    GenericGradientBoostedTreesPoissonRegression<>;
+
 template <typename Model>
 void Predict(const Model& model, const typename Model::ExampleSet& examples,
              int num_examples, std::vector<float>* predictions);

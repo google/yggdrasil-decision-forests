@@ -410,6 +410,34 @@ TEST(AdultBinaryClassGBDT, ManualGeneric) {
       dataset, *model, engine);
 }
 
+TEST(AdultBinaryClassGBDT, ManualWithNonCompatibleEngines) {
+  const auto model = LoadModel("adult_binary_class_gbdt");
+  const auto dataset = LoadDataset(model->data_spec(), "adult_test.csv", "csv");
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
+
+  {
+    GradientBoostedTreesPoissonRegression engine;
+    EXPECT_THAT(GenericToSpecializedModel(*gbt_model, &engine),
+                test::StatusIs(absl::StatusCode::kInvalidArgument,
+                               "not trained for poison regression"));
+  }
+
+  {
+    GradientBoostedTreesRanking engine;
+    EXPECT_THAT(GenericToSpecializedModel(*gbt_model, &engine),
+                test::StatusIs(absl::StatusCode::kInvalidArgument,
+                               "not trained for ranking"));
+  }
+
+  {
+    GradientBoostedTreesRegression engine;
+    EXPECT_THAT(GenericToSpecializedModel(*gbt_model, &engine),
+                test::StatusIs(absl::StatusCode::kInvalidArgument,
+                               "not trained for regression"));
+  }
+}
+
 TEST(AdultBinaryClassGBDT, ManualNumCat32) {
   const auto model = LoadModel("adult_binary_class_gbdt_32cat");
   const auto dataset = LoadDataset(model->data_spec(), "adult_test.csv", "csv");

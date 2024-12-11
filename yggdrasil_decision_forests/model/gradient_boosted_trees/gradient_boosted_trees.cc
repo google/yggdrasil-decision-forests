@@ -317,6 +317,7 @@ void GradientBoostedTreesModel::Predict(
       dist->set_counts(1, 1.f - proba_true);
       dist->set_counts(2, proba_true);
     } break;
+
     case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
       absl::FixedArray<float> accumulator(num_trees_per_iter_);
       // Zero initial prediction for the MULTINOMIAL_LOG_LIKELIHOOD.
@@ -399,6 +400,7 @@ void GradientBoostedTreesModel::Predict(
         LOG(FATAL) << "Non supported task";
       }
     } break;
+
     case proto::Loss::POISSON: {
       double accumulator = initial_predictions_[0];
       CallOnAllLeafs(dataset, row_idx,
@@ -406,13 +408,16 @@ void GradientBoostedTreesModel::Predict(
                        accumulator += node.regressor().top_value();
                      });
       if (task() == model::proto::REGRESSION) {
-        double clamped_accumulator = std::clamp(accumulator, -19., 19.);
+        float clamped_accumulator =
+            std::clamp(static_cast<float>(accumulator),
+                       -kPoissonLossClampBounds, kPoissonLossClampBounds);
         prediction->mutable_regression()->set_value(
             std::exp(clamped_accumulator));
       } else {
-        LOG(FATAL) << "Non supported task";
+        LOG(FATAL) << "Only regression is supported with poison loss";
       }
     } break;
+
     case proto::Loss::LAMBDA_MART_NDCG:
     case proto::Loss::LAMBDA_MART_NDCG5:
     case proto::Loss::XE_NDCG_MART: {
@@ -423,8 +428,8 @@ void GradientBoostedTreesModel::Predict(
                      });
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
-    default:
-      LOG(FATAL) << "Not implemented";
+    case proto::Loss::DEFAULT:
+      LOG(FATAL) << "Loss not set";
   }
 }
 
@@ -433,6 +438,7 @@ void GradientBoostedTreesModel::Predict(
     model::proto::Prediction* prediction) const {
   utils::usage::OnInference(1, metadata());
   switch (loss_) {
+    case proto::Loss::BINARY_FOCAL_LOSS:
     case proto::Loss::BINOMIAL_LOG_LIKELIHOOD: {
       double accumulator = initial_predictions_[0];
       CallOnAllLeafs(example,
@@ -499,6 +505,7 @@ void GradientBoostedTreesModel::Predict(
       prediction->mutable_classification()->set_value(highest_cell_idx + 1);
     } break;
 
+    case proto::Loss::MEAN_AVERAGE_ERROR:
     case proto::Loss::SQUARED_ERROR: {
       double accumulator = initial_predictions_[0];
       CallOnAllLeafs(example,
@@ -507,6 +514,24 @@ void GradientBoostedTreesModel::Predict(
                      });
       prediction->mutable_regression()->set_value(accumulator);
     } break;
+
+    case proto::Loss::POISSON: {
+      double accumulator = initial_predictions_[0];
+      CallOnAllLeafs(example,
+                     [&accumulator](const decision_tree::proto::Node& node) {
+                       accumulator += node.regressor().top_value();
+                     });
+      if (task() == model::proto::REGRESSION) {
+        float clamped_accumulator =
+            std::clamp(static_cast<float>(accumulator),
+                       -kPoissonLossClampBounds, kPoissonLossClampBounds);
+        prediction->mutable_regression()->set_value(
+            std::exp(clamped_accumulator));
+      } else {
+        LOG(FATAL) << "Only regression is supported with poison loss";
+      }
+    } break;
+
     case proto::Loss::LAMBDA_MART_NDCG:
     case proto::Loss::LAMBDA_MART_NDCG5:
     case proto::Loss::XE_NDCG_MART: {
@@ -517,8 +542,8 @@ void GradientBoostedTreesModel::Predict(
                      });
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
-    default:
-      LOG(FATAL) << "Not implemented";
+    case proto::Loss::DEFAULT:
+      LOG(FATAL) << "Loss not set";
   }
 }
 

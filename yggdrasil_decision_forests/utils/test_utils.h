@@ -76,9 +76,16 @@ namespace utils {
 // Train and test a model on a dataset stored in the "test_data" folder.
 class TrainAndTestTester : public ::testing::Test {
  public:
-  // Run the training and evaluation of the model. Should be called after
-  // "train_config_" is set. After this function is called, "evaluation_"
-  // contains the result of the evaluation.
+  // Trains, evaluates, serialized & deserialization (save and load a model to
+  // disk [directory format], or save and load a model from a sequence of bytes
+  // [byte sequence format]) + tests predictions, and check the equality of the
+  // predictions from the different inference implementations (e.g., slow
+  // engine, all available fast engines).
+  //
+  // This method should be called after "train_config_" is set. Once this
+  // function returns, "evaluation_" contains the result of the evaluation,
+  // "training_duration_" contains the duration of the training, and "model_"
+  // contains the model.
   void TrainAndEvaluateModel(
       std::optional<absl::string_view> numerical_weight_attribute = {},
       bool emulate_weight_with_duplication = false,
