@@ -311,27 +311,28 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
         // The worker received the request, but the worker is lacking the worker
         // configuration field. The request should be re-sent with the worker
         // configuration.
-        LOG(WARNING) << "Send worker configuration to worker #"
-                     << worker->worker_idx;
+        LOG(WARNING) << "Send configuration to worker #" << worker->worker_idx;
         utils::concurrency::MutexLock l(&mutex_worker_config_);
         *query.mutable_worker_config() = worker_config_;
         continue;
       }
-
-      if (verbosity_ >= 1) {
-        LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
-                     << " failed with error: " << status.error_message();
-      }
       if (IsTransientError(status)) {
+        if (verbosity_ >= 1) {
+          LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
+                       << " has a TRANSIENT error: " << status.error_message();
+        }
         // The worker is temporarily not available.
         absl::SleepFor(absl::Seconds(5));
         ASSIGN_OR_RETURN(stub, UpdateWorkerConnection(worker));
         continue;
       } else {
-        // Something is not right.
-        LOG(INFO)
-            << "Fatal error in GRPC communication. If this is in fact a "
-               "transiant error, update \"IsTransiantError\" accordingly.";
+        if (verbosity_ >= 1) {
+          LOG(WARNING)
+              << "GRPC to worker #" << worker->worker_idx
+              << " failed with the FATAL error (If this is in fact a "
+                 "TRANSIENT error, update \"IsTrensiantError\" accordingly): "
+              << status.error_message();
+        }
         return GrpcStatusToAbslStatus(status);
       }
     }

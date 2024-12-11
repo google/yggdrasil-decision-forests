@@ -17,6 +17,7 @@
 
 #include "gmock/gmock.h"
 #include "absl/log/log.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
@@ -37,6 +38,8 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace distributed_decision_tree {
 namespace {
+
+using test::StatusIs;
 
 // Generic training loop. Displays all the intermediate results.
 template <typename LabelAccessor, typename Tester>
@@ -115,9 +118,9 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
     // Add the found splits to the tree structure.
     const auto node_remapping = tree_builder->ApplySplitToTree(splits).value();
     LOG(INFO) << "Remapping:";
-    for (int i = 0; i < node_remapping.size(); i++) {
-      LOG(INFO) << "\t" << i << " -> " << node_remapping[i].indices[0] << " + "
-                << node_remapping[i].indices[1];
+    for (int i = 0; i < node_remapping.mapping.size(); i++) {
+      LOG(INFO) << "\t" << i << " -> " << node_remapping.mapping[i].indices[0]
+                << " + " << node_remapping.mapping[i].indices[1];
     }
 
     std::string description;
@@ -139,8 +142,10 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
     }
 
     // Update the example->node map.
+    NumExamplesPerNode num_examples_per_node;
     CHECK_OK(UpdateExampleNodeMap(splits, split_evaluation, node_remapping,
-                                  &example_to_node, &thread_pool));
+                                  &example_to_node, &thread_pool,
+                                  &num_examples_per_node));
 
     LOG(INFO) << "Example to node map (first 10 values):";
     ExampleIndex example_idx = 0;
@@ -154,8 +159,9 @@ void GenericTrainingLoop(LabelAccessor* label_accessor, Tester* tester,
 
     // Update the label statistics.
     const auto previous_label_stats_per_node_size = label_stats_per_node.size();
-    CHECK_OK(
-        UpdateLabelStatistics(splits, node_remapping, &label_stats_per_node));
+    CHECK_OK(UpdateLabelStatistics(splits, node_remapping,
+                                   num_examples_per_node, &label_stats_per_node,
+                                   /*allow_statistics_correction=*/false));
     LOG(INFO) << "Update the number of open nodes "
               << previous_label_stats_per_node_size << " -> "
               << label_stats_per_node.size();
@@ -460,9 +466,10 @@ TEST_F(AdultClassificationDataset, ManualCheck) {
               test::EqualsProto(expected_pos_statistics));
 
   const auto node_remapping = tree_builder->ApplySplitToTree(splits).value();
-  EXPECT_EQ(node_remapping.size(), 1);
-  EXPECT_EQ(node_remapping.front().indices[0], 0);
-  EXPECT_EQ(node_remapping.front().indices[1], 1);
+  EXPECT_EQ(node_remapping.mapping.size(), 1);
+  EXPECT_EQ(node_remapping.mapping.front().indices[0], 0);
+  EXPECT_EQ(node_remapping.mapping.front().indices[1], 1);
+  EXPECT_EQ(node_remapping.num_dst_nodes, 2);
   EXPECT_EQ(tree_builder->tree().NumNodes(), 3);
   EXPECT_THAT(tree_builder->tree().root().node().condition(),
               test::EqualsProto(expected_condition));
@@ -475,16 +482,34 @@ TEST_F(AdultClassificationDataset, ManualCheck) {
   EXPECT_EQ(split_evaluation.front().size(), (22792 + 7) / 8);
   EXPECT_EQ(utils::bitmap::ToStringBit(split_evaluation[0], 10), "1011101111");
 
+  NumExamplesPerNode num_examples_per_node;
   CHECK_OK(UpdateExampleNodeMap(splits, split_evaluation, node_remapping,
-                                &example_to_node, &thread_pool));
+                                &example_to_node, &thread_pool,
+                                &num_examples_per_node));
   EXPECT_EQ(example_to_node.size(), dataset_->num_examples());
   EXPECT_EQ(example_to_node[0], 1);
   EXPECT_EQ(example_to_node[1], 0);
   EXPECT_EQ(example_to_node[2], 1);
   EXPECT_EQ(example_to_node[3], 1);
 
+  EXPECT_THAT(num_examples_per_node, ::testing::ElementsAre(5569, 17223));
+
+  // Make the statistics wrong as to force the fix.
+  splits[0].label_statistics[0].set_num_examples(10);
+
+  {
+    LabelStatsPerNode new_label_stats;
+    EXPECT_THAT(UpdateLabelStatistics(splits, node_remapping,
+                                      num_examples_per_node, &new_label_stats,
+                                      /*allow_statistics_correction=*/false),
+                StatusIs(absl::StatusCode::kInternal,
+                         "The number of examples returned by"));
+  }
+
   LabelStatsPerNode new_label_stats;
-  CHECK_OK(UpdateLabelStatistics(splits, node_remapping, &new_label_stats));
+  CHECK_OK(UpdateLabelStatistics(splits, node_remapping, num_examples_per_node,
+                                 &new_label_stats,
+                                 /*allow_statistics_correction=*/true));
 
   const decision_tree::proto::LabelStatistics expected_new_label_stats_0 =
       PARSE_TEST_PROTO(
