@@ -641,7 +641,7 @@ absl::Status SortNumericalColumns(
 
   // Receive and rename the results.
   for (int result_idx = 0; result_idx < pending_requests; result_idx++) {
-    LOG_EVERY_N_SEC(INFO, 10) << "\tsorting numerical columns "
+    LOG_EVERY_N_SEC(INFO, 10) << "\tSorting numerical columns "
                               << (result_idx + 1) << "/" << pending_requests;
 
     ASSIGN_OR_RETURN(

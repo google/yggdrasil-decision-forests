@@ -22,7 +22,7 @@
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
-// Tests if a failing status is a transiant error (i.e., the recipient is
+// Tests if a failing status is a transient error (i.e., the recipient is
 // temporarily not available) or a definitive error.
 bool IsTransientError(const grpc::Status& status);
 

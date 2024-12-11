@@ -34,6 +34,8 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/label_accessor.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
@@ -43,7 +45,6 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
-#include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -944,13 +945,16 @@ absl::Status DistributedGradientBoostedTreesWorker::ShareSplits(
           weak_model_idx, weak_models_.size(), &predictions_,
           thread_pool_.get()));
 
+      distributed_decision_tree::NumExamplesPerNode num_examples_per_node;
       RETURN_IF_ERROR(UpdateExampleNodeMap(
           weak_model.last_splits, weak_model.last_split_evaluation,
-          node_remapping, &weak_model.example_to_node, thread_pool_.get()));
+          node_remapping, &weak_model.example_to_node, thread_pool_.get(),
+          &num_examples_per_node));
 
-      RETURN_IF_ERROR(UpdateLabelStatistics(weak_model.last_splits,
-                                            node_remapping,
-                                            &weak_model.label_stats_per_node));
+      RETURN_IF_ERROR(UpdateLabelStatistics(
+          weak_model.last_splits, node_remapping, num_examples_per_node,
+          &weak_model.label_stats_per_node,
+          /*allow_statistics_correction=*/true));
     }
   }
   return absl::OkStatus();
@@ -1367,7 +1371,7 @@ absl::Status UpdateClosingNodesPredictions(
           DCHECK_GE(node_idx, 0);
           DCHECK_LT(node_idx, label_stats_per_node.size());
 
-          if (node_remapping[node_idx].indices[0] !=
+          if (node_remapping.mapping[node_idx].indices[0] !=
               distributed_decision_tree::kClosedNode) {
             // This example remains in an open node.
             continue;

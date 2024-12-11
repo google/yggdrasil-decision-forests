@@ -25,9 +25,11 @@
 #include <utility>
 #include <vector>
 
+#include "absl/base/optimization.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -740,7 +742,7 @@ absl::Status SetLeafValue(
 }
 
 NodeRemapping TreeBuilder::CreateClosingNodeRemapping() const {
-  return NodeRemapping{open_nodes_.size(), {kClosedNode, kClosedNode}};
+  return NodeRemapping{{open_nodes_.size(), {kClosedNode, kClosedNode}}, 0};
 }
 
 absl::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
@@ -748,7 +750,8 @@ absl::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
   if (open_nodes_.size() != splits.size()) {
     return absl::InternalError("Wrong number of internal nodes");
   }
-  NodeRemapping remapping(open_nodes_.size());
+  NodeRemapping remapping;
+  remapping.mapping.resize(open_nodes_.size());
   std::vector<decision_tree::NodeWithChildren*> new_open_nodes;
   for (int split_idx = 0; split_idx < splits.size(); split_idx++) {
     const auto& split = splits[split_idx];
@@ -765,7 +768,7 @@ absl::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
       // condition.
       node.mutable_node()->set_num_pos_training_examples_without_weight(
           split.condition.num_training_examples_without_weight());
-      remapping[split_idx] = {
+      remapping.mapping[split_idx] = {
           static_cast<NodeIndex>(new_open_nodes.size()),
           static_cast<NodeIndex>(new_open_nodes.size() + 1)};
       new_open_nodes.push_back(node.mutable_neg_child());
@@ -781,7 +784,7 @@ absl::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
       node.FinalizeAsNonLeaf(true, true);
     } else {
       // Turning the node into a leaf.
-      remapping[split_idx] = {kClosedNode, kClosedNode};
+      remapping.mapping[split_idx] = {kClosedNode, kClosedNode};
       node.FinalizeAsLeaf(true);
     }
   }
@@ -790,6 +793,7 @@ absl::StatusOr<NodeRemapping> TreeBuilder::ApplySplitToTree(
     return absl::InvalidArgumentError("Maximum node limit exceeded");
   }
   open_nodes_ = new_open_nodes;
+  remapping.num_dst_nodes = new_open_nodes.size();
   return remapping;
 }
 
@@ -1277,8 +1281,9 @@ absl::Status UpdateExampleNodeMap(
     const SplitPerOpenNode& splits,
     const SplitEvaluationPerOpenNode& split_evaluation,
     const NodeRemapping& node_remapping, ExampleToNodeMap* example_to_node,
-    utils::concurrency::ThreadPool* thread_pool) {
-  DCHECK_EQ(split_evaluation.size(), node_remapping.size());
+    utils::concurrency::ThreadPool* thread_pool,
+    NumExamplesPerNode* num_examples_per_node) {
+  DCHECK_EQ(split_evaluation.size(), node_remapping.mapping.size());
   std::vector<utils::bitmap::BitReader> readers(split_evaluation.size());
   for (int node_idx = 0; node_idx < split_evaluation.size(); node_idx++) {
     const auto num_elements = static_cast<uint64_t>(
@@ -1286,6 +1291,8 @@ absl::Status UpdateExampleNodeMap(
     DCHECK_LE(num_elements, split_evaluation[node_idx].size() * 8);
     readers[node_idx].Open(split_evaluation[node_idx].data(), num_elements);
   }
+
+  num_examples_per_node->assign(node_remapping.num_dst_nodes, 0);
 
   // TODO: In parallel.
   for (ExampleIndex example_idx = 0; example_idx < example_to_node->size();
@@ -1298,13 +1305,14 @@ absl::Status UpdateExampleNodeMap(
     DCHECK_GE(node_idx, 0);
     DCHECK_LT(node_idx, split_evaluation.size());
 
-    if (node_remapping[node_idx].indices[0] == kClosedNode) {
+    if (node_remapping.mapping[node_idx].indices[0] == kClosedNode) {
       // The example is in a node that is closed during this iteration.
       node_idx = kClosedNode;
       continue;
     }
     const bool evaluation = readers[node_idx].Read();
-    node_idx = node_remapping[node_idx].indices[evaluation];
+    node_idx = node_remapping.mapping[node_idx].indices[evaluation];
+    (*num_examples_per_node)[node_idx]++;
   }
 
   for (auto& reader : readers) {
@@ -1314,11 +1322,12 @@ absl::Status UpdateExampleNodeMap(
   return absl::OkStatus();
 }
 
-absl::Status UpdateLabelStatistics(const SplitPerOpenNode& splits,
-                                   const NodeRemapping& node_remapping,
-                                   LabelStatsPerNode* label_stats) {
+absl::Status UpdateLabelStatistics(
+    const SplitPerOpenNode& splits, const NodeRemapping& node_remapping,
+    const NumExamplesPerNode& num_examples_per_node,
+    LabelStatsPerNode* label_stats, const bool allow_statistics_correction) {
   NodeIndex dst_num_nodes = 0;
-  for (const auto& mapping : node_remapping) {
+  for (const auto& mapping : node_remapping.mapping) {
     for (const auto evaluation : {0, 1}) {
       const auto dst_node_idx = mapping.indices[evaluation];
       if (dst_node_idx != kClosedNode) {
@@ -1328,18 +1337,38 @@ absl::Status UpdateLabelStatistics(const SplitPerOpenNode& splits,
     }
   }
   label_stats->assign(dst_num_nodes, {});
+  STATUS_CHECK_EQ(dst_num_nodes, node_remapping.num_dst_nodes);
 
   for (int src_node_idx = 0; src_node_idx < splits.size(); src_node_idx++) {
     for (const auto evaluation : {0, 1}) {
       const auto dst_node_idx =
-          node_remapping[src_node_idx].indices[evaluation];
+          node_remapping.mapping[src_node_idx].indices[evaluation];
       if (dst_node_idx == kClosedNode) {
         continue;
       }
       DCHECK_GE(dst_node_idx, 0);
       DCHECK_LT(dst_node_idx, dst_num_nodes);
-      (*label_stats)[dst_node_idx] =
-          splits[src_node_idx].label_statistics[evaluation];
+      auto& dst_stats = (*label_stats)[dst_node_idx];
+      dst_stats = splits[src_node_idx].label_statistics[evaluation];
+
+      if (ABSL_PREDICT_FALSE(dst_stats.num_examples() !=
+                             num_examples_per_node[dst_node_idx])) {
+        // Note: Due to floating point approximations, it is rare (in most
+        // training this does not happens) but possible for label statistic
+        // counts to be wrong. In such case, those counts need to be corrected.
+        // The same observations and logic is used in non-distributed training.
+        std::string message = absl::Substitute(
+            "The number of examples returned by the evaluator and "
+            "splittor don't match. $0 != $1.",
+            dst_stats.num_examples(), num_examples_per_node[dst_node_idx]);
+        if (allow_statistics_correction) {
+          LOG_FIRST_N(WARNING, 10)
+              << "[Internal]" << message << " This is not an issue.";
+        } else {
+          return absl::InternalError(message);
+        }
+        dst_stats.set_num_examples(num_examples_per_node[dst_node_idx]);
+      }
     }
   }
   return absl::OkStatus();

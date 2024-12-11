@@ -68,7 +68,13 @@ struct SplitNodeIndex {
   // Negative (0) and positive (1) node indices.
   NodeIndex indices[2];
 };
-typedef std::vector<SplitNodeIndex> NodeRemapping;
+struct NodeRemapping {
+  // mapping[i].indices[j] is the new node index for examples initially in node
+  // i and that evaluate to j.
+  std::vector<SplitNodeIndex> mapping;
+  // Number of destination nodes (excluding the kClosedNode).
+  int num_dst_nodes;
+};
 
 // Bitmap of the evaluation of a split i.e. evaluation of the boolean condition
 // defined by the split.
@@ -338,16 +344,28 @@ absl::Status EvaluateSplitsPerBooleanFeature(
     SplitEvaluationPerOpenNode* split_evaluation,
     const dataset_cache::DatasetCacheReader* dataset);
 
-// Update the node index of each example according to the split.
+// Number of examples for each of the open nodes. Used by "UpdateExampleNodeMap"
+// and "UpdateLabelStatistics".
+typedef std::vector<ExampleIndex> NumExamplesPerNode;
+
+// Updates the node index of each example according to the split. Also populate
+// "num_examples_per_node" with the number of example in each nodes as computed
+// during the split evaluation.
 absl::Status UpdateExampleNodeMap(
     const SplitPerOpenNode& splits,
     const SplitEvaluationPerOpenNode& split_evaluation,
     const NodeRemapping& node_remapping, ExampleToNodeMap* example_to_node,
-    utils::concurrency::ThreadPool* thread_pool);
+    utils::concurrency::ThreadPool* thread_pool,
+    NumExamplesPerNode* num_examples_per_node);
 
-absl::Status UpdateLabelStatistics(const SplitPerOpenNode& splits,
-                                   const NodeRemapping& node_remapping,
-                                   LabelStatsPerNode* label_stats);
+// Updates the label statistics for each node. If the number of examples in the
+// condition definition and in "num_examples_per_node" don't match, return an
+// error (allow_statistics_correction=false) or print a warning
+// (allow_statistics_correction=true).
+absl::Status UpdateLabelStatistics(
+    const SplitPerOpenNode& splits, const NodeRemapping& node_remapping,
+    const NumExamplesPerNode& num_examples_per_node,
+    LabelStatsPerNode* label_stats, bool allow_statistics_correction);
 
 // Gets the number of valid splits.
 int NumValidSplits(const SplitPerOpenNode& splits);

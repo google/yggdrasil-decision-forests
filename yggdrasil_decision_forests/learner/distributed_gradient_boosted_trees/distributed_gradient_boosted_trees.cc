@@ -1592,7 +1592,7 @@ absl::Status EmitStartTraining(
         << load_balancer->NumWorkers() << " [duration: " << absl::Now() - begin
         << "]";
   }
-  LOG(INFO) << "Worker ready to train in " << absl::Now() - begin;
+  LOG(INFO) << "All workers ready to train in " << absl::Now() - begin;
 
   monitoring->EndStage(internal::Monitoring::kStartTraining);
 
