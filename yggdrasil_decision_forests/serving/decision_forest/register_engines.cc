@@ -181,10 +181,6 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
     if (gbt_model == nullptr) {
       return false;
     }
-    // TODO: Support Poisson loss
-    if (gbt_model->loss() == gradient_boosted_trees::proto::POISSON) {
-      return false;
-    }
     return gbt_model->CheckStructure({/*.global_imputation_is_higher =*/false});
   }
 
@@ -208,7 +204,6 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
     // More than 65k nodes in a single tree is a likely indication of a problem
     // with the model.
 
-    std::unique_ptr<serving::FastEngine> engine;
     switch (gbt_model->task()) {
       case proto::CLASSIFICATION:
         if (gbt_model->label_col_spec()
@@ -241,11 +236,19 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
         }
 
       case proto::REGRESSION: {
-        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
-            serving::decision_forest::GradientBoostedTreesRegression,
-            serving::decision_forest::Predict>>();
-        RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
-        return engine;
+        if (gbt_model->loss() == gradient_boosted_trees::proto::POISSON) {
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
+              serving::decision_forest::GradientBoostedTreesPoissonRegression,
+              serving::decision_forest::Predict>>();
+          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
+          return engine;
+        } else {
+          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
+              serving::decision_forest::GradientBoostedTreesRegression,
+              serving::decision_forest::Predict>>();
+          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
+          return engine;
+        }
       }
 
       case proto::RANKING: {

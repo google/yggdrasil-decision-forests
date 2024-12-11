@@ -22,6 +22,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -50,6 +51,19 @@ template <typename SpecializedModel>
 float ActivationAddInitialPrediction(const SpecializedModel& model,
                                      const float value) {
   return value + model.initial_predictions;
+}
+
+// Activation function for regressive GBT with poisson loss.
+template <typename SpecializedModel>
+float ActivationGradientBoostedTreesPoissonRegression(
+    const SpecializedModel& model, const float value) {
+  float clamped_value =
+      std::clamp(value + model.initial_predictions,
+                 -model::gradient_boosted_trees::GradientBoostedTreesModel::
+                     kPoissonLossClampBounds,
+                 model::gradient_boosted_trees::GradientBoostedTreesModel::
+                     kPoissonLossClampBounds);
+  return std::exp(clamped_value);
 }
 
 // Final function applied by a Gradient Boosted Trees with
@@ -743,6 +757,17 @@ void Predict(const GradientBoostedTreesRanking& model,
   PredictHelper<std::remove_reference<decltype(model)>::type,
                 ActivationAddInitialPrediction>(model, examples, num_examples,
                                                 predictions);
+}
+
+template <>
+void Predict(
+    const GradientBoostedTreesPoissonRegression& model,
+    const typename GradientBoostedTreesPoissonRegression::ExampleSet& examples,
+    int num_examples, std::vector<float>* predictions) {
+  // Add activation
+  PredictHelper<std::remove_reference<decltype(model)>::type,
+                ActivationGradientBoostedTreesPoissonRegression>(
+      model, examples, num_examples, predictions);
 }
 
 }  // namespace decision_forest

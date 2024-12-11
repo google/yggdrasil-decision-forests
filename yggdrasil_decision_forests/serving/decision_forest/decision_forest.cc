@@ -903,7 +903,8 @@ absl::Status GenericToSpecializedModel(
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GradientBoostedTreesRegressionNumericalOnly* dst) {
-  if (src.loss() != Loss::SQUARED_ERROR ||
+  if ((src.loss() != Loss::SQUARED_ERROR &&
+       src.loss() != Loss::MEAN_AVERAGE_ERROR) ||
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError("The GBT is not trained for regression.");
   }
@@ -923,7 +924,8 @@ absl::Status GenericToSpecializedModel(
 absl::Status GenericToSpecializedModel(
     const GradientBoostedTreesModel& src,
     GradientBoostedTreesRegressionNumericalAndCategorical* dst) {
-  if (src.loss() != Loss::SQUARED_ERROR ||
+  if ((src.loss() != Loss::SQUARED_ERROR &&
+       src.loss() != Loss::MEAN_AVERAGE_ERROR) ||
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError("The GBT is not trained for regression.");
   }
@@ -1153,7 +1155,8 @@ absl::Status GenericToSpecializedModel(
 template <>
 absl::Status GenericToSpecializedModel(const GradientBoostedTreesModel& src,
                                        GradientBoostedTreesRegression* dst) {
-  if (src.loss() != Loss::SQUARED_ERROR ||
+  if ((src.loss() != Loss::SQUARED_ERROR &&
+       src.loss() != Loss::MEAN_AVERAGE_ERROR) ||
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError(
         "The Gradient Boosted Tree is not trained for regression.");
@@ -1174,6 +1177,22 @@ absl::Status GenericToSpecializedModel(const GradientBoostedTreesModel& src,
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError(
         "The Gradient Boosted Tree is not trained for ranking.");
+  }
+
+  dst->initial_predictions = src.initial_predictions()[0];
+
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  return GenericToSpecializedGenericModelHelper(
+      SetLeafGradientBoostedTreesRegression<DstType>, src, dst);
+}
+
+template <>
+absl::Status GenericToSpecializedModel(
+    const GradientBoostedTreesModel& src,
+    GradientBoostedTreesPoissonRegression* dst) {
+  if (src.loss() != Loss::POISSON || src.initial_predictions().size() != 1) {
+    return absl::InvalidArgumentError(
+        "The Gradient Boosted Tree is not trained for poison regression.");
   }
 
   dst->initial_predictions = src.initial_predictions()[0];

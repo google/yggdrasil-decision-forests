@@ -96,7 +96,12 @@ float ActivationBinomialLogLikelihood(const float value) {
 // Activation function for binary classification GBDT trained with Binomial
 // LogLikelihood loss.
 float ActivationPoisson(const float value) {
-  return std::exp(std::clamp(value, -19.f, 19.f));
+  return std::exp(
+      std::clamp(value,
+                 -model::gradient_boosted_trees::GradientBoostedTreesModel::
+                     kPoissonLossClampBounds,
+                 model::gradient_boosted_trees::GradientBoostedTreesModel::
+                     kPoissonLossClampBounds));
 }
 
 // Identity activation function.

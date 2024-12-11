@@ -1439,6 +1439,7 @@ AbstractModel::BuildFastEngine(
   } else {
     LOG_EVERY_N_SEC(INFO, 10)
         << "Engine \"" << engine_factory->name() << "\" built";
+    STATUS_CHECK(engine_or.value());
   }
   return engine_or;
 }

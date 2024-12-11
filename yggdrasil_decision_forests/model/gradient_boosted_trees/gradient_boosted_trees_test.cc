@@ -21,7 +21,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -209,6 +213,43 @@ TEST(GradientBoostedTrees, NDCGTruncationNonRankingModel) {
   ASSERT_EQ(gbt_model->loss(), proto::BINOMIAL_LOG_LIKELIHOOD);
   std::string description = gbt_model->DescriptionAndStatistics();
   EXPECT_THAT(description, testing::HasSubstr("BINOMIAL_LOG_LIKELIHOOD\n"));
+}
+
+TEST(GradientBoostedTrees, PoissonLossWithClassificationTaskOnExample) {
+  GradientBoostedTreesModel model;
+  model.set_loss(proto::Loss::POISSON, {});
+  model.set_task(model::proto::CLASSIFICATION);
+  dataset::AddColumn("label", dataset::proto::ColumnType::CATEGORICAL,
+                     model.mutable_data_spec());
+  model.set_label_col_idx(0);
+  model.mutable_initial_predictions()->push_back(0);
+  // Note: We don't validate the model on purpose.
+
+  // TODO: Make "Predict" return a status.
+  dataset::proto::Example example;
+  model::proto::Prediction prediction;
+  EXPECT_DEATH(model.Predict(example, &prediction),
+               "Only regression is supported with poison loss");
+}
+
+TEST(GradientBoostedTrees, PoissonLossWithClassificationTaskOnDataset) {
+  GradientBoostedTreesModel model;
+  model.set_loss(proto::Loss::POISSON, {});
+  model.set_task(model::proto::CLASSIFICATION);
+  dataset::AddColumn("label", dataset::proto::ColumnType::CATEGORICAL,
+                     model.mutable_data_spec());
+  model.set_label_col_idx(0);
+  model.mutable_initial_predictions()->push_back(0);
+  // Note: We don't validate the model on purpose.
+
+  dataset::VerticalDataset dataset;
+  dataset.set_data_spec(model.data_spec());
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+
+  // TODO: Make "Predict" return a status.
+  model::proto::Prediction prediction;
+  EXPECT_DEATH(model.Predict(dataset, 0, &prediction),
+               "Only regression is supported with poison loss");
 }
 
 }  // namespace
