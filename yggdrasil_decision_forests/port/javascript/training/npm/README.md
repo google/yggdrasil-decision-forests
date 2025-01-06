@@ -13,10 +13,9 @@ This package supports multiple surfaces.
 <script src="./node_modules/ydf-training/dist/training.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
 <script>
-YDFTraining()
-    .then(ydf => fetch("http://localhost:3000/data.csv"))
-    .then( async (response) => {
-      const data = await response.text()
+YDFTraining().then(async (ydf) => {
+      const csv = await fetch("http://localhost:3000/data.csv");
+      const data = await csv.text();
       const task = "CLASSIFICATION";
       const label = "label";
       const model = new ydf.GradientBoostedTreesLearner(label, task).train(data);
