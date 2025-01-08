@@ -17,3 +17,4 @@ tensorflow-datasets; platform_machine != 'aarch64' and platform_system != 'Windo
 grain; platform_machine != 'aarch64' and platform_system == 'Linux' and python_version >= '3.10'
 fastavro
 polars
+flax; platform_machine != 'aarch64' and platform_system != 'Windows'
