@@ -43,7 +43,7 @@ py_library(
     name = "layer",
     srcs = ["layer.py"],
     deps = [
-        "//third_party/py/flax:core",
+        # flax dep,
         # jax dep,
     ],
 )
