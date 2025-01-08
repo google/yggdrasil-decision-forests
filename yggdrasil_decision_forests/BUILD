@@ -61,7 +61,7 @@ config_setting(
 # Webassembly compilation.
 config_setting(
     name = "wasm_target",
-    values = {"cpu": "wasm"},
+    constraint_values = ["@platforms//cpu:wasm32"],
 )
 
 # With this option, YDF uses Lite protobuffers. This will disable any features based on reflection,
