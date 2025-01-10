@@ -91,9 +91,11 @@ absl::Status LoadTreesFromDisk(
 }
 
 absl::StatusOr<std::string> SerializeTrees(
-    const std::vector<std::unique_ptr<DecisionTree>>& trees) {
+    const std::vector<std::unique_ptr<DecisionTree>>& trees,
+    utils::blob_sequence::Compression compression) {
   utils::StringOutputByteStream stream;
-  ASSIGN_OR_RETURN(auto writer, utils::blob_sequence::Writer::Create(&stream));
+  ASSIGN_OR_RETURN(auto writer,
+                   utils::blob_sequence::Writer::Create(&stream, compression));
 
   class ProtoWriter : public utils::ProtoWriterInterface<proto::Node> {
    public:
@@ -149,6 +151,7 @@ absl::Status DeserializeTrees(
 absl::StatusOr<std::string> RecommendedSerializationFormat() {
   for (const auto& candidate : {
            "BLOB_SEQUENCE",
+           "BLOB_SEQUENCE_GZIP",  // TODO: Make it the default format.
        }) {
     if (AbstractFormatRegisterer::IsName(candidate)) {
       return candidate;

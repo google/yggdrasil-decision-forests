@@ -135,6 +135,7 @@ class NodeFormat(enum.Enum):
   # pyformat: enable
 
   BLOB_SEQUENCE = enum.auto()
+  BLOB_SEQUENCE_GZIP = enum.auto()
 
 
 @dataclasses.dataclass

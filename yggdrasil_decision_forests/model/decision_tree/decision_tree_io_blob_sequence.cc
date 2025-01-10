@@ -17,6 +17,7 @@
 
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree_io_interface.h"
+#include "yggdrasil_decision_forests/utils/blob_sequence.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/sharded_io_blob_sequence.h"
 
@@ -38,10 +39,28 @@ class BlobSequenceFormat : public AbstractFormat {
 
   std::unique_ptr<utils::ShardedWriter<proto::Node>> CreateWriter()
       const override {
-    return std::make_unique<utils::BlobSequenceShardedWriter<proto::Node>>();
+    return std::make_unique<utils::BlobSequenceShardedWriter<proto::Node>>(
+        utils::blob_sequence::Compression::kNone);
   };
 };
 REGISTER_AbstractFormat(BlobSequenceFormat, "BLOB_SEQUENCE");
+
+class BlobSequenceGZipFormat : public AbstractFormat {
+ public:
+  ~BlobSequenceGZipFormat() override = default;
+
+  std::unique_ptr<utils::ShardedReader<proto::Node>> CreateReader()
+      const override {
+    return std::make_unique<utils::BlobSequenceShardedReader<proto::Node>>();
+  };
+
+  std::unique_ptr<utils::ShardedWriter<proto::Node>> CreateWriter()
+      const override {
+    return std::make_unique<utils::BlobSequenceShardedWriter<proto::Node>>(
+        utils::blob_sequence::Compression::kGZIP);
+  };
+};
+REGISTER_AbstractFormat(BlobSequenceGZipFormat, "BLOB_SEQUENCE_GZIP");
 
 }  // namespace decision_tree
 }  // namespace model
