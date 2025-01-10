@@ -26,6 +26,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/utils/blob_sequence.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -53,7 +54,9 @@ absl::Status LoadTreesFromDisk(
 // Serializes a list of decision trees to a string. The tree is encoded by
 // proto-serializing the nodes in a blob sequence.
 absl::StatusOr<std::string> SerializeTrees(
-    const std::vector<std::unique_ptr<DecisionTree>>& trees);
+    const std::vector<std::unique_ptr<DecisionTree>>& trees,
+    utils::blob_sequence::Compression compression =
+        utils::blob_sequence::Compression::kGZIP);
 
 // Deserializes a list of decision trees serialized by "SerializeTrees".
 absl::Status DeserializeTrees(

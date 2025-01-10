@@ -80,6 +80,25 @@ class ApiTest(absltest.TestCase):
     deserialized_model = ydf.deserialize_model(serialized_model)
     logging.info(deserialized_model)
 
+  def test_save_model_with_different_node_formats(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
+    )
+    model = ydf.load_model(model_path)
+    serialized_model = model.serialize()
+
+    logging.info("serialized_model size: %s", len(serialized_model))
+    tmp_dir = self.create_tempdir().full_path
+
+    model.set_node_format(ydf.NodeFormat.TFE_RECORDIO)
+    model.save(os.path.join(tmp_dir, "rio"))
+
+    model.set_node_format(ydf.NodeFormat.BLOB_SEQUENCE)
+    model.save(os.path.join(tmp_dir, "blob"))
+
+    model.set_node_format(ydf.NodeFormat.BLOB_SEQUENCE_GZIP)
+    model.save(os.path.join(tmp_dir, "blob_gzip"))
+
   def test_pickle_and_unpickle_model(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"

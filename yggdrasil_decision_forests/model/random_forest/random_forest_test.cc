@@ -147,7 +147,7 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
     return tree;
   };
 
-  model->set_node_format("BLOB_SEQUENCE");
+  model->set_node_format("BLOB_SEQUENCE_GZIP");
   model->AddTree(create_tree(1, 0, 1));
   model->AddTree(create_tree(3, 2, 1));
 

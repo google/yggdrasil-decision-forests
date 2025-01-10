@@ -54,7 +54,9 @@ class BlobSequenceShardedReader : public ShardedReader<T> {
 template <typename T>
 class BlobSequenceShardedWriter : public ShardedWriter<T> {
  public:
-  BlobSequenceShardedWriter() = default;
+  BlobSequenceShardedWriter(blob_sequence::Compression compression =
+                                blob_sequence::Compression::kNone)
+      : compression_(compression) {};
 
   // This type is neither copyable nor movable.
   BlobSequenceShardedWriter(const BlobSequenceShardedWriter&) = delete;
@@ -70,6 +72,7 @@ class BlobSequenceShardedWriter : public ShardedWriter<T> {
   blob_sequence::Writer writer_;
   file::OutputFileCloser file_closer_;
   std::string buffer_;
+  blob_sequence::Compression compression_;
 };
 
 template <typename T>
@@ -99,8 +102,8 @@ absl::Status BlobSequenceShardedWriter<T>::OpenShard(
 
   ASSIGN_OR_RETURN(auto stream, file::OpenOutputFile(path));
   RETURN_IF_ERROR(file_closer_.reset(std::move(stream)));
-  ASSIGN_OR_RETURN(writer_,
-                   blob_sequence::Writer::Create(file_closer_.stream()));
+  ASSIGN_OR_RETURN(writer_, blob_sequence::Writer::Create(file_closer_.stream(),
+                                                          compression_));
   return absl::OkStatus();
 }
 

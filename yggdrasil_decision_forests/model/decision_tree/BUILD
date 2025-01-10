@@ -78,6 +78,7 @@ cc_library_ydf(
     deps = [
         ":decision_tree_cc_proto",
         ":decision_tree_io_interface",
+        "//yggdrasil_decision_forests/utils:blob_sequence",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:sharded_io_blob_sequence",
     ],
