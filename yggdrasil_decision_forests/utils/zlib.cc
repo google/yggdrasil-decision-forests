@@ -23,8 +23,8 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include <utility>
 
+#include "absl/base/nullability.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -40,10 +40,9 @@
 namespace yggdrasil_decision_forests::utils {
 
 absl::StatusOr<std::unique_ptr<GZipInputByteStream>>
-GZipInputByteStream::Create(std::unique_ptr<utils::InputByteStream>&& stream,
+GZipInputByteStream::Create(absl::Nonnull<utils::InputByteStream*> stream,
                             size_t buffer_size) {
-  auto gz_stream =
-      std::make_unique<GZipInputByteStream>(std::move(stream), buffer_size);
+  auto gz_stream = std::make_unique<GZipInputByteStream>(stream, buffer_size);
   std::memset(&gz_stream->deflate_stream_, 0,
               sizeof(gz_stream->deflate_stream_));
   if (inflateInit2(&gz_stream->deflate_stream_, 16 + MAX_WBITS) != Z_OK) {
@@ -53,9 +52,9 @@ GZipInputByteStream::Create(std::unique_ptr<utils::InputByteStream>&& stream,
   return gz_stream;
 }
 
-GZipInputByteStream::GZipInputByteStream(
-    std::unique_ptr<utils::InputByteStream>&& stream, size_t buffer_size)
-    : buffer_size_(buffer_size), stream_(std::move(stream)) {
+GZipInputByteStream::GZipInputByteStream(utils::InputByteStream* stream,
+                                         size_t buffer_size)
+    : buffer_size_(buffer_size), stream_(stream) {
   input_buffer_.resize(buffer_size_);
   output_buffer_.resize(buffer_size_);
 }
@@ -147,15 +146,14 @@ absl::Status GZipInputByteStream::CloseDeflateStream() {
 }
 
 absl::StatusOr<std::unique_ptr<GZipOutputByteStream>>
-GZipOutputByteStream::Create(std::unique_ptr<utils::OutputByteStream>&& stream,
+GZipOutputByteStream::Create(absl::Nonnull<utils::OutputByteStream*> stream,
                              int compression_level, size_t buffer_size,
                              bool raw_deflate) {
   if (compression_level != Z_DEFAULT_COMPRESSION) {
     STATUS_CHECK_GT(compression_level, Z_NO_COMPRESSION);
     STATUS_CHECK_LT(compression_level, Z_BEST_COMPRESSION);
   }
-  auto gz_stream =
-      std::make_unique<GZipOutputByteStream>(std::move(stream), buffer_size);
+  auto gz_stream = std::make_unique<GZipOutputByteStream>(stream, buffer_size);
   std::memset(&gz_stream->deflate_stream_, 0,
               sizeof(gz_stream->deflate_stream_));
   // Note: A negative window size indicate to use the raw deflate algorithm (!=
@@ -170,9 +168,9 @@ GZipOutputByteStream::Create(std::unique_ptr<utils::OutputByteStream>&& stream,
   return gz_stream;
 }
 
-GZipOutputByteStream::GZipOutputByteStream(
-    std::unique_ptr<utils::OutputByteStream>&& stream, size_t buffer_size)
-    : buffer_size_(buffer_size), stream_(std::move(stream)) {
+GZipOutputByteStream::GZipOutputByteStream(utils::OutputByteStream* stream,
+                                           size_t buffer_size)
+    : buffer_size_(buffer_size), stream_(*stream) {
   output_buffer_.resize(buffer_size_);
 }
 
@@ -215,8 +213,7 @@ absl::Status GZipOutputByteStream::WriteImpl(absl::string_view chunk,
     const size_t compressed_bytes = buffer_size_ - deflate_stream_.avail_out;
 
     if (compressed_bytes > 0) {
-      DCHECK(stream_);
-      RETURN_IF_ERROR(stream_->Write(absl::string_view{
+      RETURN_IF_ERROR(stream_.Write(absl::string_view{
           reinterpret_cast<char*>(output_buffer_.data()), compressed_bytes}));
     }
 
@@ -230,16 +227,15 @@ absl::Status GZipOutputByteStream::WriteImpl(absl::string_view chunk,
 
 absl::Status GZipOutputByteStream::Close() {
   RETURN_IF_ERROR(CloseInflateStream());
-  if (stream_) {
-    return stream_->Close();
-  }
   return absl::OkStatus();
 }
+
+absl::Status GZipOutputByteStream::Flush() { return WriteImpl("", true); }
 
 absl::Status GZipOutputByteStream::CloseInflateStream() {
   if (deflate_stream_is_allocated_) {
     deflate_stream_is_allocated_ = false;
-    RETURN_IF_ERROR(WriteImpl("", true));
+    RETURN_IF_ERROR(Flush());
     if (deflateEnd(&deflate_stream_) != Z_OK) {
       return absl::InternalError("Cannot close deflate");
     }

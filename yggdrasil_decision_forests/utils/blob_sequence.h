@@ -38,14 +38,24 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_BLOB_SEQUENCE_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_BLOB_SEQUENCE_H_
 
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
+#include "yggdrasil_decision_forests/utils/zlib.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
 namespace blob_sequence {
+
+enum class Compression : uint8_t {
+  kNone = 0,
+  kGZIP = 1,
+};
 
 // Blog sequence reader.
 class Reader {
@@ -65,9 +75,16 @@ class Reader {
   absl::Status Close();
 
  private:
+  InputByteStream& stream() {
+    return gzip_stream_ ? *gzip_stream_ : *raw_stream_;
+  }
+
   // Non-owned input stream.
-  InputByteStream* stream_ = nullptr;
+  InputByteStream* raw_stream_ = nullptr;
+  // gzip decoder is the file is compressed.
+  std::unique_ptr<utils::GZipInputByteStream> gzip_stream_;
   uint16_t version_;
+  Compression compression_;
 };
 
 // Blog sequence writer.
@@ -75,13 +92,15 @@ class Writer {
  public:
   // Creates a writer attached to a stream.  Does not take ownership of
   // "stream".
-  static absl::StatusOr<Writer> Create(utils::OutputByteStream* stream);
+  static absl::StatusOr<Writer> Create(
+      utils::OutputByteStream* stream,
+      Compression compression = Compression::kNone);
 
   // Creates a non attached writer.
   Writer() {}
 
   // Writes a blob.
-  absl::Status Write(const absl::string_view blob);
+  absl::Status Write(absl::string_view blob);
 
   // Closes the writer. Does not close the stream passed in the constructor.
   // Should be called BEFORE the stream is closed (if the stream has the concept
@@ -89,8 +108,14 @@ class Writer {
   absl::Status Close();
 
  private:
+  OutputByteStream& stream() {
+    return gzip_stream_ ? *gzip_stream_ : *raw_stream_;
+  }
+
   // Non-owned output stream.
-  OutputByteStream* stream_ = nullptr;
+  OutputByteStream* raw_stream_ = nullptr;
+  // gzip encoder is the file is compressed.
+  std::unique_ptr<utils::GZipOutputByteStream> gzip_stream_;
 };
 
 namespace internal {
@@ -104,11 +129,16 @@ struct FileHeader {
   // Version of the format.
   // Version:
   //   0: Initial version.
+  //   1: Add support for gzip compression.
   uint16_t version;
+
+  // Compression.
+  uint8_t compression;
 
   // Reserved until used (instead of creating a per-version header).
   // Should remain zero until used.
-  uint32_t reserved = 0;
+  uint8_t reserved2 = 0;
+  uint16_t reserved1 = 0;
 };
 
 // Record header.

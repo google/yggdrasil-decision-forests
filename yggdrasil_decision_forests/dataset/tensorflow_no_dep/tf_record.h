@@ -28,6 +28,7 @@
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/zlib.h"
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
 
@@ -51,17 +52,23 @@ class TFRecordReader {
   // Closes the stream.
   absl::Status Close();
 
-  TFRecordReader(std::unique_ptr<utils::InputByteStream>&& stream)
-      : stream_(std::move(stream)) {}
-
   // Value of the last read record. Includes skipped messages.
   const std::string& buffer() const { return buffer_; }
 
+  TFRecordReader() {}
+
  private:
+  utils::InputByteStream& stream() {
+    return zlib_stream_ ? *zlib_stream_ : *raw_stream_;
+  }
+
   // Reads a CRC.
   absl::StatusOr<absl::crc32c_t> ReadCRC();
 
-  std::unique_ptr<utils::InputByteStream> stream_;
+  // Underlying stream. If nullptr, the reader is closed.
+  std::unique_ptr<utils::InputByteStream> raw_stream_;
+  // Optional stream, if zlib compression is enabled.
+  std::unique_ptr<utils::GZipInputByteStream> zlib_stream_;
   std::string buffer_;
 };
 
@@ -101,11 +108,16 @@ class TFRecordWriter {
   // Closes the stream.
   absl::Status Close();
 
-  TFRecordWriter(std::unique_ptr<utils::OutputByteStream>&& stream)
-      : stream_(std::move(stream)) {}
+  TFRecordWriter() {}
 
  private:
-  std::unique_ptr<utils::OutputByteStream> stream_;
+  utils::OutputByteStream& stream() {
+    return zlib_stream_ ? *zlib_stream_ : *raw_stream_;
+  }
+  // Underlying stream. If nullptr, the writer is closed.
+  std::unique_ptr<utils::OutputByteStream> raw_stream_;
+  // Optional stream, if zlib compression is enabled.
+  std::unique_ptr<utils::GZipOutputByteStream> zlib_stream_;
   std::string buffer_;
 };
 

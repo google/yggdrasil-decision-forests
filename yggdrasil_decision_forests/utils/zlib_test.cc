@@ -47,7 +47,7 @@ std::string HelloPath() {
 
 TEST(GZip, ReadAll) {
   auto file_stream = file::OpenInputFile(HelloPath()).value();
-  auto stream = GZipInputByteStream::Create(std::move(file_stream)).value();
+  auto stream = GZipInputByteStream::Create(file_stream.get()).value();
   auto read_content = stream->ReadAll().value();
   EXPECT_OK(stream->Close());
   EXPECT_EQ("hello", read_content);
@@ -55,7 +55,7 @@ TEST(GZip, ReadAll) {
 
 TEST(GZip, ReadUnit) {
   auto file_stream = file::OpenInputFile(HelloPath()).value();
-  auto stream = GZipInputByteStream::Create(std::move(file_stream)).value();
+  auto stream = GZipInputByteStream::Create(file_stream.get()).value();
   char buffer[10];
 
   int n = stream->ReadUpTo(buffer, 1).value();
@@ -120,22 +120,24 @@ TEST_P(GZipTestCaseTest, WriteAndRead) {
 
   {
     auto file_stream = file::OpenOutputFile(file_path).value();
-    auto stream = GZipOutputByteStream::Create(std::move(file_stream),
-                                               test_case.compression,
-                                               test_case.buffer_size)
-                      .value();
+    auto stream =
+        GZipOutputByteStream::Create(file_stream.get(), test_case.compression,
+                                     test_case.buffer_size)
+            .value();
     EXPECT_OK(stream->Write(content));
     EXPECT_OK(stream->Write(content));
     EXPECT_OK(stream->Close());
+    EXPECT_OK(file_stream->Close());
   }
 
   {
     auto file_stream = file::OpenInputFile(file_path).value();
-    auto stream = GZipInputByteStream::Create(std::move(file_stream),
-                                              test_case.buffer_size)
-                      .value();
+    auto stream =
+        GZipInputByteStream::Create(file_stream.get(), test_case.buffer_size)
+            .value();
     auto read_content = stream->ReadAll().value();
     EXPECT_OK(stream->Close());
+    EXPECT_OK(file_stream->Close());
     EXPECT_EQ(content + content, read_content);
   }
 }
@@ -163,18 +165,14 @@ TEST(RawInflate, ExceedBuffer) {
   {
     // Compress the data.
     auto raw_stream = std::make_unique<StringOutputByteStream>();
-    auto stream =
-        GZipOutputByteStream::Create(std::move(raw_stream), 8, 1024 * 1024,
-                                     /*raw_deflate=*/true)
-            .value();
+    auto stream = GZipOutputByteStream::Create(raw_stream.get(), 8, 1024 * 1024,
+                                               /*raw_deflate=*/true)
+                      .value();
     EXPECT_OK(stream->Write(raw_data));
     EXPECT_OK(stream->Close());
+    EXPECT_OK(raw_stream->Close());
 
-    // TODO: Change "GZipOutputByteStream" so we don't need a dynamic cast
-    // e.g. GZipOutputByteStream don't own the sub-stream.
-    compressed_data =
-        std::move(dynamic_cast<StringOutputByteStream*>(&stream->stream()))
-            ->ToString();
+    compressed_data = raw_stream->ToString();
     LOG(INFO) << "Compressed data size:" << compressed_data.size();
   }
 
