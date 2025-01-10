@@ -113,7 +113,8 @@ absl::Status BlobSequenceShardedWriter<T>::WriteInShard(const T& value) {
 
 template <typename T>
 absl::Status BlobSequenceShardedWriter<T>::CloseWithStatus() {
-  if (file_closer_.stream() != nullptr) {
+  if (file_closer_.stream() == nullptr) {
+    // Already closed.
     return absl::OkStatus();
   }
   RETURN_IF_ERROR(writer_.Close());

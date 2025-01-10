@@ -681,6 +681,7 @@ cc_library_ydf(
     deps = [
         ":bytestream",
         ":status_macros",
+        ":zlib",
         "@com_google_absl//absl/base:endian",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -855,6 +856,7 @@ cc_library_ydf(
     deps = [
         ":bytestream",
         ":status_macros",
+        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -1195,12 +1197,14 @@ cc_test(
 cc_test(
     name = "blob_sequence_test",
     srcs = ["blob_sequence_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
         ":blob_sequence",
         ":filesystem",
         ":test",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -30,6 +30,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/zlib.h"
 
 namespace yggdrasil_decision_forests::dataset::tensorflow_no_dep {
@@ -54,12 +55,17 @@ inline uint32_t Unmask(const uint32_t masked_crc) {
   return ((rot >> 17) | (rot << 15));
 }
 
+template <typename T>
+constexpr absl::string_view GetView(const T& data) {
+  return absl::string_view((char*)&data, sizeof(T));
+}
+
 }  // namespace
 
 absl::StatusOr<absl::crc32c_t> TFRecordReader::ReadCRC() {
   uint32_t value;
   ASSIGN_OR_RETURN(const bool has_content,
-                   stream_->ReadExactly((char*)&value, sizeof(uint32_t)));
+                   stream().ReadExactly((char*)&value, sizeof(uint32_t)));
   if (!has_content) {
     return absl::InvalidArgumentError("Empty stream");
   }
@@ -67,7 +73,7 @@ absl::StatusOr<absl::crc32c_t> TFRecordReader::ReadCRC() {
 }
 
 TFRecordReader::~TFRecordReader() {
-  if (stream_) {
+  if (raw_stream_) {
     LOG(WARNING) << "Destruction of a non closed TFRecordReader";
     Close().IgnoreError();
   }
@@ -75,27 +81,28 @@ TFRecordReader::~TFRecordReader() {
 
 absl::StatusOr<std::unique_ptr<TFRecordReader>> TFRecordReader::Create(
     const absl::string_view path, bool compressed) {
-  ASSIGN_OR_RETURN(std::unique_ptr<utils::InputByteStream> stream,
-                   file::OpenInputFile(path));
+  auto reader = std::make_unique<TFRecordReader>();
+
+  ASSIGN_OR_RETURN(reader->raw_stream_, file::OpenInputFile(path));
   if (compressed) {
-    ASSIGN_OR_RETURN(stream,
-                     utils::GZipInputByteStream::Create(std::move(stream)));
+    ASSIGN_OR_RETURN(reader->zlib_stream_, utils::GZipInputByteStream::Create(
+                                               reader->raw_stream_.get()));
   }
-  return std::make_unique<TFRecordReader>(std::move(stream));
+  return reader;
 }
 
 absl::StatusOr<bool> TFRecordReader::Next(google::protobuf::MessageLite* message) {
   uint64_t raw_length;
   ASSIGN_OR_RETURN(bool has_content,
-                   stream_->ReadExactly((char*)&raw_length, sizeof(uint64_t)));
+                   stream().ReadExactly((char*)&raw_length, sizeof(uint64_t)));
   if (!has_content) {
     return false;
   }
   const uint64_t length = absl::little_endian::ToHost64(raw_length);
 
   ASSIGN_OR_RETURN(const absl::crc32c_t raw_length_expected_crc, ReadCRC());
-  const absl::crc32c_t raw_length_real_checksum = absl::ComputeCrc32c(
-      absl::string_view((char*)&raw_length, sizeof(uint64_t)));
+  const absl::crc32c_t raw_length_real_checksum =
+      absl::ComputeCrc32c(GetView(raw_length));
   if (raw_length_expected_crc != raw_length_real_checksum) {
     return absl::InvalidArgumentError(kInvalidDataMessage);
   }
@@ -103,7 +110,7 @@ absl::StatusOr<bool> TFRecordReader::Next(google::protobuf::MessageLite* message
   buffer_.resize(length);
   // TODO: Use buffer_.data() in c++>=17.
   if (length > 0) {
-    ASSIGN_OR_RETURN(has_content, stream_->ReadExactly(&buffer_[0], length));
+    ASSIGN_OR_RETURN(has_content, stream().ReadExactly(&buffer_[0], length));
   }
   if (!has_content) {
     return absl::InvalidArgumentError(kInvalidDataMessage);
@@ -123,26 +130,30 @@ absl::StatusOr<bool> TFRecordReader::Next(google::protobuf::MessageLite* message
 
 // Closes the stream.
 absl::Status TFRecordReader::Close() {
-  if (stream_) {
-    RETURN_IF_ERROR(stream_->Close());
-    stream_.reset();
+  if (zlib_stream_) {
+    RETURN_IF_ERROR(zlib_stream_->Close());
+    zlib_stream_.reset();
+  }
+  if (raw_stream_) {
+    RETURN_IF_ERROR(raw_stream_->Close());
+    raw_stream_.reset();
   }
   return absl::OkStatus();
 }
 
 absl::StatusOr<std::unique_ptr<TFRecordWriter>> TFRecordWriter::Create(
     absl::string_view path, bool compressed) {
-  ASSIGN_OR_RETURN(std::unique_ptr<utils::OutputByteStream> stream,
-                   file::OpenOutputFile(path));
+  auto writer = std::make_unique<TFRecordWriter>();
+  ASSIGN_OR_RETURN(writer->raw_stream_, file::OpenOutputFile(path));
   if (compressed) {
-    ASSIGN_OR_RETURN(stream,
-                     utils::GZipOutputByteStream::Create(std::move(stream)));
+    ASSIGN_OR_RETURN(writer->zlib_stream_, utils::GZipOutputByteStream::Create(
+                                               writer->raw_stream_.get()));
   }
-  return std::make_unique<TFRecordWriter>(std::move(stream));
+  return writer;
 }
 
 TFRecordWriter::~TFRecordWriter() {
-  if (stream_) {
+  if (raw_stream_) {
     LOG(WARNING) << "Destruction of a non closed TFRecordWriter";
     Close().IgnoreError();
   }
@@ -157,30 +168,30 @@ absl::Status TFRecordWriter::Write(const google::protobuf::MessageLite& message)
 
 absl::Status TFRecordWriter::Write(const absl::string_view data) {
   uint64_t length = data.size();
-  RETURN_IF_ERROR(
-      stream_->Write(absl::string_view((char*)&length, sizeof(uint64_t))));
+  RETURN_IF_ERROR(stream().Write(GetView(length)));
 
   const uint64_t net_length = absl::little_endian::FromHost64(length);
   const uint32_t net_length_checksum =
-      Mask(static_cast<uint32_t>(absl::ComputeCrc32c(
-          absl::string_view((char*)&net_length, sizeof(uint64_t)))));
-  RETURN_IF_ERROR(stream_->Write(
-      absl::string_view((char*)&net_length_checksum, sizeof(uint32_t))));
+      Mask(static_cast<uint32_t>(absl::ComputeCrc32c(GetView(net_length))));
+  RETURN_IF_ERROR(stream().Write(GetView(net_length_checksum)));
 
-  RETURN_IF_ERROR(stream_->Write(data));
+  RETURN_IF_ERROR(stream().Write(data));
 
   const uint32_t net_data_checksum =
       Mask(static_cast<uint32_t>(absl::ComputeCrc32c(data)));
-  RETURN_IF_ERROR(stream_->Write(
-      absl::string_view((char*)&net_data_checksum, sizeof(uint32_t))));
+  RETURN_IF_ERROR(stream().Write(GetView(net_data_checksum)));
 
   return absl::OkStatus();
 }
 
 absl::Status TFRecordWriter::Close() {
-  if (stream_) {
-    RETURN_IF_ERROR(stream_->Close());
-    stream_.reset();
+  if (zlib_stream_) {
+    RETURN_IF_ERROR(zlib_stream_->Close());
+    zlib_stream_.reset();
+  }
+  if (raw_stream_) {
+    RETURN_IF_ERROR(raw_stream_->Close());
+    raw_stream_.reset();
   }
   return absl::OkStatus();
 }
