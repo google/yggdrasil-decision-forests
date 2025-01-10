@@ -1059,6 +1059,10 @@ class ToJaxTest(parameterized.TestCase):
     )
 
     if test_tf_lite:
+      # TODO: Re-enable TFLite conversion when TFLite tfl.gather_nd
+      # issue is resolved.
+      return
+
       # Test TFLite conversion
 
       # Generate the input specs.
