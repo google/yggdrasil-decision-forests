@@ -4,7 +4,8 @@ hide: toc
 ---
 #
 
-![](image/logo_v2_christmas.png){: .center .logo}
+![](image/logo_v2.png){: .center .logo}
+<!-- ![](image/logo_v2_christmas.png){: .center .logo} -->
 
 <div class="intro_text">
 YDF is a library to train, evaluate, interpret, and
