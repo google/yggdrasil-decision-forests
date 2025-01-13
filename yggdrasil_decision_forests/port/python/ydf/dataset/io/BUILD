@@ -15,7 +15,9 @@ py_library(
     deps = [
         # numpy dep,
         # pandas dep,
-        # polars dep,
+        # Disable Polars automatic linkage as its takes unreasonable time to build (>10x of YDF and
+        # its dependencies).
+        # # polars dep,
         # xarray dep,
     ],
 )
