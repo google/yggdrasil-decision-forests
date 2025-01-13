@@ -22,7 +22,8 @@ import numpy as np
 if typing.TYPE_CHECKING:
   import pandas as pd  # pylint: disable=unused-import,g-bad-import-order
   import xarray as xr  # pylint: disable=unused-import,g-bad-import-order
-  import polars as pl  # pylint: disable=unused-import,g-bad-import-order
+  # Note: Polars is not include in the automatic build to speed-up compilation.
+  # import polars as pl  # pylint: disable=unused-import,g-bad-import-order
 
 # Supported type of column input values.
 InputValues = Union[np.ndarray, List[Any]]
@@ -37,7 +38,7 @@ UnrolledFeaturesInfo = Dict[str, List[str]]
 
 
 # Supported types of datasets.
-IODataset = Union[
+IODataset = Union[  # pytype: disable=name-error
     DictInputValues,  # Dictionary of values (e.g., lists, NumPy arrays)
     "pd.DataFrame",  # A Pandas DataFrame
     str,  # A typed path e.g. "csv:/tmp/train.csv". Supports globs.
