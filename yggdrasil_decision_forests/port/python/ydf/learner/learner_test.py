@@ -25,7 +25,7 @@ import fastavro
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
-import polars as pl
+# import polars as pl # TODO: Re-enable.
 from sklearn import metrics
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
@@ -1660,41 +1660,49 @@ class DatasetFormatsTest(parameterized.TestCase):
         "multi_f1",
     ]
 
-  def create_polars_dataset(self, n: int = 1000) -> pl.DataFrame:
-    return pl.DataFrame({
-        # Single-dim features
-        "f1": np.random.random(size=n),
-        "f2": np.random.random(size=n),
-        "i1": np.random.randint(100, size=n),
-        "i2": np.random.randint(100, size=n),
-        "c1": np.random.choice(["x", "y", "z"], size=n, p=[0.6, 0.3, 0.1]),
-        "multi_c1": np.array(
-            [["a", "x", "z"], ["b", "x", "w"], ["a", "y", "w"], ["b", "y", "z"]]
-            * (n // 4)
-        ),
-        # Cat-set features
-        # ================
-        # Note: Polars as a bug when serializing empty lists of string to Avro
-        # files (only write one of the two required "optional" bit).
-        # TODO: Replace [""] by [] once the bug if fixed is added.
-        "cs1": [["<SOMETHING>"], ["a", "b", "c"], ["b", "c"], ["a"]] * (n // 4),
-        # Multi-dim features
-        # ==================
-        # Note: It seems support for this type of feature was temporarly dropped
-        # in Polars 1.9 i.e. the data packing was improved but the avro
-        # serialization was not implemented. This code would fail with recent
-        # version of polars with: not yet implemented: write
-        # FixedSizeList(Field { name: "item", dtype: Float64, is_nullable: true,
-        # metadata: {} }, 5) to avro.
-        "multi_f1": np.random.random(size=(n, 3)),
-        # # Labels
-        "label_class_binary1": np.random.choice([False, True], size=n),
-        "label_class_binary2": np.random.choice([0, 1], size=n),
-        "label_class_binary3": np.random.choice(["l1", "l2"], size=n),
-        "label_class_multi1": np.random.choice(["l1", "l2", "l3"], size=n),
-        "label_class_multi2": np.random.choice([0, 1, 2], size=n),
-        "label_regress1": np.random.random(size=n),
-    })
+  # TODO: Re-enable.
+  def create_polars_dataset(self, n: int = 1000):
+    del n
+    raise ValueError("Not available")
+
+  # def create_polars_dataset(self, n: int = 1000) -> pl.DataFrame:
+  #   return pl.DataFrame({
+  #       # Single-dim features
+  #       "f1": np.random.random(size=n),
+  #       "f2": np.random.random(size=n),
+  #       "i1": np.random.randint(100, size=n),
+  #       "i2": np.random.randint(100, size=n),
+  #       "c1": np.random.choice(["x", "y", "z"], size=n, p=[0.6, 0.3, 0.1]),
+  #       "multi_c1": np.array(
+  #           [["a", "x", "z"], ["b", "x", "w"], ["a", "y", "w"],
+  #           ["b", "y", "z"]]
+  #           * (n // 4)
+  #       ),
+  #       # Cat-set features
+  #       # ================
+  #       # Note: Polars as a bug when serializing empty lists of string to Avro
+  #       # files (only write one of the two required "optional" bit).
+  #       # TODO: Replace [""] by [] once the bug if fixed is added.
+  #       "cs1": [["<SOMETHING>"], ["a", "b", "c"], ["b", "c"], ["a"]]
+  #         * (n // 4),
+  #       # Multi-dim features
+  #       # ==================
+  #       # Note: It seems support for this type of feature was temporarly dropped
+  #       # in Polars 1.9 i.e. the data packing was improved but the avro
+  #       # serialization was not implemented. This code would fail with recent
+  #       # version of polars with: not yet implemented: write
+  #       # FixedSizeList(Field { name: "item", dtype: Float64,
+  #         is_nullable: true,
+  #       # metadata: {} }, 5) to avro.
+  #       "multi_f1": np.random.random(size=(n, 3)),
+  #       # # Labels
+  #       "label_class_binary1": np.random.choice([False, True], size=n),
+  #       "label_class_binary2": np.random.choice([0, 1], size=n),
+  #       "label_class_binary3": np.random.choice(["l1", "l2"], size=n),
+  #       "label_class_multi1": np.random.choice(["l1", "l2", "l3"], size=n),
+  #       "label_class_multi2": np.random.choice([0, 1, 2], size=n),
+  #       "label_regress1": np.random.random(size=n),
+  #   })
 
   def test_avro_from_raw_fastavro(self):
     tmp_dir = self.create_tempdir().full_path

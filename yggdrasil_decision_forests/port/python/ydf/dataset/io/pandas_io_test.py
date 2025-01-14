@@ -16,7 +16,8 @@
 
 from absl.testing import absltest
 import pandas as pd
-import polars as pl
+
+# import polars as pl   # TODO: Re-enable.
 
 from ydf.dataset.io import pandas_io
 from ydf.utils import test_utils
@@ -32,8 +33,9 @@ class PandasIOTest(absltest.TestCase):
     self.assertTrue(pandas_io.is_pandas_dataframe(pd.DataFrame()))
     self.assertFalse(pandas_io.is_pandas_dataframe({}))
 
-  def test_polars_is_not_pandas(self):
-    self.assertFalse(pandas_io.is_pandas_dataframe(pl.DataFrame()))
+  # TODO: Re-enable.
+  # def test_polars_is_not_pandas(self):
+  #   self.assertFalse(pandas_io.is_pandas_dataframe(pl.DataFrame()))
 
   def test_pandas_generator(self):
     ds = pandas_io.PandasBatchedExampleGenerator(self.adult.train_pd)

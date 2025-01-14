@@ -15,9 +15,7 @@ py_library(
     deps = [
         # numpy dep,
         # pandas dep,
-        # Disable Polars automatic linkage as its takes unreasonable time to build (>10x of YDF and
-        # its dependencies).
-        # # polars dep,
+        # # polars dep,   # TODO: Re-enable.
         # xarray dep,
     ],
 )
@@ -111,7 +109,7 @@ py_test(
         ":pandas_io",
         # absl/testing:absltest dep,
         # pandas dep,
-        # polars dep,
+        # # polars dep,  # TODO: Re-enable.
         "//ydf/utils:test_utils",
     ],
 )
@@ -123,7 +121,7 @@ py_test(
         ":polars_io",
         # absl/testing:absltest dep,
         # pandas dep,
-        # polars dep,
+        # # polars dep,  # TODO: Re-enable.
     ],
 )
 

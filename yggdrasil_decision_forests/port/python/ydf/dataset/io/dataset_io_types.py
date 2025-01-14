@@ -44,7 +44,7 @@ IODataset = Union[  # pytype: disable=name-error
     str,  # A typed path e.g. "csv:/tmp/train.csv". Supports globs.
     Sequence[str],  # A list of typed paths
     "xr.Dataset",  # A XArray dataset
-    "pl.DataFrame",  # A Polars DataFrame
+    "pl.DataFrame",  # A Polars DataFrame # TODO: Re-enable.
     # Not listed: TensorFlow Datasets (e.g., CacheDataset, _BatchDataset),
     # PyGrain DataLoaders, PyGrain Datasets (e.g., MapDataset, IterDataset),
     # PyGrain Iterators (e.g., PyGrainDatasetIterator, DatasetIterator).
