@@ -52,6 +52,9 @@ class HyperparameterConsumer:
   def get_float(self, name: str) -> float:
     """Gets a float value."""
     value = self._get_value(name)
+    if isinstance(value, int):
+      # Allow for the value to be an integer.
+      value = float(value)
     if not isinstance(value, float):
       raise ValueError(
           f"Hyperparameter {name!r} is expected to be a floating point value."
@@ -63,7 +66,7 @@ class HyperparameterConsumer:
   def get_int(self, name: str) -> int:
     """Gets an integer value."""
     value = self._get_value(name)
-    if not isinstance(value, int):
+    if isinstance(value, bool) or not isinstance(value, int):
       raise ValueError(
           f"Hyperparameter {name!r} is expected to be a integer value. Instead,"
           f" got {value!r} of type {type(value)}"
@@ -74,10 +77,34 @@ class HyperparameterConsumer:
   def get_optional_int(self, name: str) -> int:
     """Gets an integer value. Returns None is the value does not exist."""
     value = self._get_value(name)
-    if not isinstance(value, int) and value is not None:
+    if isinstance(value, bool) or (
+        not isinstance(value, int) and value is not None
+    ):
       raise ValueError(
           f"Hyperparameter {name!r} is expected to be a integer or None value."
           f" Instead, got {value!r} of type {type(value)}"
+      )
+    self._consumed.add(name)
+    return value
+
+  def get_str(self, name: str) -> str:
+    """Gets a string value."""
+    value = self._get_value(name)
+    if not isinstance(value, str):
+      raise ValueError(
+          f"Hyperparameter {name!r} is expected to be a string value. Instead,"
+          f" got {value!r} of type {type(value)}"
+      )
+    self._consumed.add(name)
+    return value
+
+  def get_bool(self, name: str) -> bool:
+    """Gets a bool value."""
+    value = self._get_value(name)
+    if not isinstance(value, bool):
+      raise ValueError(
+          f"Hyperparameter {name!r} is expected to be a bool value. Instead,"
+          f" got {value!r} of type {type(value)}"
       )
     self._consumed.add(name)
     return value

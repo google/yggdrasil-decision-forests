@@ -14,7 +14,14 @@ py_library(
     srcs = ["dataset.py"],
     deps = [
         # jax dep,
+        # numpy dep,
+        # pandas dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset",
+        "//ydf/dataset:dataspec",
         "//ydf/dataset/io:generator",
+        "//ydf/dataset/io:pandas_io",
+        "//ydf/utils:log",
     ],
 )
 
@@ -60,6 +67,10 @@ py_library(
 py_test(
     name = "dataset_test",
     srcs = ["dataset_test.py"],
+    data = [
+        "//test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+    ],
     python_version = "PY3",
     deps = [
         ":dataset",

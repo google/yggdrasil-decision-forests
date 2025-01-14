@@ -18,12 +18,27 @@ This files notably contains the processing that cannot be expressed in JAX.
 """
 
 import dataclasses
-from typing import List, Sequence, Tuple
+from typing import Dict, List, Sequence, Set, Tuple
 import jax
+import jax.numpy as jnp
 import numpy as np
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.deep import dataset as deep_dataset_lib
 from ydf.deep import layer as layer_lib
+
+
+@dataclasses.dataclass
+class CategoricalDictionary:
+  """Dictionary for a categorical column.
+
+  Attributes:
+    sorted_keys: Item's key sorted in alphabetical order.
+    key_order: Order of the items's key i.e., how to go from the dataspec item
+      index to the index in `sorted_keys`.
+  """
+
+  sorted_keys: np.ndarray
+  key_order: np.ndarray
 
 
 @dataclasses.dataclass
@@ -40,13 +55,45 @@ class Preprocessor:
     dataspec: Definition of the data.
     input_features_col_idxs: Columns in the dataspec that represent input
       features of the model.
+    numerical_zscore: Computes the z-scores of numerical features.
+    numerical_quantiles: Computes the quantiles of numerical features.
+    input_features_col_idxs_set: Set containing the values of
+      "input_features_col_idxs".
+    categorical_dicts: Index the key of categorical columns.
   """
 
   dataspec: data_spec_pb2.DataSpecification
   input_features_col_idxs: Sequence[int]
+  numerical_zscore: bool
+  numerical_quantiles: bool
+  input_features_col_idxs_set: Set[int] = dataclasses.field(init=False)
+  categorical_dicts: Dict[int, CategoricalDictionary] = dataclasses.field(
+      init=False
+  )
 
   def __post_init__(self):
-    self._input_features_col_idxs_set = set(self.input_features_col_idxs)
+    # Index the column indexes
+    self.input_features_col_idxs_set = set(self.input_features_col_idxs)
+
+    # Index the dictionaries
+    self.categorical_dicts = {}
+    for column_idx, column in enumerate(self.dataspec.columns):
+      if column.type != data_spec_pb2.ColumnType.CATEGORICAL:
+        continue
+
+      items = sorted(
+          [(item.index, key) for key, item in column.categorical.items.items()]
+      )
+      # Item key sorted by index
+      keys = np.array([x[1] for x in items]).astype(np.bytes_)
+
+      # Key sorted by value
+      key_order = np.argsort(keys).astype(np.int32)
+      sorted_key = keys[key_order]
+      self.categorical_dicts[column_idx] = CategoricalDictionary(
+          sorted_keys=sorted_key,
+          key_order=key_order,
+      )
 
   def apply_premodel(
       self,
@@ -57,7 +104,7 @@ class Preprocessor:
 
     dst = {}
     for column_idx, column in enumerate(self.dataspec.columns):
-      is_label = column_idx not in self._input_features_col_idxs_set
+      is_label = column_idx not in self.input_features_col_idxs_set
       if not has_labels and is_label:
         continue
       src_values = src[column.name]
@@ -65,15 +112,24 @@ class Preprocessor:
         # Simply pass the value
         dst[column.name] = src_values
       else:
-        dst[column.name] = np.array(
-            [
-                self._encode_categorical_string_value(
-                    v, column.categorical, is_label=is_label
-                )
-                for v in src_values.astype(np.bytes_)
-            ],
-            dtype=np.int32,
+        # TODO: Speed up in c++.
+
+        src_values = src_values.astype(np.bytes_)
+        col_dict = self.categorical_dicts[column_idx]
+
+        # Binary search to find values
+        sorted_index = np.minimum(
+            np.searchsorted(col_dict.sorted_keys, src_values),
+            len(col_dict.sorted_keys) - 1,
         )
+        # Handle out-of-dictionary values
+        sorted_index = np.where(
+            col_dict.sorted_keys[sorted_index] == src_values, sorted_index, 0
+        )
+        dst_values = col_dict.key_order[sorted_index]
+        if is_label:
+          dst_values -= 1
+        dst[column.name] = dst_values
     return dst
 
   def apply_inmodel(
@@ -85,19 +141,40 @@ class Preprocessor:
 
     dst = []
     for column_idx, column in enumerate(self.dataspec.columns):
-      is_label = column_idx not in self._input_features_col_idxs_set
+      is_label = column_idx not in self.input_features_col_idxs_set
       if not has_labels and is_label:
         continue
       src_values = src[column.name]
       if column.type == data_spec_pb2.ColumnType.NUMERICAL:
-        dst.append((
-            layer_lib.Feature(
-                f"{column.name}_ZSCORE", layer_lib.FeatureType.NUMERICAL
-            ),
-            (src[column.name] - column.numerical.mean)
-            / column.numerical.standard_deviation,
-        ))
-        # TODO: Implement quantile normalization
+        src_values = jnp.nan_to_num(src_values, nan=column.numerical.mean)
+        if self.numerical_zscore:
+          z_score_value = (
+              src_values - column.numerical.mean
+          ) / column.numerical.standard_deviation
+          dst.append((
+              layer_lib.Feature(
+                  f"{column.name}_ZSCORE", layer_lib.FeatureType.NUMERICAL
+              ),
+              z_score_value,
+          ))
+        if self.numerical_quantiles:
+          boundaries = jnp.array(column.discretized_numerical.boundaries)
+          bucket_idx = (
+              jnp.searchsorted(boundaries, src_values, side="right") - 1
+          )
+          bucket_idx = jnp.clip(bucket_idx, 0, len(boundaries) - 2)
+          lower = boundaries[bucket_idx]
+          upper = boundaries[bucket_idx + 1]
+          # Linear interpolation
+          interpolated_values = bucket_idx + (src_values - lower) / (
+              upper - lower
+          )
+          dst.append((
+              layer_lib.Feature(
+                  f"{column.name}_QUANTILE", layer_lib.FeatureType.NUMERICAL
+              ),
+              interpolated_values / (len(boundaries) - 1),
+          ))
       elif column.type == data_spec_pb2.ColumnType.CATEGORICAL:
         dst.append((
             layer_lib.Feature(
@@ -109,6 +186,7 @@ class Preprocessor:
             src_values,
         ))
       elif column.type == data_spec_pb2.ColumnType.BOOLEAN:
+        src_values = jnp.nan_to_num(src_values.astype(jnp.float32), nan=0.5)
         dst.append((
             layer_lib.Feature(column.name, layer_lib.FeatureType.BOOLEAN),
             src_values,
@@ -119,20 +197,3 @@ class Preprocessor:
             src_values,
         ))
     return dst
-
-  def _encode_categorical_string_value(
-      self,
-      value: str,
-      categorical_col_spec: data_spec_pb2.CategoricalSpec,
-      is_label: bool,
-  ) -> int:
-
-    item = categorical_col_spec.items.get(value, None)
-    if item is None:
-      if is_label:
-        raise ValueError("Out-of-dictionary value is allowed for labels")
-      return 0  # Out of dictionary
-    if is_label:
-      return item.index - 1  # Skip of the OOD item
-    else:
-      return item.index

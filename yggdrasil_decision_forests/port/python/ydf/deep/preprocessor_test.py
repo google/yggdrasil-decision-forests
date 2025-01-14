@@ -47,7 +47,10 @@ class PreprocessorTest(parameterized.TestCase):
                 type=ds_pb.ColumnType.NUMERICAL,
                 numerical=ds_pb.NumericalSpec(
                     mean=1,
-                    standard_deviation=1,
+                    standard_deviation=2,
+                ),
+                discretized_numerical=ds_pb.DiscretizedNumericalSpec(
+                    boundaries=[1, 2, 3],
                 ),
             ),
             ds_pb.Column(
@@ -64,11 +67,13 @@ class PreprocessorTest(parameterized.TestCase):
             ),
         ]
     )
-    p = preprocessor_lib.Preprocessor(dataspec, [1, 2])
+    p = preprocessor_lib.Preprocessor(
+        dataspec, [1, 2], numerical_zscore=True, numerical_quantiles=True
+    )
     x = {
-        "l": np.array(["x", "x", "y", "y"]),
-        "n1": np.array([1, 2, 3, 4]),
-        "c1": np.array(["x", "y", "z", ""]),
+        "l": np.array(["x", "x", "y", "y", "x", "x", "x"]),
+        "n1": np.array([-1.0, 1.0, 1.5, 2.0, 3.0, 3.5, np.nan]),
+        "c1": np.array(["x", "y", "z", "", "x", "y", "y"]),
     }
 
     result_premodel = p.apply_premodel(x, has_labels=True)
@@ -80,9 +85,9 @@ class PreprocessorTest(parameterized.TestCase):
     test_utils.assert_almost_equal(
         result_premodel,
         {
-            "l": np.array([0, 0, 1, 1], dtype=np.int32),
-            "n1": np.array([1, 2, 3, 4]),
-            "c1": np.array([1, 2, 0, 0], dtype=np.int32),
+            "l": np.array([0, 0, 1, 1, 0, 0, 0], dtype=np.int32),
+            "n1": np.array([-1.0, 1.0, 1.5, 2.0, 3.0, 3.5, np.nan]),
+            "c1": np.array([1, 2, 0, 0, 1, 2, 2], dtype=np.int32),
         },
     )
     test_utils.assert_almost_equal(
@@ -94,11 +99,17 @@ class PreprocessorTest(parameterized.TestCase):
                     type=layer_lib.FeatureType.CATEGORICAL,
                     num_categorical_values=2,
                 ),
-                jnp.array([0, 0, 1, 1], dtype=np.int32),
+                jnp.array([0, 0, 1, 1, 0, 0, 0], dtype=np.int32),
             ),
             (
                 layer_lib.Feature("n1_ZSCORE", layer_lib.FeatureType.NUMERICAL),
-                jnp.array([0.0, 1.0, 2.0, 3.0]),
+                jnp.array([-1.0, 0.0, 0.25, 0.5, 1.0, 1.25, 0.0]),
+            ),
+            (
+                layer_lib.Feature(
+                    "n1_QUANTILE", layer_lib.FeatureType.NUMERICAL
+                ),
+                jnp.array([-2.0, 0.0, 0.5, 1.0, 2.0, 2.5, 0.0]) / 2,
             ),
             (
                 layer_lib.Feature(
@@ -106,7 +117,7 @@ class PreprocessorTest(parameterized.TestCase):
                     type=layer_lib.FeatureType.CATEGORICAL,
                     num_categorical_values=3,
                 ),
-                jnp.array([1, 2, 0, 0], dtype=np.int32),
+                jnp.array([1, 2, 0, 0, 1, 2, 2], dtype=np.int32),
             ),
         ],
     )

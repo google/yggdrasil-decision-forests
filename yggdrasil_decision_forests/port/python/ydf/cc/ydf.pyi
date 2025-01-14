@@ -96,6 +96,8 @@ class VerticalDataset:
       unrolling: Dict[str, List[str]],
   ) -> None: ...
 
+def DataspecToTextReport(dataset: data_spec_pb2.DataSpecification) -> str: ...
+
 # Model bindings
 # ================
 

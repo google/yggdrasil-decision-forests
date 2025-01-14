@@ -1272,8 +1272,9 @@ Use `model.describe()` for more details
     if label_column.type != data_spec_pb2.CATEGORICAL:
       semantic = dataspec.Semantic.from_proto_type(label_column.type)
       raise ValueError(
-          "Categorical type expected for classification label."
-          f" Got {semantic} instead."
+          "CATEGORICAL column expected for classification label. Got"
+          f" {semantic} instead. Should the model be a regresion? If so, set"
+          " `task=ydf.REGRESSION` in the learner constructor argument."
       )
 
     if label_column.categorical.is_already_integerized:

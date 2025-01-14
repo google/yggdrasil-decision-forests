@@ -39,6 +39,7 @@ py_library(
         # jax dep,
         # numpy dep,
         # pandas dep,
+        # sklearn dep,
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
     ],
@@ -47,7 +48,10 @@ py_library(
 py_library(
     name = "log",
     srcs = ["log.py"],
-    deps = ["//ydf/cc:ydf"],
+    deps = [
+        # absl/logging dep,
+        "//ydf/cc:ydf",
+    ],
 )
 
 py_library(

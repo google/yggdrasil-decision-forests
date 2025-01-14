@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import enum
+import logging
 import os
 from typing import Optional
 import unittest
@@ -23,16 +24,17 @@ import numpy as np
 import pandas as pd
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
-from ydf.dataset import dataset
-from ydf.dataset import dataspec
+from ydf.dataset import dataset as dataset_lib
+from ydf.dataset import dataspec as dataspec_lib
+from ydf.dataset.io import dataset_io as dataset_io_lib
 from ydf.utils import test_utils
 
 # Make "assertEqual" print more details.
 unittest.util._MAX_LENGTH = 10000
 
-Semantic = dataspec.Semantic
+Semantic = dataspec_lib.Semantic
 VocabValue = ds_pb.CategoricalSpec.VocabValue
-Column = dataspec.Column
+Column = dataspec_lib.Column
 
 
 class GenericDatasetTest(parameterized.TestCase):
@@ -54,7 +56,7 @@ class GenericDatasetTest(parameterized.TestCase):
   )
   def test_infer_semantic(self, value, expected_semantic):
     self.assertEqual(
-        dataset.infer_semantic("", value, discretize_numerical=False),
+        dataset_lib.infer_semantic("", value, discretize_numerical=False),
         expected_semantic,
     )
 
@@ -75,7 +77,7 @@ class GenericDatasetTest(parameterized.TestCase):
   )
   def test_infer_semantic_discretized(self, value, expected_semantic):
     self.assertEqual(
-        dataset.infer_semantic("", value, discretize_numerical=True),
+        dataset_lib.infer_semantic("", value, discretize_numerical=True),
         expected_semantic,
     )
 
@@ -97,14 +99,14 @@ class GenericDatasetTest(parameterized.TestCase):
         },
         dtype=dtype,
     )
-    ds = dataset.create_vertical_dataset(df)
+    ds = dataset_lib.create_vertical_dataset(df)
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=3,
         columns=(
             ds_pb.Column(
                 name="col_pos",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=2,
@@ -116,7 +118,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_neg",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=-2,
@@ -128,7 +130,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_zero",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=0,
@@ -150,14 +152,14 @@ class GenericDatasetTest(parameterized.TestCase):
         },
         dtype=dtype,
     )
-    ds = dataset.create_vertical_dataset(df)
+    ds = dataset_lib.create_vertical_dataset(df)
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=3,
         columns=(
             ds_pb.Column(
                 name="col_single_nan",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
                 count_nas=1,
                 numerical=ds_pb.NumericalSpec(
                     mean=1.5,
@@ -169,7 +171,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_nan_only",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
                 count_nas=3,
                 numerical=ds_pb.NumericalSpec(),
             ),
@@ -183,7 +185,7 @@ class GenericDatasetTest(parameterized.TestCase):
         "col2": ["", "A", "B", "C", "D"],
     })
 
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=2,
         columns=[
@@ -237,7 +239,7 @@ class GenericDatasetTest(parameterized.TestCase):
         "col1": [1, 1, 2, 2, 3],
     })
 
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[
@@ -275,7 +277,7 @@ class GenericDatasetTest(parameterized.TestCase):
         {"col_boolean": [True, False, False]},
     )
 
-    ds = dataset.create_vertical_dataset(df)
+    ds = dataset_lib.create_vertical_dataset(df)
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=3,
         columns=(
@@ -298,7 +300,7 @@ class GenericDatasetTest(parameterized.TestCase):
         {"col_hash": ["a", "b", "abc"]},
     )
 
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df, columns=[("col_hash", Semantic.HASH)]
     )
     expected_data_spec = ds_pb.DataSpecification(
@@ -323,7 +325,7 @@ class GenericDatasetTest(parameterized.TestCase):
         "col_numerical": [1, 2, 3],
         "col_str": ["A", "B", "C"],
     })
-    ds = dataset.create_vertical_dataset(df, columns=column_definition)
+    ds = dataset_lib.create_vertical_dataset(df, columns=column_definition)
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=3,
         columns=(
@@ -348,7 +350,7 @@ class GenericDatasetTest(parameterized.TestCase):
         "a": np.array([1, 2, 3]),
         "b": np.array([-1, -2, -3]),
     }
-    ds = dataset.create_vertical_dataset(ds_dict)
+    ds = dataset_lib.create_vertical_dataset(ds_dict)
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=3,
         columns=(
@@ -385,7 +387,7 @@ class GenericDatasetTest(parameterized.TestCase):
         "col1": [1.1, 21.1, np.nan],
         "col2": [1, 2, 3],
     })
-    ds = dataset.create_vertical_dataset(df)
+    ds = dataset_lib.create_vertical_dataset(df)
     # 2 columns * 3 rows * 4 bytes per values
     self.assertEqual(ds.memory_usage(), 2 * 3 * 4)
 
@@ -436,7 +438,7 @@ class GenericDatasetTest(parameterized.TestCase):
         "col_cat": ["A", "B", "C"],
         "col_bool": [True, True, False],
     })
-    ds = dataset.create_vertical_dataset(df, data_spec=data_spec)
+    ds = dataset_lib.create_vertical_dataset(df, data_spec=data_spec)
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
 
   def test_create_vds_dict_of_values_with_spec(self):
@@ -486,7 +488,7 @@ class GenericDatasetTest(parameterized.TestCase):
         "col_cat": ["A", "B", "C"],
         "col_bool": [True, False, True],
     }
-    ds = dataset.create_vertical_dataset(ds_dict, data_spec=data_spec)
+    ds = dataset_lib.create_vertical_dataset(ds_dict, data_spec=data_spec)
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
     # 2 columns * 3 rows * 4 bytes per value + 1 col * 3 rows * 1 byte p.v.
     self.assertEqual(ds.memory_usage(), 2 * 3 * 4 + 1 * 3 * 1)
@@ -503,7 +505,7 @@ class GenericDatasetTest(parameterized.TestCase):
         Column("col_str", Semantic.CATEGORICAL, min_vocab_frequency=1),
         Column("col_int_cat", Semantic.CATEGORICAL, min_vocab_frequency=1),
     ]
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df, columns=feature_definitions, include_all_columns=True
     )
     expected_dataset_content = """col_str,col_int_cat,col_int,col_float,col_bool
@@ -516,7 +518,7 @@ four entries,4,8,4.4,0
 
   def test_create_vds_pd_check_categorical(self):
     df = pd.DataFrame({"col_str": ["A", "B"] * 5})
-    ds = dataset.create_vertical_dataset(df)
+    ds = dataset_lib.create_vertical_dataset(df)
     expected_dataset_content = "col_str\n" + "A\nB\n" * 5
     self.assertEqual(expected_dataset_content, ds._dataset.DebugString())
 
@@ -524,7 +526,7 @@ four entries,4,8,4.4,0
     df = pd.DataFrame({
         "col1": ["A", "B", "C", "D", "D"],
     })
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         columns=[
             Column(
@@ -565,7 +567,7 @@ four entries,4,8,4.4,0
     with self.assertRaisesRegex(
         test_utils.AbslInvalidArgumentError, "max_vocab_count"
     ):
-      dataset.create_vertical_dataset(
+      dataset_lib.create_vertical_dataset(
           df,
           columns=[
               Column(
@@ -582,7 +584,7 @@ four entries,4,8,4.4,0
       ([True, False, False], (0, 2, 1), 0),
   )
   def test_order_boolean(self, values, expected_counts, count_nas):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"col": np.array(values)},
         columns=[Column("col", Semantic.CATEGORICAL)],
     )
@@ -608,7 +610,7 @@ four entries,4,8,4.4,0
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_order_integers(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"col": np.array([0, 1, 4, 3, 1, 2, 3, 4, 12, 11, 10, 9, 8, 7, 6, 5])},
         columns=[Column("col", Semantic.CATEGORICAL)],
         label="col",
@@ -655,7 +657,7 @@ B,2
 B,3""",
         file_path=os.path.join(tmp_dir.full_path, "file.csv"),
     )
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         path_prefix + csv_file.full_path, min_vocab_frequency=1
     )
     expected_data_spec = ds_pb.DataSpecification(
@@ -702,7 +704,7 @@ A,2
 B,3""",
         file_path=os.path.join(tmp_dir.full_path, "file.csv"),
     )
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         "csv:" + csv_file.full_path,
         min_vocab_frequency=1,
         max_num_scanned_rows_to_compute_statistics=2,
@@ -750,7 +752,7 @@ B,2
 B,3""",
         file_path=os.path.join(tmp_dir.full_path, "file.csv"),
     )
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         "csv:" + csv_file.full_path,
         min_vocab_frequency=1,
         max_num_scanned_rows_to_infer_semantic=1,
@@ -790,11 +792,11 @@ B,3""",
 A,1
 B,2
 B,3""")
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         "csv:" + csv_file.full_path, min_vocab_frequency=1
     )
     df_pd = pd.read_csv(csv_file)
-    ds_pd = dataset.create_vertical_dataset(df_pd, data_spec=ds.data_spec())
+    ds_pd = dataset_lib.create_vertical_dataset(df_pd, data_spec=ds.data_spec())
     self.assertEqual(ds._dataset.DebugString(), ds_pd._dataset.DebugString())
 
   @unittest.skip("Requires building YDF with tensorflow io")
@@ -802,7 +804,7 @@ B,3""")
     sharded_path = "tfrecord:" + os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "toy.tfe-tfrecord@2"
     )
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         sharded_path,
         min_vocab_frequency=1,
         columns=["Bool_1", "Cat_2", "Num_1"],
@@ -858,7 +860,7 @@ B,3""")
         "dataset",
         "toy.nocompress-tfe-tfrecord@2",
     )
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         sharded_path,
         min_vocab_frequency=1,
         columns=["Bool_1", "Cat_2", "Num_1"],
@@ -909,7 +911,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_numerical_float(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([1.0, 2.0, 3.0], np.float32)}
     )
     expected_data_spec = ds_pb.DataSpecification(
@@ -937,7 +939,7 @@ B,3""")
         "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL as"
         " it contains floating point values.",
     ):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           {"feature": np.array([1.0, 2.0, 3.0])},
           min_vocab_frequency=1,
           columns=[Column("feature", Semantic.CATEGORICAL)],
@@ -948,7 +950,7 @@ B,3""")
         ValueError,
         "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL",
     ):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           {"feature": np.array(["x", "y", None])},
           min_vocab_frequency=1,
           columns=[Column("feature", Semantic.CATEGORICAL)],
@@ -960,7 +962,7 @@ B,3""")
         "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL_SET"
         " as it contains floating point values.",
     ):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           {"feature": np.array([[1.0, 2.0, 3.0]], np.object_)},
           min_vocab_frequency=1,
           columns=[Column("feature", Semantic.CATEGORICAL_SET)],
@@ -971,14 +973,14 @@ B,3""")
         ValueError,
         "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL_SET",
     ):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           {"feature": np.array([["x", "y", None]], np.object_)},
           min_vocab_frequency=1,
           columns=[Column("feature", Semantic.CATEGORICAL_SET)],
       )
 
   def test_catset_string(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([["x", "y"], ["z", "w"]], np.object_)},
         min_vocab_frequency=1,
         columns=[Column("feature", Semantic.CATEGORICAL_SET)],
@@ -1007,7 +1009,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_catset_bytes(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[b"x", b"y"], [b"z", b"w"]], np.object_)},
         min_vocab_frequency=1,
         columns=[Column("feature", Semantic.CATEGORICAL_SET)],
@@ -1036,7 +1038,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_catset_bool(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[True, False], [False, True]], np.object_)},
         min_vocab_frequency=1,
         columns=[Column("feature", Semantic.CATEGORICAL_SET)],
@@ -1063,7 +1065,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_catset_int(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]], np.object_)},
         min_vocab_frequency=1,
         columns=[Column("feature", Semantic.CATEGORICAL_SET)],
@@ -1094,7 +1096,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_multidimensional_numerical(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]])}
     )
     expected_data_spec = ds_pb.DataSpecification(
@@ -1152,7 +1154,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_multidimensional_categorical_int(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]])},
         columns=[
             Column("feature", Semantic.CATEGORICAL, min_vocab_frequency=1)
@@ -1219,7 +1221,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_multidimensional_catset_object(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]], dtype=np.object_)},
         min_vocab_frequency=1,
         columns=[Column("feature", Semantic.CATEGORICAL_SET)],
@@ -1250,7 +1252,7 @@ B,3""")
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
   def test_multidimensional_ragged_catset_int(self):
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {
             "feature": np.array(
                 [np.array([0, 1]), np.array([0, 1, 2, 3])], dtype=np.object_
@@ -1289,7 +1291,9 @@ B,3""")
   def test_multidimensional_feature_name(
       self, num_dims: int, expected_first_feature: str
   ):
-    ds = dataset.create_vertical_dataset({"feature": np.zeros((3, num_dims))})
+    ds = dataset_lib.create_vertical_dataset(
+        {"feature": np.zeros((3, num_dims))}
+    )
     self.assertLen(ds.data_spec().columns, num_dims)
     self.assertEqual(ds.data_spec().columns[0].name, expected_first_feature)
 
@@ -1297,7 +1301,7 @@ B,3""")
     with self.assertRaisesRegex(
         ValueError, "Input features can only be one or two dimensional"
     ):
-      _ = dataset.create_vertical_dataset({"feature": np.zeros((3, 3, 3))})
+      _ = dataset_lib.create_vertical_dataset({"feature": np.zeros((3, 3, 3))})
 
   def test_list_of_csv_datasets(self):
     df = pd.DataFrame({
@@ -1316,7 +1320,7 @@ B,3""")
     df.head(3).to_csv(path1, index=False)
     df.tail(1).to_csv(path2, index=False)
 
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         ["csv:" + path1, "csv:" + path2],
         columns=feature_definitions,
         include_all_columns=True,
@@ -1337,7 +1341,7 @@ four entries,8,4,4.4
     self.assertEqual(data.strides, (8, 4))
     self.assertEqual(feature.strides, (8,))
 
-    ds = dataset.create_vertical_dataset({"feature": feature})
+    ds = dataset_lib.create_vertical_dataset({"feature": feature})
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=2,
         columns=(
@@ -1364,7 +1368,7 @@ four entries,8,4,4.4
     self.assertEqual(data.strides, (2, 1))
     self.assertEqual(feature.strides, (2,))
 
-    ds = dataset.create_vertical_dataset({"feature": feature})
+    ds = dataset_lib.create_vertical_dataset({"feature": feature})
     expected_data_spec = ds_pb.DataSpecification(
         created_num_rows=2,
         columns=(
@@ -1386,7 +1390,7 @@ four entries,8,4,4.4
   def test_multidimensional_strided(self):
     # Note: multidimensional features are unrolled into singledimensional
     # strided features.
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]], np.float32)}
     )
     expected_data_spec = ds_pb.DataSpecification(
@@ -1453,7 +1457,7 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
   def test_warnings(self):
     # No issues.
     self.assertEmpty(
-        dataset.validate_dataspec(
+        dataset_lib.validate_dataspec(
             ds_pb.DataSpecification(
                 columns=(
                     ds_pb.Column(
@@ -1495,40 +1499,40 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
         ),
     )
     self.assertStartsWith(
-        dataset.validate_dataspec(bad_dataspec, [0])[0],
+        dataset_lib.validate_dataspec(bad_dataspec, [0])[0],
         "Column 'f' is detected as CATEGORICAL",
     )
 
     # Bad column not selected
-    self.assertEmpty(dataset.validate_dataspec(bad_dataspec, []))
+    self.assertEmpty(dataset_lib.validate_dataspec(bad_dataspec, []))
 
   @parameterized.parameters("1", "1.", "1.0")
   def test_look_numerical(self, value: str):
-    self.assertTrue(dataset.look_numerical(value))
+    self.assertTrue(dataset_lib.look_numerical(value))
 
   @parameterized.parameters("", "a", "hello")
   def test_does_not_look_numerical(self, value: str):
-    self.assertFalse(dataset.look_numerical(value))
+    self.assertFalse(dataset_lib.look_numerical(value))
 
   def test_from_numpy(self):
     with self.assertRaisesRegex(
         ValueError, "YDF does not consume Numpy arrays directly"
     ):
-      dataset.create_vertical_dataset(np.array([1, 2, 3]))
+      dataset_lib.create_vertical_dataset(np.array([1, 2, 3]))
 
   def test_from_column_less_pandas(self):
     with self.assertRaisesRegex(
         ValueError, "The pandas DataFrame must have string column names"
     ):
-      dataset.create_vertical_dataset(pd.DataFrame([[1, 2, 3], [4, 5, 6]]))
+      dataset_lib.create_vertical_dataset(pd.DataFrame([[1, 2, 3], [4, 5, 6]]))
 
   def test_boolean_column(self):
     data = {
         "f1": np.array([True, True, True, False, False, False, False]),
     }
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         data,
-        columns=[("f1", dataspec.Semantic.BOOLEAN)],
+        columns=[("f1", dataspec_lib.Semantic.BOOLEAN)],
     )
     self.assertEqual(
         ds.data_spec(),
@@ -1556,9 +1560,9 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
         "Cannot import column 'f1' with semantic=Semantic.BOOLEAN as it does"
         " not contain boolean values.*",
     ):
-      dataset.create_vertical_dataset(
+      dataset_lib.create_vertical_dataset(
           data,
-          columns=[("f1", dataspec.Semantic.BOOLEAN)],
+          columns=[("f1", dataspec_lib.Semantic.BOOLEAN)],
       )
 
   def test_multidim_numerical_list(self):
@@ -1570,8 +1574,8 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
         ".*Unrolling multi-dimensional columns is only supported for numpy"
         " arrays.*",
     ):
-      _ = dataset.create_vertical_dataset(
-          data, columns=[("f1", dataspec.Semantic.NUMERICAL)]
+      _ = dataset_lib.create_vertical_dataset(
+          data, columns=[("f1", dataspec_lib.Semantic.NUMERICAL)]
       )
 
   def test_multidim_boolean_list(self):
@@ -1583,8 +1587,8 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
         ".*Unrolling multi-dimensional columns is only supported for numpy"
         " arrays.*",
     ):
-      _ = dataset.create_vertical_dataset(
-          data, columns=[("f1", dataspec.Semantic.BOOLEAN)]
+      _ = dataset_lib.create_vertical_dataset(
+          data, columns=[("f1", dataspec_lib.Semantic.BOOLEAN)]
       )
 
   def test_multidim_categorical_list(self):
@@ -1596,8 +1600,8 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
         ".*Unrolling multi-dimensional columns is only supported for numpy"
         " arrays.*",
     ):
-      _ = dataset.create_vertical_dataset(
-          data, columns=[("f1", dataspec.Semantic.CATEGORICAL)]
+      _ = dataset_lib.create_vertical_dataset(
+          data, columns=[("f1", dataspec_lib.Semantic.CATEGORICAL)]
       )
 
 
@@ -1674,7 +1678,7 @@ second sentence foo bar foo foo foo""",
 
   def test_csv_file_no_automatic_tokenization(self):
     path_to_csv = self.create_toy_csv()
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         "csv:" + path_to_csv, min_vocab_frequency=1
     )
     expected_data_spec = self.toy_csv_dataspec_categorical()
@@ -1682,7 +1686,7 @@ second sentence foo bar foo foo foo""",
 
   def test_csv_tokenization_when_semantic_specified(self):
     path_to_csv = self.create_toy_csv()
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         "csv:" + path_to_csv,
         min_vocab_frequency=1,
         columns=[("col_cat_set", Semantic.CATEGORICAL_SET)],
@@ -1693,7 +1697,7 @@ second sentence foo bar foo foo foo""",
   def test_csv_file_reading_respects_data_spec_categorical(self):
     path_to_csv = self.create_toy_csv()
     data_spec = self.toy_csv_dataspec_categorical()
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         "csv:" + path_to_csv, data_spec=data_spec
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
@@ -1709,7 +1713,7 @@ second sentence foo bar foo foo foo
   def test_csv_file_reading_respects_data_spec_catset(self):
     path_to_csv = self.create_toy_csv()
     data_spec = self.toy_csv_dataspec_catset()
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         "csv:" + path_to_csv, data_spec=data_spec
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
@@ -1731,7 +1735,7 @@ foo, bar, sentence, second
             [""],
         ]
     })
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[("feature", Semantic.CATEGORICAL_SET)],
@@ -1767,7 +1771,7 @@ foo, bar, sentence, second
         "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL_SET"
         " as it contains non-list values.",
     ):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           df,
           min_vocab_frequency=1,
           columns=[("feature", Semantic.CATEGORICAL_SET)],
@@ -1780,7 +1784,7 @@ foo, bar, sentence, second
             np.array(["foo", "bar", "sentence", "second"]),
         ]
     })
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[("feature", Semantic.CATEGORICAL_SET)],
@@ -1818,7 +1822,7 @@ foo, bar, sentence, second
             np.array([""], np.bytes_),
         ]
     })
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[("feature", Semantic.CATEGORICAL_SET)],
@@ -1856,7 +1860,7 @@ foo, bar, sentence, second
             ["three", "simple", "words", "words"],
         ]
     })
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[("feature", Semantic.CATEGORICAL_SET)],
@@ -1894,7 +1898,7 @@ foo, bar, sentence, second
             ["three", "simple", "words", "words"],
         ]
     })
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[("feature", Semantic.CATEGORICAL_SET)],
@@ -1925,7 +1929,7 @@ foo, bar, sentence, second
 
   def test_pd_with_unicode_feature_name(self):
     df = pd.DataFrame({"\u0080": [1, 2, 3]})
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[("\u0080", Semantic.NUMERICAL)],
@@ -1951,7 +1955,7 @@ foo, bar, sentence, second
 
   def test_pd_with_unicode_values(self):
     df = pd.DataFrame({"feature": [["\u0080"]]})
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
         columns=[("feature", Semantic.CATEGORICAL_SET)],
@@ -1985,7 +1989,7 @@ foo, bar, sentence, second
             ]
         }
     )
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
     )
@@ -2020,7 +2024,7 @@ foo, bar, sentence, second
             ]
         }
     )
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         min_vocab_frequency=1,
     )
@@ -2210,14 +2214,14 @@ class MissingColumnsTest(parameterized.TestCase):
     data_spec = self.create_data_spec(column_type)
     df = pd.DataFrame({"f1": [1, 2, 3]})
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(df, data_spec=data_spec)
+      _ = dataset_lib.create_vertical_dataset(df, data_spec=data_spec)
 
   def test_required_columns_pd_data_spec_empty(
       self, column_type: ds_pb.ColumnType
   ):
     data_spec = self.create_data_spec(column_type)
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df, data_spec=data_spec, required_columns=[]
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
@@ -2230,7 +2234,7 @@ class MissingColumnsTest(parameterized.TestCase):
   ):
     data_spec = self.create_data_spec(column_type)
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df, data_spec=data_spec, required_columns=["f1"]
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
@@ -2244,7 +2248,7 @@ class MissingColumnsTest(parameterized.TestCase):
     data_spec = self.create_data_spec(column_type)
     df = pd.DataFrame({"f1": [1, 2, 3]})
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           df, data_spec=data_spec, required_columns=["f2"]
       )
 
@@ -2254,7 +2258,7 @@ class MissingColumnsTest(parameterized.TestCase):
     df = pd.DataFrame({"f1": [1, 2, 3]})
     column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           df, columns=[("f1", column_semantic), ("f2", column_semantic)]
       )
 
@@ -2263,7 +2267,7 @@ class MissingColumnsTest(parameterized.TestCase):
   ):
     df = pd.DataFrame({"f1": [1, 2, 3]})
     column_semantic = Semantic.from_proto_type(column_type)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         columns=[("f1", column_semantic), ("f2", column_semantic)],
         required_columns=[],
@@ -2284,14 +2288,16 @@ class MissingColumnsTest(parameterized.TestCase):
     df = pd.DataFrame({"f1": [1, 2, 3]})
     column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(df, columns=[("f2", column_semantic)])
+      _ = dataset_lib.create_vertical_dataset(
+          df, columns=[("f2", column_semantic)]
+      )
 
   def test_required_columns_pd_inference_args_explicit_success(
       self, column_type: ds_pb.ColumnType
   ):
     df = pd.DataFrame({"f1": [1, 2, 3]})
     column_semantic = Semantic.from_proto_type(column_type)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         df,
         columns=[("f1", column_semantic), ("f2", column_semantic)],
         min_vocab_frequency=1,
@@ -2312,14 +2318,14 @@ class MissingColumnsTest(parameterized.TestCase):
     data_spec = self.create_data_spec(column_type)
     file_path = self.create_csv()
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(file_path, data_spec=data_spec)
+      _ = dataset_lib.create_vertical_dataset(file_path, data_spec=data_spec)
 
   def test_required_columns_file_data_spec_empty(
       self, column_type: ds_pb.ColumnType
   ):
     data_spec = self.create_data_spec(column_type)
     file_path = self.create_csv()
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         file_path, data_spec=data_spec, required_columns=[]
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
@@ -2332,7 +2338,7 @@ class MissingColumnsTest(parameterized.TestCase):
   ):
     data_spec = self.create_data_spec(column_type)
     file_path = self.create_csv()
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         file_path, data_spec=data_spec, required_columns=["f1"]
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
@@ -2346,7 +2352,7 @@ class MissingColumnsTest(parameterized.TestCase):
     data_spec = self.create_data_spec(column_type)
     file_path = self.create_csv()
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           file_path, data_spec=data_spec, required_columns=["f2"]
       )
 
@@ -2356,7 +2362,7 @@ class MissingColumnsTest(parameterized.TestCase):
     file_path = self.create_csv()
     column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           file_path, columns=[("f1", column_semantic), ("f2", column_semantic)]
       )
 
@@ -2365,7 +2371,7 @@ class MissingColumnsTest(parameterized.TestCase):
   ):
     file_path = self.create_csv()
     column_semantic = Semantic.from_proto_type(column_type)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         file_path,
         columns=[("f1", column_semantic), ("f2", column_semantic)],
         required_columns=[],
@@ -2386,7 +2392,7 @@ class MissingColumnsTest(parameterized.TestCase):
     file_path = self.create_csv()
     column_semantic = Semantic.from_proto_type(column_type)
     with self.assertRaises(ValueError):
-      _ = dataset.create_vertical_dataset(
+      _ = dataset_lib.create_vertical_dataset(
           file_path, columns=[("f2", column_semantic)]
       )
 
@@ -2395,7 +2401,7 @@ class MissingColumnsTest(parameterized.TestCase):
   ):
     file_path = self.create_csv()
     column_semantic = Semantic.from_proto_type(column_type)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         file_path,
         columns=[("f1", column_semantic), ("f2", column_semantic)],
         required_columns=["f1"],
@@ -2422,7 +2428,7 @@ class DenseDictionaryTest(parameterized.TestCase):
   )
   def test_dense_integer_dictionary_size(self, values, expected):
     self.assertEqual(
-        dataset.dense_integer_dictionary_size(np.array(values)), expected
+        dataset_lib.dense_integer_dictionary_size(np.array(values)), expected
     )
 
   @parameterized.parameters(
@@ -2432,7 +2438,9 @@ class DenseDictionaryTest(parameterized.TestCase):
       ([0, 1, 3, 4],),
   )
   def test_dense_integer_dictionary_size_is_none(self, values):
-    self.assertIsNone(dataset.dense_integer_dictionary_size(np.array(values)))
+    self.assertIsNone(
+        dataset_lib.dense_integer_dictionary_size(np.array(values))
+    )
 
 
 class DiscretizedNumericalTest(parameterized.TestCase):
@@ -2593,7 +2601,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
   @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
   def test_contents_inferred_dataspec(self, data_format):
     data = self.create_data(data_format)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         data,
         discretize_numerical_columns=True,
     )
@@ -2623,7 +2631,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
         ],
         created_num_rows=10,
     )
-    ds = dataset.create_vertical_dataset(data, data_spec=data_spec)
+    ds = dataset_lib.create_vertical_dataset(data, data_spec=data_spec)
     self.assertEqual(
         ds._dataset.DebugString(),
         """f1,f2
@@ -2643,7 +2651,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
   @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
   def test_global_parameter_only(self, data_format):
     data = self.create_data(data_format)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         data,
         discretize_numerical_columns=True,
     )
@@ -2662,7 +2670,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
   @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
   def test_column_def(self, data_format):
     data = self.create_data(data_format)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         data,
         columns=[("f1", Semantic.DISCRETIZED_NUMERICAL)],
         include_all_columns=True,
@@ -2682,7 +2690,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
   @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
   def test_column_def_and_global(self, data_format):
     data = self.create_data(data_format)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         data,
         columns=[("f1", Semantic.NUMERICAL)],
         discretize_numerical_columns=True,
@@ -2703,7 +2711,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
   @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
   def test_num_bins_global(self, data_format):
     data = self.create_data(data_format)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         data,
         discretize_numerical_columns=True,
         num_discretized_numerical_bins=4,
@@ -2768,7 +2776,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
   @parameterized.parameters(DataFormat.CSV, DataFormat.IN_MEMORY)
   def test_num_bins_feature_def(self, data_format):
     data = self.create_data(data_format)
-    ds = dataset.create_vertical_dataset(
+    ds = dataset_lib.create_vertical_dataset(
         data,
         columns=[
             Column(
@@ -2841,7 +2849,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
         created_num_rows=10,
     )
     data = self.create_data(data_format)
-    ds = dataset.create_vertical_dataset(data, data_spec=data_spec)
+    ds = dataset_lib.create_vertical_dataset(data, data_spec=data_spec)
     self.assertEqual(
         ds._dataset.DebugString(),
         """f1,f2
@@ -2857,6 +2865,222 @@ class DiscretizedNumericalTest(parameterized.TestCase):
 106.5,53.5
 """,
     )
+
+
+class DataspecInferenceFromGeneratorTest(parameterized.TestCase):
+
+  def test_infer_dataspec_integer_categorical(self):
+    # Note: For column "f",  value "3" is too infrequent (min_vocab_frequency
+    # constraint), and value "4" is pruned by value "1" and "2
+    # (max_vocab_count).
+    ds = {
+        "l": np.array([0, 1, 1, 1, 2, 2, 2, 2, 2]),
+        "f": np.array([1, 1, 1, 2, 2, 2, 3, 4, 4]),
+    }
+    ds_generator = dataset_io_lib.build_batched_example_generator(ds)
+    dataspec = dataset_lib.infer_dataspec(
+        ds_generator,
+        dataspec_lib.DataSpecInferenceArgs(
+            columns=[
+                dataspec_lib.Column(
+                    "l",
+                    dataspec_lib.Semantic.CATEGORICAL,
+                    min_vocab_frequency=1,
+                ),
+                dataspec_lib.Column("f", dataspec_lib.Semantic.CATEGORICAL),
+            ],
+            include_all_columns=True,
+            max_vocab_count=2,
+            min_vocab_frequency=2,
+            discretize_numerical_columns=True,
+            num_discretized_numerical_bins=10,
+            max_num_scanned_rows_to_infer_semantic=-1,
+            max_num_scanned_rows_to_compute_statistics=10_000,
+        ),
+    )
+
+    self.assertEqual(
+        str(dataspec),
+        """\
+columns {
+  type: CATEGORICAL
+  name: "l"
+  categorical {
+    number_of_unique_values: 3
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 1
+      }
+    }
+    items {
+      key: "2"
+      value {
+        index: 1
+        count: 5
+      }
+    }
+    items {
+      key: "1"
+      value {
+        index: 2
+        count: 3
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_INT64
+}
+columns {
+  type: CATEGORICAL
+  name: "f"
+  categorical {
+    number_of_unique_values: 3
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 3
+      }
+    }
+    items {
+      key: "2"
+      value {
+        index: 2
+        count: 3
+      }
+    }
+    items {
+      key: "1"
+      value {
+        index: 1
+        count: 3
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_INT64
+}
+created_num_rows: 9
+""",
+    )
+
+  def test_infer_dataspec_adult(self):
+    adult = test_utils.load_datasets("adult")
+    ds_generator = dataset_io_lib.build_batched_example_generator(
+        adult.train_pd
+    )
+    dataspec = dataset_lib.infer_dataspec(
+        ds_generator,
+        dataspec_lib.DataSpecInferenceArgs(
+            columns=None,
+            include_all_columns=True,
+            max_vocab_count=20,
+            min_vocab_frequency=5,
+            discretize_numerical_columns=True,
+            num_discretized_numerical_bins=10,
+            max_num_scanned_rows_to_infer_semantic=-1,
+            max_num_scanned_rows_to_compute_statistics=100_000,
+        ),
+    )
+    test_utils.golden_check_string(
+        self,
+        str(dataspec),
+        test_utils.build_pydf_golden_path("deep_adult_dataspec.pbtxt"),
+    )
+
+
+class ReservoirSamplingTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.cache_size = 1_000
+
+  def test_initial_is_empty(self):
+    r = dataset_lib.BatchReservoirSampling(
+        np.random.default_rng(), self.cache_size
+    )
+    self.assertEqual(r._num_in_cache, 0)
+    self.assertEqual(r._num_seen, 0)
+
+  def test_add_small_data(self):
+    r = dataset_lib.BatchReservoirSampling(
+        np.random.default_rng(), self.cache_size
+    )
+    r.add(np.random.randn(self.cache_size // 4))
+    self.assertEqual(r._num_in_cache, self.cache_size // 4)
+    self.assertEqual(r._num_seen, self.cache_size // 4)
+    self.assertEqual(r._samples.shape, (self.cache_size,))
+
+  def test_add_multiple_small_data(self):
+    r = dataset_lib.BatchReservoirSampling(
+        np.random.default_rng(), self.cache_size
+    )
+    r.add(np.random.randn(self.cache_size // 4))
+    r.add(np.random.randn(self.cache_size // 4))
+    n = 2 * (self.cache_size // 4)
+    self.assertEqual(r._num_in_cache, n)
+    self.assertEqual(r._num_seen, n)
+    self.assertEqual(r._samples.shape, (self.cache_size,))
+
+  def test_add_large_data(self):
+    r = dataset_lib.BatchReservoirSampling(
+        np.random.default_rng(), self.cache_size
+    )
+    r.add(np.random.randn(self.cache_size * 2))
+    self.assertEqual(r._num_in_cache, self.cache_size)
+    self.assertEqual(r._num_seen, self.cache_size * 2)
+    self.assertEqual(r._samples.shape, (self.cache_size,))
+
+  def test_add_multiple_chunks(self):
+    r = dataset_lib.BatchReservoirSampling(
+        np.random.default_rng(), self.cache_size
+    )
+    n = 2 * (self.cache_size // 3)
+    r.add(np.random.randn(n))
+    r.add(np.random.randn(n))
+    r.add(np.random.randn(n))
+    self.assertEqual(r._num_in_cache, self.cache_size)
+    self.assertEqual(r._num_seen, 3 * n)
+    self.assertEqual(r._samples.shape, (self.cache_size,))
+
+  @parameterized.parameters(
+      (10, 5000, 10_000),
+      (200, 5000, 10_000),
+      (20_000, 10, 10_000),
+  )
+  def test_approx_quantiles_small(self, batch_size, num_batches, cache_size):
+    r = dataset_lib.BatchReservoirSampling(np.random.default_rng(), cache_size)
+    values = []
+    for i in range(num_batches):
+      batch = np.random.randn(batch_size) * i / num_batches
+      values.append(batch)
+      r.add(batch)
+    quantiles, thresholds = r.get_quantiles(10)
+    expected_quantiles = np.nanquantile(
+        np.concatenate(values, axis=0), thresholds
+    )
+    # The first and last quantiles  (i.e., min/max) are very noisy.
+    quantiles = quantiles[1:-1]
+    expected_quantiles = expected_quantiles[1:-1]
+    max_diff = np.max(np.absolute(quantiles - expected_quantiles))
+    self.assertLessEqual(
+        max_diff,
+        0.03,
+        msg=f"quantiles={quantiles} expected_quantiles={expected_quantiles}",
+    )
+
+  def test_cache1(self):
+    rng = np.random.default_rng()
+    samples = []
+    for _ in range(100):
+      sampler = dataset_lib.BatchReservoirSampling(rng=rng, cache_size=1)
+      sampler.add(np.array([0]))
+      sampler.add(np.array([1]))
+      samples.append(sampler._samples[0])
+    rate = np.mean(samples)
+    self.assertAlmostEqual(rate, 0.5, delta=0.1)
 
 
 if __name__ == "__main__":
