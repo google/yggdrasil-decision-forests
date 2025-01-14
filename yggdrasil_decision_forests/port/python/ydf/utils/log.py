@@ -34,6 +34,8 @@ import io
 import sys
 from typing import Any, Optional, Set, Union
 
+from absl import logging
+
 from ydf.cc import ydf
 
 # Current verbose level. See "verbose" for details.
@@ -64,6 +66,8 @@ class WarningMessage(enum.Enum):
   UNNECESSARY_LABEL_ARGUMENT = 10
   TFE_READING_IN_PYTHON_IS_SLOW = 11
   CATEGORICAL_LOOK_LIKE_NUMERICAL = 12
+  TRAINING_NEURAL_NET_WITHOUT_VALID = 13
+  TRAIN_TRANSFORMER_ON_CPU = 14
 
 
 # List of already showed warning message that should not be displayed again.
@@ -132,6 +136,7 @@ def info(msg: str, *args: Any) -> None:
 
   if _VERBOSE_LEVEL >= 1:
     print(msg % args, flush=True)
+    logging.info(msg, *args)
 
 
 def debug(msg: str, *args: Any) -> None:
@@ -147,6 +152,7 @@ def debug(msg: str, *args: Any) -> None:
 
   if _VERBOSE_LEVEL >= 2:
     print(msg % args, flush=True)
+    logging.info(msg, *args)
 
 
 def warning(
@@ -184,6 +190,7 @@ def warning(
 
   if _VERBOSE_LEVEL >= 1:
     print("[Warning]", msg % args, flush=True, file=sys.stderr)
+  logging.warning(msg, *args)
 
 
 def strict(value: bool = True) -> None:

@@ -48,3 +48,8 @@ class BatchedExampleGenerator(abc.ABC):
   ) -> Iterator[NumpyExampleBatch]:
     """Generate an iterator."""
     raise NotImplementedError
+
+
+def get_num_examples(batch: NumpyExampleBatch) -> int:
+  """Gets the number of examples in a batch."""
+  return len(next(iter(batch.values())))

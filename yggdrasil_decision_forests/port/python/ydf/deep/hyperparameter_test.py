@@ -21,12 +21,18 @@ from ydf.deep import hyperparameter as hyperparameter_lib
 class HyperparameterTest(parameterized.TestCase):
 
   def test_consumer(self):
-    c = hyperparameter_lib.HyperparameterConsumer({"a": 1, "b": 0.5, "c": None})
+    c = hyperparameter_lib.HyperparameterConsumer(
+        {"a": 1, "b": 0.5, "c": None, "d": "hello", "e": True}
+    )
     self.assertEqual(c.get_int("a"), 1)
+    self.assertEqual(c.get_float("a"), 1.0)
+    self.assertEqual(c.get_str("d"), "hello")
+    self.assertEqual(c.get_bool("e"), True)
     with self.assertRaisesRegex(
-        ValueError, re.escape("The hyperparameter 'd' does not exist")
+        ValueError,
+        re.escape("The hyperparameter 'non_existing' does not exist"),
     ):
-      _ = c.get_int("d")
+      _ = c.get_int("non_existing")
     with self.assertRaisesRegex(
         ValueError,
         re.escape("Hyperparameter 'b' is expected to be a integer value"),

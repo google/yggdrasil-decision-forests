@@ -225,6 +225,20 @@ class GenericLearner(abc.ABC):
 
   # === Following are the non virtual and general methods for all learners ===
 
+  def _non_input_feature_columns(self) -> List[str]:
+    """Lists columns that should not be used as input features."""
+
+    single_dim_columns = []
+    for column in [
+        self._label,
+        self._weights,
+        self._ranking_group,
+        self._uplift_treatment,
+    ]:
+      if column:
+        single_dim_columns.append(column)
+    return single_dim_columns
+
   @property
   def learner_name(self) -> str:
     return self._learner_name
@@ -346,6 +360,111 @@ Task: {self._task}
 Class: ydf.{self.__class__.__name__}
 Hyper-parameters: ydf.{self._hyperparameters}
 """
+
+  def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
+    """Builds DS args with user inputs and guides for labels / special columns.
+
+    Create a copy of self._data_spec_args and adds column definitions for the
+    columns label / weights / ranking group / uplift treatment with the correct
+    semantic and dataspec inference arguments.
+
+    Returns:
+      A copy of the data spec arguments with information about the special
+      columns added.
+
+    Raises:
+      ValueError: If the label / weights / ranking group / uplift treatment
+      column are specified as features.
+    """
+
+    def create_label_column(
+        name: Optional[str], task: Task
+    ) -> Optional[dataspec.Column]:
+      if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
+        return dataspec.Column(
+            name=name,
+            semantic=dataspec.Semantic.CATEGORICAL,
+            max_vocab_count=-1,
+            min_vocab_frequency=1,
+        )
+      elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
+        return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
+      elif task in [Task.ANOMALY_DETECTION]:
+        if name is None:
+          # No label column
+          return None
+        else:
+          return dataspec.Column(
+              name=name,
+              semantic=dataspec.Semantic.CATEGORICAL,
+              max_vocab_count=-1,
+              min_vocab_frequency=1,
+          )
+      else:
+        raise ValueError(f"Unsupported task {task.name} for label column")
+
+    data_spec_args = copy.deepcopy(self._data_spec_args)
+    # If no columns have been specified, make sure that all columns are used,
+    # since this function will specify some.
+    #
+    # TODO: If `label` becomes an optional argument, this function needs
+    # to be adapted.
+    if data_spec_args.columns is None:
+      data_spec_args.include_all_columns = True
+      data_spec_args.columns = []
+    column_defs = data_spec_args.columns
+    if dataspec.column_defs_contains_column(self._label, column_defs):
+      raise ValueError(
+          f"Label column {self._label} is also an input feature. A column"
+          " cannot be both a label and input feature."
+      )
+    if (
+        label_column := create_label_column(self._label, self._task)
+    ) is not None:
+      column_defs.append(label_column)
+    if self._weights is not None:
+      if dataspec.column_defs_contains_column(self._weights, column_defs):
+        raise ValueError(
+            f"Weights column {self._weights} is also an input feature. A column"
+            " cannot be both a weights and input feature."
+        )
+      column_defs.append(
+          dataspec.Column(
+              name=self._weights, semantic=dataspec.Semantic.NUMERICAL
+          )
+      )
+    if self._ranking_group is not None:
+      assert self._task == Task.RANKING
+
+      if dataspec.column_defs_contains_column(self._ranking_group, column_defs):
+        raise ValueError(
+            f"Ranking group column {self._ranking_group} is also an input"
+            " feature. A column cannot be both a ranking group and input"
+            " feature."
+        )
+      column_defs.append(
+          dataspec.Column(
+              name=self._ranking_group, semantic=dataspec.Semantic.HASH
+          )
+      )
+    if self._uplift_treatment is not None:
+      assert self._task in [Task.NUMERICAL_UPLIFT, Task.CATEGORICAL_UPLIFT]
+
+      if dataspec.column_defs_contains_column(
+          self._uplift_treatment, column_defs
+      ):
+        raise ValueError(
+            "The uplift_treatment column should not be specified as a feature"
+        )
+      column_defs.append(
+          dataspec.Column(
+              name=self._uplift_treatment,
+              semantic=dataspec.Semantic.CATEGORICAL,
+              max_vocab_count=-1,
+              min_vocab_frequency=1,
+          )
+      )
+    return data_spec_args
 
 
 class GenericCCLearner(GenericLearner):
@@ -519,20 +638,6 @@ class GenericCCLearner(GenericLearner):
         training_config, hp_proto, self._deployment_config, cc_custom_loss
     )
 
-  def _non_input_feature_columns(self) -> List[str]:
-    """Lists columns that should not be used as input features."""
-
-    single_dim_columns = []
-    for column in [
-        self._label,
-        self._weights,
-        self._ranking_group,
-        self._uplift_treatment,
-    ]:
-      if column:
-        single_dim_columns.append(column)
-    return single_dim_columns
-
   def _get_vertical_dataset(
       self, ds: dataset.InputDataset
   ) -> dataset.VerticalDataset:
@@ -638,111 +743,6 @@ class GenericCCLearner(GenericLearner):
           deployment_evaluation,
       )
       return metric.Evaluation(evaluation_proto)
-
-  def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
-    """Builds DS args with user inputs and guides for labels / special columns.
-
-    Create a copy of self._data_spec_args and adds column definitions for the
-    columns label / weights / ranking group / uplift treatment with the correct
-    semantic and dataspec inference arguments.
-
-    Returns:
-      A copy of the data spec arguments with information about the special
-      columns added.
-
-    Raises:
-      ValueError: If the label / weights / ranking group / uplift treatment
-      column are specified as features.
-    """
-
-    def create_label_column(
-        name: Optional[str], task: Task
-    ) -> Optional[dataspec.Column]:
-      if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
-        return dataspec.Column(
-            name=name,
-            semantic=dataspec.Semantic.CATEGORICAL,
-            max_vocab_count=-1,
-            min_vocab_frequency=1,
-        )
-      elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
-        return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
-      elif task in [Task.ANOMALY_DETECTION]:
-        if name is None:
-          # No label column
-          return None
-        else:
-          return dataspec.Column(
-              name=name,
-              semantic=dataspec.Semantic.CATEGORICAL,
-              max_vocab_count=-1,
-              min_vocab_frequency=1,
-          )
-      else:
-        raise ValueError(f"Unsupported task {task.name} for label column")
-
-    data_spec_args = copy.deepcopy(self._data_spec_args)
-    # If no columns have been specified, make sure that all columns are used,
-    # since this function will specify some.
-    #
-    # TODO: If `label` becomes an optional argument, this function needs
-    # to be adapted.
-    if data_spec_args.columns is None:
-      data_spec_args.include_all_columns = True
-      data_spec_args.columns = []
-    column_defs = data_spec_args.columns
-    if dataspec.column_defs_contains_column(self._label, column_defs):
-      raise ValueError(
-          f"Label column {self._label} is also an input feature. A column"
-          " cannot be both a label and input feature."
-      )
-    if (
-        label_column := create_label_column(self._label, self._task)
-    ) is not None:
-      column_defs.append(label_column)
-    if self._weights is not None:
-      if dataspec.column_defs_contains_column(self._weights, column_defs):
-        raise ValueError(
-            f"Weights column {self._weights} is also an input feature. A column"
-            " cannot be both a weights and input feature."
-        )
-      column_defs.append(
-          dataspec.Column(
-              name=self._weights, semantic=dataspec.Semantic.NUMERICAL
-          )
-      )
-    if self._ranking_group is not None:
-      assert self._task == Task.RANKING
-
-      if dataspec.column_defs_contains_column(self._ranking_group, column_defs):
-        raise ValueError(
-            f"Ranking group column {self._ranking_group} is also an input"
-            " feature. A column cannot be both a ranking group and input"
-            " feature."
-        )
-      column_defs.append(
-          dataspec.Column(
-              name=self._ranking_group, semantic=dataspec.Semantic.HASH
-          )
-      )
-    if self._uplift_treatment is not None:
-      assert self._task in [Task.NUMERICAL_UPLIFT, Task.CATEGORICAL_UPLIFT]
-
-      if dataspec.column_defs_contains_column(
-          self._uplift_treatment, column_defs
-      ):
-        raise ValueError(
-            "The uplift_treatment column should not be specified as a feature"
-        )
-      column_defs.append(
-          dataspec.Column(
-              name=self._uplift_treatment,
-              semantic=dataspec.Semantic.CATEGORICAL,
-              max_vocab_count=-1,
-              min_vocab_frequency=1,
-          )
-      )
-    return data_spec_args
 
   def _build_weight_definition(
       self,

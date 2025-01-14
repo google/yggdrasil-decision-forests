@@ -31,4 +31,4 @@ def get_num_examples(batch: Union[NumpyExampleBatch, JaxExampleBatch]) -> int:
 
 def batch_numpy_to_jax(src: NumpyExampleBatch) -> JaxExampleBatch:
   """Converts a batch of examples from numpy to jax format."""
-  return {k: jax.numpy.array(v) for k, v in src.items()}
+  return {k: jax.numpy.asarray(v) for k, v in src.items()}

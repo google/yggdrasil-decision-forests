@@ -1,0 +1,812 @@
+columns {
+  type: NUMERICAL
+  name: "age"
+  numerical {
+    mean: 38.615259740259738
+    min_value: 17
+    max_value: 90
+    standard_deviation: 13.660960812747051
+  }
+  count_nas: 0
+  discretized_numerical {
+    boundaries: 17
+    boundaries: 22
+    boundaries: 27
+    boundaries: 31
+    boundaries: 35
+    boundaries: 39
+    boundaries: 44
+    boundaries: 49
+    boundaries: 57
+    boundaries: 90
+  }
+  dtype: DTYPE_INT64
+}
+columns {
+  type: CATEGORICAL
+  name: "workclass"
+  categorical {
+    number_of_unique_values: 8
+    items {
+      key: "Without-pay"
+      value {
+        index: 7
+        count: 11
+      }
+    }
+    items {
+      key: "State-gov"
+      value {
+        index: 4
+        count: 891
+      }
+    }
+    items {
+      key: "Self-emp-not-inc"
+      value {
+        index: 2
+        count: 1777
+      }
+    }
+    items {
+      key: "Self-emp-inc"
+      value {
+        index: 5
+        count: 802
+      }
+    }
+    items {
+      key: "Private"
+      value {
+        index: 1
+        count: 15879
+      }
+    }
+    items {
+      key: "Local-gov"
+      value {
+        index: 3
+        count: 1495
+      }
+    }
+    items {
+      key: "Federal-gov"
+      value {
+        index: 6
+        count: 677
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 3
+      }
+    }
+  }
+  count_nas: 1257
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: NUMERICAL
+  name: "fnlwgt"
+  numerical {
+    mean: 189879.1625131625
+    min_value: 12285
+    max_value: 1484705
+    standard_deviation: 106423.22838733291
+  }
+  count_nas: 0
+  discretized_numerical {
+    boundaries: 12285
+    boundaries: 71557.3359
+    boundaries: 111840.664
+    boundaries: 140664
+    boundaries: 168232
+    boundaries: 188538.328
+    boundaries: 210474
+    boundaries: 248889
+    boundaries: 319854
+    boundaries: 1484705
+  }
+  dtype: DTYPE_INT64
+}
+columns {
+  type: CATEGORICAL
+  name: "education"
+  categorical {
+    number_of_unique_values: 17
+    items {
+      key: "Some-college"
+      value {
+        index: 2
+        count: 5077
+      }
+    }
+    items {
+      key: "Prof-school"
+      value {
+        index: 10
+        count: 397
+      }
+    }
+    items {
+      key: "Preschool"
+      value {
+        index: 16
+        count: 35
+      }
+    }
+    items {
+      key: "Masters"
+      value {
+        index: 4
+        count: 1223
+      }
+    }
+    items {
+      key: "HS-grad"
+      value {
+        index: 1
+        count: 7340
+      }
+    }
+    items {
+      key: "Doctorate"
+      value {
+        index: 13
+        count: 284
+      }
+    }
+    items {
+      key: "Bachelors"
+      value {
+        index: 3
+        count: 3768
+      }
+    }
+    items {
+      key: "Assoc-voc"
+      value {
+        index: 5
+        count: 978
+      }
+    }
+    items {
+      key: "Assoc-acdm"
+      value {
+        index: 7
+        count: 765
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 0
+      }
+    }
+    items {
+      key: "9th"
+      value {
+        index: 11
+        count: 354
+      }
+    }
+    items {
+      key: "7th-8th"
+      value {
+        index: 9
+        count: 448
+      }
+    }
+    items {
+      key: "5th-6th"
+      value {
+        index: 14
+        count: 216
+      }
+    }
+    items {
+      key: "1st-4th"
+      value {
+        index: 15
+        count: 117
+      }
+    }
+    items {
+      key: "12th"
+      value {
+        index: 12
+        count: 306
+      }
+    }
+    items {
+      key: "11th"
+      value {
+        index: 6
+        count: 828
+      }
+    }
+    items {
+      key: "10th"
+      value {
+        index: 8
+        count: 656
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: NUMERICAL
+  name: "education_num"
+  numerical {
+    mean: 10.092664092664092
+    min_value: 1
+    max_value: 16
+    standard_deviation: 2.5642694768676968
+  }
+  count_nas: 0
+  discretized_numerical {
+    boundaries: 1
+    boundaries: 7
+    boundaries: 9
+    boundaries: 10
+    boundaries: 13
+    boundaries: 16
+  }
+  dtype: DTYPE_INT64
+}
+columns {
+  type: CATEGORICAL
+  name: "marital_status"
+  categorical {
+    number_of_unique_values: 8
+    items {
+      key: "Widowed"
+      value {
+        index: 4
+        count: 728
+      }
+    }
+    items {
+      key: "Separated"
+      value {
+        index: 5
+        count: 718
+      }
+    }
+    items {
+      key: "Never-married"
+      value {
+        index: 2
+        count: 7475
+      }
+    }
+    items {
+      key: "Married-spouse-absent"
+      value {
+        index: 6
+        count: 287
+      }
+    }
+    items {
+      key: "Married-civ-spouse"
+      value {
+        index: 1
+        count: 10431
+      }
+    }
+    items {
+      key: "Married-AF-spouse"
+      value {
+        index: 7
+        count: 18
+      }
+    }
+    items {
+      key: "Divorced"
+      value {
+        index: 3
+        count: 3135
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 0
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: CATEGORICAL
+  name: "occupation"
+  categorical {
+    number_of_unique_values: 14
+    items {
+      key: "Transport-moving"
+      value {
+        index: 8
+        count: 1132
+      }
+    }
+    items {
+      key: "Tech-support"
+      value {
+        index: 11
+        count: 638
+      }
+    }
+    items {
+      key: "Sales"
+      value {
+        index: 5
+        count: 2584
+      }
+    }
+    items {
+      key: "Protective-serv"
+      value {
+        index: 12
+        count: 466
+      }
+    }
+    items {
+      key: "Prof-specialty"
+      value {
+        index: 1
+        count: 2870
+      }
+    }
+    items {
+      key: "Priv-house-serv"
+      value {
+        index: 13
+        count: 98
+      }
+    }
+    items {
+      key: "Other-service"
+      value {
+        index: 6
+        count: 2299
+      }
+    }
+    items {
+      key: "Machine-op-inspct"
+      value {
+        index: 7
+        count: 1400
+      }
+    }
+    items {
+      key: "Handlers-cleaners"
+      value {
+        index: 9
+        count: 944
+      }
+    }
+    items {
+      key: "Farming-fishing"
+      value {
+        index: 10
+        count: 705
+      }
+    }
+    items {
+      key: "Exec-managerial"
+      value {
+        index: 2
+        count: 2866
+      }
+    }
+    items {
+      key: "Craft-repair"
+      value {
+        index: 3
+        count: 2819
+      }
+    }
+    items {
+      key: "Adm-clerical"
+      value {
+        index: 4
+        count: 2707
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 4
+      }
+    }
+  }
+  count_nas: 1260
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: CATEGORICAL
+  name: "relationship"
+  categorical {
+    number_of_unique_values: 7
+    items {
+      key: "Wife"
+      value {
+        index: 5
+        count: 1085
+      }
+    }
+    items {
+      key: "Unmarried"
+      value {
+        index: 4
+        count: 2498
+      }
+    }
+    items {
+      key: "Own-child"
+      value {
+        index: 3
+        count: 3547
+      }
+    }
+    items {
+      key: "Other-relative"
+      value {
+        index: 6
+        count: 671
+      }
+    }
+    items {
+      key: "Not-in-family"
+      value {
+        index: 2
+        count: 5800
+      }
+    }
+    items {
+      key: "Husband"
+      value {
+        index: 1
+        count: 9191
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 0
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: CATEGORICAL
+  name: "race"
+  categorical {
+    number_of_unique_values: 6
+    items {
+      key: "White"
+      value {
+        index: 1
+        count: 19467
+      }
+    }
+    items {
+      key: "Other"
+      value {
+        index: 5
+        count: 208
+      }
+    }
+    items {
+      key: "Black"
+      value {
+        index: 2
+        count: 2174
+      }
+    }
+    items {
+      key: "Asian-Pac-Islander"
+      value {
+        index: 3
+        count: 727
+      }
+    }
+    items {
+      key: "Amer-Indian-Eskimo"
+      value {
+        index: 4
+        count: 216
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 0
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: CATEGORICAL
+  name: "sex"
+  categorical {
+    number_of_unique_values: 3
+    items {
+      key: "Male"
+      value {
+        index: 1
+        count: 15165
+      }
+    }
+    items {
+      key: "Female"
+      value {
+        index: 2
+        count: 7627
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 0
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: NUMERICAL
+  name: "capital_gain"
+  numerical {
+    mean: 1081.8956651456651
+    min_value: 0
+    max_value: 99999
+    standard_deviation: 7509.4764484094385
+  }
+  count_nas: 0
+  discretized_numerical {
+    boundaries: 0
+    boundaries: 99999
+  }
+  dtype: DTYPE_INT64
+}
+columns {
+  type: NUMERICAL
+  name: "capital_loss"
+  numerical {
+    mean: 87.2805809055809
+    min_value: 0
+    max_value: 4356
+    standard_deviation: 403.00951852311277
+  }
+  count_nas: 0
+  discretized_numerical {
+    boundaries: 0
+    boundaries: 4356
+  }
+  dtype: DTYPE_INT64
+}
+columns {
+  type: NUMERICAL
+  name: "hours_per_week"
+  numerical {
+    mean: 40.395533520533519
+    min_value: 1
+    max_value: 99
+    standard_deviation: 12.2489662340442
+  }
+  count_nas: 0
+  discretized_numerical {
+    boundaries: 1
+    boundaries: 25
+    boundaries: 37
+    boundaries: 40
+    boundaries: 45
+    boundaries: 50
+    boundaries: 99
+  }
+  dtype: DTYPE_INT64
+}
+columns {
+  type: CATEGORICAL
+  name: "native_country"
+  categorical {
+    number_of_unique_values: 21
+    items {
+      key: "Vietnam"
+      value {
+        index: 19
+        count: 40
+      }
+    }
+    items {
+      key: "United-States"
+      value {
+        index: 1
+        count: 20436
+      }
+    }
+    items {
+      key: "Taiwan"
+      value {
+        index: 20
+        count: 35
+      }
+    }
+    items {
+      key: "South"
+      value {
+        index: 13
+        count: 51
+      }
+    }
+    items {
+      key: "Puerto-Rico"
+      value {
+        index: 6
+        count: 79
+      }
+    }
+    items {
+      key: "Philippines"
+      value {
+        index: 3
+        count: 143
+      }
+    }
+    items {
+      key: "Mexico"
+      value {
+        index: 2
+        count: 446
+      }
+    }
+    items {
+      key: "Japan"
+      value {
+        index: 18
+        count: 41
+      }
+    }
+    items {
+      key: "Jamaica"
+      value {
+        index: 11
+        count: 57
+      }
+    }
+    items {
+      key: "Italy"
+      value {
+        index: 15
+        count: 45
+      }
+    }
+    items {
+      key: "India"
+      value {
+        index: 7
+        count: 71
+      }
+    }
+    items {
+      key: "Guatemala"
+      value {
+        index: 17
+        count: 42
+      }
+    }
+    items {
+      key: "Germany"
+      value {
+        index: 4
+        count: 105
+      }
+    }
+    items {
+      key: "England"
+      value {
+        index: 10
+        count: 67
+      }
+    }
+    items {
+      key: "El-Salvador"
+      value {
+        index: 8
+        count: 70
+      }
+    }
+    items {
+      key: "Dominican-Republic"
+      value {
+        index: 12
+        count: 52
+      }
+    }
+    items {
+      key: "Cuba"
+      value {
+        index: 9
+        count: 69
+      }
+    }
+    items {
+      key: "Columbia"
+      value {
+        index: 16
+        count: 43
+      }
+    }
+    items {
+      key: "China"
+      value {
+        index: 14
+        count: 50
+      }
+    }
+    items {
+      key: "Canada"
+      value {
+        index: 5
+        count: 84
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 359
+      }
+    }
+  }
+  count_nas: 407
+  dtype: DTYPE_BYTES
+}
+columns {
+  type: CATEGORICAL
+  name: "income"
+  categorical {
+    number_of_unique_values: 3
+    items {
+      key: ">50K"
+      value {
+        index: 2
+        count: 5484
+      }
+    }
+    items {
+      key: "<OOD>"
+      value {
+        index: 0
+        count: 0
+      }
+    }
+    items {
+      key: "<=50K"
+      value {
+        index: 1
+        count: 17308
+      }
+    }
+  }
+  count_nas: 0
+  dtype: DTYPE_BYTES
+}
+created_num_rows: 22792

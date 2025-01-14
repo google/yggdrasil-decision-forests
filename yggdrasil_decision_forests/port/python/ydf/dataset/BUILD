@@ -47,6 +47,7 @@ py_library(
         "//ydf/cc:ydf",
         "//ydf/dataset/io:dataset_io",
         "//ydf/dataset/io:dataset_io_types",
+        "//ydf/dataset/io:generator",
         "//ydf/utils:log",
         "//ydf/utils:paths",
     ],
@@ -66,7 +67,10 @@ py_library(
 py_test(
     name = "dataset_test",
     srcs = ["dataset_test.py"],
-    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    data = [
+        "//test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+    ],
     python_version = "PY3",
     deps = [
         ":dataset",
@@ -76,6 +80,7 @@ py_test(
         # numpy dep,
         # pandas dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset/io:dataset_io",
         "//ydf/utils:test_utils",
     ],
 )

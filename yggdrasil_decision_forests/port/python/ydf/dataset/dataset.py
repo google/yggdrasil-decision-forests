@@ -14,19 +14,25 @@
 
 """Dataset implementations of PYDF."""
 
+import abc
+import collections
 import copy
-from typing import Any, Dict, List, Optional, Sequence, Union
+import math
+import sys
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.cc import ydf
-from ydf.dataset import dataspec
+from ydf.dataset import dataspec as dataspec_lib
 from ydf.dataset.io import dataset_io
 from ydf.dataset.io import dataset_io_types
+from ydf.dataset.io import generator as generator_lib
 from ydf.utils import log
 from ydf.utils import paths
+
 
 InputDataset = Union[dataset_io_types.IODataset, "VerticalDataset"]
 
@@ -53,7 +59,7 @@ class VerticalDataset:
 
   def _normalize_categorical_string_values(
       self,
-      column: dataspec.Column,
+      column: dataspec_lib.Column,
       values: npt.ArrayLike,
       original_column_data: Any,
   ) -> npt.NDArray[np.bytes_]:
@@ -99,9 +105,9 @@ class VerticalDataset:
 
   def _add_column(
       self,
-      column: dataspec.Column,
+      column: dataspec_lib.Column,
       column_data: Any,
-      inference_args: Optional[dataspec.DataSpecInferenceArgs],
+      inference_args: Optional[dataspec_lib.DataSpecInferenceArgs],
       column_idx: Optional[int],
       is_label: bool,
   ):
@@ -111,13 +117,13 @@ class VerticalDataset:
     original_column_data = column_data
 
     if (
-        column.semantic == dataspec.Semantic.NUMERICAL
-        or column.semantic == dataspec.Semantic.DISCRETIZED_NUMERICAL
+        column.semantic == dataspec_lib.Semantic.NUMERICAL
+        or column.semantic == dataspec_lib.Semantic.DISCRETIZED_NUMERICAL
     ):
       assert column.semantic is not None  # Appease pylint.
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, np.float32)
-      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+      ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data.dtype != np.float32:
         log.warning(
@@ -149,14 +155,14 @@ class VerticalDataset:
             " only supported for numpy arrays"
         )
 
-      if column.semantic == dataspec.Semantic.NUMERICAL:
+      if column.semantic == dataspec_lib.Semantic.NUMERICAL:
         self._dataset.PopulateColumnNumericalNPFloat32(
             column.name,
             column_data,
             ydf_dtype=ydf_dtype,
             column_idx=column_idx,  # `column_idx` may be None
         )
-      elif column.semantic == dataspec.Semantic.DISCRETIZED_NUMERICAL:
+      elif column.semantic == dataspec_lib.Semantic.DISCRETIZED_NUMERICAL:
         if (
             column.num_discretized_numerical_bins is None
             and inference_args is not None
@@ -175,10 +181,10 @@ class VerticalDataset:
         raise ValueError("Not reached")
       return
 
-    elif column.semantic == dataspec.Semantic.BOOLEAN:
+    elif column.semantic == dataspec_lib.Semantic.BOOLEAN:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, np.bool_)
-      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+      ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
       if column_data.dtype != np.bool_:
         message = (
             f"Cannot import column {column.name!r} with"
@@ -202,25 +208,25 @@ class VerticalDataset:
       )
       return
 
-    elif column.semantic == dataspec.Semantic.CATEGORICAL:
+    elif column.semantic == dataspec_lib.Semantic.CATEGORICAL:
       force_dictionary = None
       if not isinstance(column_data, np.ndarray):
         column_data = self._normalize_categorical_string_values(
             column, column_data, original_column_data
         )
-      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+      ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data.dtype.type in [np.bool_]:
         bool_column_data = column_data
         column_data = np.full_like(bool_column_data, b"false", "|S5")
         column_data[bool_column_data] = b"true"
-        force_dictionary = [dataspec.YDF_OOD_BYTES, b"false", b"true"]
-      elif column_data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE:
+        force_dictionary = [dataspec_lib.YDF_OOD_BYTES, b"false", b"true"]
+      elif column_data.dtype.type in dataspec_lib.NP_SUPPORTED_INT_DTYPE:
         if is_label:
           # Sort increasing.
           dictionary = np.unique(column_data)
           column_data = column_data.astype(np.bytes_)
-          force_dictionary = [dataspec.YDF_OOD_BYTES, *dictionary]
+          force_dictionary = [dataspec_lib.YDF_OOD_BYTES, *dictionary]
         else:
           column_data = column_data.astype(np.bytes_)
       elif column_data.dtype.type in [np.object_, np.str_]:
@@ -230,7 +236,7 @@ class VerticalDataset:
         if is_label:
           # Sort lexicographically (as opposed to by frequency as for features).
           dictionary = np.unique(column_data)
-          force_dictionary = [dataspec.YDF_OOD_BYTES, *dictionary]
+          force_dictionary = [dataspec_lib.YDF_OOD_BYTES, *dictionary]
       elif np.issubdtype(column_data.dtype, np.floating):
         message = (
             f"Cannot import column {column.name!r} with"
@@ -249,7 +255,7 @@ class VerticalDataset:
 
       if column_data.dtype.type == np.bytes_:
         if inference_args is not None:
-          guide = dataspec.categorical_column_guide(column, inference_args)
+          guide = dataspec_lib.categorical_column_guide(column, inference_args)
           if force_dictionary:
             guide["dictionary"] = np.array(force_dictionary, dtype=np.bytes_)
           self._dataset.PopulateColumnCategoricalNPBytes(
@@ -264,7 +270,7 @@ class VerticalDataset:
           )
         return
 
-    elif column.semantic == dataspec.Semantic.CATEGORICAL_SET:
+    elif column.semantic == dataspec_lib.Semantic.CATEGORICAL_SET:
       if (
           not isinstance(column_data, list)
           and column_data.dtype.type != np.object_
@@ -283,12 +289,12 @@ class VerticalDataset:
             bool_row = row
             column_data[i] = np.full_like(bool_row, b"false", "|S5")
             column_data[i][bool_row] = b"true"
-            force_dictionary = [dataspec.YDF_OOD_BYTES, b"false", b"true"]
+            force_dictionary = [dataspec_lib.YDF_OOD_BYTES, b"false", b"true"]
           elif row.dtype.type in [np.object_, np.str_]:
             column_data[i] = self._normalize_categorical_string_values(
                 column, row, original_column_data
             )
-          elif row.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE:
+          elif row.dtype.type in dataspec_lib.NP_SUPPORTED_INT_DTYPE:
             column_data[i] = row.astype(np.bytes_)
           elif np.issubdtype(row.dtype, np.floating):
             raise ValueError(
@@ -312,11 +318,11 @@ class VerticalDataset:
               f" semantic={column.semantic} as it contains non-list values."
               f" Got {original_column_data!r}."
           )
-      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+      ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data_are_bytes:
         if inference_args is not None:
-          guide = dataspec.categorical_column_guide(column, inference_args)
+          guide = dataspec_lib.categorical_column_guide(column, inference_args)
           if force_dictionary:
             guide["dictionary"] = np.array(force_dictionary, dtype=np.bytes_)
           self._dataset.PopulateColumnCategoricalSetNPBytes(
@@ -331,10 +337,10 @@ class VerticalDataset:
           )
         return
 
-    elif column.semantic == dataspec.Semantic.HASH:
+    elif column.semantic == dataspec_lib.Semantic.HASH:
       if not isinstance(column_data, np.ndarray):
         column_data = np.array(column_data, dtype=np.bytes_)
-      ydf_dtype = dataspec.np_dtype_to_ydf_dtype(column_data.dtype)
+      ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data.dtype.type in [
           np.object_,
@@ -379,7 +385,7 @@ class VerticalDataset:
 
 def create_vertical_dataset(
     data: InputDataset,
-    columns: dataspec.ColumnDefs = None,
+    columns: dataspec_lib.ColumnDefs = None,
     include_all_columns: bool = False,
     max_vocab_count: int = 2000,
     min_vocab_frequency: int = 5,
@@ -502,8 +508,8 @@ def create_vertical_dataset(
         label=label,
     )
   else:
-    inference_args = dataspec.DataSpecInferenceArgs(
-        columns=dataspec.normalize_column_defs(columns),
+    inference_args = dataspec_lib.DataSpecInferenceArgs(
+        columns=dataspec_lib.normalize_column_defs(columns),
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
@@ -525,7 +531,7 @@ def create_vertical_dataset(
 def create_vertical_dataset_with_spec_or_args(
     data: dataset_io_types.IODataset,
     required_columns: Optional[Sequence[str]],
-    inference_args: Optional[dataspec.DataSpecInferenceArgs],
+    inference_args: Optional[dataspec_lib.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
     single_dim_columns: Optional[Sequence[str]] = None,
     label: Optional[str] = None,
@@ -550,7 +556,7 @@ def create_vertical_dataset_with_spec_or_args(
       not_unrolled_multi_dim_columns = [
           c.name
           for c in inference_args.columns
-          if c.semantic == dataspec.Semantic.CATEGORICAL_SET
+          if c.semantic == dataspec_lib.Semantic.CATEGORICAL_SET
       ]
 
     # Convert the data to an in-memory dictionary of numpy array.
@@ -573,7 +579,7 @@ def create_vertical_dataset_with_spec_or_args(
 def create_vertical_dataset_from_path(
     path: Union[str, List[str]],
     required_columns: Optional[Sequence[str]],
-    inference_args: Optional[dataspec.DataSpecInferenceArgs],
+    inference_args: Optional[dataspec_lib.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
 ) -> VerticalDataset:
   """Returns a VerticalDataset from (list of) path using YDF dataset reading."""
@@ -651,7 +657,7 @@ def create_vertical_dataset_from_dict_of_values(
     data: Dict[str, dataset_io_types.InputValues],
     unroll_feature_info: dataset_io_types.UnrolledFeaturesInfo,
     required_columns: Optional[Sequence[str]],
-    inference_args: Optional[dataspec.DataSpecInferenceArgs],
+    inference_args: Optional[dataspec_lib.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
     label: Optional[str] = None,
 ) -> VerticalDataset:
@@ -719,9 +725,11 @@ def create_vertical_dataset_from_dict_of_values(
         )
       else:
         normalized_columns.append(
-            dataspec.Column(
+            dataspec_lib.Column(
                 name=column_spec.name,
-                semantic=dataspec.Semantic.from_proto_type(column_spec.type),
+                semantic=dataspec_lib.Semantic.from_proto_type(
+                    column_spec.type
+                ),
             )
         )
     return normalized_columns
@@ -733,7 +741,7 @@ def create_vertical_dataset_from_dict_of_values(
     # `inference_args` are required. This is checked by
     # dataspec.get_all_columns()
     normalized_columns, effective_unroll_feature_info = (
-        dataspec.get_all_columns(
+        dataspec_lib.get_all_columns(
             available_columns=list(data.keys()),
             inference_args=inference_args,
             required_columns=required_columns,
@@ -855,7 +863,7 @@ def infer_semantic(
     name: str,
     data: Any,
     discretize_numerical: bool,
-) -> dataspec.Semantic:
+) -> dataspec_lib.Semantic:
   """Infers the semantic of a column from its data."""
 
   # If a column has no data, we assume it only contains missing values.
@@ -873,16 +881,16 @@ def infer_semantic(
   if isinstance(data, np.ndarray):
     # We finely control the supported types.
     if (
-        data.dtype.type in dataspec.NP_SUPPORTED_INT_DTYPE
-        or data.dtype.type in dataspec.NP_SUPPORTED_FLOAT_DTYPE
+        data.dtype.type in dataspec_lib.NP_SUPPORTED_INT_DTYPE
+        or data.dtype.type in dataspec_lib.NP_SUPPORTED_FLOAT_DTYPE
     ):
       if discretize_numerical:
-        return dataspec.Semantic.DISCRETIZED_NUMERICAL
+        return dataspec_lib.Semantic.DISCRETIZED_NUMERICAL
       else:
-        return dataspec.Semantic.NUMERICAL
+        return dataspec_lib.Semantic.NUMERICAL
 
     if data.dtype.type in [np.bytes_, np.str_]:
-      return dataspec.Semantic.CATEGORICAL
+      return dataspec_lib.Semantic.CATEGORICAL
 
     if data.dtype.type in [np.object_]:
       # For performance reasons, only check the type on the first and last item
@@ -892,11 +900,11 @@ def infer_semantic(
           and isinstance(data[0], (list, np.ndarray))
           and isinstance(data[-1], (list, np.ndarray))
       ):
-        return dataspec.Semantic.CATEGORICAL_SET
-      return dataspec.Semantic.CATEGORICAL
+        return dataspec_lib.Semantic.CATEGORICAL_SET
+      return dataspec_lib.Semantic.CATEGORICAL
 
     if data.dtype.type in [np.bool_]:
-      return dataspec.Semantic.BOOLEAN
+      return dataspec_lib.Semantic.BOOLEAN
     type_str = f"numpy.array of {data.dtype}"
   else:
     type_str = str(type(data))
@@ -938,3 +946,340 @@ def dense_integer_dictionary_size(values: np.ndarray) -> Optional[int]:
   ):
     return len(unique_values)
   return None
+
+
+def infer_dataspec_types(
+    batch: generator_lib.NumpyExampleBatch,
+    dataspec: data_spec_pb2.DataSpecification,
+    data_spec_args: dataspec_lib.DataSpecInferenceArgs,
+):
+  """Infers the semantic of columns from a single generator batch."""
+
+  # Generate the columns
+  columns_to_check = []
+  columns, _ = dataspec_lib.get_all_columns(
+      available_columns=list(batch.keys()),
+      inference_args=data_spec_args,
+      required_columns=None,
+  )
+  for column_idx, py_column in enumerate(columns):
+    if py_column.semantic is None:
+      columns_to_check.append(column_idx)
+      py_semantic = infer_semantic(py_column.name, batch[py_column.name], False)
+    else:
+      py_semantic = py_column.semantic
+    column = data_spec_pb2.Column(
+        name=py_column.name,
+        type=py_semantic.to_proto_type(),
+    )
+
+    # Dtyping
+    column_data = batch[py_column.name]
+    column.dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
+
+    # Copy filter configs
+    if column.type == data_spec_pb2.ColumnType.CATEGORICAL:
+      # Note: We add +1 to take into account the OOD item.
+      if py_column.max_vocab_count is None:
+        column.categorical.max_number_of_unique_values = (
+            data_spec_args.max_vocab_count
+        ) + 1
+      else:
+        column.categorical.max_number_of_unique_values = (
+            py_column.max_vocab_count
+        ) + 1
+      if py_column.min_vocab_frequency is None:
+        column.categorical.min_value_count = data_spec_args.min_vocab_frequency
+      else:
+        column.categorical.min_value_count = py_column.min_vocab_frequency
+
+    dataspec.columns.append(column)
+  warnings = validate_dataspec(dataspec, columns_to_check)
+  if warnings:
+    log.warning(
+        "%s",
+        "\n".join(warnings),
+        message_id=log.WarningMessage.CATEGORICAL_LOOK_LIKE_NUMERICAL,
+    )
+
+
+def infer_dataspec(
+    generator: generator_lib.BatchedExampleGenerator,
+    data_spec_args: dataspec_lib.DataSpecInferenceArgs,
+    seed: int = 1234,
+) -> data_spec_pb2.DataSpecification:
+  """Infers a dataspec from an example generator."""
+
+  dataspec = data_spec_pb2.DataSpecification()
+  rng = np.random.default_rng(seed)
+
+  num_examples = 0
+  accumulators = []
+  for batch_idx, batch in enumerate(
+      generator.generate(
+          batch_size=1000, shuffle=True, seed=rng.integers(sys.maxsize)
+      )
+  ):
+    if batch_idx == 0:
+      # Generate the columns
+      infer_dataspec_types(batch, dataspec, data_spec_args)
+      for column in dataspec.columns:
+        if column.type == data_spec_pb2.ColumnType.NUMERICAL:
+          accumulators.append(
+              NumericalDataSpecAccumulator(
+                  column.name,
+                  rng,
+                  num_quantiles=data_spec_args.num_discretized_numerical_bins
+                  if data_spec_args.discretize_numerical_columns
+                  else None,
+              )
+          )
+        elif column.type == data_spec_pb2.ColumnType.CATEGORICAL:
+          accumulators.append(
+              CategoricalDataSpecAccumulator(
+                  column.name,
+                  max_vocab_count=column.categorical.max_number_of_unique_values,
+                  min_vocab_frequency=column.categorical.min_value_count,
+              )
+          )
+        else:
+          accumulators.append(None)
+
+    for accumulator, column in zip(accumulators, dataspec.columns):
+      if accumulator is not None:
+        value = batch[column.name]
+        try:
+          accumulator.visit(value)
+        except Exception as e:
+          raise ValueError(
+              f"While processing value {value} of feature {column.name}"
+          ) from e
+
+    num_examples += generator_lib.get_num_examples(batch)
+    if (
+        num_examples
+        >= data_spec_args.max_num_scanned_rows_to_compute_statistics
+    ):
+      break
+
+  dataspec.created_num_rows = num_examples
+  for accumulator, column in zip(accumulators, dataspec.columns):
+    if accumulator is not None:
+      accumulator.finalize(column)
+  return dataspec
+
+
+class DataSpecAccumulator(abc.ABC):
+  """Collects data to create the dataspec of a numerical column."""
+
+  def __init__(self, name: str):
+    self._name = name
+
+  @abc.abstractmethod
+  def visit(self, value: np.ndarray):
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def finalize(self, column: data_spec_pb2.Column):
+    raise NotImplementedError
+
+
+class NumericalDataSpecAccumulator(DataSpecAccumulator):
+  """Specialization for numerical columns."""
+
+  def __init__(
+      self,
+      name: str,
+      rng: np.random.Generator,
+      num_quantiles: Optional[int],
+  ):
+    super().__init__(name)
+    self._sum_values = 0.0
+    self._sum_square_values = 0.0
+    self._count_values = 0
+    self._max_value = None
+    self._min_value = None
+    self._count_missing_values = 0
+    self._num_quantiles = num_quantiles
+    if self._num_quantiles is not None:
+      self._reservoir = BatchReservoirSampling(rng=rng)
+    else:
+      self._reservoir = None
+
+  def visit(self, value: np.ndarray):
+    num_values = np.size(value)
+    num_missing = np.count_nonzero(np.isnan(value))
+    self._count_values += num_values - num_missing
+    self._count_missing_values += num_missing
+
+    if num_values == num_missing:
+      return
+
+    self._sum_values += np.nansum(value, dtype=np.float64)
+    self._sum_square_values += np.nansum(value**2, dtype=np.float64)
+    self._max_value = np.nanmax(value, initial=self._max_value)
+    self._min_value = np.nanmin(value, initial=self._min_value)
+    if self._reservoir is not None:
+      self._reservoir.add(value.ravel())
+
+  def finalize(self, column: data_spec_pb2.Column):
+    if self._count_values == 0:
+      log.warning(f"Feature {column.name} has no values")
+      column.numerical.CopyFrom(
+          data_spec_pb2.NumericalSpec(
+              mean=0.5,
+              standard_deviation=1,
+              min_value=0,
+              max_value=1,
+          ),
+      )
+      if self._reservoir is not None:
+        column.discretized_numerical.CopyFrom(
+            data_spec_pb2.DiscretizedNumericalSpec(
+                boundaries=[0, 1],
+            )
+        )
+      return
+
+    column.count_nas = self._count_missing_values
+    mean = self._sum_values / self._count_values
+    var = self._sum_square_values / self._count_values - mean * mean
+    if var < 0:
+      # Possible rounding error
+      var = 0
+    column.numerical.CopyFrom(
+        data_spec_pb2.NumericalSpec(
+            mean=mean,
+            standard_deviation=math.sqrt(var),
+            min_value=self._min_value,
+            max_value=self._max_value,
+        ),
+    )
+    if self._reservoir is not None:
+      assert self._num_quantiles is not None
+      quantiles, _ = self._reservoir.get_quantiles(self._num_quantiles)
+      boundaries = np.unique(quantiles).tolist()
+      if len(boundaries) < 2:
+        if self._min_value == self._max_value:
+          boundaries = [self._min_value - 1, self._min_value + 1]
+        else:
+          boundaries = [self._min_value, self._max_value]
+      column.discretized_numerical.CopyFrom(
+          data_spec_pb2.DiscretizedNumericalSpec(
+              boundaries=boundaries,
+          )
+      )
+
+
+class CategoricalDataSpecAccumulator(DataSpecAccumulator):
+  """Specialization for categorical columns."""
+
+  def __init__(self, name: str, max_vocab_count: int, min_vocab_frequency: int):
+    super().__init__(name)
+    self._items = collections.defaultdict(int)
+    self._max_vocab_count = max_vocab_count
+    self._min_vocab_frequency = min_vocab_frequency
+    self._count_nan = 0
+
+  def visit(self, value: np.ndarray):
+    value = value.astype(np.bytes_)
+    unique_values, counts = np.unique(value, return_counts=True)
+    for key, count in zip(unique_values, counts):
+      self._items[key.item()] += count.item()
+
+  def finalize(self, column: data_spec_pb2.Column):
+    column.count_nas = self._items.get(b"nan", 0)
+    num_ood = self._items.get(dataspec_lib.YDF_OOD_BYTES, 0)
+
+    # Sort values by count
+    items = sorted(
+        [
+            (count, key)
+            for key, count in self._items.items()
+            if key != b"nan" and key != dataspec_lib.YDF_OOD_BYTES
+        ],
+        key=lambda x: (-x[0], x[1]),
+    )
+
+    # Prune items
+    while items and (
+        (self._max_vocab_count > 1 and len(items) + 1 > self._max_vocab_count)
+        or items[-1][0] < self._min_vocab_frequency
+    ):
+      last = items.pop()
+      num_ood += last[0]
+    items.insert(0, (num_ood, dataspec_lib.YDF_OOD_BYTES))
+
+    # TODO: Sort integer looking categorical strings
+    column.categorical.CopyFrom(
+        data_spec_pb2.CategoricalSpec(
+            items={
+                key: data_spec_pb2.CategoricalSpec.VocabValue(
+                    index=item_idx, count=count
+                )
+                for item_idx, (count, key) in enumerate(items)
+            },
+            number_of_unique_values=len(items),
+        )
+    )
+
+
+class BatchReservoirSampling:
+  """Computes the quantiles of a stream of batches."""
+
+  def __init__(
+      self,
+      rng: np.random.Generator,
+      cache_size: int = 1_000_000,
+  ):
+    """Initializes the reservoir sampling.
+
+    Args:
+      rng: Optional numpy bit generator.
+      cache_size: Cache size. The larger, the most accurate the estimates.
+    """
+    self._cache_size = cache_size
+    self._samples = np.empty(cache_size, dtype=np.float32)
+    self._num_in_cache = 0
+    self._num_seen = 0
+    self._rng = rng
+
+  def add(self, data: np.ndarray) -> None:
+    """Adds a batch of observations."""
+    assert data.ndim == 1
+    batch_size = data.shape[0]
+    new_num_in_cache = self._num_in_cache + batch_size
+
+    if new_num_in_cache <= self._cache_size:
+      # Add the entire batch to the cache
+      self._samples[self._num_in_cache : new_num_in_cache] = data
+      self._num_in_cache = new_num_in_cache
+      self._num_seen += batch_size
+      return
+
+    if self._num_in_cache + 1 <= self._cache_size:
+      # Add the first elements to the cache until it's full
+      num_consumed = self._cache_size - self._num_in_cache
+      self._samples[self._num_in_cache : self._cache_size] = data[:num_consumed]
+      data = data[num_consumed:]
+      batch_size -= num_consumed
+      self._num_in_cache += num_consumed
+      self._num_seen += num_consumed
+      assert self._num_in_cache == self._cache_size
+
+    # Reservoir sampling
+    rnd01 = self._rng.uniform(0.0, 1.0, batch_size)
+    sample_idx = np.arange(self._num_seen + 1, self._num_seen + batch_size + 1)
+    indexes = (rnd01 * sample_idx).astype(np.int32)
+    is_selected = (indexes < self._cache_size).nonzero()
+    self._samples[indexes[is_selected]] = data[is_selected]
+    self._num_seen += batch_size
+
+  def get_quantiles(self, num_quantiles: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Computes the quantiles and corresponding quantile arguments."""
+    # TODO: This is not optimal when a few values have a lot of
+    # weights: The functions might return less than "num_quantiles" quantiles
+    # when returning "num_quantiles" quantiles is possible.
+    thresholds = np.linspace(0, 1, num_quantiles)
+    quantiles = np.nanquantile(self._samples[: self._num_in_cache], thresholds)
+    return quantiles.tolist(), thresholds.tolist()

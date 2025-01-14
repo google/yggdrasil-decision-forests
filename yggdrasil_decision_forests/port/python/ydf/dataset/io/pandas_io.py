@@ -92,7 +92,7 @@ class PandasBatchedExampleGenerator(generator_lib.BatchedExampleGenerator):
         begin_idx = i
         end_idx = min(i + batch_size, self._num_examples)
         yield {
-            str(k): v[begin_idx:end_idx].to_numpy()
+            str(k): v.iloc[begin_idx:end_idx].to_numpy()
             for k, v in self._dataframe.items()
         }
         i += batch_size
@@ -107,7 +107,7 @@ class PandasBatchedExampleGenerator(generator_lib.BatchedExampleGenerator):
         end_idx = min(i + batch_size, self._num_examples)
         selected_idxs = idxs[begin_idx:end_idx]
         yield {
-            str(k): v[selected_idxs].to_numpy()
+            str(k): v.iloc[selected_idxs].to_numpy()
             for k, v in self._dataframe.items()
         }
         i += batch_size

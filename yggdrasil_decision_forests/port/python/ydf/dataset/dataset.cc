@@ -941,6 +941,12 @@ absl::Status CreateFromPathWithDataSpecGuide(
 
   return CreateFromPathWithDataSpec(self, path, data_spec, required_columns);
 }
+
+std::string DataspecToTextReport(
+    const dataset::proto::DataSpecification& dataspec) {
+  return dataset::PrintHumanReadable(dataspec);
+}
+
 }  // namespace
 
 void init_dataset(py::module_& m) {
@@ -1010,6 +1016,8 @@ void init_dataset(py::module_& m) {
            py::arg("unrolling"),
            "Records, in the dataspec, which columns have been unrolled from "
            "multi-dimensional features.");
+
+  m.def("DataspecToTextReport", DataspecToTextReport, py::arg("dataspec"));
 }
 
 }  // namespace yggdrasil_decision_forests::port::python
