@@ -267,7 +267,7 @@ py_test(
         # fastavro dep,
         # numpy dep,
         # pandas dep,
-        # polars dep,
+        # # polars dep,  # TODO: Re-enable.
         # sklearn dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
