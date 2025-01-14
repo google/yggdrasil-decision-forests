@@ -136,7 +136,7 @@ void init_model(py::module_& m) {
            py::arg("options"))
       // WARNING: This method releases the Global Interpreter Lock.
       .def("Save", WithStatus(&GenericCCModel::Save), py::arg("directory"),
-           py::arg("file_prefix"))
+           py::arg("file_prefix"), py::arg("pure_serving"))
       .def("Serialize", WithStatusOr(&GenericCCModel::Serialize))
       .def("name", &GenericCCModel::name)
       .def("task", &GenericCCModel::task)
