@@ -1,5 +1,12 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+-   Expose `model.save(..., pure_serving=True)` for saving a model without
+    debug information.
+
 ## 0.9.0 - 2024-12-02
 
 ### Feature

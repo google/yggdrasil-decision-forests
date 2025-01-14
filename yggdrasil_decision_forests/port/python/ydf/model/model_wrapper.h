@@ -99,7 +99,8 @@ class GenericCCModel {
   // Save the model to `directory`. Use `file_prefix` for all model files if
   // specified.
   absl::Status Save(std::string_view directory,
-                    std::optional<std::string> file_prefix) const;
+                    std::optional<std::string> file_prefix,
+                    bool pure_serving) const;
 
   // Serializes a model to a sequence of bytes.
   absl::StatusOr<py::bytes> Serialize() const;

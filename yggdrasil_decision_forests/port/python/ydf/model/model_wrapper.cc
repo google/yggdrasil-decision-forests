@@ -17,13 +17,13 @@
 
 #include <pybind11/numpy.h>
 
-#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
@@ -275,11 +275,20 @@ GenericCCModel::AnalyzePrediction(
                                                   options);
 }
 
-absl::Status GenericCCModel::Save(
-    std::string_view directory,
-    const std::optional<std::string> file_prefix) const {
+absl::Status GenericCCModel::Save(std::string_view directory,
+                                  const std::optional<std::string> file_prefix,
+                                  const bool pure_serving) const {
   py::gil_scoped_release release;
-  return model::SaveModel(directory, model_.get(), {file_prefix});
+  if (pure_serving) {
+    // Do not modify the original model.
+    ASSIGN_OR_RETURN(auto serialized_model, model::SerializeModel(*model_));
+    ASSIGN_OR_RETURN(auto copied_model,
+                     model::DeserializeModel(std::move(serialized_model)));
+    RETURN_IF_ERROR(copied_model->MakePureServing());
+    return model::SaveModel(directory, copied_model.get(), {file_prefix});
+  } else {
+    return model::SaveModel(directory, model_.get(), {file_prefix});
+  }
 }
 
 absl::StatusOr<py::bytes> GenericCCModel::Serialize() const {

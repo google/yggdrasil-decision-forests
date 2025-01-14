@@ -290,7 +290,9 @@ Use `model.describe()` for more details
     raise NotImplementedError
 
   @abc.abstractmethod
-  def save(self, path: str, advanced_options=ModelIOOptions()) -> None:
+  def save(
+      self, path: str, advanced_options=ModelIOOptions(), *, pure_serving=False
+  ) -> None:
     """Save the model to disk.
 
     YDF uses a proprietary model format for saving models. A model consists of
@@ -322,6 +324,10 @@ Use `model.describe()` for more details
     Args:
       path: Path to directory to store the model in.
       advanced_options: Advanced options for saving models.
+      pure_serving: If true, save the model without debug information to save
+        disk space. Note that this option might require additional memory during
+        saving, even though the resulting model can be significantly smaller on
+        disk.
     """
     raise NotImplementedError
 
@@ -1457,7 +1463,9 @@ class GenericCCModel(GenericModel):
       )
     return result
 
-  def save(self, path: str, advanced_options=ModelIOOptions()) -> None:
+  def save(
+      self, path: str, advanced_options=ModelIOOptions(), *, pure_serving=False
+  ) -> None:
     # Warn if the user is trying to save to a nonempty directory without
     # prefixing the model.
     if advanced_options.file_prefix is not None:
@@ -1474,7 +1482,7 @@ class GenericCCModel(GenericModel):
               )
 
     with log.cc_log_context():
-      self._model.Save(path, advanced_options.file_prefix)
+      self._model.Save(path, advanced_options.file_prefix, pure_serving)
 
   def serialize(self) -> bytes:
     with log.cc_log_context():

@@ -1131,6 +1131,32 @@ Use `model.describe()` for more details
     )
     self.assertAlmostEqual(evaluation.mrr, expected_mrr)
 
+  def test_model_save_pure_serving(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "golden",
+        "gbt_adult_base",
+    )
+    with open(os.path.join(model_path, "header.pb"), "rb") as f:
+      header = abstract_model_pb2.AbstractModel.FromString(f.read())
+      self.assertFalse(header.is_pure_model)
+    model = model_lib.load_model(model_path)
+    with tempfile.TemporaryDirectory() as tempdir:
+      model.save(tempdir, pure_serving=True)
+      self.assertTrue(os.path.exists(os.path.join(tempdir, "done")))
+      self.assertTrue(os.path.exists(os.path.join(tempdir, "header.pb")))
+      with open(os.path.join(tempdir, "header.pb"), "rb") as f:
+        header = abstract_model_pb2.AbstractModel.FromString(f.read())
+        self.assertTrue(header.is_pure_model)
+    # The model in memory still has debug information.
+    with tempfile.TemporaryDirectory() as tempdir:
+      model.save(tempdir)
+      self.assertTrue(os.path.exists(os.path.join(tempdir, "done")))
+      self.assertTrue(os.path.exists(os.path.join(tempdir, "header.pb")))
+      with open(os.path.join(tempdir, "header.pb"), "rb") as f:
+        header = abstract_model_pb2.AbstractModel.FromString(f.read())
+        self.assertFalse(header.is_pure_model)
+
 
 if __name__ == "__main__":
   absltest.main()
