@@ -160,6 +160,9 @@ class NodeWithChildren {
   // Instantiate the children.
   void CreateChildren();
 
+  // Removes the children.
+  void ClearChildren();
+
   // Number of nodes.
   int64_t NumNodes() const;
 
@@ -447,6 +450,12 @@ std::string DebugCompare(
     const dataset::proto::DataSpecification& dataspec, int label_idx,
     absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> a,
     absl::Span<const std::unique_ptr<decision_tree::DecisionTree>> b);
+
+// Square of the euclidean distance between two vectors.
+float SquaredDistance(absl::Span<const float> a, absl::Span<const float> b);
+
+// A dot product between two vectors.
+float DotProduct(absl::Span<const float> a, absl::Span<const float> b);
 
 }  // namespace decision_tree
 }  // namespace model

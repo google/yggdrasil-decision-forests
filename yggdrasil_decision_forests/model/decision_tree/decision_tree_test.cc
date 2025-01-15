@@ -439,7 +439,7 @@ TEST_F(EvalConditions, EvalConditionOblique) {
       0, false);
 }
 
-TEST_F(EvalConditions, EvalConditionSequenceVector) {
+TEST_F(EvalConditions, EvalConditionSequenceVectorCloserThan) {
   dataset_ = dataset::VerticalDataset();
   auto* col_spec = dataset::AddColumn(
       "f1", dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
@@ -462,6 +462,45 @@ TEST_F(EvalConditions, EvalConditionSequenceVector) {
     condition {
       numerical_vector_sequence {
         closer_than {
+          threshold2: 0.04
+          anchor { grounded: 0.95 grounded: 0.95 }
+        }
+      }
+    }
+  )pb");
+
+  EXPECT_EQ(
+      DescribeCondition(condition_1),
+      R"("f1" contains X with | X - [0.95, 0.95] |² <= 0.04 [s:0 n:0 np:0 miss:0])");
+
+  CheckCondition(condition_1, 0, false);
+  CheckCondition(condition_1, 1, false);
+  CheckCondition(condition_1, 2, true);
+}
+
+TEST_F(EvalConditions, EvalConditionSequenceVectorProjectedMoreThan) {
+  dataset_ = dataset::VerticalDataset();
+  auto* col_spec = dataset::AddColumn(
+      "f1", dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+      dataset_.mutable_data_spec());
+  col_spec->mutable_numerical_vector_sequence()->set_vector_length(2);
+  EXPECT_OK(dataset_.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(
+      auto* col,
+      dataset_.MutableColumnWithCastWithStatus<
+          dataset::VerticalDataset::NumericalVectorSequenceColumn>(0));
+
+  col->AddNA();
+  col->Add({0.f, 0.f, 1.f, 0.f});
+  col->Add({0.f, 0.f, 1.f, 0.f, 1.f, 1.f});
+  dataset_.set_nrow(3);
+
+  const proto::NodeCondition condition_1 = PARSE_TEST_PROTO(R"pb(
+    na_value: false
+    attribute: 0
+    condition {
+      numerical_vector_sequence {
+        projected_more_than {
           threshold: 0.2
           anchor { grounded: 0.95 grounded: 0.95 }
         }
@@ -471,10 +510,10 @@ TEST_F(EvalConditions, EvalConditionSequenceVector) {
 
   EXPECT_EQ(
       DescribeCondition(condition_1),
-      R"("f1" contains X with | X - [0.95, 0.95] | <= 0.2 [s:0 n:0 np:0 miss:0])");
+      R"("f1" contains X with X @ [0.95, 0.95] >= 0.2 [s:0 n:0 np:0 miss:0])");
 
   CheckCondition(condition_1, 0, false);
-  CheckCondition(condition_1, 1, false);
+  CheckCondition(condition_1, 1, true);
   CheckCondition(condition_1, 2, true);
 }
 

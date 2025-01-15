@@ -633,7 +633,7 @@ TEST(NumericalVectorSequence, Inspect) {
 
   col->ShrinkToFit();
 
-  EXPECT_EQ(col->memory_usage().first, 84);
+  EXPECT_EQ(col->memory_usage().first, 72);
 
   col->Reserve(4);
   col->Resize(4);

@@ -137,13 +137,26 @@ message Condition {
     }
 
     message CloserThan {
-      // Condition of the type \exits a \in Obs; |a - anchor|_2 >= threshold.
+      // Condition of the type \exits a \in Obs; |a - anchor|^2 <= threshold2.
+      // Where |.|^2 is the squared euclidean distance.
+      // Note: The condition is not on the euclidean distance as to avoid
+      // rounding errors of a squared root.
+      // Note: Notice the direction of the inequality (<=) compared to other
+      // ydf conditions (>=).
+      optional Anchor anchor = 1;
+      // Threshold to apply on the squared distance.
+      optional float threshold2 = 2;
+    }
+
+    message ProjectedMoreThan {
+      // Condition of the type \exits a \in Obs; <a|anchor> threshold.
       optional Anchor anchor = 1;
       optional float threshold = 2;
     }
 
     oneof type {
       CloserThan closer_than = 1;
+      ProjectedMoreThan projected_more_than = 2;
     }
   }
 

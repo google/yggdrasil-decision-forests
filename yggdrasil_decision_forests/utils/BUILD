@@ -216,7 +216,9 @@ cc_library_ydf(
             "@release_or_nightly//:tensorflow_libtensorflow_framework",
             "@release_or_nightly//:tensorflow_tf_header_lib",
         ],
-        "//conditions:default": ["@org_tensorflow//tensorflow/core:lib"],
+        "//conditions:default": [
+            "@org_tensorflow//tensorflow/core:lib",
+        ],
     }),
 )
 
@@ -865,6 +867,17 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "time",
+    srcs = ["time.cc"],
+    hdrs = ["time.h"],
+    deps = [
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time",
+    ],
+)
+
 # Bzl Libraries
 # =============
 
@@ -1330,6 +1343,16 @@ cc_test(
         ":zlib",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "time_test",
+    srcs = ["time_test.cc"],
+    deps = [
+        ":time",
+        "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",
     ],
 )

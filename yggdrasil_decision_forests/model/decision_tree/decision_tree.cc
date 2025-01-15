@@ -50,6 +50,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
@@ -224,16 +225,26 @@ void AddMinimumDepthPerPath(const NodeWithChildren& node, const int depth,
   }
 }
 
+// Returns a human readable representation of the anchor. "max_items" is the
+// maximum number of anchor values to print. If more values are available, "..."
+// is used.
 std::string AnchorToString(
-    const proto::Condition::NumericalVectorSequence::Anchor& anchor) {
+    const proto::Condition::NumericalVectorSequence::Anchor& anchor,
+    const int max_items = -1) {
   std::string result;
   absl::StrAppend(&result, "[");
   for (int i = 0; i < anchor.grounded_size(); ++i) {
+    if (anchor.grounded_size() > max_items && i == max_items - 1) {
+      absl::StrAppend(&result, ", ..., ",
+                      anchor.grounded(anchor.grounded_size() - 1));
+      break;
+    }
     if (i > 0) {
       absl::StrAppend(&result, ", ");
     }
     absl::StrAppendFormat(&result, "%.5g", anchor.grounded(i));
   }
+
   absl::StrAppend(&result, "]");
   return result;
 }
@@ -242,6 +253,8 @@ absl::Span<const float> AnchorToVector(
     const proto::Condition::NumericalVectorSequence::Anchor& anchor) {
   return absl::Span<const float>(anchor.grounded());
 }
+
+}  // namespace
 
 float SquaredDistance(const absl::Span<const float> a,
                       const absl::Span<const float> b) {
@@ -254,7 +267,15 @@ float SquaredDistance(const absl::Span<const float> a,
   return acc;
 }
 
-}  // namespace
+float DotProduct(const absl::Span<const float> a,
+                 const absl::Span<const float> b) {
+  DCHECK_EQ(a.size(), b.size());
+  float acc = 0;
+  for (size_t i = 0; i < a.size(); i++) {
+    acc += a[i] * b[i];
+  }
+  return acc;
+}
 
 std::vector<int32_t> ExactElementsFromContainsCondition(
     int vocab_size, const proto::Condition& condition) {
@@ -357,8 +378,16 @@ void AppendConditionDescription(
           const auto& closer_than =
               node.condition().numerical_vector_sequence().closer_than();
           absl::StrAppend(description, " contains X with | X - ",
-                          AnchorToString(closer_than.anchor()),
-                          " | <= ", closer_than.threshold());
+                          AnchorToString(closer_than.anchor(), 5),
+                          " |² <= ", closer_than.threshold2());
+        } break;
+        case proto::Condition::NumericalVectorSequence::kProjectedMoreThan: {
+          const auto& project_more_than = node.condition()
+                                              .numerical_vector_sequence()
+                                              .projected_more_than();
+          absl::StrAppend(description, " contains X with X @ ",
+                          AnchorToString(project_more_than.anchor(), 5),
+                          " >= ", project_more_than.threshold());
         } break;
         case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
           absl::StrAppend(description, "Invalid vector sequence condition");
@@ -583,8 +612,17 @@ absl::Status NodeWithChildren::ReadNodes(
 }
 
 void NodeWithChildren::CreateChildren() {
+  DCHECK(!children_[0]);
+  DCHECK(!children_[1]);
   children_[0] = std::make_unique<NodeWithChildren>();
   children_[1] = std::make_unique<NodeWithChildren>();
+}
+
+void NodeWithChildren::ClearChildren() {
+  DCHECK(children_[0]);
+  DCHECK(children_[1]);
+  children_[0] = {};
+  children_[1] = {};
 }
 
 void NodeWithChildren::ClearLabelDistributionDetails() {
@@ -825,8 +863,7 @@ struct EvalConditionOblique {
 struct EvalConditionVectorSequenceCloserThan {
   EvalConditionVectorSequenceCloserThan(
       const proto::Condition::NumericalVectorSequence::CloserThan& condition)
-      : condition_(condition),
-        threshold2_(condition_.threshold() * condition_.threshold()) {}
+      : condition_(condition), threshold2_(condition_.threshold2()) {}
 
   absl::StatusOr<bool> operator()(
       const dataset::VerticalDataset::NumericalVectorSequenceColumn& col,
@@ -850,6 +887,37 @@ struct EvalConditionVectorSequenceCloserThan {
 
   const proto::Condition::NumericalVectorSequence::CloserThan& condition_;
   float threshold2_;
+};
+
+struct EvalConditionVectorSequenceProjectedMoreThan {
+  EvalConditionVectorSequenceProjectedMoreThan(
+      const proto::Condition::NumericalVectorSequence::ProjectedMoreThan&
+          condition)
+      : condition_(condition), threshold_(condition_.threshold()) {}
+
+  absl::StatusOr<bool> operator()(
+      const dataset::VerticalDataset::NumericalVectorSequenceColumn& col,
+      UnsignedExampleIdx example_idx, const bool na_value) {
+    if (ABSL_PREDICT_FALSE(col.IsNa(example_idx))) {
+      return na_value;
+    }
+
+    const auto anchor_value = AnchorToVector(condition_.anchor());
+    const auto sequence_len = col.SequenceLength(example_idx);
+    for (int vector_idx = 0; vector_idx < sequence_len; vector_idx++) {
+      ASSIGN_OR_RETURN(const auto vector,
+                       col.GetVector(example_idx, vector_idx));
+      const float p = DotProduct(vector, anchor_value);
+      if (p >= threshold_) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  const proto::Condition::NumericalVectorSequence::ProjectedMoreThan&
+      condition_;
+  float threshold_;
 };
 
 template <typename EvalFn, typename T>
@@ -1048,6 +1116,16 @@ absl::Status EvalConditionOnDataset(
               positive_examples, negative_examples));
 
         } break;
+        case proto::Condition::NumericalVectorSequence::kProjectedMoreThan: {
+          RETURN_IF_ERROR(EvalConditionTemplate(
+              EvalConditionVectorSequenceProjectedMoreThan(
+                  condition.condition()
+                      .numerical_vector_sequence()
+                      .projected_more_than()),
+              examples, *column_data, dataset_is_dense, condition.na_value(),
+              positive_examples, negative_examples));
+
+        } break;
         case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
           return absl::InvalidArgumentError("No vector sequence condition set");
       }
@@ -1199,9 +1277,25 @@ absl::StatusOr<bool> EvalConditionFromColumn(
             ASSIGN_OR_RETURN(const auto vector,
                              col->GetVector(example_idx, vector_idx));
             const float distance2 = SquaredDistance(vector, anchor_value);
-            DCHECK_GT(closer_than.threshold(), 0);
-            if (distance2 <=
-                closer_than.threshold() * closer_than.threshold()) {
+            DCHECK_GT(closer_than.threshold2(), 0);
+            if (distance2 <= closer_than.threshold2()) {
+              return true;
+            }
+          }
+          return false;
+        } break;
+        case proto::Condition::NumericalVectorSequence::kProjectedMoreThan: {
+          const auto& projected_more_than = condition.condition()
+                                                .numerical_vector_sequence()
+                                                .projected_more_than();
+          const auto anchor_value =
+              AnchorToVector(projected_more_than.anchor());
+          const auto sequence_len = col->SequenceLength(example_idx);
+          for (int vector_idx = 0; vector_idx < sequence_len; vector_idx++) {
+            ASSIGN_OR_RETURN(const auto vector,
+                             col->GetVector(example_idx, vector_idx));
+            const float p = DotProduct(vector, anchor_value);
+            if (p >= projected_more_than.threshold()) {
               return true;
             }
           }
@@ -1346,8 +1440,23 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
                attribute.numerical_vector_sequence().vectors()) {
             const absl::Span<const float> vector(proto_vector.values());
             const float distance2 = SquaredDistance(vector, anchor_value);
-            if (distance2 <=
-                closer_than.threshold() * closer_than.threshold()) {
+            if (distance2 <= closer_than.threshold2()) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        case proto::Condition::NumericalVectorSequence::kProjectedMoreThan: {
+          const auto& project_more_than = condition.condition()
+                                              .numerical_vector_sequence()
+                                              .projected_more_than();
+          const auto anchor_value = AnchorToVector(project_more_than.anchor());
+          for (const auto& proto_vector :
+               attribute.numerical_vector_sequence().vectors()) {
+            const absl::Span<const float> vector(proto_vector.values());
+            const float p = DotProduct(vector, anchor_value);
+            if (p >= project_more_than.threshold()) {
               return true;
             }
           }

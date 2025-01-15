@@ -315,9 +315,11 @@ cc_library_ydf(
         "synthetic_dataset.h",
     ],
     deps = [
+        ":data_spec",
         ":formats",
         ":formats_cc_proto",
         ":synthetic_dataset_cc_proto",
+        ":vertical_dataset",
         "//yggdrasil_decision_forests/dataset/tensorflow:tf_example_io_interface",
         "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:csv",
@@ -327,6 +329,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:random",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
     ],
 )
@@ -625,6 +628,7 @@ cc_test(
         ":synthetic_dataset_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
