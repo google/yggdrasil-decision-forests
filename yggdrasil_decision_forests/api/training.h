@@ -23,12 +23,14 @@
 #include <memory>
 #include <string>
 
+#include "absl/log/check.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_builder.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
+#include "yggdrasil_decision_forests/learner/cart/cart.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.pb.h"
@@ -79,6 +81,7 @@ constexpr auto GetLearner =
 // Accesses the hyper-parameters of a gradient boosted decision trees.
 inline model::gradient_boosted_trees::proto::GradientBoostedTreesTrainingConfig*
 GetGradientBoostedTreesTrainingConfig(TrainingConfig* training_config) {
+  DCHECK_EQ(training_config->learner(), "GRADIENT_BOOSTED_TREES");
   return training_config->MutableExtension(
       model::gradient_boosted_trees::proto::gradient_boosted_trees_config);
 }
@@ -86,8 +89,16 @@ GetGradientBoostedTreesTrainingConfig(TrainingConfig* training_config) {
 // Accesses the hyper-parameters of a random forest.
 inline model::random_forest::proto::RandomForestTrainingConfig*
 GetRandomForestTrainingConfig(TrainingConfig* training_config) {
+  DCHECK_EQ(training_config->learner(), "RANDOM_FOREST");
   return training_config->MutableExtension(
       model::random_forest::proto::random_forest_config);
+}
+
+// Accesses the hyper-parameters of a Cart.
+inline model::cart::proto::CartTrainingConfig* GetCartTrainingConfig(
+    TrainingConfig* training_config) {
+  DCHECK_EQ(training_config->learner(), "CART");
+  return training_config->MutableExtension(model::cart::proto::cart_config);
 }
 
 }  // namespace yggdrasil_decision_forests::training_api

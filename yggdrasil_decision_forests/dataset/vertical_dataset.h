@@ -649,12 +649,15 @@ class VerticalDataset {
 
     // Number of vectors in the sequence.
     uint32_t SequenceLength(row_t row) const {
-      const auto& item = items_[row];
-      if (item.size == -1) {
+      DCHECK_GE(row, 0);
+      DCHECK_LT(row, nrows());
+
+      const auto& size = item_sizes_[row];
+      if (size == -1) {
         DCHECK(false);  // Trying to get a missing value.
         return 0;
       }
-      return item.size;
+      return size;
     }
 
     // Gets a view to a vector. "sequence_idx" should be in [0, SequenceLength).
@@ -666,13 +669,14 @@ class VerticalDataset {
       DCHECK_GE(sequence_idx, 0);
       DCHECK_LT(sequence_idx, SequenceLength(row));
 
-      const auto& item = items_[row];
-      if (item.size == -1) {
+      const auto size = item_sizes_[row];
+      if (size == -1) {
         return absl::InvalidArgumentError(
             "Trying to get a vector from a missing vector sequence.");
       }
       return absl::Span<const float>(
-          &values_[item.begin + sequence_idx * vector_length_], vector_length_);
+          &bank_[item_begins_[row] + sequence_idx * vector_length_],
+          vector_length_);
     };
 
     void Add(absl::Span<const float> values);
@@ -722,22 +726,22 @@ class VerticalDataset {
 
     void ShrinkToFit() override;
 
+    const std::vector<float>& bank() const { return bank_; }
+    const std::vector<size_t>& item_begins() const { return item_begins_; }
+    const std::vector<int32_t>& item_sizes() const { return item_sizes_; }
+    int vector_length() const { return vector_length_; }
+
    private:
     // The values of examples i are:
-    //   T_i = values_[items_[i].begin ... items_[i].begin + items_[i].size *
+    //   T_i = bank_[items_begins[i] ... items_begin[i] + items_size[i] *
     //   vector_length_]
     // The d-th dimension of the s-th sequence of example i is:
     //   T_i[s * vector_length_ + d]
-    struct PerExample {
-      size_t begin;
-      int32_t size;  // Size of -1 indicates NA.
 
-      // Constructor required for C++17 compatibility.
-      PerExample(size_t begin, int32_t size) : begin(begin), size(size) {}
-    };
     const int vector_length_;
-    std::vector<float> values_;      // Vector of size num_rows
-    std::vector<PerExample> items_;  // Vector of size num_rows
+    std::vector<float> bank_;          // Vector of size num_rows
+    std::vector<size_t> item_begins_;  // Vector of size num_rows
+    std::vector<int32_t> item_sizes_;  // Vector of size num_rows
   };
 
   VerticalDataset() {}
@@ -1176,13 +1180,14 @@ VerticalDataset::NumericalVectorSequenceColumn::ExtractAndAppendTemplate(
   for (size_t new_idx = 0; new_idx < indices_size; new_idx++) {
     const auto src_row_idx = indices[new_idx];
     const auto dst_row_idx = new_idx + init_dst_nrows;
-    DCHECK_LT(src_row_idx, values_.size());
+    DCHECK_LT(src_row_idx, bank_.size());
     if (!IsNa(src_row_idx)) {
-      const auto num_sequences = items_[src_row_idx].size;
-      cast_dst->items_[dst_row_idx] = {cast_dst->values_.size(), num_sequences};
-      const auto src_it = values_.begin();
-      cast_dst->values_.insert(cast_dst->values_.end(), src_it,
-                               src_it + num_sequences * vector_length_);
+      const auto num_sequences = item_sizes_[src_row_idx];
+      cast_dst->item_begins_[dst_row_idx] = cast_dst->bank_.size();
+      cast_dst->item_sizes_[dst_row_idx] = num_sequences;
+      const auto src_it = bank_.begin() + item_begins_[src_row_idx];
+      cast_dst->bank_.insert(cast_dst->bank_.end(), src_it,
+                             src_it + num_sequences * vector_length_);
     } else {
       cast_dst->SetNA(dst_row_idx);
     }

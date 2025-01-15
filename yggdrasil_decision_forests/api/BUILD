@@ -31,10 +31,12 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:all_learners",
         "//yggdrasil_decision_forests/learner:learner_library",
+        "//yggdrasil_decision_forests/learner/cart:cart_cc_proto",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
         "//yggdrasil_decision_forests/learner/random_forest:random_forest_cc_proto",
         "//yggdrasil_decision_forests/model:all_models",
+        "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status:statusor",
     ],
 )

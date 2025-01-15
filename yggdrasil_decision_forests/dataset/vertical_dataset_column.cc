@@ -68,45 +68,51 @@ VerticalDataset::NumericalVectorSequenceColumn::ToStringWithDigitPrecision(
 
 bool VerticalDataset::NumericalVectorSequenceColumn::IsNa(
     const row_t row) const {
-  return items_[row].size == -1;
+  return item_sizes_[row] == -1;
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::AddNA() {
-  items_.push_back({0, -1});
+  item_begins_.push_back(0);
+  item_sizes_.push_back(-1);
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::SetNA(const row_t row) {
-  items_[row] = {0, -1};
+  item_begins_[row] = 0;
+  item_sizes_[row] = -1;
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::Resize(
     const row_t num_rows) {
-  items_.resize(num_rows, {0, -1});
+  item_begins_.resize(num_rows, 0);
+  item_sizes_.resize(num_rows, -1);
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::Reserve(const row_t row) {
-  items_.reserve(row);
+  item_begins_.reserve(row);
+  item_sizes_.reserve(row);
 }
 
 VerticalDataset::row_t VerticalDataset::NumericalVectorSequenceColumn::nrows()
     const {
-  return items_.size();
+  return item_sizes_.size();
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::Add(
     absl::Span<const float> values) {
   DCHECK_EQ(values.size() % vector_length_, 0);
   const int32_t num_values = values.size() / vector_length_;
-  items_.push_back({values_.size(), num_values});
-  values_.insert(values_.end(), values.begin(), values.end());
+  item_begins_.push_back(bank_.size());
+  item_sizes_.push_back(num_values);
+  bank_.insert(bank_.end(), values.begin(), values.end());
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::Set(
     row_t row, absl::Span<const float> values) {
   DCHECK_EQ(values.size() % vector_length_, 0);
   const int32_t num_values = values.size() / vector_length_;
-  items_[row] = {values_.size(), num_values};
-  values_.insert(values_.end(), values.begin(), values.end());
+  item_begins_[row] = bank_.size();
+  item_sizes_[row] = num_values;
+  bank_.insert(bank_.end(), values.begin(), values.end());
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::AddFromExample(
@@ -116,13 +122,13 @@ void VerticalDataset::NumericalVectorSequenceColumn::AddFromExample(
   } else {
     DCHECK_EQ(attribute.type_case(),
               proto::Example::Attribute::TypeCase::kNumericalVectorSequence);
-    items_.push_back(
-        {values_.size(), attribute.numerical_vector_sequence().vectors_size()});
+    item_begins_.push_back(bank_.size());
+    item_sizes_.push_back(attribute.numerical_vector_sequence().vectors_size());
     for (const auto& src_vector :
          attribute.numerical_vector_sequence().vectors()) {
-      const auto src_values = src_vector.values();
+      const auto& src_values = src_vector.values();
       DCHECK_EQ(src_values.size(), vector_length_);
-      values_.insert(values_.end(), src_values.begin(), src_values.end());
+      bank_.insert(bank_.end(), src_values.begin(), src_values.end());
     }
   }
 }
@@ -134,13 +140,14 @@ void VerticalDataset::NumericalVectorSequenceColumn::Set(
   } else {
     DCHECK_EQ(attribute.type_case(),
               proto::Example::Attribute::TypeCase::kNumericalVectorSequence);
-    items_[example_idx] = {
-        values_.size(), attribute.numerical_vector_sequence().vectors_size()};
+    item_begins_[example_idx] = bank_.size();
+    item_sizes_[example_idx] =
+        attribute.numerical_vector_sequence().vectors_size();
     for (const auto& src_vector :
          attribute.numerical_vector_sequence().vectors()) {
-      const auto src_values = src_vector.values();
+      const auto& src_values = src_vector.values();
       DCHECK_EQ(src_values.size(), vector_length_);
-      values_.insert(values_.end(), src_values.begin(), src_values.end());
+      bank_.insert(bank_.end(), src_values.begin(), src_values.end());
     }
   }
 }
@@ -170,13 +177,16 @@ VerticalDataset::NumericalVectorSequenceColumn::ConvertToGivenDataspec(
 std::pair<uint64_t, uint64_t>
 VerticalDataset::NumericalVectorSequenceColumn::memory_usage() const {
   return std::pair<uint64_t, uint64_t>(
-      items_.size() * sizeof(PerExample) + values_.size() * sizeof(float),
-      items_.capacity() * sizeof(PerExample) +
-          values_.capacity() * sizeof(float));
+      item_sizes_.size() * sizeof(int32_t) +
+          item_begins_.size() * sizeof(size_t) + bank_.size() * sizeof(float),
+      item_sizes_.capacity() * sizeof(int32_t) +
+          item_begins_.capacity() * sizeof(size_t) +
+          bank_.capacity() * sizeof(float));
 }
 
 void VerticalDataset::NumericalVectorSequenceColumn::ShrinkToFit() {
-  items_.shrink_to_fit();
+  item_sizes_.shrink_to_fit();
+  item_begins_.shrink_to_fit();
 }
 
 }  // namespace yggdrasil_decision_forests::dataset

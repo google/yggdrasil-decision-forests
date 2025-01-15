@@ -13,24 +13,19 @@
  * limitations under the License.
  */
 
-// Pseudo random generator used in the entire codebase.
+#ifndef YGGDRASIL_DECISION_FORESTS_UTILS_TIME_H_
+#define YGGDRASIL_DECISION_FORESTS_UTILS_TIME_H_
 
-#ifndef YGGDRASIL_DECISION_FORESTS_UTILS_RANDOM_H_
-#define YGGDRASIL_DECISION_FORESTS_UTILS_RANDOM_H_
+#include <string>
 
-#include <random>
+#include "absl/time/time.h"
 
-namespace yggdrasil_decision_forests {
-namespace utils {
+namespace yggdrasil_decision_forests::utils {
 
-using RandomEngine = std::mt19937;
+// Converts a duration into a string compatible with the training logs (i.e.,
+// limited precision on the seconds, only use hours, minutes and seconds).
+std::string FormatDurationForLogs(const absl::Duration& duration);
 
-template <typename T>
-T RandomUniformInt(const T& n, RandomEngine* random) {
-  return std::uniform_int_distribution<T>(0, n - 1)(*random);
-}
+}  // namespace yggdrasil_decision_forests::utils
 
-}  // namespace utils
-}  // namespace yggdrasil_decision_forests
-
-#endif  // YGGDRASIL_DECISION_FORESTS_UTILS_RANDOM_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_UTILS_TIME_H_

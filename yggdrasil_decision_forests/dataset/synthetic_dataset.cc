@@ -67,10 +67,12 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/formats.pb.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow/tf_example_io_interface.h"
 #include "yggdrasil_decision_forests/dataset/tensorflow_no_dep/tf_example.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/hash.h"
@@ -777,6 +779,83 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
   }
   return absl::OkStatus();
 }
+
+namespace testing {
+
+absl::StatusOr<dataset::VerticalDataset> GenerateVectorSequenceSyntheticDataset(
+    const VectorSequenceSyntheticDatasetOptions& options) {
+  dataset::VerticalDataset dataset;
+
+  // Create dataspec.
+  auto* label_spec =
+      AddColumn(options.label_key, proto::ColumnType::CATEGORICAL,
+                dataset.mutable_data_spec());
+  label_spec->mutable_categorical()->set_is_already_integerized(true);
+  label_spec->mutable_categorical()->set_number_of_unique_values(3);
+
+  for (int feature_idx = 0; feature_idx < options.num_features; feature_idx++) {
+    auto* feature_spec =
+        AddColumn(absl::StrCat(options.features_key_prefix, feature_idx),
+                  proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+                  dataset.mutable_data_spec());
+    feature_spec->mutable_numerical_vector_sequence()->set_vector_length(
+        options.vector_dim);
+  }
+  RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
+
+  // Index raw data.
+  ASSIGN_OR_RETURN(auto* label_col, dataset.MutableColumnWithCastWithStatus<
+                                        VerticalDataset::CategoricalColumn>(0));
+
+  std::vector<VerticalDataset::NumericalVectorSequenceColumn*> feature_cols;
+  feature_cols.reserve(options.num_features);
+  for (int feature_idx = 0; feature_idx < options.num_features; feature_idx++) {
+    ASSIGN_OR_RETURN(
+        auto* feature_col,
+        dataset.MutableColumnWithCastWithStatus<
+            VerticalDataset::NumericalVectorSequenceColumn>(1 + feature_idx));
+    feature_cols.push_back(feature_col);
+  }
+
+  // Populate columns.
+  utils::RandomEngine rng(options.seed);
+  int num_positive_labels = 0;
+  for (int example_idx = 0; example_idx < options.num_examples; example_idx++) {
+    int label = 0;
+
+    // Generate between 0 and 5 random vectors for each feature.
+    for (int feature_idx = 0; feature_idx < options.num_features;
+         feature_idx++) {
+      const int num_vectors = std::uniform_int_distribution<int>(0, 5)(rng);
+      std::vector<float> vectors;
+      vectors.reserve(num_vectors * options.vector_dim);
+      for (int vector_idx = 0; vector_idx < num_vectors; vector_idx++) {
+        double sum_squance_distance = 0;
+        for (int dim_idx = 0; dim_idx < options.vector_dim; dim_idx++) {
+          const float value = std::uniform_real_distribution<float>(0, 1)(rng);
+          vectors.push_back(value);
+          sum_squance_distance += (value - 0.5) * (value - 0.5);
+        }
+        if (sum_squance_distance <=
+            options.distance_limit * options.distance_limit) {
+          label = 1;
+          num_positive_labels++;
+        }
+      }
+      feature_cols[feature_idx]->Add(vectors);
+    }
+
+    // Set the label.
+    label_col->Add(label + 1);
+  }
+
+  LOG(INFO) << "Label distribution: "
+            << static_cast<float>(num_positive_labels) / options.num_examples;
+  dataset.set_nrow(options.num_examples);
+  return dataset;
+}
+
+}  // namespace testing
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

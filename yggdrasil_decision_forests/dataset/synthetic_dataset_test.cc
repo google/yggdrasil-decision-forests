@@ -14,6 +14,7 @@
  */
 
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
+
 #include <string>
 
 #include "gmock/gmock.h"
@@ -26,9 +27,11 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -179,5 +182,19 @@ TEST(SyntheticDataset, Ranking) {
 }
 
 }  // namespace
+namespace testing {
+namespace {
+
+TEST(VectorSequenceSyntheticDataset, Base) {
+  VectorSequenceSyntheticDatasetOptions options;
+  ASSERT_OK_AND_ASSIGN(const auto d,
+                       GenerateVectorSequenceSyntheticDataset(options));
+  LOG(INFO) << "SPEC:\n" << d.data_spec().DebugString();
+  EXPECT_EQ(d.nrow(), options.num_examples);
+  EXPECT_EQ(d.ncol(), options.num_features + 1);
+};
+
+}  // namespace
+}  // namespace testing
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests

@@ -16,9 +16,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_SYNTHETIC_DATASET_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_SYNTHETIC_DATASET_H_
 
+#include <string>
+
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -38,6 +42,29 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
     const proto::SyntheticDatasetOptions& options,
     absl::string_view typed_path_train, absl::string_view typed_path_valid,
     absl::string_view typed_path_test, float ratio_valid, float ratio_test);
+
+// Methods used for testing.
+namespace testing {
+
+// Creates a synthetic dataset with vector sequence input features. Used for
+// unit testing.
+struct VectorSequenceSyntheticDatasetOptions {
+  int seed = 1234;
+  std::string label_key = "l";
+  std::string features_key_prefix = "f";
+  int num_features = 1;
+  int vector_dim = 5;
+  int num_examples = 10000;
+
+  // Note: The label is true when there is a point within "distance_limit" unit
+  // of (0.5, 0.5) in any of the vector-sequence features.
+  float distance_limit = 0.5;
+};
+
+absl::StatusOr<dataset::VerticalDataset> GenerateVectorSequenceSyntheticDataset(
+    const VectorSequenceSyntheticDatasetOptions& options);
+
+}  // namespace testing
 
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
