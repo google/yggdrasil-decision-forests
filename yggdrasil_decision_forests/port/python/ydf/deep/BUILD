@@ -10,6 +10,44 @@ package(
 # =========
 
 py_library(
+    name = "generic_jax",
+    srcs = ["generic_jax.py"],
+    deps = [
+        ":dataset",
+        ":hyperparameter",
+        ":metric",
+        ":preprocessor",
+        # flax:core dep,
+        # jax dep,
+        # jaxtyping dep,
+        # numpy dep,
+        # optax dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
+        "//ydf/cc:ydf",
+        "//ydf/dataset",
+        "//ydf/dataset:dataspec",
+        "//ydf/dataset/io:dataset_io",
+        "//ydf/dataset/io:generator",
+        "//ydf/learner:abstract_feature_selector",
+        "//ydf/learner:generic_learner",
+        "//ydf/learner:hyperparameters",
+        "//ydf/learner:tuner",
+        "//ydf/metric",
+        "//ydf/metric:evaluate",
+        "//ydf/model:analysis",
+        "//ydf/model:feature_selector_logs",
+        "//ydf/model:generic_model",
+        "//ydf/model:model_metadata",
+        "//ydf/model:optimizer_logs",
+        "//ydf/utils:concurrency",
+        "//ydf/utils:html",
+        "//ydf/utils:log",
+    ],
+)
+
+py_library(
     name = "dataset",
     srcs = ["dataset.py"],
     deps = [
@@ -61,8 +99,51 @@ py_library(
     deps = [],
 )
 
+py_library(
+    name = "mlp",
+    srcs = ["mlp.py"],
+    deps = [
+        ":generic_jax",
+        ":hyperparameter",
+        ":layer",
+        # flax:core dep,
+        # jax dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/learner:abstract_feature_selector",
+        "//ydf/learner:generic_learner",
+        "//ydf/learner:tuner",
+        "//ydf/model:generic_model",
+        "//ydf/utils:func_helpers",
+    ],
+)
+
 # Tests
 # =====
+
+py_test(
+    name = "mlp_test",
+    srcs = ["mlp_test.py"],
+    data = [
+        "//test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+    ],
+    python_version = "PY3",
+    shard_count = 4,
+    deps = [
+        ":mlp",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
+        "//ydf/dataset:dataspec",
+        "//ydf/dataset/io:dataset_io",
+        "//ydf/learner:specialized_learners",
+        "//ydf/model:generic_model",
+        "//ydf/utils:test_utils",
+    ],
+)
 
 py_test(
     name = "dataset_test",
