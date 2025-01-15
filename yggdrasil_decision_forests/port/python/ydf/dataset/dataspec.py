@@ -424,6 +424,7 @@ class DataSpecInferenceArgs:
   num_discretized_numerical_bins: int
   max_num_scanned_rows_to_infer_semantic: int
   max_num_scanned_rows_to_compute_statistics: int
+  zscore_numerical_columns: bool = False
 
   def to_proto_guide(self) -> ds_pb.DataSpecificationGuide:
     """Creates a proto DataSpecGuide for these arguments.
