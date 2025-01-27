@@ -162,29 +162,38 @@ void TrainAndTestTester::TrainAndEvaluateModel(
     std::optional<absl::string_view> numerical_weight_attribute,
     const bool emulate_weight_with_duplication,
     std::function<void(void)> callback_training_about_to_start) {
-  model::ModelIOOptions model_io;
-  model_io.file_prefix = "";
+  // TODO: Remove "emulate_weight_with_duplication" argument.
 
+  PrepareDataset(numerical_weight_attribute);
+  TrainModel(callback_training_about_to_start);
+  CHECK_OK(PostTrainingChecks());
+}
+
+void TrainAndTestTester::PrepareDataset(
+    std::optional<absl::string_view> numerical_weight_attribute) {
   // Path to dataset(s).
   std::string dataset_path;
   std::string test_dataset_path;
   std::tie(dataset_path, test_dataset_path) = GetTrainAndTestDatasetPaths();
 
   // Build dataspec.
-  const auto data_spec = BuildDataspec(dataset_path);
+  dataspec_ = BuildDataspec(dataset_path);
 
   // Check and update the configuration.
   int32_t numerical_weight_attribute_idx;
   float max_numerical_weight_value;
-  FixConfiguration(numerical_weight_attribute, data_spec,
+  FixConfiguration(numerical_weight_attribute, dataspec_,
                    &numerical_weight_attribute_idx,
                    &max_numerical_weight_value);
 
   // Instantiate the train and test datasets.
-  BuildTrainValidTestDatasets(data_spec, dataset_path, test_dataset_path,
+  BuildTrainValidTestDatasets(dataspec_, dataset_path, test_dataset_path,
                               numerical_weight_attribute_idx,
                               max_numerical_weight_value);
+}
 
+void TrainAndTestTester::TrainModel(
+    std::function<void(void)> callback_training_about_to_start) {
   // Configure the learner.
   CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
 
@@ -240,10 +249,10 @@ void TrainAndTestTester::TrainAndEvaluateModel(
       const auto valid_dataset_path =
           ShardDataset(valid_dataset_, num_shards_, 1.f, preferred_format_type,
                        "validation");
-      model_or = learner_->TrainWithStatus(train_dataset_path, data_spec,
+      model_or = learner_->TrainWithStatus(train_dataset_path, dataspec_,
                                            valid_dataset_path);
     } else {
-      model_or = learner_->TrainWithStatus(train_dataset_path, data_spec);
+      model_or = learner_->TrainWithStatus(train_dataset_path, dataspec_);
     }
   } else if (pass_validation_dataset_) {
     model_or = learner_->TrainWithStatus(train_dataset_, valid_dataset_);
@@ -263,7 +272,9 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   }
 
   LOG(INFO) << "Training duration: " << training_duration_;
+}
 
+absl::Status TrainAndTestTester::PostTrainingChecks() {
   // Evaluate the model.
   utils::RandomEngine rnd(1234);  // Not used
   if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
@@ -274,7 +285,8 @@ void TrainAndTestTester::TrainAndEvaluateModel(
                 model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
             .value();
   } else {
-    evaluation_ = model_->Evaluate(test_dataset_, eval_options_, &rnd);
+    ASSIGN_OR_RETURN(evaluation_, model_->EvaluateWithStatus(
+                                      test_dataset_, eval_options_, &rnd));
   }
 
   // Print the model evaluation.
@@ -290,17 +302,15 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   CHECK_OK(file::SetContent(html_report_path, html_evaluation_report));
 
   if (!check_model) {
-    return;
+    return absl::OkStatus();
   }
 
   // Save model to disk.
   const std::string model_path =
       file::JoinPath(test::TmpDirectory(), test_dir_, "model");
-  EXPECT_OK(SaveModel(model_path, model_.get(), model_io));
-
-  // LOG(INFO) << "Description:\n"
-  //               <<
-  //               model_->DescriptionAndStatistics(show_full_model_structure_);
+  model::ModelIOOptions model_io;
+  model_io.file_prefix = "";
+  CHECK_OK(SaveModel(model_path, model_.get(), model_io));
 
   const auto check_evaluation_is_equal =
       [this](const metric::proto::EvaluationResults& e1,
@@ -312,19 +322,19 @@ void TrainAndTestTester::TrainAndEvaluateModel(
             //
             // Note: In the next test (see "TestGenericEngine"), we ensure that
             // predictions are equal with a margin of 0.0002.
-            EXPECT_NEAR(metric::Accuracy(e1), metric::Accuracy(e2), 0.002);
-            EXPECT_NEAR(metric::LogLoss(e1), metric::LogLoss(e2), 0.05);
+            CHECK_NEAR(metric::Accuracy(e1), metric::Accuracy(e2), 0.002);
+            CHECK_NEAR(metric::LogLoss(e1), metric::LogLoss(e2), 0.05);
             break;
           case model::proto::Task::REGRESSION:
-            EXPECT_NEAR(metric::RMSE(e1), metric::RMSE(e2), 0.001);
+            CHECK_NEAR(metric::RMSE(e1), metric::RMSE(e2), 0.001);
             break;
           case model::proto::Task::RANKING:
-            EXPECT_NEAR(metric::NDCG(e1), metric::NDCG(e2), 0.001);
+            CHECK_NEAR(metric::NDCG(e1), metric::NDCG(e2), 0.001);
             break;
           case model::proto::Task::CATEGORICAL_UPLIFT:
           case model::proto::Task::NUMERICAL_UPLIFT:
-            EXPECT_NEAR(metric::AUUC(e1), metric::AUUC(e2), 0.001);
-            EXPECT_NEAR(metric::Qini(e1), metric::Qini(e2), 0.001);
+            CHECK_NEAR(metric::AUUC(e1), metric::AUUC(e2), 0.001);
+            CHECK_NEAR(metric::Qini(e1), metric::Qini(e2), 0.001);
             break;
           case model::proto::Task::ANOMALY_DETECTION:
             // No metrics
@@ -337,28 +347,28 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   // Evaluate the model saved to disk.
   LOG(INFO) << "Evaluate model saved to disk";
   std::unique_ptr<model::AbstractModel> loaded_model;
-  EXPECT_OK(LoadModel(model_path, &loaded_model, model_io));
+  CHECK_OK(LoadModel(model_path, &loaded_model, model_io));
   rnd.seed(1234);
   metric::proto::EvaluationResults evaluation_loaded_model;
   if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
-    evaluation_loaded_model =
-        loaded_model
-            ->EvaluateOverrideType(
-                test_dataset_, eval_options_, evaluation_override_type_,
-                model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
-            .value();
+    ASSIGN_OR_RETURN(
+        evaluation_loaded_model,
+        loaded_model->EvaluateOverrideType(
+            test_dataset_, eval_options_, evaluation_override_type_,
+            model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd));
   } else {
-    evaluation_loaded_model =
-        loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+    ASSIGN_OR_RETURN(
+        evaluation_loaded_model,
+        loaded_model->EvaluateWithStatus(test_dataset_, eval_options_, &rnd));
   }
 
   // Test that the exported model evaluation is the same as the original model
   // evaluation.
   check_evaluation_is_equal(evaluation_, evaluation_loaded_model);
 
-  // Model serialization / unserialization.
+  // Model serialization / deserialization.
   if (test_model_serialization_) {
-    TestModelSerialization();
+    RETURN_IF_ERROR(TestModelSerialization());
   }
 
   // Ensure that the predictions of the semi-fast engine are similar as the
@@ -372,46 +382,48 @@ void TrainAndTestTester::TrainAndEvaluateModel(
   rnd.seed(1234);
   metric::proto::EvaluationResults evaluation_loaded_model_no_fast_engine;
   if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
-    evaluation_loaded_model_no_fast_engine =
-        loaded_model
-            ->EvaluateOverrideType(
-                test_dataset_, eval_options_, evaluation_override_type_,
-                model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
-            .value();
+    ASSIGN_OR_RETURN(
+        evaluation_loaded_model_no_fast_engine,
+        loaded_model->EvaluateOverrideType(
+            test_dataset_, eval_options_, evaluation_override_type_,
+            model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd));
   } else {
-    evaluation_loaded_model_no_fast_engine =
-        loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+    ASSIGN_OR_RETURN(
+        evaluation_loaded_model_no_fast_engine,
+        loaded_model->EvaluateWithStatus(test_dataset_, eval_options_, &rnd));
   }
   check_evaluation_is_equal(evaluation_loaded_model,
                             evaluation_loaded_model_no_fast_engine);
 
   // Test that the pure version of the model is equal to the non-pure version.
-  EXPECT_OK(loaded_model->MakePureServing());
+  CHECK_OK(loaded_model->MakePureServing());
   rnd.seed(1234);
   metric::proto::EvaluationResults evaluation_loaded_and_pure_model;
   if (evaluation_override_type_ != model::proto::Task::UNDEFINED) {
-    evaluation_loaded_and_pure_model =
-        loaded_model
-            ->EvaluateOverrideType(
-                test_dataset_, eval_options_, evaluation_override_type_,
-                model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd)
-            .value();
+    ASSIGN_OR_RETURN(
+        evaluation_loaded_and_pure_model,
+        loaded_model->EvaluateOverrideType(
+            test_dataset_, eval_options_, evaluation_override_type_,
+            model_->label_col_idx(), model_->ranking_group_col_idx(), &rnd));
   } else {
-    evaluation_loaded_and_pure_model =
-        loaded_model->Evaluate(test_dataset_, eval_options_, &rnd);
+    ASSIGN_OR_RETURN(
+        evaluation_loaded_and_pure_model,
+        loaded_model->EvaluateWithStatus(test_dataset_, eval_options_, &rnd));
   }
   check_evaluation_is_equal(evaluation_, evaluation_loaded_and_pure_model);
+  return absl::OkStatus();
 }
 
-void TrainAndTestTester::TestModelSerialization() {
-  ASSERT_OK_AND_ASSIGN(const std::string serialized_model,
-                       model::SerializeModel(*model_));
+absl::Status TrainAndTestTester::TestModelSerialization() {
+  ASSIGN_OR_RETURN(const std::string serialized_model,
+                   model::SerializeModel(*model_));
 
-  ASSERT_OK_AND_ASSIGN(
+  ASSIGN_OR_RETURN(
       const std::unique_ptr<model::AbstractModel> deserialized_model,
       model::DeserializeModel(serialized_model));
 
-  EXPECT_EQ(model_->DebugCompare(*deserialized_model), "");
+  CHECK_EQ(model_->DebugCompare(*deserialized_model), "");
+  return absl::OkStatus();
 }
 
 std::pair<std::string, std::string>
@@ -446,7 +458,7 @@ dataset::proto::DataSpecification TrainAndTestTester::BuildDataspec(
     dataset::proto::DataSpecificationGuide loaded_guide;
     const std::string guide_path =
         file::JoinPath(EffectiveDatasetRootDirectory(), guide_filename_);
-    QCHECK_OK(file::GetTextProto(guide_path, &loaded_guide, file::Defaults()));
+    CHECK_OK(file::GetTextProto(guide_path, &loaded_guide, file::Defaults()));
     guide_.MergeFrom(loaded_guide);
   }
   dataset::proto::DataSpecification data_spec;
@@ -658,11 +670,11 @@ void ExpectEqualPredictions(const model::proto::Task task,
                             const model::proto::Prediction& a,
                             const model::proto::Prediction& b) {
   constexpr float epsilon = 0.0002f;
-  EXPECT_EQ(a.type_case(), b.type_case());
+  CHECK_EQ(a.type_case(), b.type_case());
   switch (task) {
     case model::proto::Task::CLASSIFICATION: {
-      EXPECT_EQ(a.classification().distribution().counts().size(),
-                b.classification().distribution().counts().size());
+      CHECK_EQ(a.classification().distribution().counts().size(),
+               b.classification().distribution().counts().size());
       for (int class_idx = 0;
            class_idx < a.classification().distribution().counts().size();
            class_idx++) {
@@ -674,32 +686,32 @@ void ExpectEqualPredictions(const model::proto::Task task,
                         ? (b.classification().distribution().counts(class_idx) /
                            b.classification().distribution().sum())
                         : 0;
-        EXPECT_NEAR(p1, p2, epsilon);
+        CHECK_NEAR(p1, p2, epsilon);
       }
     } break;
 
     case model::proto::Task::REGRESSION:
-      EXPECT_NEAR(a.regression().value(), b.regression().value(), epsilon);
+      CHECK_NEAR(a.regression().value(), b.regression().value(), epsilon);
       break;
 
     case model::proto::Task::RANKING:
-      EXPECT_NEAR(a.ranking().relevance(), b.ranking().relevance(), epsilon);
+      CHECK_NEAR(a.ranking().relevance(), b.ranking().relevance(), epsilon);
       break;
 
     case model::proto::Task::CATEGORICAL_UPLIFT:
     case model::proto::Task::NUMERICAL_UPLIFT: {
-      EXPECT_EQ(a.uplift().treatment_effect().size(),
+      ASSERT_EQ(a.uplift().treatment_effect().size(),
                 b.uplift().treatment_effect().size());
       for (int effect_idx = 0;
            effect_idx < a.uplift().treatment_effect().size(); effect_idx++) {
-        EXPECT_NEAR(a.uplift().treatment_effect(effect_idx),
-                    b.uplift().treatment_effect(effect_idx), epsilon);
+        CHECK_NEAR(a.uplift().treatment_effect(effect_idx),
+                   b.uplift().treatment_effect(effect_idx), epsilon);
       }
     } break;
 
     case model::proto::Task::ANOMALY_DETECTION:
-      EXPECT_NEAR(a.anomaly_detection().value(), b.anomaly_detection().value(),
-                  epsilon);
+      CHECK_NEAR(a.anomaly_detection().value(), b.anomaly_detection().value(),
+                 epsilon);
       break;
 
     default:
@@ -759,31 +771,31 @@ void ExpectEqualPredictions(
               << "Compact format only compatible with binary predictions.";
           // Generic predictions.
           const float pos_probability = get_probability(generic_prediction, 2);
-          EXPECT_NEAR(pos_probability, predictions[prediction_idx], epsilon)
-              << "Predictions don't match.";
+          CHECK_NEAR(pos_probability, predictions[prediction_idx], epsilon)
+              << "row_idx:" << row_idx;
         } else {
           // Precomputed predictions.
           for (int class_idx = 0; class_idx < num_classes; class_idx++) {
             const float probability =
                 get_probability(generic_prediction, class_idx + 1);
-            EXPECT_NEAR(probability,
-                        predictions[prediction_idx * num_classes + class_idx],
-                        epsilon)
-                << "Predictions don't match.";
+            CHECK_NEAR(probability,
+                       predictions[prediction_idx * num_classes + class_idx],
+                       epsilon)
+                << "row_idx:" << row_idx;
           }
         }
       } break;
 
       case model::proto::Task::REGRESSION:
-        EXPECT_NEAR(generic_prediction.regression().value(),
-                    predictions[prediction_idx], epsilon)
-            << "Predictions don't match.";
+        CHECK_NEAR(generic_prediction.regression().value(),
+                   predictions[prediction_idx], epsilon)
+            << "row_idx:" << row_idx;
         break;
 
       case model::proto::Task::RANKING:
-        EXPECT_NEAR(generic_prediction.ranking().relevance(),
-                    predictions[prediction_idx], epsilon)
-            << "Predictions don't match.";
+        CHECK_NEAR(generic_prediction.ranking().relevance(),
+                   predictions[prediction_idx], epsilon)
+            << "row_idx:" << row_idx;
         break;
 
       case model::proto::Task::CATEGORICAL_UPLIFT:
@@ -794,17 +806,17 @@ void ExpectEqualPredictions(
         for (int effect_idx = 0;
              effect_idx < generic_prediction.uplift().treatment_effect_size();
              effect_idx++) {
-          EXPECT_NEAR(generic_prediction.uplift().treatment_effect(effect_idx),
-                      predictions[prediction_idx * num_effects + effect_idx],
-                      epsilon)
-              << "Predictions don't match.";
+          CHECK_NEAR(generic_prediction.uplift().treatment_effect(effect_idx),
+                     predictions[prediction_idx * num_effects + effect_idx],
+                     epsilon)
+              << "row_idx:" << row_idx;
         }
       } break;
 
       case model::proto::Task::ANOMALY_DETECTION:
-        EXPECT_NEAR(generic_prediction.anomaly_detection().value(),
-                    predictions[prediction_idx], epsilon)
-            << "Predictions don't match.";
+        CHECK_NEAR(generic_prediction.anomaly_detection().value(),
+                   predictions[prediction_idx], epsilon)
+            << "row_idx:" << row_idx;
         break;
 
       default:
@@ -848,7 +860,7 @@ void TestPredefinedHyperParameters(
     if (min_accuracy.has_value()) {
       utils::RandomEngine rnd(1234);  // Not used.
       const auto evaluation = model->Evaluate(test_ds, {}, &rnd);
-      EXPECT_GE(metric::Accuracy(evaluation), min_accuracy.value());
+      CHECK_GE(metric::Accuracy(evaluation), min_accuracy.value());
     }
   }
 }
@@ -865,7 +877,7 @@ void TestPredefinedHyperParametersAdultDataset(
   const auto test_ds_path = file::JoinPath(base_ds_path, "adult_test.csv");
   // Create a dataspec.
   dataset::proto::DataSpecification data_spec;
-  ASSERT_OK(
+  CHECK_OK(
       dataset::CreateDataSpecWithStatus(train_ds_path, false, {}, &data_spec));
 
   train_config.set_label("income");
@@ -899,8 +911,8 @@ void TestPredefinedHyperParametersRankingDataset(
   group_guide->set_type(dataset::proto::HASH);
 
   dataset::proto::DataSpecification data_spec;
-  ASSERT_OK(dataset::CreateDataSpecWithStatus(train_ds_path, false, guide,
-                                              &data_spec));
+  CHECK_OK(dataset::CreateDataSpecWithStatus(train_ds_path, false, guide,
+                                             &data_spec));
 
   TestPredefinedHyperParameters(
       train_ds_path, test_ds_path, train_config, data_spec,
@@ -1017,24 +1029,24 @@ void InternalExportMetricCondition(const absl::string_view test,
     CHECK_OK(file::SetContent(path, content));
   } else {
     if (!success_margin) {
-      EXPECT_TRUE(false) << "Non satisfied range condition for " << metric
-                         << " in " << test << "\ndefined at\n"
-                         << file << ":" << line << "\nThe metric value "
-                         << value << " is not in " << center << " +- " << margin
-                         << ".\ni.e. not in [" << (center - margin) << " , "
-                         << (center + margin)
-                         << "].\nThe absolute value of the difference is "
-                         << abs_diff_margin << ".";
+      CHECK(false) << "Non satisfied range condition for " << metric << " in "
+                   << test << "\ndefined at\n"
+                   << file << ":" << line << "\nThe metric value " << value
+                   << " is not in " << center << " +- " << margin
+                   << ".\ni.e. not in [" << (center - margin) << " , "
+                   << (center + margin)
+                   << "].\nThe absolute value of the difference is "
+                   << abs_diff_margin << ".";
     }
 
     if (golden_test && !success_golden) {
-      EXPECT_TRUE(false) << "Non satisfied golden value condition for "
-                         << metric << " in " << test << "\ndefined at\n"
-                         << file << ":" << line << "\nThe metric value "
-                         << value << " is different from " << golden
-                         << " (margin:" << kGoldenMargin
-                         << ").\nThe absolute value of the difference is "
-                         << abs_diff_golden << ".";
+      CHECK(false) << "Non satisfied golden value condition for " << metric
+                   << " in " << test << "\ndefined at\n"
+                   << file << ":" << line << "\nThe metric value " << value
+                   << " is different from " << golden
+                   << " (margin:" << kGoldenMargin
+                   << ").\nThe absolute value of the difference is "
+                   << abs_diff_golden << ".";
     }
   }
 }
@@ -1082,14 +1094,14 @@ void ExpectEqualGoldenModel(const model::AbstractModel& model,
   if (!status.ok()) {
     const std::string observed_model_path =
         file::JoinPath(test::TmpDirectory(), "golden", model_name);
-    ASSERT_OK(model::SaveModel(observed_model_path, &model));
+    CHECK_OK(model::SaveModel(observed_model_path, &model));
 
     LOG(INFO) << "The model unit test failed.";
     LOG(INFO) << "";
     LOG(INFO) << "Update the golden file with:\n"
               << "cp -R " << observed_model_path << " "
               << local_expected_model_path;
-    ASSERT_OK(status);
+    CHECK_OK(status);
   }
 }
 

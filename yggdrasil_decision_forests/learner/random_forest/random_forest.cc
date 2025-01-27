@@ -47,6 +47,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/gpu.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
@@ -69,6 +70,7 @@
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
+#include "yggdrasil_decision_forests/utils/time.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -376,6 +378,15 @@ RandomForestLearner::TrainWithStatusImpl(
         valid_dataset) const {
   // TODO: Divide function into smaller blocks.
   const auto begin_training = absl::Now();
+
+  // Timeout in the tree training.
+  std::optional<absl::Time> timeout;
+  if (training_config().has_maximum_training_duration_seconds()) {
+    timeout =
+        begin_training +
+        absl::Seconds(training_config().maximum_training_duration_seconds());
+  }
+
   RETURN_IF_ERROR(dataset::CheckNumExamples(train_dataset.nrow()));
 
   if (training_config().task() != model::proto::Task::CLASSIFICATION &&
@@ -451,6 +462,21 @@ RandomForestLearner::TrainWithStatusImpl(
                    decision_tree::PreprocessTrainingDataset(
                        train_dataset, config_with_default, config_link,
                        rf_config.decision_tree(), deployment_.num_threads()));
+
+  std::vector<const dataset::VerticalDataset::NumericalVectorSequenceColumn*>
+      vector_sequence_columns(train_dataset.ncol(), nullptr);
+  for (int col_idx = 0; col_idx < train_dataset.ncol(); col_idx++) {
+    vector_sequence_columns[col_idx] = train_dataset.ColumnWithCastOrNull<
+        dataset::VerticalDataset::NumericalVectorSequenceColumn>(col_idx);
+  }
+  std::unique_ptr<decision_tree::gpu::VectorSequenceComputer>
+      vector_sequence_computer;
+  if (!vector_sequence_columns.empty()) {
+    ASSIGN_OR_RETURN(
+        vector_sequence_computer,
+        decision_tree::gpu::VectorSequenceComputer::Create(
+            vector_sequence_columns, /*use_gpu=*/deployment_.use_gpu()));
+  }
 
   utils::RandomEngine global_random(config_with_default.random_seed());
   // Individual seeds for each tree.
@@ -529,7 +555,7 @@ RandomForestLearner::TrainWithStatusImpl(
   }
 
   // If true, only a subset of trees will have been trained.
-  bool training_stopped_early = false;
+  std::atomic<bool> training_stopped_early = false;
 
   std::unique_ptr<utils::AdaptativeWork> adaptative_work;
   if (rf_config.adapt_bootstrap_size_ratio_for_maximum_training_duration()) {
@@ -576,6 +602,7 @@ RandomForestLearner::TrainWithStatusImpl(
   // Note: "num_trained_trees" is defined outside of the following brackets so
   // to make use it is not released before "pool".
   std::atomic<int> num_trained_trees{0};
+  const absl::Time begin_tree_grow = absl::Now();
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         deployment().num_threads(), {.name_prefix = std::string("TrainRF")});
@@ -613,16 +640,18 @@ RandomForestLearner::TrainWithStatusImpl(
           }
         }
 
+        // Check if the training should be stopped.
         {
           utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
           if (!concurrent_fields.status.ok()) {
+            // Some other thread already failed.
             return;
           }
 
-          // Maximum model size.
           if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
             if (concurrent_fields.model_size_in_bytes >
                 training_config().maximum_model_size_in_memory_in_bytes()) {
+              // Reached the model size limit.
               return;
             }
           }
@@ -630,18 +659,21 @@ RandomForestLearner::TrainWithStatusImpl(
           if (rf_config.total_max_num_nodes() > 0) {
             if (concurrent_fields.total_num_nodes_accounted >
                 rf_config.total_max_num_nodes()) {
-              // The num node limits is already exceeded.
+              // Reached the total number of nodes limit.
               return;
             }
           }
         }
 
-        const auto begin_tree_training = absl::Now();
+        const absl::Time begin_single_tree = absl::Now();
 
         utils::RandomEngine random(tree_seeds[tree_idx]);
         // Examples selected for the training.
         // Note: This in the inverse of the Out-of-bag (OOB) set.
+
+        // TODO: Cache.
         std::vector<UnsignedExampleIdx> selected_examples;
+
         auto& decision_tree = (*mdl->mutable_decision_trees())[tree_idx];
         if (rf_config.bootstrap_training_dataset()) {
           if (!rf_config.sampling_with_replacement() &&
@@ -672,17 +704,13 @@ RandomForestLearner::TrainWithStatusImpl(
           std::iota(selected_examples.begin(), selected_examples.end(), 0);
         }
 
-        // Timeout in the tree training.
-        std::optional<absl::Time> timeout;
-        if (training_config().has_maximum_training_duration_seconds()) {
-          timeout = begin_training +
-                    absl::Seconds(
-                        training_config().maximum_training_duration_seconds());
-        }
-
         decision_tree::InternalTrainConfig internal_config;
         internal_config.preprocessing = &preprocessing;
         internal_config.timeout = timeout;
+        if (vector_sequence_computer) {
+          internal_config.vector_sequence_computer =
+              vector_sequence_computer.get();
+        }
         auto status_train = decision_tree::Train(
             train_dataset, selected_examples, config_with_default, config_link,
             rf_config.decision_tree(), deployment(), weights, &random,
@@ -693,6 +721,7 @@ RandomForestLearner::TrainWithStatusImpl(
           utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
           concurrent_fields.status.Update(status_train);
           if (!concurrent_fields.status.ok()) {
+            // The training of the tree has failed.
             return;
           }
 
@@ -747,8 +776,37 @@ RandomForestLearner::TrainWithStatusImpl(
         if (adaptative_work) {
           adaptative_work->ReportTaskDone(
               bootstrap_size_ratio_factor,
-              absl::ToDoubleSeconds(absl::Now() - begin_tree_training));
+              absl::ToDoubleSeconds(absl::Now() - begin_single_tree));
         }
+
+        // General logging
+        const auto build_common_snippet = [&]() -> std::string {
+          std::string snippet =
+              absl::StrFormat("Train tree %d/%d", current_num_trained_trees,
+                              rf_config.num_trees());
+          return snippet;
+        };
+
+        const auto build_common_snippet_extra = [&]() -> std::string {
+          std::string snippet;
+          if (bootstrap_size_ratio_factor < 1.f) {
+            absl::StrAppendFormat(&snippet, " work-factor:%f",
+                                  bootstrap_size_ratio_factor);
+          }
+          if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
+            utils::concurrency::MutexLock lock2(&concurrent_fields.mutex);
+            absl::StrAppendFormat(&snippet, " model-size:%d bytes",
+                                  concurrent_fields.model_size_in_bytes);
+          }
+          const absl::Time now = absl::Now();
+          const std::string since_start =
+              utils::FormatDurationForLogs(now - begin_tree_grow);
+          const std::string time_per_tree =
+              utils::FormatDurationForLogs(now - begin_single_tree);
+          absl::StrAppendFormat(&snippet, " [index:%d total:%s tree:%s]",
+                                tree_idx, since_start, time_per_tree);
+          return snippet;
+        };
 
         // OOB Metrics.
         if (compute_oob_performances) {
@@ -794,21 +852,11 @@ RandomForestLearner::TrainWithStatusImpl(
             mdl->mutable_out_of_bag_evaluations()->push_back(evaluation);
 
             // Print progress in the console.
-            std::string snippet = absl::StrFormat("Training of tree  %d/%d",
-                                                  current_num_trained_trees,
-                                                  rf_config.num_trees());
-            if (bootstrap_size_ratio_factor < 1.f) {
-              absl::StrAppendFormat(&snippet, " work-factor:%f",
-                                    bootstrap_size_ratio_factor);
-            }
-            if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
-              utils::concurrency::MutexLock lock2(&concurrent_fields.mutex);
-              absl::StrAppendFormat(&snippet, " model-size:%d bytes",
-                                    concurrent_fields.model_size_in_bytes);
-            }
-            absl::StrAppendFormat(
-                &snippet, " (tree index:%d) done %s", tree_idx,
+            auto snippet = build_common_snippet();
+            absl::StrAppend(
+                &snippet, " ",
                 internal::EvaluationSnippet(evaluation.evaluation()));
+            absl::StrAppend(&snippet, build_common_snippet_extra());
             LOG(INFO) << snippet;
           }
 
@@ -829,9 +877,7 @@ RandomForestLearner::TrainWithStatusImpl(
           }
         } else {
           LOG_EVERY_N_SEC(INFO, 20)
-              << "Training of tree " << current_num_trained_trees << "/"
-              << rf_config.num_trees() << " (tree index:" << tree_idx
-              << ") done";
+              << build_common_snippet() << build_common_snippet_extra();
         }
       });
     }
@@ -913,6 +959,9 @@ RandomForestLearner::TrainWithStatusImpl(
 
   decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
 
+  if (vector_sequence_computer) {
+    RETURN_IF_ERROR(vector_sequence_computer->Release());
+  }
   return std::move(mdl);
 }
 

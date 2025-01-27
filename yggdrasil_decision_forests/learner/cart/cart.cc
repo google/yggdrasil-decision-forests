@@ -33,6 +33,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
@@ -220,11 +221,11 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   // "valid_dataset" or point to "buffer_valid_dataset".
   dataset::VerticalDataset const* effective_valid_dataset = nullptr;
   dataset::VerticalDataset buffer_valid_dataset;
-  std::vector<UnsignedExampleIdx> train_examples_in_train_ds,
-      valid_examples_in_valid_ds;
+  std::vector<UnsignedExampleIdx> train_examples_in_train_ds;
   if (valid_dataset.has_value()) {
     // The user provided a validation dataset.
     effective_valid_dataset = &valid_dataset.value().get();
+    // Uses all the training examples for growing the tree.
     train_examples_in_train_ds.resize(train_dataset.nrow());
     std::iota(train_examples_in_train_ds.begin(),
               train_examples_in_train_ds.end(), 0);
@@ -244,12 +245,6 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
     }
   }
 
-  if (effective_valid_dataset) {
-    valid_examples_in_valid_ds.resize(effective_valid_dataset->nrow());
-    std::iota(valid_examples_in_valid_ds.begin(),
-              valid_examples_in_valid_ds.end(), 0);
-  }
-
   // Timeout in the tree training.
   std::optional<absl::Time> timeout;
   if (training_config().has_maximum_training_duration_seconds()) {
@@ -267,6 +262,17 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
       decision_tree, internal_config));
 
   if (effective_valid_dataset) {
+    std::vector<UnsignedExampleIdx> valid_examples_in_valid_ds;
+    valid_examples_in_valid_ds.resize(effective_valid_dataset->nrow());
+    std::iota(valid_examples_in_valid_ds.begin(),
+              valid_examples_in_valid_ds.end(), 0);
+
+    std::vector<UnsignedExampleIdx> valid_examples_in_valid_ds_buffer;
+    auto valid_examples_in_valid_ds_rb =
+        decision_tree::SelectedExamplesRollingBuffer::Create(
+            absl::MakeSpan(valid_examples_in_valid_ds),
+            &valid_examples_in_valid_ds_buffer);
+
     // "valid_examples_in_valid_ds" always contains all the examples in
     // "effective_valid_dataset".
     DCHECK_EQ(effective_valid_dataset->nrow(),
@@ -274,7 +280,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
     // Prune the tree.
     const auto num_nodes_pre_pruning = decision_tree->NumNodes();
     RETURN_IF_ERROR(internal::PruneTree(*effective_valid_dataset, weights,
-                                        valid_examples_in_valid_ds, config,
+                                        valid_examples_in_valid_ds_rb, config,
                                         config_link, decision_tree));
     mdl->set_num_pruned_nodes(num_nodes_pre_pruning -
                               decision_tree->NumNodes());
@@ -337,46 +343,49 @@ namespace internal {
 //
 template <typename ScoreAccumulator, typename Label, typename Prediction,
           typename Secondary>
-absl::Status PruneNode(const dataset::VerticalDataset& dataset,
-                       const std::vector<float>& weights,
-                       const std::vector<Label>& labels,
-                       const std::vector<Secondary>& secondary_labels,
-                       const std::vector<UnsignedExampleIdx>& example_idxs,
-                       std::vector<Prediction>* predictions,
-                       model::decision_tree::NodeWithChildren* node) {
+absl::Status PruneNode(
+    const dataset::VerticalDataset& dataset, const std::vector<float>& weights,
+    const std::vector<Label>& labels,
+    const std::vector<Secondary>& secondary_labels,
+    const decision_tree::SelectedExamplesRollingBuffer example_idxs,
+    std::vector<Prediction>* predictions,
+    model::decision_tree::NodeWithChildren* node) {
   if (node->IsLeaf()) {
     // Compute the predictions and return.
     // Leaf cannot be pruned "more".
-    for (const auto& example_idx : example_idxs) {
+    for (const auto example_idx : example_idxs.active) {
       (*predictions)[example_idx] = ScoreAccumulator::LeafToPrediction(node);
     }
     return absl::OkStatus();
   }
 
+  // Note: This copy ensures the values are tested in the same order.
+  // This is a bit less efficiently memory-wise, but make the computation of the
+  // evaluation more local (i.e., faster).
+  const auto save_example_idxs_order = example_idxs.active;
+
   // Maybe prune the children.
-  std::vector<UnsignedExampleIdx> positive_examples, negative_examples;
-  RETURN_IF_ERROR(decision_tree::internal::SplitExamples(
-      dataset, example_idxs, node->node().condition(),
-      /*dataset_is_dense=*/false, /*error_on_wrong_splitter_statistics=*/false,
-      &positive_examples, &negative_examples,
-      /*examples_are_training_examples=*/false));
+  ASSIGN_OR_RETURN(auto example_split,
+                   decision_tree::internal::SplitExamplesInPlace(
+                       dataset, example_idxs, node->node().condition(),
+                       /*dataset_is_dense=*/false,
+                       /*error_on_wrong_splitter_statistics=*/false,
+                       /*examples_are_training_examples=*/false));
 
   RETURN_IF_ERROR((PruneNode<ScoreAccumulator, Label, Prediction, Secondary>(
-      dataset, weights, labels, secondary_labels, positive_examples,
-      predictions, node->mutable_pos_child())));
-  positive_examples.clear();
-  positive_examples.shrink_to_fit();
+      dataset, weights, labels, secondary_labels,
+      example_split.positive_examples, predictions,
+      node->mutable_pos_child())));
 
   RETURN_IF_ERROR((PruneNode<ScoreAccumulator, Label, Prediction, Secondary>(
-      dataset, weights, labels, secondary_labels, negative_examples,
-      predictions, node->mutable_neg_child())));
-  negative_examples.clear();
-  negative_examples.shrink_to_fit();
+      dataset, weights, labels, secondary_labels,
+      example_split.negative_examples, predictions,
+      node->mutable_neg_child())));
 
   // Compare the quality of the current node as a leaf or as a non-leaf.
   ScoreAccumulator score_as_leaf;
   ScoreAccumulator score_as_non_leaf;
-  for (const auto& example_idx : example_idxs) {
+  for (const auto example_idx : save_example_idxs_order) {
     Secondary secondary_label{};
     if (!secondary_labels.empty()) {
       secondary_label = secondary_labels[example_idx];
@@ -397,7 +406,7 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
   node->TurnIntoLeaf();
 
   // Update the predictions with this node as a leaf.
-  for (const auto& example_idx : example_idxs) {
+  for (const auto example_idx : save_example_idxs_order) {
     (*predictions)[example_idx] = ScoreAccumulator::LeafToPrediction(node);
   }
   return absl::OkStatus();
@@ -405,7 +414,7 @@ absl::Status PruneNode(const dataset::VerticalDataset& dataset,
 
 absl::Status PruneTreeClassification(
     const dataset::VerticalDataset& dataset, const std::vector<float> weights,
-    const std::vector<UnsignedExampleIdx>& example_idxs,
+    const decision_tree::SelectedExamplesRollingBuffer example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     model::decision_tree::DecisionTree* tree) {
@@ -445,7 +454,7 @@ absl::Status PruneTreeClassification(
 
 absl::Status PruneTreeRegression(
     const dataset::VerticalDataset& dataset, const std::vector<float> weights,
-    const std::vector<UnsignedExampleIdx>& example_idxs,
+    const decision_tree::SelectedExamplesRollingBuffer example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     model::decision_tree::DecisionTree* tree) {
@@ -486,7 +495,7 @@ absl::Status PruneTreeRegression(
 
 absl::Status PruneTreeUpliftCategorical(
     const dataset::VerticalDataset& dataset, const std::vector<float> weights,
-    const std::vector<UnsignedExampleIdx>& example_idxs,
+    const decision_tree::SelectedExamplesRollingBuffer example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     model::decision_tree::DecisionTree* tree) {
@@ -565,12 +574,12 @@ absl::Status PruneTreeUpliftCategorical(
       tree->mutable_root());
 }
 
-absl::Status PruneTree(const dataset::VerticalDataset& dataset,
-                       const std::vector<float>& weights,
-                       const std::vector<UnsignedExampleIdx>& example_idxs,
-                       const model::proto::TrainingConfig& config,
-                       const model::proto::TrainingConfigLinking& config_link,
-                       model::decision_tree::DecisionTree* tree) {
+absl::Status PruneTree(
+    const dataset::VerticalDataset& dataset, const std::vector<float>& weights,
+    const decision_tree::SelectedExamplesRollingBuffer example_idxs,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    model::decision_tree::DecisionTree* tree) {
   const auto num_nodes_pre_pruning = tree->NumNodes();
 
   switch (config.task()) {

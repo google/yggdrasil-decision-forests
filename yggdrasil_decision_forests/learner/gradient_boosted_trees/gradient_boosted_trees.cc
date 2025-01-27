@@ -55,6 +55,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/gpu.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
@@ -82,6 +83,7 @@
 #include "yggdrasil_decision_forests/utils/snapshot.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
+#include "yggdrasil_decision_forests/utils/time.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -1358,6 +1360,21 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           config.train_config_link, config.gbt_config->decision_tree(),
           deployment_.num_threads()));
 
+  std::vector<const dataset::VerticalDataset::NumericalVectorSequenceColumn*>
+      vector_sequence_columns(train_dataset.ncol(), nullptr);
+  for (int col_idx = 0; col_idx < train_dataset.ncol(); col_idx++) {
+    vector_sequence_columns[col_idx] = train_dataset.ColumnWithCastOrNull<
+        dataset::VerticalDataset::NumericalVectorSequenceColumn>(col_idx);
+  }
+  std::unique_ptr<decision_tree::gpu::VectorSequenceComputer>
+      vector_sequence_computer;
+  if (!vector_sequence_columns.empty()) {
+    ASSIGN_OR_RETURN(
+        vector_sequence_computer,
+        decision_tree::gpu::VectorSequenceComputer::Create(
+            vector_sequence_columns, /*use_gpu=*/deployment_.use_gpu()));
+  }
+
   // Time of the next snapshot if training resume is enabled.
   auto next_snapshot =
       absl::Now() +
@@ -1396,6 +1413,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     goss_weights = weights;
     tree_weights = &goss_weights;
   }
+  const auto begin_tree_grow = absl::Now();
   for (; iter_idx < config.gbt_config->num_trees(); iter_idx++) {
     // The user interrupted the training.
     if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
@@ -1467,7 +1485,10 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           config, deployment().num_threads(), grad_idx, gradients,
           sub_train_predictions, begin_training);
       internal_config.preprocessing = &preprocessing;
-
+      if (vector_sequence_computer) {
+        internal_config.vector_sequence_computer =
+            vector_sequence_computer.get();
+      }
       RETURN_IF_ERROR(decision_tree::Train(
           gradient_sub_train_dataset, selected_examples,
           gradients[grad_idx].config, gradients[grad_idx].config_link,
@@ -1540,9 +1561,9 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           training_loss_result.secondary_metrics.end()};
       log_entry->set_mean_abs_prediction(mean_abs_prediction);
 
-      std::string snippet =
-          absl::StrFormat("\tnum-trees:%d train-loss:%f", iter_idx + 1,
-                          training_loss_result.loss);
+      std::string snippet = absl::StrFormat(
+          "Train tree %d/%d train-loss:%f", iter_idx + 1,
+          config.gbt_config->num_trees(), training_loss_result.loss);
       if (subsample_factor < 1.f) {
         absl::StrAppendFormat(&snippet, " subsample_factor:%f",
                               subsample_factor);
@@ -1599,10 +1620,17 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
         }
       }  // End of validation loss.
 
-      if (iter_idx == 0 || iter_idx == config.gbt_config->num_trees() - 1) {
+      const auto now = absl::Now();
+      const auto since_start =
+          utils::FormatDurationForLogs(now - begin_tree_grow);
+      const auto time_per_tree =
+          utils::FormatDurationForLogs(now - begin_iter_training);
+      absl::StrAppendFormat(&snippet, " [total:%s iter:%s]", since_start,
+                            time_per_tree);
+      if (iter_idx <= 1 || iter_idx == config.gbt_config->num_trees() - 1) {
         LOG(INFO) << snippet;
       } else {
-        LOG_EVERY_N_SEC(INFO, 30) << snippet;
+        LOG_EVERY_N_SEC(INFO, 20) << snippet;
       }
 
       if (training_config().has_maximum_training_duration_seconds() &&
@@ -1667,6 +1695,10 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   }
 
   RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+
+  if (vector_sequence_computer) {
+    RETURN_IF_ERROR(vector_sequence_computer->Release());
+  }
 
   decision_tree::SetLeafIndices(mdl->mutable_decision_trees());
   return std::move(mdl);
@@ -2654,8 +2686,8 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
                    rows_per_groups_decreasing_volume.end(), *random);
       std::sort(rows_per_groups_decreasing_volume.begin(),
                 rows_per_groups_decreasing_volume.end(),
-                [](const std::vector<UnsignedExampleIdx>& a,
-                   const std::vector<UnsignedExampleIdx>& b) {
+                [](const absl::Span<const UnsignedExampleIdx> a,
+                   const absl::Span<const UnsignedExampleIdx> b) {
                   if (a.size() == b.size()) {
                     return std::lexicographical_compare(a.begin(), a.end(),
                                                         b.begin(), b.end());

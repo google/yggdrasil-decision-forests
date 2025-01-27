@@ -67,9 +67,9 @@
 #include <string>
 #include <type_traits>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
+#include "absl/base/nullability.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -77,6 +77,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -159,6 +160,11 @@ struct Rangei32 {
 };
 constexpr Rangei32 kUnitBufferRange = {/*.begin =*/0, /*.end =*/1};
 
+struct RangeV2i32 {
+  int32_t begin;
+  int32_t size;
+};
+
 struct FeatureDef {
   // Name of a feature.
   std::string name;
@@ -170,6 +176,12 @@ struct FeatureDef {
   // Note: Two separate features (e.g. different spec_idx) can have the same
   // internal index.
   int internal_idx;
+};
+
+struct NumericalVectorSequenceFeatureDef : FeatureDef {
+  // Number of float values in a vector.
+  // Similar to the "vector_length" field in the dataspec.
+  int vector_length;
 };
 
 // Definition about the unstacked features (accessible as multi dimensional
@@ -188,8 +200,22 @@ struct UnstackedFeature {
 
 std::ostream& operator<<(std::ostream& os, const FeatureDef& feature);
 
-absl::StatusOr<FeatureDef> FindFeatureDef(const std::vector<FeatureDef>& defs,
-                                          int spec_feature_idx);
+// Returns a non-owning ptr to the feature definition with given
+// "spec_feature_idx" value. The pointer is tied to "defs" and only valid until
+// "defs" is destroyed or modified.
+template <typename T>
+absl::StatusOr<absl::Nonnull<const T*>> FindFeatureDef(
+    const std::vector<T>& defs, int spec_feature_idx) {
+  static_assert(std::is_base_of_v<FeatureDef, T>,
+                "T must be derived from FeatureDef");
+  for (const auto& def : defs) {
+    if (def.spec_idx == spec_feature_idx) {
+      return &def;
+    }
+  }
+  return absl::InvalidArgumentError(
+      absl::Substitute("Unknown feature idx $0", spec_feature_idx));
+}
 
 const FeatureDef* FindFeatureDefFromInternalIndex(
     const std::vector<FeatureDef>& defs, int internal_index);
@@ -214,6 +240,9 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   struct MultiDimNumericalFeatureId {
     int index;
   };
+  struct NumericalVectorSequenceFeatureId {
+    int index;
+  };
 
   // Gets the feature def of a feature from its name.
   // Returns an invalid status if the feature was not found or if the feature
@@ -228,25 +257,26 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
 
     // Test if the feature is in the dataspec i.e. the feature was provided
     // during training but ultimately not used by the model.
-    bool feature_in_dataspec = false;
-    for (const auto& column : data_spec_.columns()) {
-      if (column.name() == name) {
-        feature_in_dataspec = true;
+    int feature_column_idx = -1;
+    for (int column_idx = 0; column_idx < data_spec_.columns_size();
+         column_idx++) {
+      if (data_spec_.columns(column_idx).name() == name) {
+        feature_column_idx = column_idx;
         break;
       }
     }
 
     std::string error_snippet;
-    if (feature_in_dataspec) {
+    if (feature_column_idx != -1) {
       absl::SubstituteAndAppend(
           &error_snippet,
-          " The column \"$0\" is present in the dataspec but it is not used by "
-          "the model (e.g. feature ignored as non-interesting filtered-out "
-          "by the training configuration). Use "
+          " The column \"$0\" (col_idx:$1) is present in the dataspec but it "
+          "is not used by the model (e.g. feature ignored as non-interesting "
+          "filtered-out by the training configuration). Use "
           "\"model.features().HasInputFeature()\" or "
           "\"model.features().input_features()\" to check and list the input "
           "features of the model.",
-          name);
+          name, feature_column_idx);
     }
 
     return absl::InvalidArgumentError(absl::Substitute(
@@ -281,13 +311,13 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
       const int feature_spec_idx) const {
     ASSIGN_OR_RETURN(const auto def,
                      FindFeatureDef(fixed_length_features(), feature_spec_idx));
-    if (def.type != dataset::proto::ColumnType::NUMERICAL &&
-        def.type != dataset::proto::ColumnType::DISCRETIZED_NUMERICAL &&
-        def.type != dataset::proto::ColumnType::BOOLEAN) {
+    if (def->type != dataset::proto::ColumnType::NUMERICAL &&
+        def->type != dataset::proto::ColumnType::DISCRETIZED_NUMERICAL &&
+        def->type != dataset::proto::ColumnType::BOOLEAN) {
       return absl::InvalidArgumentError(
           absl::Substitute("Feature $0 is not numerical", feature_spec_idx));
     }
-    return NumericalFeatureId{def.internal_idx};
+    return NumericalFeatureId{def->internal_idx};
   }
 
   absl::StatusOr<BooleanFeatureId> GetBooleanFeatureId(
@@ -315,11 +345,11 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
       const int feature_spec_idx) const {
     ASSIGN_OR_RETURN(const auto def,
                      FindFeatureDef(fixed_length_features(), feature_spec_idx));
-    if (def.type != dataset::proto::ColumnType::CATEGORICAL) {
+    if (def->type != dataset::proto::ColumnType::CATEGORICAL) {
       return absl::InvalidArgumentError(
           absl::Substitute("Feature $0 is not categorical", feature_spec_idx));
     }
-    return CategoricalFeatureId{def.internal_idx};
+    return CategoricalFeatureId{def->internal_idx};
   }
 
   // Get the identifier of a categorical-set feature.
@@ -333,7 +363,21 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
       const int feature_spec_idx) const {
     ASSIGN_OR_RETURN(const auto def, FindFeatureDef(categorical_set_features(),
                                                     feature_spec_idx));
-    return CategoricalSetFeatureId{def.internal_idx};
+    return CategoricalSetFeatureId{def->internal_idx};
+  }
+
+  absl::StatusOr<NumericalVectorSequenceFeatureId>
+  GetNumericalVectorSequenceFeatureId(const absl::string_view name) const {
+    ASSIGN_OR_RETURN(const auto* def, FindFeatureDefByName(name));
+    return NumericalVectorSequenceFeatureId{def->internal_idx};
+  }
+
+  absl::StatusOr<NumericalVectorSequenceFeatureId>
+  GetNumericalVectorSequenceFeatureId(const int feature_spec_idx) const {
+    ASSIGN_OR_RETURN(
+        const auto def,
+        FindFeatureDef(numerical_vector_sequence_features(), feature_spec_idx));
+    return NumericalVectorSequenceFeatureId{def->internal_idx};
   }
 
   // Get the identifier of a multi-dimensional numerical feature.
@@ -377,6 +421,11 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
     return categorical_set_features_;
   }
 
+  const std::vector<NumericalVectorSequenceFeatureDef>&
+  numerical_vector_sequence_features() const {
+    return numerical_vector_sequence_features_;
+  }
+
   // Specification of the features.
   const DataSpecification& data_spec() const { return data_spec_; }
 
@@ -405,7 +454,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   // Specialization of "Initialize" for "unstacked" features.
   absl::Status InitializeUnstackedFeatures(
       const std::vector<int>& input_features, const DataSpecification& dataspec,
-      const bool missing_numerical_is_na);
+      bool missing_numerical_is_na);
 
   // The name and order of the fixed length input features expected by the
   // model.
@@ -420,11 +469,16 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   // model.
   std::vector<FeatureDef> categorical_set_features_;
 
+  // The name and order of the numerical vector sequence input features expected
+  // by the model.
+  std::vector<NumericalVectorSequenceFeatureDef>
+      numerical_vector_sequence_features_;
+
   // Data specification.
   DataSpecification data_spec_;
 
-  // Index to the "fixed_length_features_" and "categorical_set_features_" by
-  // "name".
+  // Index to the "fixed_length_features_", "categorical_set_features_" and
+  // "numerical_vector_sequence_features_" by "name".
   std::unordered_map<std::string, const FeatureDef*> feature_def_cache_;
 
   // List of "unstacked" features (similar to "unstackeds" in the dataspec).
@@ -489,6 +543,11 @@ class AbstractExampleSet {
       const std::vector<std::string>& values,
       const FeaturesDefinition& features) = 0;
 
+  virtual void SetNumericalVectorSequence(
+      int example_idx,
+      FeaturesDefinition::NumericalVectorSequenceFeatureId feature_id,
+      absl::Span<const float> values, const FeaturesDefinition& features) = 0;
+
   virtual absl::Status SetMultiDimNumerical(
       int example_idx,
       FeaturesDefinition::MultiDimNumericalFeatureId feature_id,
@@ -510,6 +569,11 @@ class AbstractExampleSet {
       int example_idx, FeaturesDefinition::CategoricalSetFeatureId feature_id,
       const FeaturesDefinition& features) = 0;
 
+  virtual void SetMissingNumericalVectorSequence(
+      int example_idx,
+      FeaturesDefinition::NumericalVectorSequenceFeatureId feature_id,
+      const FeaturesDefinition& features) = 0;
+
   virtual void SetMissingMultiDimNumerical(
       int example_idx,
       FeaturesDefinition::MultiDimNumericalFeatureId feature_id,
@@ -522,11 +586,11 @@ class AbstractExampleSet {
                             AbstractExampleSet* dst) const = 0;
 
   virtual absl::Status FromProtoExample(const dataset::proto::Example& src,
-                                        const int example_idx,
+                                        int example_idx,
                                         const FeaturesDefinition& features) = 0;
 
   virtual absl::StatusOr<dataset::proto::Example> ExtractProtoExample(
-      const int example_idx, const FeaturesDefinition& features) const = 0;
+      int example_idx, const FeaturesDefinition& features) const = 0;
 
   virtual void Clear() = 0;
 
@@ -549,6 +613,8 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   using BooleanFeatureId = FeaturesDefinition::BooleanFeatureId;
   using CategoricalFeatureId = FeaturesDefinition::CategoricalFeatureId;
   using CategoricalSetFeatureId = FeaturesDefinition::CategoricalSetFeatureId;
+  using NumericalVectorSequenceFeatureId =
+      FeaturesDefinition::NumericalVectorSequenceFeatureId;
   using MultiDimNumericalFeatureId =
       FeaturesDefinition::MultiDimNumericalFeatureId;
 
@@ -598,6 +664,20 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     return model.features().GetCategoricalSetFeatureId(feature_spec_idx);
   }
 
+  // Get the identifier of a numerical vector sequence feature.
+  static absl::StatusOr<NumericalVectorSequenceFeatureId>
+  GetNumericalVectorSequenceFeatureId(const absl::string_view name,
+                                      const Model& model) {
+    return model.features().GetNumericalVectorSequenceFeatureId(name);
+  }
+
+  static absl::StatusOr<NumericalVectorSequenceFeatureId>
+  GetNumericalVectorSequenceFeatureId(const int feature_spec_idx,
+                                      const Model& model) {
+    return model.features().GetNumericalVectorSequenceFeatureId(
+        feature_spec_idx);
+  }
+
   // Get the identifier of a multi-dimensional numerical feature.
   static absl::StatusOr<MultiDimNumericalFeatureId>
   GetMultiDimNumericalFeatureId(const absl::string_view name,
@@ -623,7 +703,10 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
                                model.features().fixed_length_features().size()),
         num_examples_(num_examples),
         categorical_set_begins_and_ends_(
-            num_examples * model.features().categorical_set_features().size()) {
+            num_examples * model.features().categorical_set_features().size()),
+        numerical_vector_sequence_begins_and_sizes_(
+            num_examples *
+            model.features().numerical_vector_sequence_features().size()) {
     if (UsesNAConditions(model)) {
       store_na_bitmap_ = true;
       na_bitmap_.assign(
@@ -686,6 +769,32 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
                         model) >= 0.5f;
   }
 
+  struct NumericalVectorSequenceValue {
+    const absl::Span<const float> vector_values;
+    const int num_vectors;
+    const int vector_length;
+
+    absl::Span<const float> GetVector(const int vector_idx) const {
+      return vector_values.subspan(vector_idx * vector_length, vector_length);
+    }
+  };
+  NumericalVectorSequenceValue GetNumericalVectorSequence(
+      const int example_idx, const NumericalVectorSequenceFeatureId feature_id,
+      const Model& model) const {
+    const auto vector_length =
+        model.features()
+            .numerical_vector_sequence_features()[feature_id.index]
+            .vector_length;
+
+    auto& range = numerical_vector_sequence_begins_and_sizes_
+        [NumericalVectorSequenceIndex(example_idx, feature_id.index,
+                                      model.features())];
+    return NumericalVectorSequenceValue{
+        absl::MakeConstSpan(numerical_vector_sequence_item_buffer_)
+            .subspan(range.begin, range.size * vector_length),
+        range.size, vector_length};
+  }
+
   // Set the value of an integer categorical feature.
   void SetCategorical(const int example_idx,
                       const CategoricalFeatureId feature_id, const int value,
@@ -745,6 +854,16 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
         example_idx, feature_index, model.features())];
     return categorical_item_buffer_[dst_range.begin] ==
            kMissingCategoricalSetValue;
+  }
+
+  bool IsMissingNumericalVectorSequence(const int example_idx,
+                                        const int feature_index,
+                                        const Model& model) const {
+    DCHECK(store_na_bitmap_);
+    auto& dst_range = numerical_vector_sequence_begins_and_sizes_
+        [NumericalVectorSequenceIndex(example_idx, feature_index,
+                                      model.features())];
+    return dst_range.size == -1;
   }
 
   // Set the value of a string categorical feature.
@@ -847,6 +966,33 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     SetCategoricalSet(example_idx, feature_id, values, model.features());
   }
 
+  void SetNumericalVectorSequence(
+      const int example_idx, const NumericalVectorSequenceFeatureId feature_id,
+      absl::Span<const float> values,
+      const FeaturesDefinition& features) override {
+    const auto vector_length =
+        features.numerical_vector_sequence_features()[feature_id.index]
+            .vector_length;
+    DCHECK_EQ(values.size() % vector_length, 0);
+    const int num_vectors = values.size() / vector_length;
+
+    auto& dst_range = numerical_vector_sequence_begins_and_sizes_
+        [NumericalVectorSequenceIndex(example_idx, feature_id.index, features)];
+
+    dst_range.begin = numerical_vector_sequence_item_buffer_.size();
+    dst_range.size = num_vectors;
+    numerical_vector_sequence_item_buffer_.insert(
+        numerical_vector_sequence_item_buffer_.end(), values.begin(),
+        values.end());
+  }
+
+  void SetNumericalVectorSequence(
+      const int example_idx, const NumericalVectorSequenceFeatureId feature_id,
+      absl::Span<const float> values, const Model& model) {
+    SetNumericalVectorSequence(example_idx, feature_id, values,
+                               model.features());
+  }
+
   absl::Status SetMultiDimNumerical(
       int example_idx, MultiDimNumericalFeatureId feature_id,
       const absl::Span<const float> values,
@@ -934,10 +1080,27 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     categorical_item_buffer_.push_back(kMissingCategoricalSetValue);
     dst_range.end = categorical_item_buffer_.size();
   }
+
   void SetMissingCategoricalSet(const int example_idx,
                                 const CategoricalSetFeatureId feature_id,
                                 const Model& model) {
     SetMissingCategoricalSet(example_idx, feature_id, model.features());
+  }
+
+  void SetMissingNumericalVectorSequence(
+      const int example_idx, const NumericalVectorSequenceFeatureId feature_id,
+      const FeaturesDefinition& features) override {
+    auto& dst_range = numerical_vector_sequence_begins_and_sizes_
+        [NumericalVectorSequenceIndex(example_idx, feature_id.index, features)];
+    dst_range.begin = 0;
+    dst_range.size = -1;
+  }
+
+  void SetMissingNumericalVectorSequence(
+      const int example_idx, const NumericalVectorSequenceFeatureId feature_id,
+      const Model& model) {
+    SetMissingNumericalVectorSequence(example_idx, feature_id,
+                                      model.features());
   }
 
   // Set a missing value of a multi-dimensional numerical feature.
@@ -1011,7 +1174,7 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   }
 
   absl::StatusOr<dataset::proto::Example> ExtractProtoExample(
-      const int example_idx, const FeaturesDefinition& features) const override;
+      int example_idx, const FeaturesDefinition& features) const override;
 
   // Set the value of one example from a proto::Example.
   absl::Status FromProtoExample(const dataset::proto::Example& src,
@@ -1038,6 +1201,11 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     return categorical_set_begins_and_ends_;
   }
 
+  const std::vector<RangeV2i32>& InternalNumericalVectorSequenceBeginAndSizes()
+      const {
+    return numerical_vector_sequence_begins_and_sizes_;
+  }
+
   const std::vector<int32_t>& InternalCategoricalItemBuffer() const {
     return categorical_item_buffer_;
   }
@@ -1048,6 +1216,9 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
                sizeof(NumericalOrCategoricalValue) +
            categorical_set_begins_and_ends_.capacity() * sizeof(Rangei32) +
            categorical_item_buffer_.capacity() * sizeof(int32_t) +
+           numerical_vector_sequence_begins_and_sizes_.capacity() *
+               sizeof(RangeV2i32) +
+           numerical_vector_sequence_item_buffer_.capacity() * sizeof(float) +
            na_bitmap_.capacity() * sizeof(char);
   }
 
@@ -1073,6 +1244,12 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
     return example_idx + categorical_set_feature_idx * num_examples_;
   }
 
+  int NumericalVectorSequenceIndex(
+      const int example_idx, const int numerical_vector_sequence_feature_idx,
+      const FeaturesDefinition& features) const {
+    return example_idx + numerical_vector_sequence_feature_idx * num_examples_;
+  }
+
   // Storage for 32bits fixed length values (currently, numerical and
   // categorical) ordered according to the "format".
   std::vector<NumericalOrCategoricalValue> fixed_length_features_;
@@ -1087,6 +1264,16 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
 
   // Buffer of categorical values. Used to store categorical-set values.
   std::vector<int32_t> categorical_item_buffer_;
+
+  // "numerical_vector_sequence_begins_and_ands_[i]" defines the indexes in
+  // "numerical_vector_sequence_item_buffer_", of the numerical vector sequence
+  // values for the "i-th" example. If size==-1, the value is missing.
+  // "size" represents the number of vectors for a given example. The number of
+  // float-values is "size * vector_length".
+  std::vector<RangeV2i32> numerical_vector_sequence_begins_and_sizes_;
+
+  // Buffer of categorical values. Used to store categorical-set values.
+  std::vector<float> numerical_vector_sequence_item_buffer_;
 
   // If true, store a bitmap of N/A values in `na_bitmap_`. This allows querying
   // if a feature is N/A. Imputation values are stored even if N/A the N/A
@@ -1130,8 +1317,8 @@ struct EmptyModel {
 // Extracts a set of examples from a vertical dataset.
 absl::Status CopyVerticalDatasetToAbstractExampleSet(
     const dataset::VerticalDataset& dataset,
-    const dataset::VerticalDataset::row_t begin_example_idx,
-    const dataset::VerticalDataset::row_t end_example_idx,
+    dataset::VerticalDataset::row_t begin_example_idx,
+    dataset::VerticalDataset::row_t end_example_idx,
     const FeaturesDefinition& features, AbstractExampleSet* examples);
 
 // Converts a Vertical dataset into an example set.
@@ -1170,6 +1357,10 @@ void ExampleSetNumericalOrCategoricalFlat<Model, format>::FillMissing(
   categorical_item_buffer_.assign(1, kMissingCategoricalSetValue);
   std::fill(categorical_set_begins_and_ends_.begin(),
             categorical_set_begins_and_ends_.end(), kUnitBufferRange);
+
+  std::fill(numerical_vector_sequence_begins_and_sizes_.begin(),
+            numerical_vector_sequence_begins_and_sizes_.end(),
+            RangeV2i32{.begin = 0, .size = -1});
 }
 
 template <typename Model, ExampleFormat format>
@@ -1223,6 +1414,30 @@ absl::Status ExampleSetNumericalOrCategoricalFlat<Model, format>::Copy(
           example_idx - begin, CategoricalSetFeatureId{feature.internal_idx},
           categorical_item_buffer_.begin() + src_range.begin,
           categorical_item_buffer_.begin() + src_range.end, features);
+    }
+  }
+
+  // Copy of the numerical vector sequence features.
+  for (const auto& feature : features.numerical_vector_sequence_features()) {
+    for (int64_t example_idx = begin; example_idx < end; example_idx++) {
+      const auto& src_range =
+          numerical_vector_sequence_begins_and_sizes_[example_idx +
+                                                      feature.internal_idx *
+                                                          NumberOfExamples()];
+
+      if (src_range.size == -1) {
+        dst->SetMissingNumericalVectorSequence(
+            example_idx - begin,
+            NumericalVectorSequenceFeatureId{feature.internal_idx}, features);
+      } else {
+        dst->SetNumericalVectorSequence(
+            example_idx - begin,
+            NumericalVectorSequenceFeatureId{feature.internal_idx},
+            absl::MakeConstSpan(numerical_vector_sequence_item_buffer_)
+                .subspan(src_range.begin,
+                         src_range.size * feature.vector_length),
+            features);
+      }
     }
   }
 
@@ -1294,6 +1509,27 @@ ExampleSetNumericalOrCategoricalFlat<Model, format>::FromProtoExample(
           SetMissingCategoricalSet(
               example_idx, CategoricalSetFeatureId{feature.internal_idx},
               features);
+        }
+        break;
+
+      case dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE:
+        if (attribute.has_numerical_vector_sequence()) {
+          const auto& vectors = attribute.numerical_vector_sequence().vectors();
+
+          auto& dst_range = numerical_vector_sequence_begins_and_sizes_
+              [NumericalVectorSequenceIndex(example_idx, feature.internal_idx,
+                                            features)];
+          dst_range.begin = numerical_vector_sequence_item_buffer_.size();
+          dst_range.size = vectors.size();
+          for (const auto& vector : vectors) {
+            numerical_vector_sequence_item_buffer_.insert(
+                numerical_vector_sequence_item_buffer_.end(),
+                vector.values().begin(), vector.values().end());
+          }
+        } else {
+          SetMissingNumericalVectorSequence(
+              example_idx,
+              NumericalVectorSequenceFeatureId{feature.internal_idx}, features);
         }
         break;
 
@@ -1371,6 +1607,28 @@ ExampleSetNumericalOrCategoricalFlat<Model, format>::ExtractProtoExample(
         break;
       }
       dst.add_values(value);
+    }
+  }
+
+  // Extract the example of numerical vector sequence features
+  for (const auto& feature_id : features.numerical_vector_sequence_features()) {
+    auto& dst = *example.mutable_attributes(feature_id.spec_idx)
+                     ->mutable_numerical_vector_sequence();
+    const auto range = numerical_vector_sequence_begins_and_sizes_
+        [NumericalVectorSequenceIndex(example_idx, feature_id.internal_idx,
+                                      features)];
+
+    if (range.size == -1) {
+      // Missing value
+    } else {
+      for (int vector_idx = 0; vector_idx < range.size; vector_idx++) {
+        const auto begin_idx =
+            range.begin + vector_idx * feature_id.vector_length;
+        const auto end_idx = begin_idx + feature_id.vector_length;
+        *dst.add_vectors()->mutable_values() = {
+            numerical_vector_sequence_item_buffer_.begin() + begin_idx,
+            numerical_vector_sequence_item_buffer_.begin() + end_idx};
+      }
     }
   }
 

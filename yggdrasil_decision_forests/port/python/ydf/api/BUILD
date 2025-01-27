@@ -21,3 +21,13 @@ py_library(
     srcs = ["internal.py"],
     deps = ["//ydf/monitoring:benchmark_io_speed"],
 )
+
+py_library(
+    name = "experimental",
+    srcs = ["experimental.py"],
+    deps = [
+        "//ydf/deep:jax_fallback",
+        "//ydf/deep:mlp",
+        "//ydf/deep:tabular_transformer",
+    ],
+)

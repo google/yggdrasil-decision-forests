@@ -29,6 +29,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -75,6 +76,8 @@ using CategoricalSetColumn = ::yggdrasil_decision_forests::dataset::
     VerticalDataset::CategoricalSetColumn;
 using HashColumn =
     ::yggdrasil_decision_forests::dataset::VerticalDataset::HashColumn;
+using NumericalVectorSequenceColumn = ::yggdrasil_decision_forests::dataset::
+    VerticalDataset::NumericalVectorSequenceColumn;
 
 // Checks if all columns of the dataset have the same number of rows and sets
 // the dataset's number of rows accordingly. Columns with 0 rows are resized
@@ -732,6 +735,181 @@ absl::Status PopulateColumnCategoricalSetNPBytes(
   return absl::OkStatus();
 }
 
+template <typename V>
+absl::Status PopulateNumericalVectorSequenceValue(
+    const py::array& value, size_t dst_example_idx, std::vector<float>* cache,
+    NumericalVectorSequenceColumn* column,
+    dataset::proto::NumericalVectorSequenceSpec* column_spec) {
+  if (value.ndim() != 2) {
+    return absl::InvalidArgumentError(
+        "All the numpy arrays should be two-dimensional");
+  }
+  const int num_vectors = value.shape(0);
+  const int vector_dim = value.shape(1);
+
+  if (column_spec->vector_length() != vector_dim) {
+    return absl::InternalError(
+        "Inconsistant number of elements in a numerical vector sequence "
+        "feature");
+  }
+
+  auto unchecked = value.unchecked<V, 2>();
+
+  // Note: We don't do a simple memcpy because we don't know how the numpy
+  // array is organized. Later, we could detect if the numpy array memory is
+  // compatible with a memcpy and use this solution in this case.
+  cache->resize(num_vectors * vector_dim);
+  for (int vector_idx = 0; vector_idx < num_vectors; vector_idx++) {
+    for (int dim_idx = 0; dim_idx < vector_dim; dim_idx++) {
+      (*cache)[vector_idx * vector_dim + dim_idx] =
+          unchecked(vector_idx, dim_idx);
+    }
+  }
+  column->Set(dst_example_idx, *cache);
+  return absl::OkStatus();
+}
+
+absl::Status PopulateColumnNumericalVectorSequence(
+    dataset::VerticalDataset& self, const std::string& name, py::list& data,
+    std::optional<dataset::proto::DType> ydf_dtype,
+    std::optional<int> column_idx) {
+  if (data.empty()) {
+    return absl::InvalidArgumentError("Empty numerical vector sequence");
+  }
+
+  NumericalVectorSequenceColumn* column;
+  dataset::proto::Column* column_spec;
+
+  if (!column_idx.has_value()) {
+    dataset::proto::Column new_column_spec;
+    new_column_spec.set_name(name);
+    new_column_spec.set_type(
+        dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE);
+    if (ydf_dtype.has_value()) {
+      new_column_spec.set_dtype(*ydf_dtype);
+    }
+
+    // Find the number of dimensions of the vectors.
+    if (!py::isinstance<py::array>(data[0])) {
+      return absl::InvalidArgumentError(
+          "All the elements should be numpy arrays");
+    }
+    auto value_array = data[0].cast<py::array>();
+    if (value_array.ndim() != 2) {
+      return absl::InvalidArgumentError(
+          "All the numpy arrays should be of dim 2");
+    }
+    new_column_spec.mutable_numerical_vector_sequence()->set_vector_length(
+        value_array.shape(1));
+
+    dataset::VerticalDataset::AbstractColumn* abstract_column;
+    ASSIGN_OR_RETURN(std::tie(column_spec, abstract_column),
+                     self.AddColumnV2(new_column_spec));
+
+    ASSIGN_OR_RETURN(
+        column, abstract_column
+                    ->MutableCastWithStatus<NumericalVectorSequenceColumn>());
+  } else {
+    ASSIGN_OR_RETURN(
+        column,
+        self.MutableColumnWithCastWithStatus<NumericalVectorSequenceColumn>(
+            column_idx.value()));
+    column_spec = self.mutable_data_spec()->mutable_columns(column_idx.value());
+  }
+
+  auto* special_column_spec = column_spec->mutable_numerical_vector_sequence();
+
+  const size_t offset = column->nrows();
+  column->Resize(data.size() + offset);
+
+  double sum_values = 0;
+  double sum_square_values = 0;
+  double min_value = 0;
+  double max_value = 0;
+  size_t num_valid_values = 0;
+
+  std::vector<float> cache;
+  size_t src_example_idx = 0;
+  for (const auto& value : data) {
+    if (!py::isinstance<py::array>(value)) {
+      return absl::InvalidArgumentError(
+          "All the elements should be numpy arrays");
+    }
+    auto value_array = value.cast<py::array>();
+
+    // Populate the vector dataset column
+    if (py::isinstance<py::array_t<float>>(value_array)) {
+      RETURN_IF_ERROR(PopulateNumericalVectorSequenceValue<float>(
+          value_array, offset + src_example_idx, &cache, column,
+          special_column_spec));
+    } else if (py::isinstance<py::array_t<double>>(value_array)) {
+      RETURN_IF_ERROR(PopulateNumericalVectorSequenceValue<double>(
+          value_array, offset + src_example_idx, &cache, column,
+          special_column_spec));
+    } else if (py::isinstance<py::array_t<std::int32_t>>(value_array)) {
+      RETURN_IF_ERROR(PopulateNumericalVectorSequenceValue<int32_t>(
+          value_array, offset + src_example_idx, &cache, column,
+          special_column_spec));
+    } else if (py::isinstance<py::array_t<std::int64_t>>(value_array)) {
+      RETURN_IF_ERROR(PopulateNumericalVectorSequenceValue<int64_t>(
+          value_array, offset + src_example_idx, &cache, column,
+          special_column_spec));
+    } else {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "Non supported array dtype $0 for a numerical vector sequence value",
+          value_array.dtype().kind()));
+    }
+
+    if (!column_idx.has_value()) {
+      // Update min/max of vector length
+      const int num_vectors = value_array.shape(0);
+      if (!special_column_spec->has_max_num_vectors() ||
+          num_vectors > special_column_spec->max_num_vectors()) {
+        special_column_spec->set_max_num_vectors(num_vectors);
+      }
+      if (!special_column_spec->has_min_num_vectors() ||
+          num_vectors < special_column_spec->min_num_vectors()) {
+        special_column_spec->set_min_num_vectors(num_vectors);
+      }
+
+      // Update value statistics.
+      num_valid_values += cache.size();
+      for (const float v : cache) {
+        sum_values += v;
+        sum_square_values += v * v;
+        if (src_example_idx == 0) {
+          min_value = v;
+          max_value = v;
+        } else {
+          if (v < min_value) {
+            min_value = v;
+          }
+          if (v > max_value) {
+            max_value = v;
+          }
+        }
+      }
+    }
+
+    src_example_idx++;
+  }
+
+  special_column_spec->set_count_values(num_valid_values);
+  if (!column_idx.has_value()) {
+    if (num_valid_values > 0) {
+      const double mean = sum_values / num_valid_values;
+      const double var = sum_square_values / num_valid_values - mean * mean;
+      auto* column_num = column_spec->mutable_numerical();
+      column_num->set_min_value(min_value);
+      column_num->set_max_value(max_value);
+      column_num->set_mean(mean);
+      column_num->set_standard_deviation(std::sqrt(var));
+    }
+  }
+
+  return absl::OkStatus();
+}
+
 // Records, in the dataspec, which column comes from an unrolled
 // multi-dimensional feature. This function can only be called once.
 absl::Status SetMultiDimDataspec(
@@ -1012,6 +1190,10 @@ void init_dataset(py::module_& m) {
            py::arg("max_vocab_count") = -1, py::arg("min_vocab_frequency") = -1,
            py::arg("column_idx") = std::nullopt,
            py::arg("dictionary") = std::nullopt)
+      .def("PopulateColumnNumericalVectorSequence",
+           WithStatus(PopulateColumnNumericalVectorSequence), py::arg("name"),
+           py::arg("data").noconvert(), py::arg("ydf_dtype"),
+           py::arg("column_idx") = std::nullopt)
       .def("SetMultiDimDataspec", WithStatus(SetMultiDimDataspec),
            py::arg("unrolling"),
            "Records, in the dataspec, which columns have been unrolled from "

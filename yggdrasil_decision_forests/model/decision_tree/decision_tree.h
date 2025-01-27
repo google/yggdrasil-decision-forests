@@ -73,12 +73,36 @@ absl::StatusOr<bool> EvalConditionFromColumn(
 absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
                                    const dataset::proto::Example& example);
 
-absl::Status EvalConditionOnDataset(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& examples,
-    const proto::NodeCondition& condition, const bool dataset_is_dense,
-    std::vector<UnsignedExampleIdx>* positive_examples,
-    std::vector<UnsignedExampleIdx>* negative_examples);
+// A list of selected examples, and a related buffer used to do some
+// computation.
+struct SelectedExamplesRollingBuffer {
+  absl::Span<UnsignedExampleIdx> active;
+  absl::Span<UnsignedExampleIdx> inactive;
+
+  size_t size() const { return active.size(); }
+  bool empty() const { return active.empty(); }
+
+  static SelectedExamplesRollingBuffer Create(
+      const absl::Span<UnsignedExampleIdx> active,
+      std::vector<UnsignedExampleIdx>* buffer) {
+    buffer->resize(active.size());
+    return {.active = active, .inactive = absl::MakeSpan(*buffer)};
+  }
+};
+
+struct ExampleSplitRollingBuffer {
+  SelectedExamplesRollingBuffer positive_examples;
+  SelectedExamplesRollingBuffer negative_examples;
+
+  size_t num_positive() const { return positive_examples.size(); }
+  size_t num_negative() const { return negative_examples.size(); }
+};
+
+absl::Status EvalConditionOnDataset(const dataset::VerticalDataset& dataset,
+                                    SelectedExamplesRollingBuffer examples,
+                                    const proto::NodeCondition& condition,
+                                    bool dataset_is_dense,
+                                    ExampleSplitRollingBuffer* example_split);
 
 // Argument to the "CheckStructure" method that tests various aspects of the
 // model structure. By default, "CheckStructureOptions" checks if the model

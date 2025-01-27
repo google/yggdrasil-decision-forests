@@ -58,48 +58,48 @@ using Projection = internal::Projection;
 using ProjectionEvaluator = internal::ProjectionEvaluator;
 using LDACache = internal::LDACache;
 
-// Extracts values using an index i.e. returns "values[selected]".
+}  // namespace
+
 template <typename T>
 std::vector<T> Extract(const std::vector<T>& values,
-                       const std::vector<UnsignedExampleIdx>& selected) {
+                       const absl::Span<const UnsignedExampleIdx> selected) {
   if (values.empty()) {
     return {};
   }
   std::vector<T> extracted(selected.size());
-  for (UnsignedExampleIdx selected_idx = 0; selected_idx < selected.size();
+  for (size_t selected_idx = 0; selected_idx < selected.size();
        selected_idx++) {
     extracted[selected_idx] = values[selected[selected_idx]];
   }
   return extracted;
 }
 
-// Extraction of label values. Different implementations for different types of
-// labels.
+template std::vector<int32_t> Extract<int32_t>(
+    const std::vector<int32_t>& values,
+    const absl::Span<const UnsignedExampleIdx> selected);
+
+template std::vector<float> Extract<float>(
+    const std::vector<float>& values,
+    const absl::Span<const UnsignedExampleIdx> selected);
+
 std::vector<int32_t> ExtractLabels(
     const ClassificationLabelStats& labels,
-    const std::vector<UnsignedExampleIdx>& selected) {
+    const absl::Span<const UnsignedExampleIdx> selected) {
   return Extract(labels.label_data, selected);
 }
 
 std::vector<float> ExtractLabels(
     const RegressionLabelStats& labels,
-    const std::vector<UnsignedExampleIdx>& selected) {
+    const absl::Span<const UnsignedExampleIdx> selected) {
   return Extract(labels.label_data, selected);
 }
 
-struct GradientAndHessian {
-  const std::vector<float> gradient_data;
-  const std::vector<float> hessian_data;
-};
-
 GradientAndHessian ExtractLabels(
     const RegressionHessianLabelStats& labels,
-    const std::vector<UnsignedExampleIdx>& selected) {
+    const absl::Span<const UnsignedExampleIdx> selected) {
   return {/*.gradient_data =*/Extract(labels.gradient_data, selected),
           /*.hessian_data =*/Extract(labels.hessian_data, selected)};
 }
-
-}  // namespace
 
 int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
                       const int num_numerical_features) {
@@ -126,7 +126,7 @@ int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
 template <typename LabelStats>
 absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -286,12 +286,17 @@ template <typename LabelStats, typename Labels>
 absl::StatusOr<SplitSearchResult> EvaluateProjection(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const LabelStats& label_stats,
-    const std::vector<UnsignedExampleIdx>& dense_example_idxs,
+    const absl::Span<const UnsignedExampleIdx> dense_example_idxs,
     const std::vector<float>& selected_weights, const Labels& selected_labels,
-    const std::vector<float>& projection_values,
+    const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
+  InternalTrainConfig effective_internal_config = internal_config;
+  effective_internal_config.override_sorting_strategy =
+      proto::DecisionTreeTrainingConfig::Internal::SortingStrategy::
+          DecisionTreeTrainingConfig_Internal_SortingStrategy_IN_NODE;
+
   const UnsignedExampleIdx min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
@@ -304,14 +309,13 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
 #endif
 
   // Find a good split in the current_projection.
-  // TODO: Why is internal_config not passed along below?
   SplitSearchResult result;
   if constexpr (is_same<LabelStats, ClassificationLabelStats>::value) {
     result = FindSplitLabelClassificationFeatureNumericalCart(
         dense_example_idxs, selected_weights, projection_values,
         selected_labels, label_stats.num_label_classes, na_replacement,
         min_num_obs, dt_config, label_stats.label_distribution,
-        first_attribute_idx, {}, condition, cache);
+        first_attribute_idx, effective_internal_config, condition, cache);
   } else if constexpr (is_same<LabelStats,
                                RegressionHessianLabelStats>::value) {
     if (!selected_weights.empty()) {
@@ -321,7 +325,8 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
           selected_labels.gradient_data, selected_labels.hessian_data,
           na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
           label_stats.sum_hessian, label_stats.sum_weights, first_attribute_idx,
-          internal_config, constraints, monotonic_direction, condition, cache);
+          effective_internal_config, constraints, monotonic_direction,
+          condition, cache);
 
     } else {
       result = FindSplitLabelHessianRegressionFeatureNumericalCart<
@@ -330,21 +335,22 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
           selected_labels.gradient_data, selected_labels.hessian_data,
           na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
           label_stats.sum_hessian, label_stats.sum_weights, first_attribute_idx,
-          internal_config, constraints, monotonic_direction, condition, cache);
+          effective_internal_config, constraints, monotonic_direction,
+          condition, cache);
     }
   } else if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
     if (!selected_weights.empty()) {
       result = FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
           dense_example_idxs, selected_weights, projection_values,
           selected_labels, na_replacement, min_num_obs, dt_config,
-          label_stats.label_distribution, first_attribute_idx, {}, condition,
-          cache);
+          label_stats.label_distribution, first_attribute_idx,
+          effective_internal_config, condition, cache);
     } else {
       result = FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
           dense_example_idxs, selected_weights, projection_values,
           selected_labels, na_replacement, min_num_obs, dt_config,
-          label_stats.label_distribution, first_attribute_idx, {}, condition,
-          cache);
+          label_stats.label_distribution, first_attribute_idx,
+          effective_internal_config, condition, cache);
     }
   } else {
     static_assert(!is_same<LabelStats, LabelStats>::value, "Not implemented.");
@@ -353,16 +359,53 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
   return result;
 }
 
+template absl::StatusOr<SplitSearchResult>
+EvaluateProjection<ClassificationLabelStats, std::vector<int32_t>>(
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const ClassificationLabelStats& label_stats,
+    const absl::Span<const UnsignedExampleIdx> dense_example_idxs,
+    const std::vector<float>& selected_weights,
+    const std::vector<int32_t>& selected_labels,
+    const absl::Span<const float> projection_values,
+    const InternalTrainConfig& internal_config, const int first_attribute_idx,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+EvaluateProjection<RegressionLabelStats, std::vector<float>>(
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const RegressionLabelStats& label_stats,
+    const absl::Span<const UnsignedExampleIdx> dense_example_idxs,
+    const std::vector<float>& selected_weights,
+    const std::vector<float>& selected_labels,
+    const absl::Span<const float> projection_values,
+    const InternalTrainConfig& internal_config, const int first_attribute_idx,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+EvaluateProjection<RegressionHessianLabelStats, GradientAndHessian>(
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const RegressionHessianLabelStats& label_stats,
+    const absl::Span<const UnsignedExampleIdx> dense_example_idxs,
+    const std::vector<float>& selected_weights,
+    const GradientAndHessian& selected_labels,
+    const absl::Span<const float> projection_values,
+    const InternalTrainConfig& internal_config, const int first_attribute_idx,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
 template <typename LabelStats, typename Labels>
 absl::Status EvaluateProjectionAndSetCondition(
     const dataset::proto::DataSpecification& dataspec,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const LabelStats& label_stats,
-    const std::vector<UnsignedExampleIdx>& dense_example_idxs,
+    const absl::Span<const UnsignedExampleIdx> dense_example_idxs,
     const std::vector<float>& selected_weights, const Labels& selected_labels,
-    const std::vector<float>& projection_values, const Projection& projection,
-    const InternalTrainConfig& internal_config, const int first_attribute_idx,
-    proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
+    const absl::Span<const float> projection_values,
+    const Projection& projection, const InternalTrainConfig& internal_config,
+    const int first_attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache) {
   ASSIGN_OR_RETURN(
       const auto result,
       EvaluateProjection(dt_config, label_stats, dense_example_idxs,
@@ -385,11 +428,11 @@ absl::Status EvaluateMHLDCandidates(
     const std::vector<std::vector<int>>& candidates,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const LabelStats& label_stats,
-    const std::vector<UnsignedExampleIdx>& dense_example_idxs,
+    const absl::Span<const UnsignedExampleIdx> dense_example_idxs,
     const std::vector<float>& selected_weights, const Labels& selected_labels,
     const InternalTrainConfig& internal_config,
     const ProjectionEvaluator& projection_evaluator,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     std::vector<proto::NodeCondition>* conditions,
     SplitterPerThreadCache* cache, utils::RandomEngine* random) {
   // TODO: Multi-thread
@@ -477,7 +520,7 @@ absl::StatusOr<std::vector<int>> SampleAttributes(
 template <typename LabelStats>
 absl::StatusOr<bool> FindBestConditionMHLDObliqueTemplate(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -576,7 +619,7 @@ absl::StatusOr<bool> FindBestConditionMHLDObliqueTemplate(
 
 absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -605,7 +648,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
 
 absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -635,7 +678,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
 
 absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -980,7 +1023,7 @@ ProjectionEvaluator::ProjectionEvaluator(
 
 absl::Status ProjectionEvaluator::Evaluate(
     const Projection& projection,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     std::vector<float>* values) const {
   RETURN_IF_ERROR(constructor_status_);
   values->resize(selected_examples.size());
@@ -1007,7 +1050,7 @@ absl::Status ProjectionEvaluator::Evaluate(
 
 absl::Status ProjectionEvaluator::ExtractAttribute(
     const int attribute_idx,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     std::vector<float>* values) const {
   RETURN_IF_ERROR(constructor_status_);
   values->resize(selected_examples.size());

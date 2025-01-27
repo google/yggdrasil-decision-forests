@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -186,6 +187,17 @@ VariableImportanceMapToSortedVector(
   return importance_vec;
 }
 
+std::vector<int> GetAttributes(const decision_tree::NodeWithChildren& node) {
+  const auto& condition = node.node().condition();
+  if (condition.condition().has_oblique_condition()) {
+    return std::vector<int>{
+        condition.condition().oblique_condition().attributes().begin(),
+        condition.condition().oblique_condition().attributes().end()};
+  } else {
+    return {condition.attribute()};
+  }
+}
+
 // For each path "p" and for each feature "i", adds to
 // "min_depth_per_feature[i]" the minimum depth of feature "i" along the path
 // "p".
@@ -199,15 +211,22 @@ VariableImportanceMapToSortedVector(
 // If a feature is effectively seen in the tree, set feature_used[feature_idx]
 // to be true.
 void AddMinimumDepthPerPath(const NodeWithChildren& node, const int depth,
-                            std::vector<int>* stack,
+                            std::vector<std::vector<int>>* stack,
                             std::vector<int>* min_depth_per_feature,
                             std::vector<bool>* feature_used) {
   if (node.IsLeaf()) {
     for (int feature_idx = 0; feature_idx < min_depth_per_feature->size();
          feature_idx++) {
       int min_depth = 0;
-      while (min_depth < stack->size() && (*stack)[min_depth] != feature_idx) {
-        min_depth++;
+      while (min_depth < stack->size()) {
+        const std::vector<int>& current_depth_features = (*stack)[min_depth];
+        if (std::find(current_depth_features.begin(),
+                      current_depth_features.end(),
+                      feature_idx) == current_depth_features.end()) {
+          min_depth++;
+        } else {
+          break;
+        }
       }
 
       if (min_depth < stack->size()) {
@@ -216,7 +235,7 @@ void AddMinimumDepthPerPath(const NodeWithChildren& node, const int depth,
       (*min_depth_per_feature)[feature_idx] += min_depth;
     }
   } else {
-    stack->push_back(node.node().condition().attribute());
+    stack->push_back(GetAttributes(node));
     AddMinimumDepthPerPath(*node.pos_child(), depth + 1, stack,
                            min_depth_per_feature, feature_used);
     AddMinimumDepthPerPath(*node.neg_child(), depth + 1, stack,
@@ -226,8 +245,8 @@ void AddMinimumDepthPerPath(const NodeWithChildren& node, const int depth,
 }
 
 // Returns a human readable representation of the anchor. "max_items" is the
-// maximum number of anchor values to print. If more values are available, "..."
-// is used.
+// maximum number of anchor values to print. If more values are available,
+// "..." is used.
 std::string AnchorToString(
     const proto::Condition::NumericalVectorSequence::Anchor& anchor,
     const int max_items = -1) {
@@ -921,73 +940,94 @@ struct EvalConditionVectorSequenceProjectedMoreThan {
 };
 
 template <typename EvalFn, typename T>
-absl::Status EvalConditionTemplate(
-    EvalFn eval_fn, const std::vector<UnsignedExampleIdx>& examples,
-    const T& data, const bool dataset_is_dense, const bool na_value,
-    std::vector<UnsignedExampleIdx>* positive_examples,
-    std::vector<UnsignedExampleIdx>* negative_examples) {
-  std::vector<UnsignedExampleIdx>* example_sets[2] = {negative_examples,
-                                                      positive_examples};
+absl::Status EvalConditionTemplate(EvalFn eval_fn,
+                                   const SelectedExamplesRollingBuffer examples,
+                                   const T& data, const bool dataset_is_dense,
+                                   const bool na_value,
+                                   ExampleSplitRollingBuffer* example_split) {
+  std::ptrdiff_t next_pos_idx = 0;
+  std::ptrdiff_t next_neg_idx =
+      static_cast<std::ptrdiff_t>(examples.size()) - 1;
+  DCHECK_EQ(examples.active.size(), examples.inactive.size());
+
   if (!dataset_is_dense) {
-    for (const UnsignedExampleIdx example_idx : examples) {
+    for (const UnsignedExampleIdx example_idx : examples.active) {
       ASSIGN_OR_RETURN(const bool eval, eval_fn(data, example_idx, na_value));
-      const auto dst = example_sets[eval];
-      dst->push_back(example_idx);
+      if (eval) {
+        examples.inactive[next_pos_idx] = example_idx;
+        next_pos_idx++;
+      } else {
+        examples.inactive[next_neg_idx] = example_idx;
+        next_neg_idx--;
+      }
     }
   } else {
     UnsignedExampleIdx dense_example_idx = 0;
-    for (const UnsignedExampleIdx example_idx : examples) {
+    for (const UnsignedExampleIdx example_idx : examples.active) {
       ASSIGN_OR_RETURN(const bool eval,
                        eval_fn(data, dense_example_idx, na_value));
-      const auto dst = example_sets[eval];
       dense_example_idx++;
-      dst->push_back(example_idx);
+      if (eval) {
+        examples.inactive[next_pos_idx] = example_idx;
+        next_pos_idx++;
+      } else {
+        examples.inactive[next_neg_idx] = example_idx;
+        next_neg_idx--;
+      }
     }
   }
+  DCHECK_EQ(next_pos_idx, next_neg_idx + 1);
+
+  example_split->positive_examples = {
+      .active = examples.inactive.subspan(0, next_pos_idx),
+      .inactive = examples.active.subspan(0, next_pos_idx)};
+  example_split->negative_examples = {
+      .active = examples.inactive.subspan(next_pos_idx),
+      .inactive = examples.active.subspan(next_pos_idx)};
+
+  // TODO: Populate directly in the right direction, and only use the
+  // "reverse option" is the expected number of positive examples does not match
+  // the evaluation. Alternatively, we can remove the reverse. The results will
+  // be the same (modulo rounding error variation from summing float values in a
+  // different order).
+
+  std::reverse(example_split->negative_examples.active.begin(),
+               example_split->negative_examples.active.end());
   return absl::OkStatus();
 }
 
-void EvalConditionIsNaTemplate(
+absl::Status EvalConditionIsNaTemplate(
     const proto::NodeCondition& condition,
     const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& examples,
-    const bool dataset_is_dense,
-    std::vector<UnsignedExampleIdx>* positive_examples,
-    std::vector<UnsignedExampleIdx>* negative_examples) {
-  std::vector<UnsignedExampleIdx>* example_sets[2] = {negative_examples,
-                                                      positive_examples};
-  const auto column_data = dataset.column(condition.attribute());
+    SelectedExamplesRollingBuffer examples, const bool dataset_is_dense,
+    ExampleSplitRollingBuffer* example_split) {
+  const dataset::VerticalDataset::AbstractColumn& column_data =
+      *dataset.column(condition.attribute());
 
-  if (!dataset_is_dense) {
-    for (const UnsignedExampleIdx example_idx : examples) {
-      const bool eval = column_data->IsNa(example_idx);
-      const auto dst = example_sets[eval];
-      dst->push_back(example_idx);
+  struct EvalConditionIsNaValue {
+    absl::StatusOr<bool> operator()(
+        const dataset::VerticalDataset::AbstractColumn& data,
+        UnsignedExampleIdx example_idx, const bool na_value) {
+      return data.IsNa(example_idx);
     }
-  } else {
-    UnsignedExampleIdx dense_example_idx = 0;
-    for (const UnsignedExampleIdx example_idx : examples) {
-      const bool eval = column_data->IsNa(dense_example_idx);
-      const auto dst = example_sets[eval];
-      dense_example_idx++;
-      dst->push_back(example_idx);
-    }
-  }
+  };
+
+  return EvalConditionTemplate(EvalConditionIsNaValue(), examples, column_data,
+                               dataset_is_dense, false, example_split);
 }
 
-absl::Status EvalConditionOnDataset(
-    const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& examples,
-    const proto::NodeCondition& condition, const bool dataset_is_dense,
-    std::vector<UnsignedExampleIdx>* positive_examples,
-    std::vector<UnsignedExampleIdx>* negative_examples) {
+absl::Status EvalConditionOnDataset(const dataset::VerticalDataset& dataset,
+                                    SelectedExamplesRollingBuffer examples,
+                                    const proto::NodeCondition& condition,
+                                    const bool dataset_is_dense,
+                                    ExampleSplitRollingBuffer* example_split) {
   switch (condition.condition().type_case()) {
     case proto::Condition::TypeCase::TYPE_NOT_SET:
       return absl::InvalidArgumentError("Non set condition");
 
     case proto::Condition::TypeCase::kNaCondition:
-      EvalConditionIsNaTemplate(condition, dataset, examples, dataset_is_dense,
-                                positive_examples, negative_examples);
+      RETURN_IF_ERROR(EvalConditionIsNaTemplate(
+          condition, dataset, examples, dataset_is_dense, example_split));
       break;
 
     case proto::Condition::TypeCase::kTrueValueCondition: {
@@ -998,7 +1038,7 @@ absl::Status EvalConditionOnDataset(
       const auto& data = column_data->values();
       RETURN_IF_ERROR(EvalConditionTemplate(
           EvalConditionTrueValue(), examples, data, dataset_is_dense,
-          condition.na_value(), positive_examples, negative_examples));
+          condition.na_value(), example_split));
     } break;
 
     case proto::Condition::TypeCase::kDiscretizedHigherCondition: {
@@ -1012,7 +1052,7 @@ absl::Status EvalConditionOnDataset(
           EvalConditionDiscretizedHigher(
               condition.condition().discretized_higher_condition()),
           examples, data, dataset_is_dense, condition.na_value(),
-          positive_examples, negative_examples));
+          example_split));
     } break;
 
     case proto::Condition::TypeCase::kHigherCondition: {
@@ -1024,7 +1064,7 @@ absl::Status EvalConditionOnDataset(
       RETURN_IF_ERROR(EvalConditionTemplate(
           EvalConditionHigher(condition.condition().higher_condition()),
           examples, data, dataset_is_dense, condition.na_value(),
-          positive_examples, negative_examples));
+          example_split));
     } break;
 
     case proto::Condition::TypeCase::kContainsCondition: {
@@ -1039,7 +1079,7 @@ absl::Status EvalConditionOnDataset(
             EvalConditionContainsCategorical(
                 condition.condition().contains_condition()),
             examples, data, dataset_is_dense, condition.na_value(),
-            positive_examples, negative_examples));
+            example_split));
       } else if (column_data->type() ==
                  dataset::proto::ColumnType::CATEGORICAL_SET) {
         ASSIGN_OR_RETURN(const auto* column_data,
@@ -1050,7 +1090,7 @@ absl::Status EvalConditionOnDataset(
             EvalConditionContainsCategoricalSet(
                 condition.condition().contains_condition()),
             examples, *column_data, dataset_is_dense, condition.na_value(),
-            positive_examples, negative_examples));
+            example_split));
       } else {
         return absl::InternalError(absl::StrCat(
             "Non supported column type for kContainsCondition condition: ",
@@ -1070,7 +1110,7 @@ absl::Status EvalConditionOnDataset(
             EvalConditionContainsBitmapCategorical(
                 condition.condition().contains_bitmap_condition()),
             examples, data, dataset_is_dense, condition.na_value(),
-            positive_examples, negative_examples));
+            example_split));
       } else if (column_data->type() ==
                  dataset::proto::ColumnType::CATEGORICAL_SET) {
         ASSIGN_OR_RETURN(const auto* column_data,
@@ -1081,7 +1121,7 @@ absl::Status EvalConditionOnDataset(
             EvalConditionContainsBitmapCategoricalSet(
                 condition.condition().contains_bitmap_condition()),
             examples, *column_data, dataset_is_dense, condition.na_value(),
-            positive_examples, negative_examples));
+            example_split));
       } else {
         return absl::InternalError(
             absl::StrCat("Non supported column type for "
@@ -1096,7 +1136,7 @@ absl::Status EvalConditionOnDataset(
                                             dataset, ob_condition));
       RETURN_IF_ERROR(EvalConditionTemplate(
           EvalConditionOblique(ob_condition), examples, data, dataset_is_dense,
-          condition.na_value(), positive_examples, negative_examples));
+          condition.na_value(), example_split));
     } break;
 
     case proto::Condition::TypeCase::kNumericalVectorSequence: {
@@ -1107,13 +1147,13 @@ absl::Status EvalConditionOnDataset(
               condition.attribute()));
       switch (condition.condition().numerical_vector_sequence().type_case()) {
         case proto::Condition::NumericalVectorSequence::kCloserThan: {
-          RETURN_IF_ERROR(EvalConditionTemplate(
-              EvalConditionVectorSequenceCloserThan(
-                  condition.condition()
-                      .numerical_vector_sequence()
-                      .closer_than()),
-              examples, *column_data, dataset_is_dense, condition.na_value(),
-              positive_examples, negative_examples));
+          RETURN_IF_ERROR(
+              EvalConditionTemplate(EvalConditionVectorSequenceCloserThan(
+                                        condition.condition()
+                                            .numerical_vector_sequence()
+                                            .closer_than()),
+                                    examples, *column_data, dataset_is_dense,
+                                    condition.na_value(), example_split));
 
         } break;
         case proto::Condition::NumericalVectorSequence::kProjectedMoreThan: {
@@ -1123,7 +1163,7 @@ absl::Status EvalConditionOnDataset(
                       .numerical_vector_sequence()
                       .projected_more_than()),
               examples, *column_data, dataset_is_dense, condition.na_value(),
-              positive_examples, negative_examples));
+              example_split));
 
         } break;
         case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
@@ -1733,7 +1773,12 @@ absl::Status NodeWithChildren::Validate(
         }
         break;
       case proto::Condition::kNumericalVectorSequence:
-        return absl::InvalidArgumentError("Not implemented");
+        if (attribute_spec.type() !=
+            dataset::proto::NUMERICAL_VECTOR_SEQUENCE) {
+          return absl::InvalidArgumentError(
+              "Invalid condition. Expect numerical vector sequence feature.");
+        }
+        break;
       case proto::Condition::TYPE_NOT_SET:
         return absl::InvalidArgumentError("Unknown condition");
     }
@@ -1933,7 +1978,9 @@ std::vector<model::proto::VariableImportance> StructureNumberOfTimesAsRoot(
   absl::flat_hash_map<int, double> importance;
   for (const auto& tree : decision_trees) {
     if (!tree->root().IsLeaf()) {
-      importance[tree->root().node().condition().attribute()]++;
+      for (const auto& att : GetAttributes(tree->root())) {
+        importance[att]++;
+      }
     }
   }
   return VariableImportanceMapToSortedVector(importance);
@@ -1947,7 +1994,9 @@ std::vector<model::proto::VariableImportance> StructureNumberOfTimesInNode(
     tree->IterateOnNodes(
         [&](const decision_tree::NodeWithChildren& node, const int depth) {
           if (!node.IsLeaf()) {
-            importance[node.node().condition().attribute()]++;
+            for (const auto& att : GetAttributes(node)) {
+              importance[att]++;
+            }
           }
         });
   }
@@ -1966,7 +2015,7 @@ std::vector<model::proto::VariableImportance> StructureMeanMinDepth(
 
   for (auto& tree : decision_trees) {
     const auto num_nodes = tree->NumLeafs();
-    std::vector<int> stack;
+    std::vector<std::vector<int>> stack;
     std::vector<int> min_depth_per_feature(num_features, 0);
     std::vector<bool> feature_used(num_features, false);
 
@@ -2009,9 +2058,12 @@ std::vector<model::proto::VariableImportance> StructureSumScore(
     tree->IterateOnNodes(
         [&](const decision_tree::NodeWithChildren& node, const int depth) {
           if (!node.IsLeaf()) {
-            importance[node.node().condition().attribute()] +=
+            const double weighted_score =
                 node.node().condition().split_score() *
                 node.node().condition().num_training_examples_with_weight();
+            for (const auto& att : GetAttributes(node)) {
+              importance[att] += weighted_score;
+            }
           }
         });
   }

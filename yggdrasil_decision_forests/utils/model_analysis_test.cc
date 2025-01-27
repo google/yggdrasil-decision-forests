@@ -140,6 +140,7 @@ TEST(ModelAnalysis, AnomalyDetection) {
   options.set_num_threads(1);
   options.set_html_id_prefix("my_report");
   options.mutable_report_header()->set_enabled(false);
+  options.mutable_permuted_variable_importance()->set_enabled(false);
   const auto report_path = file::JoinPath(test::TmpDirectory(), "analysis");
 
   ASSERT_OK_AND_ASSIGN(const auto analysis,

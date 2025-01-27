@@ -1134,8 +1134,8 @@ Use `model.describe()` for more details
   def test_model_save_pure_serving(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(),
-        "golden",
-        "gbt_adult_base",
+        "model",
+        "adult_binary_class_gbdt",
     )
     with open(os.path.join(model_path, "header.pb"), "rb") as f:
       header = abstract_model_pb2.AbstractModel.FromString(f.read())

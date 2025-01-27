@@ -298,6 +298,46 @@ absl::Status SetObliqueCondition(
   return absl::OkStatus();
 }
 
+template <typename SpecializedModel>
+absl::Status SetNumericalVectorSequenceCondition(
+    const model::decision_tree::proto::Condition::NumericalVectorSequence&
+        condition,
+    const FeatureDefMap& spec_idx_to_feature, SpecializedModel* dst_model,
+    typename SpecializedModel::NodeType* dst_node) {
+  using GenericNode = typename SpecializedModel::NodeType;
+
+  const model::decision_tree::proto::Condition::NumericalVectorSequence::Anchor*
+      anchor = nullptr;
+  float threshold;
+  switch (condition.type_case()) {
+    case model::decision_tree::proto::Condition::NumericalVectorSequence::
+        kCloserThan: {
+      dst_node->type = GenericNode::Type::kNumericalVectorSequenceCloserThan;
+      anchor = &condition.closer_than().anchor();
+      threshold = condition.closer_than().threshold2();
+    } break;
+    case model::decision_tree::proto::Condition::NumericalVectorSequence::
+        kProjectedMoreThan: {
+      dst_node->type =
+          GenericNode::Type::kNumericalVectorSequenceProjectedMoreThan;
+      anchor = &condition.projected_more_than().anchor();
+      threshold = condition.projected_more_than().threshold();
+    } break;
+    case model::decision_tree::proto::Condition::NumericalVectorSequence::
+        TYPE_NOT_SET:
+      return absl::InvalidArgumentError(
+          "Invalid numerical vector sequence condition");
+  }
+
+  dst_node->numerical_vector_sequence_offset =
+      dst_model->numerical_vector_sequence_anchor_weights.size();
+  dst_model->numerical_vector_sequence_anchor_weights.insert(
+      dst_model->numerical_vector_sequence_anchor_weights.end(),
+      anchor->grounded().begin(), anchor->grounded().end());
+  dst_model->numerical_vector_sequence_anchor_weights.push_back(threshold);
+  return absl::OkStatus();
+}
+
 // Set the value of a non-leaf nodes for "generic" models i.e. models that
 // support all (or almost all) types of conditions.
 template <
@@ -425,6 +465,13 @@ absl::Status SetNonLeafNode(const GenericModel& src_model,
           src_node.node().condition().condition().oblique_condition();
       RETURN_IF_ERROR(SetObliqueCondition(condition, spec_idx_to_feature,
                                           dst_model, dst_node));
+    } break;
+
+    case ConditionType::kNumericalVectorSequence: {
+      const auto& condition =
+          src_node.node().condition().condition().numerical_vector_sequence();
+      RETURN_IF_ERROR(SetNumericalVectorSequenceCondition(
+          condition, spec_idx_to_feature, dst_model, dst_node));
     } break;
 
     case ConditionType::kNaCondition: {

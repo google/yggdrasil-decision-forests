@@ -58,7 +58,6 @@ run_test() {
   set -e
 
   echo "YOu can run one of the following commands:"
-  echo "INSTALL_DEPENDENCIES=1 COMPILERS="clang-12" CPP_VERSIONS="14" ./tools/test_bazel.sh"
   echo "INSTALL_DEPENDENCIES=1 COMPILERS="clang-12" CPP_VERSIONS="17" ./tools/test_bazel.sh"
   if [[ "$INTERACTIVE" = 1 ]]; then
     CMD='$SHELL'

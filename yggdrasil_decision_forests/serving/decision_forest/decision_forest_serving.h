@@ -120,6 +120,8 @@ struct GenericNode {
     kNumericalObliqueProjectionIsHigher,
     kNumericalAndCategoricalIsNa,
     kCategoricalSetIsNa,
+    kNumericalVectorSequenceCloserThan,
+    kNumericalVectorSequenceProjectedMoreThan,
   };
   // Type of the node (leaf or condition type).
   Type type;
@@ -154,6 +156,13 @@ struct GenericNode {
     // * feature_values[oblique_feature_idxs[offset+i].feature_idx] >=
     // weights[offset+num_oblique_projections].
     uint32_t oblique_projection_offset;
+
+    // Offset to the first value of the anchor in
+    // "numerical_vector_sequence_anchor_weights" i.e. the anchor is
+    // numerical_vector_sequence_anchor_weights[offset...offset+vector_dim].
+    // If the condition uses a threshold, this one is stored at
+    // numerical_vector_sequence_anchor_weights[offset+vector_dim].
+    uint32_t numerical_vector_sequence_offset;
   };
 
   // Simple one dimension output leaf constructor.
@@ -220,6 +229,10 @@ struct FlatNodeModel {
   // documentation about these fields.
   std::vector<float> oblique_weights;
   std::vector<typename Node::FeatureIdx> oblique_internal_feature_idxs;
+
+  // Buffer of value for static anchor and thresholds in numerical vector
+  // sequence conditions.
+  std::vector<float> numerical_vector_sequence_anchor_weights;
 
   // True if and only if the model uses N/A conditions.
   bool uses_na_conditions = false;

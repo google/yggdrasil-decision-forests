@@ -16,6 +16,7 @@
 
 # pylint: disable=g-statement-before-imports,g-importing-member,g-import-not-at-top,g-bad-import-order,reimported
 
+
 def _check_install():
   from yggdrasil_decision_forests.dataset import data_spec_pb2
 
@@ -86,6 +87,15 @@ from ydf.model.generic_model import from_sklearn
 from ydf.model.generic_model import NodeFormat
 from ydf.metric.evaluate import evaluate_predictions
 
+from yggdrasil_decision_forests.dataset.data_spec_pb2 import DataSpecification
+from yggdrasil_decision_forests.learner.abstract_learner_pb2 import TrainingConfig
+
+# Silent proto exentions
+from yggdrasil_decision_forests.learner.gradient_boosted_trees import gradient_boosted_trees_pb2 as _
+from yggdrasil_decision_forests.learner.isolation_forest import isolation_forest_pb2 as _
+from yggdrasil_decision_forests.learner.random_forest import random_forest_pb2 as _
+from yggdrasil_decision_forests.learner.cart import cart_pb2 as _
+
 # Custom Loss
 from ydf.learner.custom_loss import RegressionLoss
 from ydf.learner.custom_loss import BinaryClassificationLoss
@@ -103,6 +113,10 @@ from ydf.api import util
 # Internals
 
 from ydf.api import internal
+
+# Experimental
+
+from ydf.api import experimental
 
 
 # pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported

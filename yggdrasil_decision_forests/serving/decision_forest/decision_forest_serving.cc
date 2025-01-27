@@ -22,6 +22,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "absl/types/span.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
@@ -131,6 +133,9 @@ inline bool EvalCondition(const typename Model::NodeType* node,
                           const int example_idx, const Model& model) {
   using GenericNode = typename Model::NodeType;
   switch (node->type) {
+    case GenericNode::Type::kLeaf:
+      NOTREACHED();
+      return false;
     case GenericNode::Type::kNumericalIsHigherMissingIsFalse:
     case GenericNode::Type::kNumericalIsHigherMissingIsTrue: {
       const auto attribute_value =
@@ -194,6 +199,57 @@ inline bool EvalCondition(const typename Model::NodeType* node,
                                           num_projection];
     }
 
+    case GenericNode::Type::kNumericalVectorSequenceCloserThan: {
+      const int vector_length =
+          model.features()
+              .numerical_vector_sequence_features()[node->feature_idx]
+              .vector_length;
+      const auto anchor =
+          absl::MakeConstSpan(model.numerical_vector_sequence_anchor_weights)
+              .subspan(node->numerical_vector_sequence_offset, vector_length);
+      const float threshold2 =
+          model.numerical_vector_sequence_anchor_weights
+              [node->numerical_vector_sequence_offset + vector_length];
+      const auto nvs_value = examples.GetNumericalVectorSequence(
+          example_idx, {node->feature_idx}, model);
+
+      for (int vector_idx = 0; vector_idx < nvs_value.num_vectors;
+           vector_idx++) {
+        const auto vector = nvs_value.GetVector(vector_idx);
+        const float distance2 =
+            model::decision_tree::SquaredDistance(vector, anchor);
+        if (distance2 <= threshold2) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    case GenericNode::Type::kNumericalVectorSequenceProjectedMoreThan: {
+      const int vector_length =
+          model.features()
+              .numerical_vector_sequence_features()[node->feature_idx]
+              .vector_length;
+      const auto anchor =
+          absl::MakeConstSpan(model.numerical_vector_sequence_anchor_weights)
+              .subspan(node->numerical_vector_sequence_offset, vector_length);
+      const float threshold =
+          model.numerical_vector_sequence_anchor_weights
+              [node->numerical_vector_sequence_offset + vector_length];
+      const auto nvs_value = examples.GetNumericalVectorSequence(
+          example_idx, {node->feature_idx}, model);
+
+      for (int vector_idx = 0; vector_idx < nvs_value.num_vectors;
+           vector_idx++) {
+        const auto vector = nvs_value.GetVector(vector_idx);
+        const float p = model::decision_tree::DotProduct(vector, anchor);
+        if (p >= threshold) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     case GenericNode::Type::kNumericalAndCategoricalIsNa: {
       return examples.IsMissingCategoricalAndNumerical(
           example_idx, node->feature_idx, model);
@@ -203,10 +259,6 @@ inline bool EvalCondition(const typename Model::NodeType* node,
       return examples.IsMissingCategoricalSet(example_idx, node->feature_idx,
                                               model);
     }
-
-    default:
-      NOTREACHED();
-      return false;
   }
 }
 

@@ -436,6 +436,11 @@ absl::StatusOr<std::string> GenSingleLearnerWrapper(
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and 
       `num_discretized_numerical_bins` will be ignored.
+    extra_training_config: Training configuration proto (advanced). If set, this
+      training configuration proto is merged with the one implicitely defined
+      by the learner. Can be used to set internal or advanced parameters that
+      are not exposed as constructor arguments. Parameters in
+      extra_training_config have higher priority as the constructor arguments.
 )";
   // Constructor arguments.
   std::string fields_constructor =
@@ -455,6 +460,7 @@ absl::StatusOr<std::string> GenSingleLearnerWrapper(
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      extra_training_config: Optional[abstract_learner_pb2.TrainingConfig] = None,
 )",
                        learner_config.default_task);
   // Use of constructor arguments the parameter dictionary.
@@ -637,8 +643,7 @@ class $0(generic_learner.GenericCCLearner):
   `$0.hyperparameter_templates()` (see this function's documentation for
   details).
 
-  Attributes:
-$2
+  Attributes:$2
     working_dir: Path to a directory available for the learning algorithm to
       store intermediate computation results. Depending on the learning
       algorithm and parameters, the working_dir might be optional, required, or
@@ -708,6 +713,7 @@ $8
       deployment_config=deployment_config,
       tuner=tuner,
       feature_selector=feature_selector,
+      extra_training_config=extra_training_config,
     )
 
   def train(

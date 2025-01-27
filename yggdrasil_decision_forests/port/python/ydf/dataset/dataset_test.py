@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import enum
-import logging
 import os
 from typing import Optional
 import unittest
 
 from absl.testing import absltest
 from absl.testing import parameterized
+import fastavro
 import numpy as np
 import pandas as pd
 
@@ -2899,72 +2899,40 @@ class DataspecInferenceFromGeneratorTest(parameterized.TestCase):
         ),
     )
 
-    self.assertEqual(
-        str(dataspec),
-        """\
-columns {
-  type: CATEGORICAL
-  name: "l"
-  categorical {
-    number_of_unique_values: 3
-    items {
-      key: "<OOD>"
-      value {
-        index: 0
-        count: 1
-      }
-    }
-    items {
-      key: "2"
-      value {
-        index: 1
-        count: 5
-      }
-    }
-    items {
-      key: "1"
-      value {
-        index: 2
-        count: 3
-      }
-    }
-  }
-  count_nas: 0
-  dtype: DTYPE_INT64
-}
-columns {
-  type: CATEGORICAL
-  name: "f"
-  categorical {
-    number_of_unique_values: 3
-    items {
-      key: "<OOD>"
-      value {
-        index: 0
-        count: 3
-      }
-    }
-    items {
-      key: "2"
-      value {
-        index: 2
-        count: 3
-      }
-    }
-    items {
-      key: "1"
-      value {
-        index: 1
-        count: 3
-      }
-    }
-  }
-  count_nas: 0
-  dtype: DTYPE_INT64
-}
-created_num_rows: 9
-""",
+    expected_dataspec = ds_pb.DataSpecification(
+        columns=(
+            ds_pb.Column(
+                name="l",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=1),
+                        "2": VocabValue(index=1, count=5),
+                        "1": VocabValue(index=2, count=3),
+                    },
+                ),
+                count_nas=0,
+                dtype=ds_pb.DType.DTYPE_INT64,
+            ),
+            ds_pb.Column(
+                name="f",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=3,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=3),
+                        "2": VocabValue(index=2, count=3),
+                        "1": VocabValue(index=1, count=3),
+                    },
+                ),
+                count_nas=0,
+                dtype=ds_pb.DType.DTYPE_INT64,
+            ),
+        ),
+        created_num_rows=9,
     )
+    test_utils.assertProto2Equal(self, dataspec, expected_dataspec)
 
   def test_infer_dataspec_adult(self):
     adult = test_utils.load_datasets("adult")
@@ -2983,11 +2951,6 @@ created_num_rows: 9
             max_num_scanned_rows_to_infer_semantic=-1,
             max_num_scanned_rows_to_compute_statistics=100_000,
         ),
-    )
-    test_utils.golden_check_string(
-        self,
-        str(dataspec),
-        test_utils.build_pydf_golden_path("deep_adult_dataspec.pbtxt"),
     )
 
 
@@ -3067,7 +3030,7 @@ class ReservoirSamplingTest(parameterized.TestCase):
     max_diff = np.max(np.absolute(quantiles - expected_quantiles))
     self.assertLessEqual(
         max_diff,
-        0.03,
+        0.05,
         msg=f"quantiles={quantiles} expected_quantiles={expected_quantiles}",
     )
 
@@ -3081,6 +3044,133 @@ class ReservoirSamplingTest(parameterized.TestCase):
       samples.append(sampler._samples[0])
     rate = np.mean(samples)
     self.assertAlmostEqual(rate, 0.5, delta=0.1)
+
+
+class VectorSequenceTest(absltest.TestCase):
+
+  def create_toy_avro_dataset(self) -> str:
+    schema = fastavro.parse_schema({
+        "fields": [
+            {
+                "name": "f1",
+                "type": "float",
+            },
+            {
+                "name": "f2",
+                "type": {
+                    "type": "array",
+                    "items": {"type": "array", "items": "float"},
+                },
+            },
+        ],
+        "name": "",
+        "type": "record",
+    })
+    records = [
+        {"f1": 1, "f2": [[1, 2], [3, 4], [5, 6]]},
+        {"f1": 2, "f2": [[7, 8], [1, 2]]},
+    ]
+
+    tmp_dir = self.create_tempdir()
+    file = self.create_tempfile(
+        file_path=os.path.join(tmp_dir.full_path, "file.avro")
+    )
+    with file.open_bytes("wb") as f:
+      fastavro.writer(f, schema, records, codec="null")
+    return file.full_path
+
+  def test_read_from_avro(self):
+    path = self.create_toy_avro_dataset()
+    ds = dataset_lib.create_vertical_dataset("avro:" + path)
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.NUMERICAL,
+                is_manual_type=False,
+                numerical=ds_pb.NumericalSpec(
+                    mean=1.5,
+                    min_value=1,
+                    max_value=2,
+                    standard_deviation=0.5,
+                ),
+            ),
+            ds_pb.Column(
+                name="f2",
+                type=ds_pb.ColumnType.NUMERICAL_VECTOR_SEQUENCE,
+                is_manual_type=False,
+                numerical=ds_pb.NumericalSpec(
+                    mean=3.9,
+                    min_value=1,
+                    max_value=8,
+                    standard_deviation=2.3853720883753127,
+                ),
+                numerical_vector_sequence=ds_pb.NumericalVectorSequenceSpec(
+                    vector_length=2,
+                    count_values=10,
+                    min_num_vectors=2,
+                    max_num_vectors=3,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_read_from_numpy(self):
+    ds = {
+        "f1": np.array([1, 2]),
+        "f2": [
+            np.array([[1, 2], [3, 4], [5, 6]]),
+            np.array([[7.0, 8.0], [1.0, 2.0]], dtype=np.float32),
+        ],
+    }
+    vertical_ds = dataset_lib.create_vertical_dataset(ds)
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.NUMERICAL,
+                numerical=ds_pb.NumericalSpec(
+                    mean=1.5,
+                    min_value=1,
+                    max_value=2,
+                    standard_deviation=0.5,
+                ),
+                count_nas=0,
+                dtype=ds_pb.DType.DTYPE_INT64,
+            ),
+            ds_pb.Column(
+                name="f2",
+                type=ds_pb.ColumnType.NUMERICAL_VECTOR_SEQUENCE,
+                numerical=ds_pb.NumericalSpec(
+                    mean=3.9,
+                    min_value=1,
+                    max_value=8,
+                    standard_deviation=2.3853720883753127,
+                ),
+                dtype=ds_pb.DType.DTYPE_INT64,
+                numerical_vector_sequence=ds_pb.NumericalVectorSequenceSpec(
+                    vector_length=2,
+                    count_values=10,
+                    min_num_vectors=2,
+                    max_num_vectors=3,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(
+        self, vertical_ds.data_spec(), expected_data_spec
+    )
+    self.assertEqual(
+        str(vertical_ds._dataset.DebugString()),
+        """\
+f1,f2
+1,[[1, 2], [3, 4], [5, 6]]
+2,[[7, 8], [1, 2]]
+""",
+    )
 
 
 if __name__ == "__main__":

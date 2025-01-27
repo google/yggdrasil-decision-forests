@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "gmock/gmock.h"
@@ -23,15 +24,18 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/gpu.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
@@ -45,6 +49,7 @@ namespace model {
 namespace decision_tree {
 namespace {
 
+using test::EqualsProto;
 using test::StatusIs;
 using ::testing::DoubleNear;
 using ::testing::ElementsAre;
@@ -639,6 +644,135 @@ TEST(MHLDTOblique, SubtractTransposeMultiplyAdd) {
   internal::SubtractTransposeMultiplyAdd(1., absl::MakeSpan(a),
                                          absl::MakeSpan(b), output);
   EXPECT_THAT(output, Pointwise(DoubleNear(eps), {4, -2, -2, 1}));
+}
+
+TEST(VectorSequenceCondition, Classification) {
+  const model::proto::TrainingConfig config;
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(0);
+  config_link.add_features(1);
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.set_min_examples(1);
+
+  dataset::VerticalDataset dataset;
+  auto* label_spec =
+      dataset::AddColumn("l", dataset::proto::ColumnType::CATEGORICAL,
+                         dataset.mutable_data_spec());
+  label_spec->mutable_categorical()->set_is_already_integerized(true);
+  label_spec->mutable_categorical()->set_number_of_unique_values(3);
+  auto* feature_spec = dataset::AddColumn(
+      "f1", dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+      dataset.mutable_data_spec());
+  feature_spec->mutable_numerical_vector_sequence()->set_vector_length(2);
+
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+
+  ASSERT_OK_AND_ASSIGN(auto* label_col,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(0));
+  ASSERT_OK_AND_ASSIGN(
+      auto* feature_col,
+      dataset.MutableColumnWithCastWithStatus<
+          dataset::VerticalDataset::NumericalVectorSequenceColumn>(1));
+
+  label_col->Add(1);
+  label_col->Add(1);
+  label_col->Add(2);
+  label_col->Add(2);
+
+  feature_col->Add({0.f, 0.f});
+  feature_col->Add({0.f, 0.f, 1.f, 1.f});
+  feature_col->Add({0.f, 0.f, 0.5f, 0.5f});
+  feature_col->Add({1.f, 1.f, 0.6f, 0.6f});
+
+  dataset.set_nrow(4);
+
+  std::vector<UnsignedExampleIdx> selected_examples(dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(selected_examples.size(), 1.f);
+
+  ClassificationLabelStats label_stats(label_col->values());
+  label_stats.num_label_classes = 3;
+  label_stats.label_distribution.SetNumClasses(3);
+  for (const auto example_idx : selected_examples) {
+    label_stats.label_distribution.Add(label_col->values()[example_idx],
+                                       weights[example_idx]);
+  }
+
+  ASSERT_OK_AND_ASSIGN(auto vector_sequence_computer,
+                       decision_tree::gpu::VectorSequenceComputer::Create(
+                           {nullptr, feature_col}, /*use_gpu=*/false));
+
+  proto::Node parent;
+  InternalTrainConfig internal_config;
+  internal_config.vector_sequence_computer = vector_sequence_computer.get();
+  proto::NodeCondition condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  const auto found_condition = FindBestConditionClassification(
+      dataset, selected_examples, weights, config, config_link, dt_config,
+      parent, internal_config, label_stats, 1, {}, &condition, &random, &cache);
+
+  LOG(INFO) << "condition:\n" << condition.DebugString();
+  const proto::NodeCondition expected_condition = PARSE_TEST_PROTO(R"pb(
+    na_value: true
+    attribute: 1
+    condition {
+      numerical_vector_sequence {
+        closer_than {
+          anchor { grounded: 0.6 grounded: 0.6 }
+          threshold2: 0.16999999
+        }
+      }
+    }
+    num_training_examples_without_weight: 4
+    num_training_examples_with_weight: 4
+    split_score: 0.6931472
+    num_pos_training_examples_without_weight: 2
+    num_pos_training_examples_with_weight: 2
+  )pb");
+  EXPECT_EQ(found_condition, SplitSearchResult::kBetterSplitFound);
+  EXPECT_THAT(condition, EqualsProto(expected_condition));
+
+  ASSERT_OK(vector_sequence_computer->Release());
+}
+
+TEST(SplitExamplesInPlace, Base) {
+  dataset::VerticalDataset dataset;
+  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "a" }
+  )pb");
+  CHECK_OK(dataset.CreateColumnsFromDataspec());
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "3"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"a", "4"}}));
+
+  std::vector<UnsignedExampleIdx> examples = {0, 1, 2, 3};
+  std::vector<UnsignedExampleIdx> buffer;
+  auto examples_rb =
+      SelectedExamplesRollingBuffer::Create(absl::MakeSpan(examples), &buffer);
+
+  proto::NodeCondition condition = PARSE_TEST_PROTO(R"pb(
+    attribute: 0
+    condition { higher_condition { threshold: 2.5 } }
+    num_pos_training_examples_without_weight: 2
+  )pb");
+
+  ASSERT_OK_AND_ASSIGN(auto example_split,
+                       internal::SplitExamplesInPlace(
+                           dataset, examples_rb, condition,
+                           /*dataset_is_dense=*/false,
+                           /*error_on_wrong_splitter_statistics=*/true,
+                           /*examples_are_training_examples=*/true));
+
+  EXPECT_THAT(example_split.positive_examples.active, ElementsAre(1, 3));
+  EXPECT_THAT(example_split.negative_examples.active, ElementsAre(0, 2));
+
+  EXPECT_THAT(example_split.positive_examples.inactive, ElementsAre(0, 1));
+  EXPECT_THAT(example_split.negative_examples.inactive, ElementsAre(2, 3));
 }
 
 }  // namespace

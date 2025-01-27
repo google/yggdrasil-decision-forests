@@ -37,6 +37,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -123,7 +124,7 @@ template <typename T>
 absl::StatusOr<bool> CanSplit(
     const dataset::VerticalDataset& train_dataset, int feature_idx,
     typename T::Format na_replacement,
-    const std::vector<UnsignedExampleIdx>& selected_examples) {
+    const absl::Span<const UnsignedExampleIdx> selected_examples) {
   ASSIGN_OR_RETURN(const T* value_container,
                    train_dataset.ColumnWithCastWithStatus<T>(feature_idx));
   DCHECK_GT(selected_examples.size(), 1);
@@ -148,7 +149,7 @@ absl::StatusOr<bool> CanSplit(
 // features is returned.
 absl::StatusOr<int> FindNontrivialFeatures(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     absl::flat_hash_map<dataset::proto::ColumnType, std::vector<int>>*
         nontrivial_features) {
   DCHECK_GT(selected_examples.size(), 1);
@@ -218,7 +219,7 @@ namespace internal {
 
 absl::StatusOr<bool> FindSplit(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
   if (selected_examples.size() <= 1) {
     return false;
@@ -309,7 +310,7 @@ absl::StatusOr<bool> FindSplit(
 absl::Status SetRandomSplitNumericalSparseOblique(
     const std::vector<int>& nontrivial_features, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
   decision_tree::internal::Projection current_projection;
   const float projection_density = config.if_config->decision_tree()
@@ -326,7 +327,7 @@ absl::Status SetRandomSplitNumericalSparseOblique(
   // (which is likely indicative of an issue with the splitter).
   const int maximum__num_trials = 100 * nontrivial_features.size();
   int8_t unused_monotonic_direction;
-  
+
   for (int i = 0; i < maximum__num_trials; i++) {
     decision_tree::internal::SampleProjection(
         nontrivial_features, config.if_config->decision_tree(),
@@ -393,7 +394,7 @@ absl::Status SetRandomSplitNumericalSparseOblique(
 absl::Status SetRandomSplitNumericalAxisAligned(
     const int feature_idx, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
   auto& col_spec = train_dataset.data_spec().columns(feature_idx);
   DCHECK_EQ(col_spec.type(), dataset::proto::NUMERICAL);
@@ -460,7 +461,7 @@ absl::Status SetRandomSplitNumericalAxisAligned(
 absl::Status FindSplitBoolean(
     const int feature_idx, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
   auto& col_spec = train_dataset.data_spec().columns(feature_idx);
   DCHECK_EQ(col_spec.type(), dataset::proto::BOOLEAN);
@@ -499,7 +500,7 @@ absl::Status FindSplitBoolean(
 absl::Status FindSplitCategorical(
     const int feature_idx, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd) {
   const auto& col_spec = train_dataset.data_spec().columns(feature_idx);
   const auto na_replacement = col_spec.categorical().most_frequent_value();
@@ -586,11 +587,11 @@ absl::Status FindSplitCategorical(
 }
 
 // Grows recursively a node.
-absl::Status GrowNode(const Configuration& config,
-                      const dataset::VerticalDataset& train_dataset,
-                      const std::vector<UnsignedExampleIdx>& selected_examples,
-                      const int depth, decision_tree::NodeWithChildren* node,
-                      utils::RandomEngine* rnd) {
+absl::Status GrowNode(
+    const Configuration& config, const dataset::VerticalDataset& train_dataset,
+    const decision_tree::SelectedExamplesRollingBuffer selected_examples,
+    const int depth, decision_tree::NodeWithChildren* node,
+    utils::RandomEngine* rnd) {
   if (selected_examples.empty()) {
     return absl::InternalError("No examples fed to the node trainer");
   }
@@ -614,7 +615,7 @@ absl::Status GrowNode(const Configuration& config,
   // Look for a split
   ASSIGN_OR_RETURN(
       const bool found_condition,
-      FindSplit(config, train_dataset, selected_examples, node, rnd));
+      FindSplit(config, train_dataset, selected_examples.active, node, rnd));
 
   if (!found_condition) {
     // No split found
@@ -631,20 +632,18 @@ absl::Status GrowNode(const Configuration& config,
                           dt_config.store_detailed_label_distribution());
 
   // Branch examples to children
-  // TODO: Use cache to avoid re-allocating selected example
-  // buffers.
-  std::vector<UnsignedExampleIdx> positive_examples;
-  std::vector<UnsignedExampleIdx> negative_examples;
-  RETURN_IF_ERROR(decision_tree::internal::SplitExamples(
-      train_dataset, selected_examples, node->node().condition(), false,
-      dt_config.internal_error_on_wrong_splitter_statistics(),
-      &positive_examples, &negative_examples));
+  ASSIGN_OR_RETURN(
+      auto example_split,
+      decision_tree::internal::SplitExamplesInPlace(
+          train_dataset, selected_examples, node->node().condition(), false,
+          dt_config.internal_error_on_wrong_splitter_statistics()));
 
   // Split children
-  RETURN_IF_ERROR(GrowNode(config, train_dataset, positive_examples, depth + 1,
+  RETURN_IF_ERROR(GrowNode(config, train_dataset,
+                           example_split.positive_examples, depth + 1,
                            node->mutable_pos_child(), rnd));
-  positive_examples = {};  // Release memory of "positive_examples".
-  RETURN_IF_ERROR(GrowNode(config, train_dataset, negative_examples, depth + 1,
+  RETURN_IF_ERROR(GrowNode(config, train_dataset,
+                           example_split.negative_examples, depth + 1,
                            node->mutable_neg_child(), rnd));
   return absl::OkStatus();
 }
@@ -652,11 +651,17 @@ absl::Status GrowNode(const Configuration& config,
 // Grows and return a tree.
 absl::StatusOr<std::unique_ptr<decision_tree::DecisionTree>> GrowTree(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<UnsignedExampleIdx> selected_examples,
     utils::RandomEngine* rnd) {
   auto tree = std::make_unique<decision_tree::DecisionTree>();
   tree->CreateRoot();
-  RETURN_IF_ERROR(GrowNode(config, train_dataset, selected_examples,
+
+  std::vector<UnsignedExampleIdx> selected_examples_buffer;
+  auto selected_examples_rb =
+      decision_tree::SelectedExamplesRollingBuffer::Create(
+          absl::MakeSpan(selected_examples), &selected_examples_buffer);
+
+  RETURN_IF_ERROR(GrowNode(config, train_dataset, selected_examples_rb,
                            /*depth=*/0, tree->mutable_root(), rnd));
   return std::move(tree);
 }
@@ -916,14 +921,15 @@ IsolationForestLearner::TrainWithStatusImpl(
           }
         }
         utils::RandomEngine local_random(seed);
-        const auto selected_examples = internal::SampleExamples(
+        auto selected_examples = internal::SampleExamples(
             train_dataset.nrow(), model->num_examples_per_trees(),
             &local_random);
         DCHECK(
             std::is_sorted(selected_examples.begin(), selected_examples.end()));
         DCHECK_EQ(selected_examples.size(), model->num_examples_per_trees());
         auto tree_or =
-            GrowTree(config, train_dataset, selected_examples, &local_random);
+            GrowTree(config, train_dataset, absl::MakeSpan(selected_examples),
+                     &local_random);
         if (!tree_or.ok()) {
           utils::concurrency::MutexLock lock(&global_mutex);
           global_status.Update(tree_or.status());

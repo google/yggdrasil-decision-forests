@@ -23,8 +23,10 @@
 
 #include "absl/status/status.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/gpu.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -113,7 +115,7 @@ struct NumericalUpliftLabelStats : LabelStats {
 // Signature of a function that sets the value (i.e. the prediction) of a leaf
 // from the gradient data.
 typedef std::function<absl::Status(
-    const dataset::VerticalDataset&, const std::vector<UnsignedExampleIdx>&,
+    const dataset::VerticalDataset&, absl::Span<const UnsignedExampleIdx>,
     const std::vector<float>&, const model::proto::TrainingConfig&,
     const model::proto::TrainingConfigLinking&, NodeWithChildren* node)>
     CreateSetLeafValueFunctor;
@@ -130,7 +132,7 @@ typedef std::function<absl::Status(
 // - Mean of the labels for regression.
 absl::Status SetLabelDistribution(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -181,6 +183,9 @@ struct InternalTrainConfig {
   // Depending on the decision tree configuration this field might be required.
   const Preprocessing* preprocessing = nullptr;
 
+  decision_tree::gpu::VectorSequenceComputer* vector_sequence_computer =
+      nullptr;
+
   // If true, the list of selected example index ("selected_examples") can
   // contain duplicated values. If false, all selected examples are expected to
   // be unique.
@@ -190,6 +195,10 @@ struct InternalTrainConfig {
   // under-grow but valid decision tree. The growing strategy defines how the
   // tree is "under-grown".
   std::optional<absl::Time> timeout;
+
+  // If set, overrides the sorting_strategy.
+  absl::optional<proto::DecisionTreeTrainingConfig::Internal::SortingStrategy>
+      override_sorting_strategy;
 };
 
 }  // namespace yggdrasil_decision_forests::model::decision_tree

@@ -79,6 +79,13 @@ class VerticalDataset:
       ydf_dtype: Optional[data_spec_pb2.DType],
       column_idx: Optional[int],
   ) -> None: ...
+  def PopulateColumnNumericalVectorSequence(
+      self,
+      name: str,
+      data: List[npt.NDArray],
+      ydf_dtype: Optional[data_spec_pb2.DType],
+      column_idx: Optional[int],
+  ) -> None: ...
   def CreateFromPathWithDataSpec(
       self,
       path: str,
@@ -351,6 +358,7 @@ class GenericCCLearner:
 
 def GetLearner(
     train_config: abstract_learner_pb2.TrainingConfig,
+    extra_training_config: Optional[abstract_learner_pb2.TrainingConfig],
     hyperparameters: hyperparameter_pb2.GenericHyperParameters,
     deployment_config: abstract_learner_pb2.DeploymentConfig,
     custom_loss: Optional[CCRegressionLoss],

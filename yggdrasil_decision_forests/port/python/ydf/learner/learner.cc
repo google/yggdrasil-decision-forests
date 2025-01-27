@@ -222,6 +222,7 @@ class GenericCCLearner {
 // deployment config.
 absl::StatusOr<std::unique_ptr<GenericCCLearner>> GetLearner(
     const model::proto::TrainingConfig& train_config,
+    const std::optional<model::proto::TrainingConfig>& extra_training_config,
     const model::proto::GenericHyperParameters& hyperparameters,
     const model::proto::DeploymentConfig& deployment_config,
     const CCCustomLoss& custom_loss = std::monostate()) {
@@ -229,6 +230,10 @@ absl::StatusOr<std::unique_ptr<GenericCCLearner>> GetLearner(
   RETURN_IF_ERROR(
       model::GetLearner(train_config, &learner_ptr, deployment_config));
   RETURN_IF_ERROR(learner_ptr->SetHyperParameters(hyperparameters));
+  if (extra_training_config.has_value()) {
+    learner_ptr->mutable_training_config()->MergeFrom(
+        extra_training_config.value());
+  }
   RETURN_IF_ERROR(ApplyCustomLoss(custom_loss, learner_ptr.get()));
 
   learner_ptr->set_stop_training_trigger(&stop_training);
@@ -280,7 +285,8 @@ absl::Status ValidateHyperparameters(
 
 void init_learner(py::module_& m) {
   m.def("GetLearner", WithStatusOr(GetLearner), py::arg("train_config"),
-        py::arg("hyperparameters"), py::arg("deployment_config"),
+        py::arg("extra_training_config"), py::arg("hyperparameters"),
+        py::arg("deployment_config"),
         py::arg("custom_loss").noconvert() = std::monostate());
   m.def("GetInvalidHyperparameters", WithStatusOr(GetInvalidHyperparameters),
         py::arg("hp_names"), py::arg("explicit_hp_names"),

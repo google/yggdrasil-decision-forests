@@ -16,11 +16,14 @@
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
+#include "absl/base/nullability.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -87,17 +90,6 @@ GetDefaultValue<NumericalOrCategoricalValue>(
   }
 }
 
-absl::StatusOr<FeatureDef> FindFeatureDef(const std::vector<FeatureDef>& defs,
-                                          const int spec_feature_idx) {
-  for (const auto& def : defs) {
-    if (def.spec_idx == spec_feature_idx) {
-      return def;
-    }
-  }
-  return absl::InvalidArgumentError(
-      absl::Substitute("Unknown feature idx $0", spec_feature_idx));
-}
-
 const FeatureDef* FindFeatureDefFromInternalIndex(
     const std::vector<FeatureDef>& defs, const int internal_index) {
   for (const auto& def : defs) {
@@ -124,6 +116,8 @@ FeaturesDefinitionNumericalOrCategoricalFlat::input_features() const {
                   fixed_length_features_.end());
   features.insert(features.end(), categorical_set_features_.begin(),
                   categorical_set_features_.end());
+  features.insert(features.end(), numerical_vector_sequence_features_.begin(),
+                  numerical_vector_sequence_features_.end());
   return features;
 }
 
@@ -157,6 +151,9 @@ absl::Status FeaturesDefinitionNumericalOrCategoricalFlat::Initialize(
     feature_def_cache_[feature_def.name] = &feature_def;
   }
   for (const auto& feature_def : categorical_set_features()) {
+    feature_def_cache_[feature_def.name] = &feature_def;
+  }
+  for (const auto& feature_def : numerical_vector_sequence_features()) {
     feature_def_cache_[feature_def.name] = &feature_def;
   }
 
@@ -198,6 +195,17 @@ FeaturesDefinitionNumericalOrCategoricalFlat::InitializeNormalFeatures(
                                              /*.type =*/col_spec.type(),
                                              /*.spec_idx =*/spec_feature_idx,
                                              /*.internal_idx =*/internal_idx});
+      } break;
+      case ColumnType::NUMERICAL_VECTOR_SEQUENCE: {
+        const int internal_idx = numerical_vector_sequence_features_.size();
+        numerical_vector_sequence_features_.push_back({
+            {/*.name =*/col_spec.name(),
+             /*.type =*/col_spec.type(),
+             /*.spec_idx =*/spec_feature_idx,
+             /*.internal_idx =*/internal_idx},
+            /*.vector_length =*/
+            col_spec.numerical_vector_sequence().vector_length(),
+        });
       } break;
       default:
         return absl::InvalidArgumentError(
@@ -288,6 +296,8 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
       dataset::VerticalDataset::DiscretizedNumericalColumn;
   using CategoricalColumn = dataset::VerticalDataset::CategoricalColumn;
   using CategoricalSetColumn = dataset::VerticalDataset::CategoricalSetColumn;
+  using NumericalVectorSequenceColumn =
+      dataset::VerticalDataset::NumericalVectorSequenceColumn;
 
   const auto num_examples = end_example_idx - begin_example_idx;
 
@@ -389,6 +399,34 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
     return absl::OkStatus();
   };
 
+  const auto CopyNumericalVectorSequenceFeature =
+      [&](const int feature_idx) -> absl::Status {
+    ASSIGN_OR_RETURN(
+        const auto& feature_data,
+        dataset.ColumnWithCastWithStatus<NumericalVectorSequenceColumn>(
+            feature_idx));
+    ASSIGN_OR_RETURN(
+        const auto feature_id,
+        features.GetNumericalVectorSequenceFeatureId(feature_data->name()));
+    for (int example_idx = 0; example_idx < num_examples; example_idx++) {
+      const row_t row_idx = begin_example_idx + example_idx;
+      if (feature_data->IsNa(row_idx)) {
+        examples->SetMissingNumericalVectorSequence(example_idx, feature_id,
+                                                    features);
+      } else {
+        std::vector<float> values;
+        const int num_vectors = feature_data->SequenceLength(row_idx);
+        for (int vector_idx = 0; vector_idx < num_vectors; vector_idx++) {
+          const auto vector = feature_data->GetVector(row_idx, vector_idx);
+          values.insert(values.end(), vector->begin(), vector->end());
+        }
+        examples->SetNumericalVectorSequence(example_idx, feature_id, values,
+                                             features);
+      }
+    }
+    return absl::OkStatus();
+  };
+
   for (const auto& feature : features.input_features()) {
     if (feature.spec_idx < 0 || feature.spec_idx >= dataset.ncol()) {
       return absl::InvalidArgumentError(
@@ -416,6 +454,9 @@ absl::Status CopyVerticalDatasetToAbstractExampleSet(
         break;
       case dataset::proto::ColumnType::CATEGORICAL_SET:
         RETURN_IF_ERROR(CopyCategoricalSetFeature(feature.spec_idx));
+        break;
+      case dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE:
+        RETURN_IF_ERROR(CopyNumericalVectorSequenceFeature(feature.spec_idx));
         break;
       default:
         return absl::InvalidArgumentError("Non supported feature type.");

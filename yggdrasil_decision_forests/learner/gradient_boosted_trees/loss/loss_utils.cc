@@ -39,7 +39,7 @@ namespace gradient_boosted_trees {
 template <bool weighted>
 absl::Status SetLeafValueWithNewtonRaphsonStep(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const absl::Span<const float> weights, const GradientData& gradients,
     decision_tree::NodeWithChildren* node) {
   if constexpr (weighted) {
@@ -126,7 +126,7 @@ SetLeafValueWithNewtonRaphsonStepFunctor(
     const GradientData& gradients) {
   return [&gradients, &gbt_config](
              const dataset::VerticalDataset& train_dataset,
-             const std::vector<UnsignedExampleIdx>& selected_examples,
+             const absl::Span<const UnsignedExampleIdx> selected_examples,
              const absl::Span<const float> weights,
              const model::proto::TrainingConfig& config,
              const model::proto::TrainingConfigLinking& config_link,

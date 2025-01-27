@@ -67,6 +67,7 @@ class GenericLearner(abc.ABC):
       feature_selector: Optional[
           abstract_feature_selector_lib.AbstractFeatureSelector
       ],
+      extra_training_config: Optional[abstract_learner_pb2.TrainingConfig],
   ):
     # TODO: Refactor to a single hyperparameter dictionary with edit
     # access to these options.
@@ -83,6 +84,7 @@ class GenericLearner(abc.ABC):
     self._tuner = tuner
     self._feature_selector = feature_selector
     self._explicit_learner_arguments = explicit_learner_arguments
+    self._extra_training_config = extra_training_config
 
     if self._label is not None and not isinstance(label, str):
       raise ValueError("The 'label' should be a string")
@@ -635,7 +637,11 @@ class GenericCCLearner(GenericLearner):
 
     hp_proto = hp_lib.dict_to_generic_hyperparameter(self._hyperparameters)
     return ydf.GetLearner(
-        training_config, hp_proto, self._deployment_config, cc_custom_loss
+        training_config,
+        self._extra_training_config,
+        hp_proto,
+        self._deployment_config,
+        cc_custom_loss,
     )
 
   def _get_vertical_dataset(

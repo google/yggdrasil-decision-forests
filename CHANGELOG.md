@@ -18,6 +18,10 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 -   Deprecated `SparseObliqueSplit.binary_weights` hyperparameter in favor of
     `SparseObliqueSplit.weights`.
 
+### Fix
+
+-   Fix structural variable importances for oblique splits.
+
 ### Misc
 
 -   Loss options are now defined
