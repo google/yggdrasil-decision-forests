@@ -144,7 +144,6 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
   details).
 
   Attributes:
-
     label: Label of the dataset. The label column
       should not be identified as a feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
@@ -203,6 +202,11 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and 
       `num_discretized_numerical_bins` will be ignored.
+    extra_training_config: Training configuration proto (advanced). If set, this
+      training configuration proto is merged with the one implicitely defined
+      by the learner. Can be used to set internal or advanced parameters that
+      are not exposed as constructor arguments. Parameters in
+      extra_training_config have higher priority as the constructor arguments.
     a: Documentation for a Default: 1.0.
     b: Documentation for b Default: 4.0.
     c: Documentation for c Default: None.
@@ -258,6 +262,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      extra_training_config: Optional[abstract_learner_pb2.TrainingConfig] = None,
       a: float = 1.0,
       b: Optional[float] = 4.0,
       c: Optional[float] = None,
@@ -313,6 +318,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       deployment_config=deployment_config,
       tuner=tuner,
       feature_selector=feature_selector,
+      extra_training_config=extra_training_config,
     )
 
   def train(

@@ -63,6 +63,10 @@ message DeploymentConfig {
   // Maximum number of snapshots to keep.
   optional int32 max_kept_snapshots = 9 [default = 3];
 
+  // Use GPU for algorithms that supports it if a GPU is available and if YDF is
+  // compiled with GPU support.
+  optional bool use_gpu = 10 [default = true];
+
   // Computation distribution engine.
   oneof execution {
     // Local execution.

@@ -89,25 +89,28 @@ class RegressionLoss(AbstractCustomLoss):
     mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
   ```
 
-  initial_predictions: The bias / initial predictions of the GBT model. Receives
-    the label values and the weights, outputs the initial prediction as a float.
-  loss: The loss function controls the early stopping. The loss function
-    receives the labels, the current predictions and the current weights and
-    must output the loss as a float. Note that the predictions provided to the
-    loss functions have not yet had an activation function applied to them.
-  gradient_and_hessian: Gradient and hessian of the current predictions. Note
-    that only the diagonal of the hessian must be provided. Receives as input
-    the labels and the current predictions (without activation) and returns a
-    tuple of the gradient and the hessian.
-  activation: Activation function to be applied to the model. Regression models
-    are expected to return a value in the same space as the labels after
-    applying the activation function.
-  may_trigger_gc: If True (default), YDF may trigger Python's garbage collection
-    to determine if a Numpy array that is backed by YDF-internal data is used
-    after its lifetime has ended. If False, checks for illegal memory accesses
-    are disabled. This can be useful when training many small models or if the
-    observed impact of triggering GC is large. If `may_trigger_gc=False`, it is
-    very important that the user validate manuallythat no memory leakage occurs.
+  Attributes:
+    initial_predictions: The bias / initial predictions of the GBT model.
+      Receives the label values and the weights, outputs the initial prediction
+      as a float.
+    loss: The loss function controls the early stopping. The loss function
+      receives the labels, the current predictions and the current weights and
+      must output the loss as a float. Note that the predictions provided to the
+      loss functions have not yet had an activation function applied to them.
+    gradient_and_hessian: Gradient and hessian of the current predictions. Note
+      that only the diagonal of the hessian must be provided. Receives as input
+      the labels and the current predictions (without activation) and returns a
+      tuple of the gradient and the hessian.
+    activation: Activation function to be applied to the model. Regression
+      models are expected to return a value in the same space as the labels
+      after applying the activation function.
+    may_trigger_gc: If True (default), YDF may trigger Python's garbage
+      collection to determine if a Numpy array that is backed by YDF-internal
+      data is used after its lifetime has ended. If False, checks for illegal
+      memory accesses are disabled. This can be useful when training many small
+      models or if the observed impact of triggering GC is large. If
+      `may_trigger_gc=False`, it is very important that the user validate
+      manuallythat no memory leakage occurs.
   """
 
   initial_predictions: Callable[
@@ -175,24 +178,26 @@ class BinaryClassificationLoss(AbstractCustomLoss):
     mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
   ```
 
-  initial_predictions: The bias / initial predictions of the GBT model. Receives
-    the label values and the weights, outputs the initial prediction as a float.
-  loss: The loss function controls the early stopping. The loss function
-    receives the labels, the current predictions and the current weights and
-    must output the loss as a float. Note that the predictions provided to the
-    loss functions have not yet had an activation function applied to them.
-  gradient_and_hessian: Gradient and hessian of the current predictions. Note
-    that only the diagonal of the hessian must be provided. Receives as input
-    the labels and the current predictions (without activation). Returns a
-    tuple of the gradient and the hessian.
-  activation: Activation function to be applied to the model. Binary
-    classification models are expected to return a probability after applying
-    the activation function.
-  may_trigger_gc: If True (default), YDF may trigger Python's garbage collection
-    to determine if an Numpy array that is backed by YDF-internal data is used
-    after its lifetime has ended. If False, checks for illegal memory accesses
-    are disabled. Setting this parameter to False is dangerous, since illegal
-    memory accesses will no longer be detected.
+  Attributes:
+    initial_predictions: The bias / initial predictions of the GBT model.
+      Receives the label values and the weights, outputs the initial prediction
+      as a float.
+    loss: The loss function controls the early stopping. The loss function
+      receives the labels, the current predictions and the current weights and
+      must output the loss as a float. Note that the predictions provided to the
+      loss functions have not yet had an activation function applied to them.
+    gradient_and_hessian: Gradient and hessian of the current predictions. Note
+      that only the diagonal of the hessian must be provided. Receives as input
+      the labels and the current predictions (without activation). Returns a
+      tuple of the gradient and the hessian.
+    activation: Activation function to be applied to the model. Binary
+      classification models are expected to return a probability after applying
+      the activation function.
+    may_trigger_gc: If True (default), YDF may trigger Python's garbage
+      collection to determine if an Numpy array that is backed by YDF-internal
+      data is used after its lifetime has ended. If False, checks for illegal
+      memory accesses are disabled. Setting this parameter to False is
+      dangerous, since illegal memory accesses will no longer be detected.
   """
 
   initial_predictions: Callable[
@@ -263,26 +268,28 @@ class MultiClassificationLoss(AbstractCustomLoss):
     mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
   ```
 
-  initial_predictions: The bias / initial predictions of the GBT model. Receives
-  the label values and the weights, outputs the initial prediction as an array
-  of floats (one initial prediction per class).
-  loss: The loss function controls the early stopping. The loss function
-    receives the labels, the current predictions and the current weights and
-    must output the loss as a float. Note that the predictions provided to the
-    loss functions have not yet had an activation function applied to them.
-  gradient_and_hessian: Gradient and hessian of the current predictions with
-    respect to each class. Note that only the diagonal of the hessian must be
-    provided. Receives as input the labels and the current predictions (without
-    activation). Returns a tuple of the gradient and the hessian. Both gradient
-    and hessian must be arrays of shape (num_classes, num_examples).
-  activation: Activation function to be applied to the model. Multi-class
-    classification models are expected to return a probability distribution over
-    the classes after applying the activation function.
-  may_trigger_gc: If True (default), YDF may trigger Python's garbage collection
-    to determine if an Numpy array that is backed by YDF-internal data is used
-    after its lifetime has ended. If False, checks for illegal memory accesses
-    are disabled. Setting this parameter to False is dangerous, since illegal
-    memory accesses will no longer be detected.
+  Attributes:
+    initial_predictions: The bias / initial predictions of the GBT model.
+      Receives the label values and the weights, outputs the initial prediction
+      as an array of floats (one initial prediction per class).
+    loss: The loss function controls the early stopping. The loss function
+      receives the labels, the current predictions and the current weights and
+      must output the loss as a float. Note that the predictions provided to the
+      loss functions have not yet had an activation function applied to them.
+    gradient_and_hessian: Gradient and hessian of the current predictions with
+      respect to each class. Note that only the diagonal of the hessian must be
+      provided. Receives as input the labels and the current predictions
+      (without activation). Returns a tuple of the gradient and the hessian.
+      Both gradient and hessian must be arrays of shape (num_classes,
+      num_examples).
+    activation: Activation function to be applied to the model. Multi-class
+      classification models are expected to return a probability distribution
+      over the classes after applying the activation function.
+    may_trigger_gc: If True (default), YDF may trigger Python's garbage
+      collection to determine if an Numpy array that is backed by YDF-internal
+      data is used after its lifetime has ended. If False, checks for illegal
+      memory accesses are disabled. Setting this parameter to False is
+      dangerous, since illegal memory accesses will no longer be detected.
   """
 
   initial_predictions: Callable[

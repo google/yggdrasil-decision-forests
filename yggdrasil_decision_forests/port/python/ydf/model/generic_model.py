@@ -112,11 +112,11 @@ class ModelIOOptions:
   """Advanced options for saving and loading YDF models.
 
   Attributes:
-      file_prefix: Optional prefix for the model. File prefixes allow multiple
-        models to exist in the same folder. Doing so is heavily DISCOURAGED
-        outside of edge cases. When loading a model, the prefix, if not
-        specified, is auto-detected if possible. When saving a model, the empty
-        string is used as file prefix unless it is explicitly specified.
+    file_prefix: Optional prefix for the model. File prefixes allow multiple
+      models to exist in the same folder. Doing so is heavily DISCOURAGED
+      outside of edge cases. When loading a model, the prefix, if not specified,
+      is auto-detected if possible. When saving a model, the empty string is
+      used as file prefix unless it is explicitly specified.
   """
 
   file_prefix: Optional[str] = None
@@ -1290,7 +1290,7 @@ Use `model.describe()` for more details
       self,
       data: dataset.InputDataset,
       *,
-      use_slow_engine=False,
+      use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> np.ndarray:
     """Returns the most likely predicted class for a classification model.
@@ -1640,6 +1640,22 @@ class GenericCCModel(GenericModel):
     if num_threads is None:
       num_threads = concurrency.determine_optimal_num_threads(training=False)
 
+    enable_permutation_variable_importances = (
+        permutation_variable_importance_rounds > 0
+    )
+    if (
+        enable_permutation_variable_importances
+        and self.task() == Task.ANOMALY_DETECTION
+        and self._model.label_col_idx() == -1
+    ):
+      # TODO: Allow AD evaluation and analysis without providing label at training time.
+      enable_permutation_variable_importances = False
+      log.warning(
+          "ANOMALY DETECTION models must be trained with a label for variable"
+          " importance computation",
+          message_id=log.WarningMessage.AD_PERMUTATION_VARIABLE_IMPORTANCE_NOT_ENABLED,
+      )
+
     with log.cc_log_context():
       ds = dataset.create_vertical_dataset(
           data, data_spec=self._model.data_spec()
@@ -1659,7 +1675,7 @@ class GenericCCModel(GenericModel):
               num_numerical_bins=num_bins,
           ),
           permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
-              enabled=permutation_variable_importance_rounds > 0,
+              enabled=enable_permutation_variable_importances,
               num_rounds=permutation_variable_importance_rounds,
           ),
           include_model_structural_variable_importances=True,

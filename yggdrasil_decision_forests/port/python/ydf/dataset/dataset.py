@@ -364,6 +364,34 @@ class VerticalDataset:
         )
         return
 
+    elif column.semantic == dataspec_lib.Semantic.NUMERICAL_VECTOR_SEQUENCE:
+      if not isinstance(column_data, list):
+        raise ValueError(
+            "A numerical vector sequence should be a list. Got"
+            f" {original_column_data!r}"
+        )
+      if not (
+          isinstance(column_data[0], np.ndarray)
+          and column_data[0].ndim == 2
+          and (
+              column_data[0].dtype.type in dataspec_lib.NP_SUPPORTED_INT_DTYPE
+              or column_data[0].dtype.type
+              in dataspec_lib.NP_SUPPORTED_FLOAT_DTYPE
+          )
+      ):
+        raise ValueError(
+            "Each value of a numerical vector sequence should be numerical"
+            f" numpy array with two dimension. Got {original_column_data!r}"
+        )
+      ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data[0].dtype)
+      self._dataset.PopulateColumnNumericalVectorSequence(
+          column.name,
+          column_data,
+          ydf_dtype=ydf_dtype,
+          column_idx=column_idx,
+      )
+      return
+
     raise ValueError(
         f"Cannot import column {column.name!r} with semantic={column.semantic},"
         f" type={_type(original_column_data)} and"
@@ -907,6 +935,16 @@ def infer_semantic(
       return dataspec_lib.Semantic.BOOLEAN
     type_str = f"numpy.array of {data.dtype}"
   else:
+    if (
+        isinstance(data, list)
+        and isinstance(data[0], np.ndarray)
+        and data[0].ndim == 2
+        and (
+            data[0].dtype.type in dataspec_lib.NP_SUPPORTED_INT_DTYPE
+            or data[0].dtype.type in dataspec_lib.NP_SUPPORTED_FLOAT_DTYPE
+        )
+    ):
+      return dataspec_lib.Semantic.NUMERICAL_VECTOR_SEQUENCE
     type_str = str(type(data))
 
   raise ValueError(

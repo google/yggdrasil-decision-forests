@@ -375,6 +375,14 @@ function display_value(options, value, output) {
     return;
   }
 
+  if (value.type === 'ANOMALY_DETECTION') {
+    display_node_text(
+        options,
+        'Number of examples: ' + d3.format('.6')(value.num_examples),
+        output);
+    return;
+  }
+
   display_node_text(options, `Non supported value ${value.type}`, output);
 }
 

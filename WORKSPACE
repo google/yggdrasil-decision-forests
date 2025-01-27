@@ -20,12 +20,18 @@ grpc_deps()
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
 grpc_extra_deps()
 
+
+# TODO: Enbable CUDA build in OSS
+# load("@rules_cuda//cuda:repositories.bzl", "register_detected_cuda_toolchains", "rules_cuda_dependencies")
+# rules_cuda_dependencies()
+# register_detected_cuda_toolchains()
+
 # Emscripten; needed for the Web build.
 http_archive(
-  name = "emsdk",
-  strip_prefix = "emsdk-3.1.15/bazel",
-  url = "https://github.com/emscripten-core/emsdk/archive/refs/tags/3.1.15.zip",
-  sha256 = "bc06feb66e376f0184929e603d7c02dcd07646ed6f89281bf1478bb8947fbb0f",
+    name = "emsdk",
+    sha256 = "ee008c9aff9a633f6da37f53283b40654635f1739e0f1bcde9d887d895803157",
+    strip_prefix = "emsdk-3.1.74/bazel",
+    url = "https://github.com/emscripten-core/emsdk/archive/refs/tags/3.1.74.zip",
 )
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 emsdk_deps()

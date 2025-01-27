@@ -24,6 +24,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -102,7 +103,7 @@ int DefaultMaximumDepth(UnsignedExampleIdx num_examples_per_trees);
 // TODO: Add support for more feature types.
 absl::StatusOr<bool> FindSplit(
     const Configuration& config, const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
 // Sample an oblique split on the features in `nontrivial_features`.
@@ -119,7 +120,7 @@ absl::StatusOr<bool> FindSplit(
 absl::Status SetRandomSplitNumericalSparseOblique(
     const std::vector<int>& nontrivial_features, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
 // Create an axis-aligned split on nontrivial numerical feature `feature_idx`.
@@ -131,21 +132,21 @@ absl::Status SetRandomSplitNumericalSparseOblique(
 absl::Status SetRandomSplitNumericalAxisAligned(
     int feature_idx, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
 // Create a split on nontrivial boolean feature `feature_idx`.
 absl::Status FindSplitBoolean(
     int feature_idx, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
 // Create a split on nontrivial categorical feature `feature_idx`.
 absl::Status FindSplitCategorical(
     int feature_idx, const Configuration& config,
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     decision_tree::NodeWithChildren* node, utils::RandomEngine* rnd);
 
 }  // namespace internal

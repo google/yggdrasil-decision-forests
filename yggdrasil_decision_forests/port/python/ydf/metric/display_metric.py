@@ -14,12 +14,12 @@
 
 """Utilities to display metrics."""
 
-import base64
-import io
 import textwrap
 from typing import Any, Optional, Tuple
+import uuid
 from xml.dom import minidom
 
+from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
 from ydf.metric import metric
 from ydf.utils import documentation
@@ -47,7 +47,132 @@ class _UnescappedString(minidom.Text):
     writer.write(self._data)
 
 
-def css_style(doc: html.Doc) -> html.Elem:
+def js_functionality(doc: html.Doc) -> html.Elem:
+  """Javascript functions for metric display."""
+  raw_js = textwrap.dedent("""\
+  function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+  }
+  """)
+
+  js = doc.createElement("script")
+  raw_node = _UnescappedString()
+  raw_node.set_data(raw_js)
+  js.appendChild(raw_node)
+  return js
+
+
+def glossary(doc: html.Doc, e: metric.Evaluation) -> html.Elem:
+  """Glossary for evaluations."""
+
+  raw_glossary = _UnescappedString()
+  if e._evaluation_proto.task == abstract_model_pb2.CLASSIFICATION:
+    raw_glossary.set_data(textwrap.dedent("""\
+<h2>Evaluation of classification models</h2>
+<dl>
+  <dt><b>Accuracy</b></dt>
+  <dd>The simplest metric. It's the percentage of predictions that are correct (matching the ground truth).
+      <br><i>Example:</i> If a model correctly identifies 90 out of 100 images as cat or dog, the accuracy is 90%.</dd>
+
+  <dt><b>Confusion Matrix</b></dt>
+  <dd>A table that shows the counts of:
+    <ul>
+      <li><b>True Positives (TP):</b> Model correctly predicted positive.</li>
+      <li><b>True Negatives (TN):</b> Model correctly predicted negative.</li>
+      <li><b>False Positives (FP):</b> Model incorrectly predicted positive (a "false alarm").</li>
+      <li><b>False Negatives (FN):</b> Model incorrectly predicted negative (a "miss").</li>
+    </ul>
+  </dd>
+
+  <dt><b>Threshold</b></dt>
+  <dd>YDF classification models predict a probability for each class. A threshold determines the cutoff for classifying something as positive or negative.
+    <br><i>Example:</i> If the threshold is 0.5, any prediction above 0.5 might be classified as "spam," and anything below as "not spam."
+  </dd>
+
+  <dt><b>ROC Curve (Receiver Operating Characteristic Curve)</b></dt>
+  <dd>A graph that plots the True Positive Rate (TPR) against the False Positive Rate (FPR) at various thresholds.
+    <ul>
+      <li><b>TPR (Sensitivity or Recall):</b> TP / (TP + FN) - How many of the actual positives did the model catch?</li>
+      <li><b>FPR:</b> FP / (FP + TN) - How many negatives were incorrectly classified as positives?</li>
+    </ul>
+    <br><i>Interpretation:</i> A good model has an ROC curve that hugs the top-left corner (high TPR, low FPR).
+  </dd>
+
+  <dt><b>AUC (Area Under the ROC Curve)</b></dt>
+  <dd>A single number that summarizes the overall performance shown by the ROC curve. The AUC is a more stable metric than the accuracy. Multi-class classification models evaluate one class against all other classes.
+    <br><i>Interpretation:</i> Ranges from 0 to 1. A perfect model has an AUC of 1, while a random model has an AUC of 0.5. Higher is better.
+  </dd>
+
+  <dt><b>Precision-Recall Curve</b></dt>
+  <dd>A graph that plots Precision against Recall at various thresholds.
+    <ul>
+      <li><b>Precision:</b> TP / (TP + FP) - Out of all the predictions the model labeled as positive, how many were actually positive?</li>
+      <li><b>Recall (same as TPR):</b> TP / (TP + FN) - Out of all the actual positive cases, how many did the model correctly identify?</li>
+    </ul>
+    <br><i>Interpretation:</i> A good model has a curve that stays high (both high precision and high recall). It is especially useful when dealing with imbalanced datasets (e.g., when one class is much rarer than the other).
+  </dd>
+
+  <dt><b>PR-AUC (Area Under the Precision-Recall Curve)</b></dt>
+  <dd>Similar to AUC, but for the Precision-Recall curve. A single number summarizing performance. Multi-class classification models evaluate one class against all other classes. Higher is better.</dd>
+
+  <dt><b>Threshold / Accuracy Curve</b></dt>
+  <dd>A graph that shows how the model's accuracy changes as you vary the classification threshold.</dd>
+
+  <dt><b>Threshold / Volume Curve</b></dt>
+  <dd>A graph showing how the number of data points classified as positive changes as you vary the threshold.</dd>
+</dl>
+    """))
+  elif e._evaluation_proto.task == abstract_model_pb2.REGRESSION:
+    raw_glossary.set_data(textwrap.dedent("""\
+<h2>Evaluation of regression models</h2>
+<dl>
+  <dt><b>RMSE (Root Mean Squared Error)</b></dt>
+  <dd>The square root of the average squared difference between predictions and ground truth values.
+    <br><i>Interpretation:</i> Lower RMSE is better. It has the same units as the target variable, making it somewhat interpretable.
+  </dd>
+
+  <dt><b>Residual</b></dt>
+  <dd>The difference between a prediction and the ground truth per example (Prediction - Ground Truth).</dd>
+
+  <dt><b>Residual Histogram</b></dt>
+  <dd>A histogram showing the distribution of the residuals.
+    <br><i>Interpretation:</i> Ideally, you want a roughly symmetrical, bell-shaped distribution centered around zero, indicating that the errors are random and not biased.
+  </dd>
+
+  <dt><b>Ground Truth Histogram</b></dt>
+  <dd>A histogram showing the distribution of the actual target values in your dataset.</dd>
+
+  <dt><b>Prediction Histogram</b></dt>
+  <dd>A histogram showing the distribution of the model's predictions.</dd>
+
+  <dt><b>Ground Truth vs Predictions Curve</b></dt>
+  <dd>A scatter plot where each point represents a data point. The x-axis is the ground truth value, and the y-axis is the model's prediction.
+    <br><i>Interpretation:</i> A perfect model would have all points falling on a diagonal line (where prediction = ground truth). Deviations from this line show errors.
+  </dd>
+
+  <dt><b>Predictions vs Residual Curve</b></dt>
+  <dd>A scatter plot where the x-axis is the model's prediction, and the y-axis is the residual.
+    <br><i>Interpretation:</i> Ideally, you want to see a random scatter of points around the horizontal line at zero. Patterns (e.g., a funnel shape) might indicate problems with the model.
+  </dd>
+
+  <dt><b>Predictions vs Ground Truth Curve</b></dt>
+  <dd>Sometimes this will plot a fitted curve through the points on the Ground Truth vs Predictions scatter plot to visualize the trend. It can help to see if the model is systematically over- or under-predicting in certain ranges.</dd>
+</dl>
+    """))
+  else:
+    raise ValueError(f"Unsupported evaluation task: {e._evaluation_proto.task}")
+  glossary_node = doc.createElement("div")
+  glossary_node.appendChild(raw_glossary)
+  return glossary_node
+
+
+def css_style(doc: html.Doc, add_glossary_style: bool) -> html.Elem:
   """Css style for metric display."""
 
   raw_style = textwrap.dedent("""\
@@ -122,6 +247,42 @@ def css_style(doc: html.Doc) -> html.Elem:
   }
   """)
 
+  if add_glossary_style:
+    raw_style += textwrap.dedent("""\
+
+  .tab_block .header {
+      flex-direction: row;
+      display: flex;
+  }
+
+  .tab_block .header .tab {
+      cursor: pointer;
+      background-color: #F6F5F5;
+      text-decoration: none;
+      text-align: center;
+      padding: 4px 12px;
+      color: black;
+  }
+
+  .tab_block .header .tab.selected {
+      border-bottom: 2px solid #2F80ED;
+  }
+
+  .tab_block .header .tab:hover {
+      text-decoration: none;
+      background-color: #DCDCDC;
+  }
+
+  .tab_block .body .tab_content {
+      display: none;
+      padding: 5px;
+  }
+
+  .tab_block .body .tab_content.selected {
+      display: block;
+  }
+  """)
+
   style = doc.createElement("style")
   raw_node = _UnescappedString()
   raw_node.set_data(raw_style)
@@ -172,15 +333,68 @@ def evaluation_to_str(e: metric.Evaluation) -> str:
 
 def evaluation_to_html_str(e: metric.Evaluation, add_style: bool = True) -> str:
   """Html representation of an evaluation."""
+  show_glossary = e._evaluation_proto.task in [
+      abstract_model_pb2.CLASSIFICATION,
+      abstract_model_pb2.REGRESSION,
+  ]
 
   doc, root = html.create_doc()
+  effective_root = root
 
   if add_style:
-    root.appendChild(css_style(doc))
+    effective_root.appendChild(css_style(doc, show_glossary))
+  if show_glossary:
+    effective_root.appendChild(js_functionality(doc))
+    tab_id = str(uuid.uuid4())
+    tab_block = doc.createElement("div")
+    tab_block.setAttribute("id", tab_id)
+    tab_block.setIdAttribute("id")
+    tab_block.setAttribute("class", "tab_block")
+    tab_header = doc.createElement("div")
+    tab_header.setAttribute("class", "header")
+
+    eval_link = doc.createElement("a")
+    eval_link.setAttribute("id", f"{tab_id}_eval")
+    eval_link.setIdAttribute("id")
+    eval_link.setAttribute("class", "tab selected")
+    eval_link.setAttribute("onclick", f"ydfShowTab('{tab_id}', 'eval')")
+    eval_link.appendChild(doc.createTextNode("Evalution"))
+
+    glossary_link = doc.createElement("a")
+    glossary_link.setAttribute("id", f"{tab_id}_glossary")
+    glossary_link.setIdAttribute("id")
+    glossary_link.setAttribute("class", "tab")
+    glossary_link.setAttribute("onclick", f"ydfShowTab('{tab_id}', 'glossary')")
+    glossary_link.appendChild(doc.createTextNode("Glossary"))
+
+    tab_header.appendChild(eval_link)
+    tab_header.appendChild(glossary_link)
+    tab_block.appendChild(tab_header)
+
+    tab_body = doc.createElement("div")
+    tab_body.setAttribute("class", "body")
+    tab_block.appendChild(tab_body)
+
+    eval_content = doc.createElement("div")
+    eval_content.setAttribute("id", f"{tab_id}_body_eval")
+    eval_content.setIdAttribute("id")
+    eval_content.setAttribute("class", "tab_content selected")
+
+    glossary_content = doc.createElement("div")
+    glossary_content.setAttribute("id", f"{tab_id}_body_glossary")
+    glossary_content.setIdAttribute("id")
+    glossary_content.setAttribute("class", "tab_content")
+    glossary_content.appendChild(glossary(doc, e))
+
+    tab_body.appendChild(glossary_content)
+    tab_body.appendChild(eval_content)
+
+    root.appendChild(tab_block)
+    effective_root = eval_content
 
   html_metric_box = doc.createElement("div")
   html_metric_box.setAttribute("class", "metric_box")
-  root.appendChild(html_metric_box)
+  effective_root.appendChild(html_metric_box)
 
   html_metric_grid = doc.createElement("div")
   html_metric_grid.setAttribute("class", "grid section")

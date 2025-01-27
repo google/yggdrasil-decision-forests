@@ -73,23 +73,39 @@
 namespace yggdrasil_decision_forests {
 namespace utils {
 
-// Train and test a model on a dataset stored in the "test_data" folder.
+// Train, test and run many checks on a model (e.g., check equality of
+// predictions of various engines, save and restore a model from disk).
+// This utility class can also be used on a pre-trained model.
 class TrainAndTestTester : public ::testing::Test {
  public:
-  // Trains, evaluates, serialized & deserialization (save and load a model to
-  // disk [directory format], or save and load a model from a sequence of bytes
-  // [byte sequence format]) + tests predictions, and check the equality of the
-  // predictions from the different inference implementations (e.g., slow
-  // engine, all available fast engines).
+  // Runs the full checking.
+  // Prepare the dataset, trains, evaluates, serialized & deserialization (save
+  // and load a model to disk [directory format], or save and load a model from
+  // a sequence of bytes [byte sequence format]) + tests predictions, and check
+  // the equality of the predictions from the different inference
+  // implementations (e.g., slow engine, all available fast engines).
   //
   // This method should be called after "train_config_" is set. Once this
   // function returns, "evaluation_" contains the result of the evaluation,
   // "training_duration_" contains the duration of the training, and "model_"
   // contains the model.
+  //
+  // TrainAndEvaluateModel := PrepareDataset + TrainModel + PostTrainingChecks.
   void TrainAndEvaluateModel(
       std::optional<absl::string_view> numerical_weight_attribute = {},
       bool emulate_weight_with_duplication = false,
       std::function<void(void)> callback_training_about_to_start = nullptr);
+
+  // Prepare the dataset.
+  void PrepareDataset(
+      std::optional<absl::string_view> numerical_weight_attribute = {});
+
+  // Train the model.
+  void TrainModel(
+      std::function<void(void)> callback_training_about_to_start = nullptr);
+
+  // Run checks on an already trained model.
+  absl::Status PostTrainingChecks();
 
   // Configure the test to run on the synthetic dataset generator.
   void ConfigureForSyntheticDataset();
@@ -101,41 +117,50 @@ class TrainAndTestTester : public ::testing::Test {
   std::string EffectiveDatasetRootDirectory();
 
   // Filename of the dataset. The full dataset path will be
-  // Join(dataset_root_directory_, dataset_filename_).
+  // Join(dataset_root_directory_, dataset_filename_). If empty, generates a
+  // synthetic dataset.
   std::string dataset_filename_;
 
-  // If "dataset_test_filename_" is not specified, the dataset
+  // Filename of the test dataset. If not specified, the dataset
   // "dataset_filename_" is split into a training and a testing dataset.
   // If "dataset_test_filename_" is specified, all of "dataset_filename_" is
   // used for training, and "dataset_test_filename_" is used for testing.
   std::string dataset_test_filename_;
 
+  // Options to generate a syntheteic dataset when "dataset_filename_" is empty.
   dataset::proto::SyntheticDatasetOptions synthetic_dataset_;
 
-  // Filename of the datec guide. The full guide path will be
+  // Filename of the dataspec guide. The full guide path will be
   // Join(dataset_root_directory_, guide_filename_). If empty, no guide will
   // be used.
   std::string guide_filename_;
 
-  // Training configuration of the model.
+  // Training configuration to train the model.
   model::proto::TrainingConfig train_config_;
 
+  // Generic hyper-parameters to train the model.
   std::optional<model::proto::GenericHyperParameters> generic_parameters_;
 
+  // Deployment configuration to train the model.
   model::proto::DeploymentConfig deployment_config_;
 
+  // Result of the evaluating the model on the test dataset.
   metric::proto::EvaluationResults evaluation_;
 
-  // Type used when evaluating the model.
+  // If set, overrides the type used in the model evaluation.
   model::proto::Task evaluation_override_type_ = model::proto::Task::UNDEFINED;
 
+  // Learner.
   std::unique_ptr<model::AbstractLearner> learner_;
 
-  // Configure the evaluation.
+  // Options of the model evaluation.
   metric::proto::EvaluationOptions eval_options_;
 
   // Percentage of the dataset used for the train/test.
   float dataset_sampling_ = 1.f;
+
+  // Dataspec.
+  dataset::proto::DataSpecification dataspec_;
 
   // The trained model.
   std::unique_ptr<model::AbstractModel> model_;
@@ -205,7 +230,7 @@ class TrainAndTestTester : public ::testing::Test {
   std::pair<std::string, std::string> GetTrainAndTestDatasetPaths();
 
   dataset::proto::DataSpecification BuildDataspec(
-      const absl::string_view dataset_path);
+      absl::string_view dataset_path);
 
   void FixConfiguration(
       std::optional<absl::string_view> numerical_weight_attribute,
@@ -215,12 +240,12 @@ class TrainAndTestTester : public ::testing::Test {
 
   void BuildTrainValidTestDatasets(
       const dataset::proto::DataSpecification& data_spec,
-      const absl::string_view train_path, const absl::string_view test_path,
+      absl::string_view train_path, absl::string_view test_path,
       int32_t numerical_weight_attribute_idx, float max_numerical_weight_value);
 
   // Serialize the model to std::string, deserialize it, and check the equality
   // of the original and deserialized model.
-  void TestModelSerialization();
+  absl::Status TestModelSerialization();
 };
 
 // Tests the prediction of the (slow) generic engine and the fast generic

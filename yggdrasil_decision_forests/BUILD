@@ -5,6 +5,28 @@ package(
     licenses = ["notice"],
 )
 
+# ==========================
+# Following is a quick recap of the most useful compilation flags of YDF. Look at the individual
+# flags documentation for more details.
+#
+# - YDF benefits from AVX an other special instructions. Compile YDF with
+#   "--copt=-mfma --copt=-mavx2 --copt=-mavx " for maximum performances.
+#
+# - Get support for TensorFlow Example proto without compiling TensorFlow with
+#   "--define=use_ydf_tensorflow_proto=1".
+#
+# - Use Protobuf Lite instead of Protobuf with "--define=ydf_protobuf_lite=1".
+#
+# - Add support for GPUs with "--@rules_cuda//cuda:enable=True" (external; defaults to true) or
+#   "--config=cuda" (internal; defaults to false).
+#
+# - Enable support for training on more than 2 billions examples with
+#   "--define=ydf_example_idx_num_bits=64".
+#
+# - Compile YDF with Google public only libraries (e.g., filesystem, logging, threading) with
+#   "--define=ydf_use_default_libs=1".
+# ==========================
+
 exports_files(["LICENSE"])
 
 # RECOMMENDED VALUE: use_ydf_tensorflow_proto=1

@@ -52,7 +52,7 @@ message GradientBoostedTreesTrainingConfig {
   //
   // Note: This parameter is ignored if another sampling strategy
   // ("sampling_methods") is set.
-  optional float subsample = 4 [default = 1, deprecated = true];
+  optional float subsample = 4 [default = 1];
 
   // How is the sampling ("subsample" or "sampling_methods") is implemented.
   oneof sampling_implementation {

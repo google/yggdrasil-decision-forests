@@ -10,6 +10,12 @@ package(
 # =========
 
 py_library(
+    name = "jax_fallback",
+    srcs = ["jax_fallback.py"],
+    deps = [],
+)
+
+py_library(
     name = "generic_jax",
     srcs = ["generic_jax.py"],
     deps = [
@@ -88,7 +94,7 @@ py_library(
     name = "layer",
     srcs = ["layer.py"],
     deps = [
-        # flax dep,
+        # flax:core dep,
         # jax dep,
     ],
 )
@@ -115,6 +121,26 @@ py_library(
         "//ydf/learner:tuner",
         "//ydf/model:generic_model",
         "//ydf/utils:func_helpers",
+    ],
+)
+
+py_library(
+    name = "tabular_transformer",
+    srcs = ["tabular_transformer.py"],
+    deps = [
+        ":generic_jax",
+        ":hyperparameter",
+        ":layer",
+        # flax:core dep,
+        # jax dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/learner:abstract_feature_selector",
+        "//ydf/learner:generic_learner",
+        "//ydf/learner:tuner",
+        "//ydf/model:generic_model",
+        "//ydf/utils:func_helpers",
+        "//ydf/utils:log",
     ],
 )
 
@@ -213,5 +239,29 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
+    ],
+)
+
+py_test(
+    name = "tabular_transformer_test",
+    srcs = ["tabular_transformer_test.py"],
+    data = [
+        "//test_data",
+        "@ydf_cc//yggdrasil_decision_forests/test_data",
+    ],
+    python_version = "PY3",
+    shard_count = 4,
+    deps = [
+        ":layer",
+        ":tabular_transformer",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # jax dep,
+        # numpy dep,
+        # pandas dep,
+        "//ydf/dataset/io:dataset_io",
+        "//ydf/model:generic_model",
+        "//ydf/utils:test_utils",
     ],
 )

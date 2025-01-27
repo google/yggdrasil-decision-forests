@@ -18,7 +18,7 @@
 
 #include <functional>
 #include <optional>
-#include <random>
+#include <string>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -27,6 +27,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {

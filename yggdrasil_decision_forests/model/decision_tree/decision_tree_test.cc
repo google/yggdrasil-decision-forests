@@ -161,16 +161,17 @@ class EvalConditions : public ::testing::Test {
     EXPECT_EQ(EvalCondition(condition, example).value(), expected_result);
 
     // Evaluate on full dataset
-    std::vector<UnsignedExampleIdx> positive_examples;
-    std::vector<UnsignedExampleIdx> negative_examples;
-    EXPECT_OK(EvalConditionOnDataset(
-        dataset_,
-        std::vector<UnsignedExampleIdx>{
-            static_cast<UnsignedExampleIdx>(dataset_row)},
-        condition,
-        /*dataset_is_dense=*/false, &positive_examples, &negative_examples));
-    EXPECT_EQ(positive_examples.size() == 1, expected_result);
-    EXPECT_EQ(negative_examples.size() == 1, !expected_result);
+    std::vector<UnsignedExampleIdx> selected_examples;
+    std::vector<UnsignedExampleIdx> selected_examples_buffer;
+    selected_examples.push_back(dataset_row);
+    auto selected_example_rb = SelectedExamplesRollingBuffer::Create(
+        absl::MakeSpan(selected_examples), &selected_examples_buffer);
+    ExampleSplitRollingBuffer example_split;
+    CHECK_OK(EvalConditionOnDataset(dataset_, selected_example_rb, condition,
+                                    /*dataset_is_dense=*/false,
+                                    &example_split));
+    EXPECT_EQ(example_split.positive_examples.size() == 1, expected_result);
+    EXPECT_EQ(example_split.negative_examples.size() == 1, !expected_result);
 
     std::string description;
     AppendConditionDescription(dataset_.data_spec(), condition, &description);
@@ -604,6 +605,118 @@ TEST(DecisionTree, DoSortedRangesIntersect) {
   EXPECT_FALSE(intersect());
 }
 
+TEST(DecisionTree, StructureNumberOfTimesAsRoot) {
+  std::vector<std::unique_ptr<decision_tree::DecisionTree>> trees;
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(1);
+  }
+
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(1);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(3);
+  }
+
+  auto vi = StructureNumberOfTimesAsRoot(trees);
+  EXPECT_EQ(vi.size(), 2);
+
+  EXPECT_EQ(vi[0].attribute_idx(), 0);
+  EXPECT_EQ(vi[0].importance(), 2);
+  EXPECT_EQ(vi[1].attribute_idx(), 1);
+  EXPECT_EQ(vi[1].importance(), 1);
+}
+
+TEST(DecisionTree, StructureNumberOfTimesInNode) {
+  std::vector<std::unique_ptr<decision_tree::DecisionTree>> trees;
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(1);
+  }
+
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(1);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(3);
+  }
+
+  auto vi = StructureNumberOfTimesInNode(trees);
+  EXPECT_EQ(vi.size(), 3);
+
+  EXPECT_EQ(vi[0].attribute_idx(), 0);
+  EXPECT_EQ(vi[0].importance(), 2);
+  EXPECT_EQ(vi[1].attribute_idx(), 1);
+  EXPECT_EQ(vi[1].importance(), 2);
+  EXPECT_EQ(vi[2].attribute_idx(), 3);
+  EXPECT_EQ(vi[2].importance(), 1);
+}
+
 TEST(DecisionTree, StructureMeanMinDepth) {
   std::vector<std::unique_ptr<decision_tree::DecisionTree>> trees;
   trees.push_back(std::make_unique<DecisionTree>());
@@ -629,6 +742,18 @@ TEST(DecisionTree, StructureMeanMinDepth) {
 
     tree.mutable_root()->CreateChildren();
     tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(1);
 
     tree.mutable_root()->mutable_pos_child()->CreateChildren();
     tree.mutable_root()
@@ -647,11 +772,102 @@ TEST(DecisionTree, StructureMeanMinDepth) {
 
   EXPECT_EQ(vi[1].attribute_idx(), 1);
   EXPECT_NEAR(vi[1].importance(),
-              1. / (1. + (1. + 1. + 1. + 2. + 2. + 1.) / 6.), kMargin);
+              1. / (1. + (1. + 1. + 1. + 0. + 0. + 0.) / 6.), kMargin);
 
   EXPECT_EQ(vi[2].attribute_idx(), 3);
   EXPECT_NEAR(vi[2].importance(),
               1. / (1. + (1. + 1. + 1. + 2. + 2. + 1.) / 6.), kMargin);
+}
+
+TEST(DecisionTree, StructureSumScore) {
+  std::vector<std::unique_ptr<decision_tree::DecisionTree>> trees;
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_split_score(
+        0.1f);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_num_training_examples_with_weight(10);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(1);
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_split_score(0.5f);
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_num_training_examples_with_weight(5);
+  }
+
+  trees.push_back(std::make_unique<DecisionTree>());
+  {
+    auto& tree = *trees.back();
+    tree.CreateRoot();
+
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(0);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_oblique_condition()
+        ->add_attributes(1);
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_split_score(
+        0.2f);
+    tree.mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_num_training_examples_with_weight(40);
+
+    tree.mutable_root()->mutable_pos_child()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(3);
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_split_score(0.4f);
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_num_training_examples_with_weight(10);
+  }
+
+  auto vi = StructureSumScore(trees);
+  EXPECT_EQ(vi.size(), 3);
+
+  EXPECT_EQ(vi[0].attribute_idx(), 1);
+  EXPECT_NEAR(vi[0].importance(), 0.5f * 5 + 0.2f * 40, 1e-6);
+
+  EXPECT_EQ(vi[1].attribute_idx(), 0);
+  EXPECT_NEAR(vi[1].importance(), 0.1f * 10 + 0.2f * 40, 1e-6);
+
+  EXPECT_EQ(vi[2].attribute_idx(), 3);
+  EXPECT_NEAR(vi[2].importance(), 0.4f * 10, 1e-6);
 }
 
 TEST(DecisionTree, Distance) {

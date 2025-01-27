@@ -141,6 +141,11 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
+    extra_training_config: Training configuration proto (advanced). If set, this
+      training configuration proto is merged with the one implicitely defined by
+      the learner. Can be used to set internal or advanced parameters that are
+      not exposed as constructor arguments. Parameters in extra_training_config
+      have higher priority as the constructor arguments.
     adapt_bootstrap_size_ratio_for_maximum_training_duration: Control how the
       maximum training duration (if set) is applied. If false, the training stop
       when the time is used. If true, adapts the size of the sampled dataset
@@ -311,6 +316,11 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       the training. This solution is faster but consumes much more memory than
       IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
       IN_NODE. . Default: "PRESORT".
+    sparse_oblique_max_num_features: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. Controls the maximum number of features in a
+      split.Set to -1 for no maximum. Use only if a hard maximum on the number
+      of variables is needed, otherwise prefer `projection_density_factor` for
+      controlling the number of features per projection. Default: None.
     sparse_oblique_max_num_projections: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after
       the num_projections_exponent). Oblique splits try out
@@ -353,9 +363,33 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       inference time (on average). This value is best tuned for each dataset.
       Default: None.
     sparse_oblique_weights: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Possible values: - `BINARY`: The oblique
-      weights are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique
-      weights are be sampled in [-1,1]. Default: None.
+      `split_axis=SPARSE_OBLIQUE`. Note that normalization is applied after
+      sampling the weights, e.g. binary weights are only guaranteed binary if
+      normalization is NONE.  Possible values: - `BINARY`: The oblique weights
+      are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique weights are
+      be sampled in [-1,1]. - `POWER_OF_TWO`: The oblique weights are powers of
+      two. The exponents are sampled uniformly in
+      [sparse_oblique_weights_power_of_two_min_exponent,
+      sparse_oblique_weights_power_of_two_max_exponent], the sign is uniformly
+      sampled. - `INTEGER`: The weights are integers sampled uniformly from the
+      range [sparse_oblique_weights_integer_minimum,
+      sparse_oblique_weights_integer_maximum]. Default: None.
+    sparse_oblique_weights_integer_maximum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Maximum value of the weights Default:
+      None.
+    sparse_oblique_weights_integer_minimum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Minimum value of the weights. Default:
+      None.
+    sparse_oblique_weights_power_of_two_max_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Maximum exponent of the weights
+      Default: None.
+    sparse_oblique_weights_power_of_two_min_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Minimum exponent of the weights
+      Default: None.
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
@@ -419,6 +453,9 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      extra_training_config: Optional[
+          abstract_learner_pb2.TrainingConfig
+      ] = None,
       adapt_bootstrap_size_ratio_for_maximum_training_duration: bool = False,
       allow_na_conditions: bool = False,
       bootstrap_size_ratio: float = 1.0,
@@ -451,11 +488,16 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       random_seed: int = 123456,
       sampling_with_replacement: bool = True,
       sorting_strategy: str = "PRESORT",
+      sparse_oblique_max_num_features: Optional[int] = None,
       sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
       sparse_oblique_weights: Optional[str] = None,
+      sparse_oblique_weights_integer_maximum: Optional[int] = None,
+      sparse_oblique_weights_integer_minimum: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_max_exponent: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_min_exponent: Optional[int] = None,
       split_axis: str = "AXIS_ALIGNED",
       uplift_min_examples_in_treatment: int = 5,
       uplift_split_score: str = "KULLBACK_LEIBLER",
@@ -514,6 +556,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         "random_seed": random_seed,
         "sampling_with_replacement": sampling_with_replacement,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_max_num_features": sparse_oblique_max_num_features,
         "sparse_oblique_max_num_projections": (
             sparse_oblique_max_num_projections
         ),
@@ -525,6 +568,18 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             sparse_oblique_projection_density_factor
         ),
         "sparse_oblique_weights": sparse_oblique_weights,
+        "sparse_oblique_weights_integer_maximum": (
+            sparse_oblique_weights_integer_maximum
+        ),
+        "sparse_oblique_weights_integer_minimum": (
+            sparse_oblique_weights_integer_minimum
+        ),
+        "sparse_oblique_weights_power_of_two_max_exponent": (
+            sparse_oblique_weights_power_of_two_max_exponent
+        ),
+        "sparse_oblique_weights_power_of_two_min_exponent": (
+            sparse_oblique_weights_power_of_two_min_exponent
+        ),
         "split_axis": split_axis,
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
         "uplift_split_score": uplift_split_score,
@@ -563,6 +618,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         deployment_config=deployment_config,
         tuner=tuner,
         feature_selector=feature_selector,
+        extra_training_config=extra_training_config,
     )
 
   def train(
@@ -763,6 +819,11 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
+    extra_training_config: Training configuration proto (advanced). If set, this
+      training configuration proto is merged with the one implicitely defined by
+      the learner. Can be used to set internal or advanced parameters that are
+      not exposed as constructor arguments. Parameters in extra_training_config
+      have higher priority as the constructor arguments.
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
       will be roots. `max_depth=-1` means that tree depth unconstrained by this
       parameter. `max_depth=-2` means that the maximum depth is log2(number of
@@ -779,6 +840,11 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
       Default: False.
     random_seed: Random seed for the training of the model. Learners are
       expected to be deterministic by the random seed. Default: 123456.
+    sparse_oblique_max_num_features: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. Controls the maximum number of features in a
+      split.Set to -1 for no maximum. Use only if a hard maximum on the number
+      of variables is needed, otherwise prefer `projection_density_factor` for
+      controlling the number of features per projection. Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before
       applying the sparse oblique projections. - `NONE`: No normalization. -
@@ -795,9 +861,33 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
       inference time (on average). This value is best tuned for each dataset.
       Default: None.
     sparse_oblique_weights: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Possible values: - `BINARY`: The oblique
-      weights are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique
-      weights are be sampled in [-1,1]. Default: None.
+      `split_axis=SPARSE_OBLIQUE`. Note that normalization is applied after
+      sampling the weights, e.g. binary weights are only guaranteed binary if
+      normalization is NONE.  Possible values: - `BINARY`: The oblique weights
+      are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique weights are
+      be sampled in [-1,1]. - `POWER_OF_TWO`: The oblique weights are powers of
+      two. The exponents are sampled uniformly in
+      [sparse_oblique_weights_power_of_two_min_exponent,
+      sparse_oblique_weights_power_of_two_max_exponent], the sign is uniformly
+      sampled. - `INTEGER`: The weights are integers sampled uniformly from the
+      range [sparse_oblique_weights_integer_minimum,
+      sparse_oblique_weights_integer_maximum]. Default: None.
+    sparse_oblique_weights_integer_maximum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Maximum value of the weights Default:
+      None.
+    sparse_oblique_weights_integer_minimum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Minimum value of the weights. Default:
+      None.
+    sparse_oblique_weights_power_of_two_max_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Maximum exponent of the weights
+      Default: None.
+    sparse_oblique_weights_power_of_two_min_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Minimum exponent of the weights
+      Default: None.
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
@@ -856,14 +946,22 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      extra_training_config: Optional[
+          abstract_learner_pb2.TrainingConfig
+      ] = None,
       max_depth: int = -2,
       min_examples: int = 5,
       num_trees: int = 300,
       pure_serving_model: bool = False,
       random_seed: int = 123456,
+      sparse_oblique_max_num_features: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
       sparse_oblique_weights: Optional[str] = None,
+      sparse_oblique_weights_integer_maximum: Optional[int] = None,
+      sparse_oblique_weights_integer_minimum: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_max_exponent: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_min_exponent: Optional[int] = None,
       split_axis: str = "AXIS_ALIGNED",
       subsample_count: Optional[int] = 256,
       subsample_ratio: Optional[float] = None,
@@ -882,11 +980,24 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
         "num_trees": num_trees,
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
+        "sparse_oblique_max_num_features": sparse_oblique_max_num_features,
         "sparse_oblique_normalization": sparse_oblique_normalization,
         "sparse_oblique_projection_density_factor": (
             sparse_oblique_projection_density_factor
         ),
         "sparse_oblique_weights": sparse_oblique_weights,
+        "sparse_oblique_weights_integer_maximum": (
+            sparse_oblique_weights_integer_maximum
+        ),
+        "sparse_oblique_weights_integer_minimum": (
+            sparse_oblique_weights_integer_minimum
+        ),
+        "sparse_oblique_weights_power_of_two_max_exponent": (
+            sparse_oblique_weights_power_of_two_max_exponent
+        ),
+        "sparse_oblique_weights_power_of_two_min_exponent": (
+            sparse_oblique_weights_power_of_two_min_exponent
+        ),
         "split_axis": split_axis,
         "subsample_count": subsample_count,
         "subsample_ratio": subsample_ratio,
@@ -924,6 +1035,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
         deployment_config=deployment_config,
         tuner=tuner,
         feature_selector=feature_selector,
+        extra_training_config=extra_training_config,
     )
 
   def train(
@@ -1087,6 +1199,11 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
+    extra_training_config: Training configuration proto (advanced). If set, this
+      training configuration proto is merged with the one implicitely defined by
+      the learner. Can be used to set internal or advanced parameters that are
+      not exposed as constructor arguments. Parameters in extra_training_config
+      have higher priority as the constructor arguments.
     adapt_subsample_for_maximum_training_duration: Control how the maximum
       training duration (if set) is applied. If false, the training stop when
       the time is used. If true, the size of the sampled datasets used train
@@ -1330,6 +1447,11 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       the training. This solution is faster but consumes much more memory than
       IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
       IN_NODE. . Default: "PRESORT".
+    sparse_oblique_max_num_features: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. Controls the maximum number of features in a
+      split.Set to -1 for no maximum. Use only if a hard maximum on the number
+      of variables is needed, otherwise prefer `projection_density_factor` for
+      controlling the number of features per projection. Default: None.
     sparse_oblique_max_num_projections: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after
       the num_projections_exponent). Oblique splits try out
@@ -1372,9 +1494,33 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       inference time (on average). This value is best tuned for each dataset.
       Default: None.
     sparse_oblique_weights: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Possible values: - `BINARY`: The oblique
-      weights are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique
-      weights are be sampled in [-1,1]. Default: None.
+      `split_axis=SPARSE_OBLIQUE`. Note that normalization is applied after
+      sampling the weights, e.g. binary weights are only guaranteed binary if
+      normalization is NONE.  Possible values: - `BINARY`: The oblique weights
+      are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique weights are
+      be sampled in [-1,1]. - `POWER_OF_TWO`: The oblique weights are powers of
+      two. The exponents are sampled uniformly in
+      [sparse_oblique_weights_power_of_two_min_exponent,
+      sparse_oblique_weights_power_of_two_max_exponent], the sign is uniformly
+      sampled. - `INTEGER`: The weights are integers sampled uniformly from the
+      range [sparse_oblique_weights_integer_minimum,
+      sparse_oblique_weights_integer_maximum]. Default: None.
+    sparse_oblique_weights_integer_maximum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Maximum value of the weights Default:
+      None.
+    sparse_oblique_weights_integer_minimum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Minimum value of the weights. Default:
+      None.
+    sparse_oblique_weights_power_of_two_max_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Maximum exponent of the weights
+      Default: None.
+    sparse_oblique_weights_power_of_two_min_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Minimum exponent of the weights
+      Default: None.
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
@@ -1468,6 +1614,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      extra_training_config: Optional[
+          abstract_learner_pb2.TrainingConfig
+      ] = None,
       adapt_subsample_for_maximum_training_duration: bool = False,
       allow_na_conditions: bool = False,
       apply_link_function: bool = True,
@@ -1515,11 +1664,16 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       selective_gradient_boosting_ratio: float = 0.01,
       shrinkage: float = 0.1,
       sorting_strategy: str = "PRESORT",
+      sparse_oblique_max_num_features: Optional[int] = None,
       sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
       sparse_oblique_weights: Optional[str] = None,
+      sparse_oblique_weights_integer_maximum: Optional[int] = None,
+      sparse_oblique_weights_integer_minimum: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_max_exponent: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_min_exponent: Optional[int] = None,
       split_axis: str = "AXIS_ALIGNED",
       subsample: float = 1.0,
       uplift_min_examples_in_treatment: int = 5,
@@ -1601,6 +1755,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "selective_gradient_boosting_ratio": selective_gradient_boosting_ratio,
         "shrinkage": shrinkage,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_max_num_features": sparse_oblique_max_num_features,
         "sparse_oblique_max_num_projections": (
             sparse_oblique_max_num_projections
         ),
@@ -1612,6 +1767,18 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
             sparse_oblique_projection_density_factor
         ),
         "sparse_oblique_weights": sparse_oblique_weights,
+        "sparse_oblique_weights_integer_maximum": (
+            sparse_oblique_weights_integer_maximum
+        ),
+        "sparse_oblique_weights_integer_minimum": (
+            sparse_oblique_weights_integer_minimum
+        ),
+        "sparse_oblique_weights_power_of_two_max_exponent": (
+            sparse_oblique_weights_power_of_two_max_exponent
+        ),
+        "sparse_oblique_weights_power_of_two_min_exponent": (
+            sparse_oblique_weights_power_of_two_min_exponent
+        ),
         "split_axis": split_axis,
         "subsample": subsample,
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
@@ -1656,6 +1823,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         deployment_config=deployment_config,
         tuner=tuner,
         feature_selector=feature_selector,
+        extra_training_config=extra_training_config,
     )
 
   def train(
@@ -1852,6 +2020,11 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
+    extra_training_config: Training configuration proto (advanced). If set, this
+      training configuration proto is merged with the one implicitely defined by
+      the learner. Can be used to set internal or advanced parameters that are
+      not exposed as constructor arguments. Parameters in extra_training_config
+      have higher priority as the constructor arguments.
     apply_link_function: If true, applies the link function (a.k.a. activation
       function), if any, before returning the model prediction. If false,
       returns the pre-link function model output. For example, in the case of
@@ -1967,6 +2140,9 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      extra_training_config: Optional[
+          abstract_learner_pb2.TrainingConfig
+      ] = None,
       apply_link_function: bool = True,
       force_numerical_discretization: bool = False,
       max_depth: int = 6,
@@ -2051,6 +2227,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         deployment_config=deployment_config,
         tuner=tuner,
         feature_selector=feature_selector,
+        extra_training_config=extra_training_config,
     )
 
   def train(
@@ -2212,6 +2389,11 @@ class CartLearner(generic_learner.GenericCCLearner):
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
       `num_discretized_numerical_bins` will be ignored.
+    extra_training_config: Training configuration proto (advanced). If set, this
+      training configuration proto is merged with the one implicitely defined by
+      the learner. Can be used to set internal or advanced parameters that are
+      not exposed as constructor arguments. Parameters in extra_training_config
+      have higher priority as the constructor arguments.
     allow_na_conditions: If true, the tree training evaluates conditions of the
       type `X is NA` i.e. `X is missing`. Default: False.
     categorical_algorithm: How to learn splits on categorical attributes. -
@@ -2347,6 +2529,11 @@ class CartLearner(generic_learner.GenericCCLearner):
       the training. This solution is faster but consumes much more memory than
       IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
       IN_NODE. . Default: "IN_NODE".
+    sparse_oblique_max_num_features: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. Controls the maximum number of features in a
+      split.Set to -1 for no maximum. Use only if a hard maximum on the number
+      of variables is needed, otherwise prefer `projection_density_factor` for
+      controlling the number of features per projection. Default: None.
     sparse_oblique_max_num_projections: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after
       the num_projections_exponent). Oblique splits try out
@@ -2389,9 +2576,33 @@ class CartLearner(generic_learner.GenericCCLearner):
       inference time (on average). This value is best tuned for each dataset.
       Default: None.
     sparse_oblique_weights: For sparse oblique splits i.e.
-      `split_axis=SPARSE_OBLIQUE`. Possible values: - `BINARY`: The oblique
-      weights are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique
-      weights are be sampled in [-1,1]. Default: None.
+      `split_axis=SPARSE_OBLIQUE`. Note that normalization is applied after
+      sampling the weights, e.g. binary weights are only guaranteed binary if
+      normalization is NONE.  Possible values: - `BINARY`: The oblique weights
+      are sampled in {-1,1} (default). - `CONTINUOUS`: The oblique weights are
+      be sampled in [-1,1]. - `POWER_OF_TWO`: The oblique weights are powers of
+      two. The exponents are sampled uniformly in
+      [sparse_oblique_weights_power_of_two_min_exponent,
+      sparse_oblique_weights_power_of_two_max_exponent], the sign is uniformly
+      sampled. - `INTEGER`: The weights are integers sampled uniformly from the
+      range [sparse_oblique_weights_integer_minimum,
+      sparse_oblique_weights_integer_maximum]. Default: None.
+    sparse_oblique_weights_integer_maximum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Maximum value of the weights Default:
+      None.
+    sparse_oblique_weights_integer_minimum: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE` with integer weights i.e.
+      `sparse_oblique_weights=INTEGER`. Minimum value of the weights. Default:
+      None.
+    sparse_oblique_weights_power_of_two_max_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Maximum exponent of the weights
+      Default: None.
+    sparse_oblique_weights_power_of_two_min_exponent: For sparse oblique splits
+      i.e. `split_axis=SPARSE_OBLIQUE` with power-of-two weights i.e.
+      `sparse_oblique_weights=POWER_OF_TWO`. Minimum exponent of the weights
+      Default: None.
     split_axis: What structure of split to consider for numerical features. -
       `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This
       is the "classical" way to train a tree. Default value. - `SPARSE_OBLIQUE`:
@@ -2454,6 +2665,9 @@ class CartLearner(generic_learner.GenericCCLearner):
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
+      extra_training_config: Optional[
+          abstract_learner_pb2.TrainingConfig
+      ] = None,
       allow_na_conditions: bool = False,
       categorical_algorithm: str = "CART",
       categorical_set_split_greedy_sampling: float = 0.1,
@@ -2478,11 +2692,16 @@ class CartLearner(generic_learner.GenericCCLearner):
       pure_serving_model: bool = False,
       random_seed: int = 123456,
       sorting_strategy: str = "IN_NODE",
+      sparse_oblique_max_num_features: Optional[int] = None,
       sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
       sparse_oblique_num_projections_exponent: Optional[float] = None,
       sparse_oblique_projection_density_factor: Optional[float] = None,
       sparse_oblique_weights: Optional[str] = None,
+      sparse_oblique_weights_integer_maximum: Optional[int] = None,
+      sparse_oblique_weights_integer_minimum: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_max_exponent: Optional[int] = None,
+      sparse_oblique_weights_power_of_two_min_exponent: Optional[int] = None,
       split_axis: str = "AXIS_ALIGNED",
       uplift_min_examples_in_treatment: int = 5,
       uplift_split_score: str = "KULLBACK_LEIBLER",
@@ -2529,6 +2748,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_max_num_features": sparse_oblique_max_num_features,
         "sparse_oblique_max_num_projections": (
             sparse_oblique_max_num_projections
         ),
@@ -2540,6 +2760,18 @@ class CartLearner(generic_learner.GenericCCLearner):
             sparse_oblique_projection_density_factor
         ),
         "sparse_oblique_weights": sparse_oblique_weights,
+        "sparse_oblique_weights_integer_maximum": (
+            sparse_oblique_weights_integer_maximum
+        ),
+        "sparse_oblique_weights_integer_minimum": (
+            sparse_oblique_weights_integer_minimum
+        ),
+        "sparse_oblique_weights_power_of_two_max_exponent": (
+            sparse_oblique_weights_power_of_two_max_exponent
+        ),
+        "sparse_oblique_weights_power_of_two_min_exponent": (
+            sparse_oblique_weights_power_of_two_min_exponent
+        ),
         "split_axis": split_axis,
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
         "uplift_split_score": uplift_split_score,
@@ -2578,6 +2810,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         deployment_config=deployment_config,
         tuner=tuner,
         feature_selector=feature_selector,
+        extra_training_config=extra_training_config,
     )
 
   def train(

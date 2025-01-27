@@ -34,6 +34,10 @@
 
 ::: ydf.NodeFormat
 
+::: ydf.DataSpecification
+
+::: ydf.TrainingConfig
+
 ::: ydf.RegressionLoss
 
 ::: ydf.BinaryClassificationLoss

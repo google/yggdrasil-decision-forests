@@ -38,7 +38,8 @@ build_and_maybe_test () {
     BAZEL=bazel
     ${BAZEL} version
 
-    local flags="--config=linux_cpp${1} --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${2} --build_tag_filters=-tf_dep --test_tag_filters=-tf_dep"
+    local flags="--config=linux_cpp${1} --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${2} --build_tag_filters=-tf_dep,-cuda_dep --test_tag_filters=-tf_dep,-cuda_dep"
+    # TODO: By default, disable GPU build with --@rules_cuda//cuda:enable=False
 
     # Do not build the PYDF targets, use tools/build_test_linux.sh instead
     local exclude_pydf_targets="-//yggdrasil_decision_forests/port/python/...:all"

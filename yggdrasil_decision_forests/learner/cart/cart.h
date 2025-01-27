@@ -27,6 +27,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -85,12 +86,13 @@ namespace internal {
 // For each non-leaf node, test if the validation metric (accuracy or rmse)
 // would be better if the node was a leaf. If true, the node is turned into a
 // leaf and the children nodes are pruned.
-absl::Status PruneTree(const dataset::VerticalDataset& train_dataset,
-                       const std::vector<float>& weights,
-                       const std::vector<UnsignedExampleIdx>& example_idxs,
-                       const model::proto::TrainingConfig& config,
-                       const model::proto::TrainingConfigLinking& config_link,
-                       model::decision_tree::DecisionTree* tree);
+absl::Status PruneTree(
+    const dataset::VerticalDataset& train_dataset,
+    const std::vector<float>& weights,
+    decision_tree::SelectedExamplesRollingBuffer example_idxs,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    model::decision_tree::DecisionTree* tree);
 
 }  // namespace internal
 

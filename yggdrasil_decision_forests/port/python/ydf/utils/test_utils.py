@@ -44,6 +44,14 @@ def pydf_test_data_path() -> str:
   return os.path.join(data_root_path(), "test_data")
 
 
+def build_pydf_golden_path(filename: str) -> str:
+  return os.path.join(
+      pydf_test_data_path(),
+      "golden",
+      filename,
+  )
+
+
 @dataclasses.dataclass(frozen=True)
 class TrainAndTestDataset:
   """Training / test dataset as path, VerticalDataset and DataFrame."""

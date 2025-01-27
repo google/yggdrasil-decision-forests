@@ -40,6 +40,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -123,6 +124,7 @@ cc_test(
     deps = [
         ":example_set",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log:check",

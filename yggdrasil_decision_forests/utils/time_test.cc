@@ -15,7 +15,6 @@
 
 #include "yggdrasil_decision_forests/utils/time.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/time/time.h"
 

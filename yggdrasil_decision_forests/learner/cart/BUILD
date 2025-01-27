@@ -41,6 +41,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
     alwayslink = 1,
 )
@@ -68,6 +69,7 @@ cc_test(
         ":cart",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",

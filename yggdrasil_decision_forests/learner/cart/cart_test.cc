@@ -22,6 +22,7 @@
 #include "absl/log/log.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -59,8 +60,8 @@ class CartOnAdult : public utils::TrainAndTestTester {
 TEST_F(CartOnAdult, Base) {
   TrainAndEvaluateModel();
   // Random Forest has an accuracy of ~0.860.
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8546, 0.011, 0.8552);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.4392, 0.156, 0.4082);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8546, 0.011, 0.85454);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.4392, 0.156, 0.4092);
 
   // Show the tree structure.
   std::string description;
@@ -114,7 +115,7 @@ TEST_F(CartOnAbalone, Base) {
   TrainAndEvaluateModel();
   // Random Forest has an rmse of ~2.10.
   // The default RMSE (always retuning the label mean) is ~3.204.
-  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.3728, 0.1566, 2.3054);
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.3728, 0.1566, 2.33376);
 
   auto* rf_model =
       dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
@@ -249,7 +250,10 @@ TEST_F(CartPruningTest, PruneTree) {
 
   std::vector<float> weights = {1.f, 1.f, 1.f};
   std::vector<UnsignedExampleIdx> example_idxs = {0, 1, 2};
-  EXPECT_OK(internal::PruneTree(dataset_, weights, example_idxs, config_,
+  std::vector<UnsignedExampleIdx> example_idxs_buffer;
+  auto example_idxs_rb = decision_tree::SelectedExamplesRollingBuffer::Create(
+      absl::MakeSpan(example_idxs), &example_idxs_buffer);
+  EXPECT_OK(internal::PruneTree(dataset_, weights, example_idxs_rb, config_,
                                 config_link_, &tree_));
 
   // Note: There is only one way to prune the tree and make it having 3 nodes.
@@ -284,13 +288,13 @@ class CartOnSimPTE : public utils::TrainAndTestTester {
 TEST_F(CartOnSimPTE, Base) {
   TrainAndEvaluateModel();
   // Note: A Qini of ~0.1 is expected with a simple Random Forest model.
-  YDF_TEST_METRIC(metric::Qini(evaluation_), 0.058, 0.041, 0.0825);
+  YDF_TEST_METRIC(metric::Qini(evaluation_), 0.058, 0.041, 0.07751);
 
   auto* rf_model =
       dynamic_cast<const random_forest::RandomForestModel*>(model_.get());
 
-  YDF_TEST_METRIC(rf_model->num_pruned_nodes().value(), 49.0, 46.5, 58.0);
-  YDF_TEST_METRIC(rf_model->NumNodes(), 37.0, 42.0, 33.0);
+  YDF_TEST_METRIC(rf_model->num_pruned_nodes().value(), 49.0, 46.5, 40.0);
+  YDF_TEST_METRIC(rf_model->NumNodes(), 37.0, 42.0, 51.0);
 }
 
 TEST_F(CartOnSimPTE, Honest) {
@@ -298,7 +302,7 @@ TEST_F(CartOnSimPTE, Honest) {
   config->mutable_decision_tree()->mutable_honest();
 
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Qini(evaluation_), 0.044, 0.0521, 0.0276);
+  YDF_TEST_METRIC(metric::Qini(evaluation_), 0.044, 0.0521, 0.01871);
 }
 
 }  // namespace

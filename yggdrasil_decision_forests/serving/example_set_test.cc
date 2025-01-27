@@ -13,11 +13,15 @@
  * limitations under the License.
  */
 
+#include <string>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -181,6 +185,14 @@ dataset::proto::DataSpecification ToyDataSpec() {
       boolean { count_true: 5 count_false: 10 }
     }
 
+    # Id:15
+    columns {
+      type: NUMERICAL_VECTOR_SEQUENCE
+      name: "k"
+      numerical_vector_sequence { vector_length: 2 }
+      numerical { mean: 0 }
+    }
+
     unstackeds {
       original_name: "g"
       begin_column_idx: 7
@@ -206,7 +218,8 @@ struct ToyModel : EmptyModel {
   // Skipping columns 7, 10 and 11 on purpose.
   ToyModel(const bool enable_na_conditions) {
     uses_na_conditions = enable_na_conditions;
-    CHECK_OK(Initialize({0, 1, 2, 3, 4, 6, 8, 9, 12, 13, 14}, ToyDataSpec()));
+    CHECK_OK(
+        Initialize({0, 1, 2, 3, 4, 6, 8, 9, 12, 13, 14, 15}, ToyDataSpec()));
   }
 };
 
@@ -232,6 +245,9 @@ void SetToyValues(const ToyModel& model, ToyModel::ExampleSet* example_set,
       ToyModel::ExampleSet::GetMultiDimNumericalFeatureId("i", model).value();
   const auto feature_j =
       ToyModel::ExampleSet::GetBooleanFeatureId("j", model).value();
+  const auto feature_k =
+      ToyModel::ExampleSet::GetNumericalVectorSequenceFeatureId("k", model)
+          .value();
 
   // Applies some arbitrary values to make sure the test does not depend on
   // undefined behavior (i.e. reading without setting first). For the tests to
@@ -248,6 +264,8 @@ void SetToyValues(const ToyModel& model, ToyModel::ExampleSet* example_set,
       example_set->SetMultiDimNumerical(0, feature_g, {-4, -5, -6}, model));
   CHECK_OK(example_set->SetMultiDimNumerical(0, feature_i, {0.5, 0.5}, model));
   example_set->SetBoolean(0, feature_j, false, model);
+  example_set->SetNumericalVectorSequence(
+      0, feature_k, std::vector<float>{1.f, 2.f, 3.f, 4.f, 5.f, 6.f}, model);
 
   if (apply_fill_missing) {
     example_set->FillMissing(model);
@@ -263,6 +281,7 @@ void SetToyValues(const ToyModel& model, ToyModel::ExampleSet* example_set,
     example_set->SetMissingMultiDimNumerical(0, feature_g, model);
     example_set->SetMissingMultiDimNumerical(0, feature_i, model);
     example_set->SetMissingBoolean(0, feature_j, model);
+    example_set->SetMissingNumericalVectorSequence(0, feature_k, model);
   }
 
   if (apply_set_values) {
@@ -277,6 +296,8 @@ void SetToyValues(const ToyModel& model, ToyModel::ExampleSet* example_set,
     CHECK_OK(
         example_set->SetMultiDimNumerical(1, feature_i, {1.5, 1.5}, model));
     example_set->SetBoolean(1, feature_j, true, model);
+    example_set->SetNumericalVectorSequence(
+        1, feature_k, std::vector<float>{1.f, 2.f, 3.f, 4.f, 5.f, 6.f}, model);
   }
 }
 
@@ -296,12 +317,22 @@ TEST_P(ExampleSetTest, GetValue) {
       ToyModel::ExampleSet::GetCategoricalFeatureId("c", model).value();
   const auto feature_j =
       ToyModel::ExampleSet::GetBooleanFeatureId("j", model).value();
+  const auto feature_k =
+      ToyModel::ExampleSet::GetNumericalVectorSequenceFeatureId("k", model)
+          .value();
 
   const float kEpsilon = 0.0001;
   EXPECT_NEAR(example_set.GetNumerical(1, feature_a, model), 1.0f, kEpsilon);
   EXPECT_EQ(example_set.GetCategoricalInt(1, feature_b, model), 1);
   EXPECT_EQ(example_set.GetCategoricalString(1, feature_c, model), "y_c");
   EXPECT_EQ(example_set.GetBoolean(1, feature_j, model), true);
+
+  const auto nvs_value =
+      example_set.GetNumericalVectorSequence(1, feature_k, model);
+  EXPECT_EQ(nvs_value.num_vectors, 3);
+  EXPECT_EQ(nvs_value.vector_length, 2);
+  EXPECT_THAT(nvs_value.vector_values,
+              testing::ElementsAre(1.f, 2.f, 3.f, 4.f, 5.f, 6.f));
 }
 
 TEST(ExampleSetTest, IsMissing) {
@@ -326,6 +357,9 @@ TEST(ExampleSetTest, IsMissing) {
       ToyModel::ExampleSet::GetMultiDimNumericalFeatureId("g", model));
   ASSERT_OK_AND_ASSIGN(auto feature_j,
                        ToyModel::ExampleSet::GetBooleanFeatureId("j", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_k,
+      ToyModel::ExampleSet::GetNumericalVectorSequenceFeatureId("k", model));
 
   EXPECT_TRUE(
       example_set.IsMissingCategoricalAndNumerical(0, feature_a.index, model));
@@ -347,9 +381,15 @@ TEST(ExampleSetTest, IsMissing) {
       example_set.IsMissingCategoricalAndNumerical(0, feature_j.index, model));
   EXPECT_FALSE(
       example_set.IsMissingCategoricalAndNumerical(1, feature_j.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingCategoricalAndNumerical(0, feature_k.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingCategoricalAndNumerical(1, feature_k.index, model));
 
-  EXPECT_TRUE(example_set.IsMissingCategoricalSet(0, feature_d.index, model));
-  EXPECT_FALSE(example_set.IsMissingCategoricalSet(1, feature_d.index, model));
+  EXPECT_TRUE(
+      example_set.IsMissingNumericalVectorSequence(0, feature_d.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingNumericalVectorSequence(1, feature_d.index, model));
 }
 
 TEST(ExampleSetTest, IsMissingWithFillMissing) {
@@ -374,6 +414,9 @@ TEST(ExampleSetTest, IsMissingWithFillMissing) {
       ToyModel::ExampleSet::GetMultiDimNumericalFeatureId("g", model));
   ASSERT_OK_AND_ASSIGN(auto feature_j,
                        ToyModel::ExampleSet::GetBooleanFeatureId("j", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_k,
+      ToyModel::ExampleSet::GetNumericalVectorSequenceFeatureId("k", model));
 
   EXPECT_TRUE(
       example_set.IsMissingCategoricalAndNumerical(0, feature_a.index, model));
@@ -398,6 +441,11 @@ TEST(ExampleSetTest, IsMissingWithFillMissing) {
 
   EXPECT_TRUE(example_set.IsMissingCategoricalSet(0, feature_d.index, model));
   EXPECT_FALSE(example_set.IsMissingCategoricalSet(1, feature_d.index, model));
+
+  EXPECT_TRUE(
+      example_set.IsMissingNumericalVectorSequence(0, feature_k.index, model));
+  EXPECT_FALSE(
+      example_set.IsMissingNumericalVectorSequence(1, feature_k.index, model));
 }
 
 TEST(ExampleSetTest, IsMissingWithCopy) {
@@ -423,6 +471,9 @@ TEST(ExampleSetTest, IsMissingWithCopy) {
       ToyModel::ExampleSet::GetMultiDimNumericalFeatureId("g", model));
   ASSERT_OK_AND_ASSIGN(auto feature_j,
                        ToyModel::ExampleSet::GetBooleanFeatureId("j", model));
+  ASSERT_OK_AND_ASSIGN(
+      auto feature_k,
+      ToyModel::ExampleSet::GetNumericalVectorSequenceFeatureId("k", model));
 
   EXPECT_TRUE(dst_example_set.IsMissingCategoricalAndNumerical(
       0, feature_a.index, model));
@@ -449,6 +500,11 @@ TEST(ExampleSetTest, IsMissingWithCopy) {
       dst_example_set.IsMissingCategoricalSet(0, feature_d.index, model));
   EXPECT_FALSE(
       dst_example_set.IsMissingCategoricalSet(1, feature_d.index, model));
+
+  EXPECT_TRUE(dst_example_set.IsMissingNumericalVectorSequence(
+      0, feature_k.index, model));
+  EXPECT_FALSE(dst_example_set.IsMissingNumericalVectorSequence(
+      1, feature_k.index, model));
 }
 
 TEST_P(ExampleSetTest, HasFeature) {
@@ -464,6 +520,7 @@ TEST_P(ExampleSetTest, HasFeature) {
   EXPECT_TRUE(ToyModel::ExampleSet::HasInputFeature("g", model));
   EXPECT_TRUE(ToyModel::ExampleSet::HasInputFeature("g_0", model));
   EXPECT_TRUE(ToyModel::ExampleSet::HasInputFeature("j", model));
+  EXPECT_TRUE(ToyModel::ExampleSet::HasInputFeature("k", model));
 }
 
 TEST_P(ExampleSetTest, GetValueMissing) {
@@ -489,6 +546,7 @@ TEST_P(ExampleSetTest, ExtractProtoExampleMissing) {
   example_set.FillMissing(model);
   const dataset::proto::Example expected_example = PARSE_TEST_PROTO(
       R"pb(
+        attributes {}
         attributes {}
         attributes {}
         attributes {}
@@ -536,6 +594,7 @@ TEST_P(ExampleSetTest, ExtractProtoExampleMissingManually) {
         attributes {}
         attributes {}
         attributes {}
+        attributes {}
       )pb");
   EXPECT_THAT(example_set.ExtractProtoExample(0, model).value(),
               EqualsProto(expected_example));
@@ -549,6 +608,7 @@ TEST_P(ExampleSetTest, ExtractProtoManualExample) {
 
   const dataset::proto::Example expected_example_0 = PARSE_TEST_PROTO(
       R"pb(
+        attributes {}
         attributes {}
         attributes {}
         attributes {}
@@ -585,6 +645,13 @@ TEST_P(ExampleSetTest, ExtractProtoManualExample) {
         attributes { discretized_numerical: 2 }
         attributes { discretized_numerical: 2 }
         attributes { boolean: true }
+        attributes {
+          numerical_vector_sequence {
+            vectors { values: 1 values: 2 }
+            vectors { values: 3 values: 4 }
+            vectors { values: 5 values: 6 }
+          }
+        }
       )pb");
   EXPECT_THAT(example_set.ExtractProtoExample(1, model).value(),
               EqualsProto(expected_example_1));
@@ -597,6 +664,7 @@ TEST_P(ExampleSetTest, FromProtoExample) {
 
   const dataset::proto::Example example_0 = PARSE_TEST_PROTO(
       R"pb(
+        attributes {}
         attributes {}
         attributes {}
         attributes {}
@@ -634,6 +702,13 @@ TEST_P(ExampleSetTest, FromProtoExample) {
         attributes { discretized_numerical: 2 }
         attributes { discretized_numerical: 2 }
         attributes { boolean: true }
+        attributes {
+          numerical_vector_sequence {
+            vectors { values: 1 values: 2 }
+            vectors { values: 3 values: 4 }
+            vectors { values: 5 values: 6 }
+          }
+        }
       )pb");
 
   EXPECT_OK(example_set.FromProtoExample(example_1, 1, model));
@@ -648,6 +723,35 @@ TEST_P(ExampleSetTest, MemoryUsage) {
   SetToyValues(model, &example_set);
   const auto usage = example_set.MemoryUsage();
   EXPECT_LE(usage, 2000);
+}
+
+TEST_P(ExampleSetTest, CopyVerticalDatasetToAbstractExampleSet) {
+  const bool enable_na_conditions = GetParam();
+  ToyModel model(enable_na_conditions);
+  ToyModel::ExampleSet example_set_1(5, model);
+  SetToyValues(model, &example_set_1);
+
+  ASSERT_OK_AND_ASSIGN(const auto proto_example0_from_example_set,
+                       example_set_1.ExtractProtoExample(0, model));
+  ASSERT_OK_AND_ASSIGN(const auto proto_example1_from_example_set,
+                       example_set_1.ExtractProtoExample(1, model));
+
+  dataset::VerticalDataset vertical_dataset;
+  vertical_dataset.set_data_spec(model.features().data_spec());
+  ASSERT_OK(vertical_dataset.CreateColumnsFromDataspec());
+  ASSERT_OK(vertical_dataset.AppendExampleWithStatus(
+      proto_example0_from_example_set));
+  ASSERT_OK(vertical_dataset.AppendExampleWithStatus(
+      proto_example1_from_example_set));
+
+  ToyModel::ExampleSet example_set_2(5, model);
+  ASSERT_OK(CopyVerticalDatasetToAbstractExampleSet(
+      vertical_dataset, 0, 2, model.features(), &example_set_2));
+
+  EXPECT_THAT(example_set_2.ExtractProtoExample(0, model).value(),
+              EqualsProto(proto_example0_from_example_set));
+  EXPECT_THAT(example_set_2.ExtractProtoExample(1, model).value(),
+              EqualsProto(proto_example1_from_example_set));
 }
 
 INSTANTIATE_TEST_SUITE_P(ExampleSetTestWithAndWithoutNA, ExampleSetTest,

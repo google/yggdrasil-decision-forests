@@ -17,3 +17,11 @@ load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 grpc_deps()
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
 grpc_extra_deps()
+
+# TODO: Enbable CUDA build in OSS
+
+# copybara:strip_begin
+load("@rules_cuda//cuda:repositories.bzl", "register_detected_cuda_toolchains", "rules_cuda_dependencies")
+rules_cuda_dependencies()
+register_detected_cuda_toolchains()
+# copybara:strip_end

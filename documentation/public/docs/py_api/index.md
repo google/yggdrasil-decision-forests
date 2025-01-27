@@ -87,6 +87,11 @@ A **Feature Selector** finds the optimal set of input features for the model.
     into a YDF model.
 -   [NodeFormat](utilities.md#ydf.NodeFormat): Format used to serialize the tree
     nodes.
+-   [DataSpecification](utilities.md#ydf.DataSpecification): Internal data
+    specification proto. Describe the columns of the model.
+-   [TrainingConfig](utilities.md#ydf.TrainingConfig): Internal training
+    configuration proto. Describe the training configuration of a learner.
+
 
 ## Custom Loss
 

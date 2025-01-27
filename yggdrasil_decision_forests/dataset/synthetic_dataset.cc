@@ -839,7 +839,6 @@ absl::StatusOr<dataset::VerticalDataset> GenerateVectorSequenceSyntheticDataset(
         if (sum_squance_distance <=
             options.distance_limit * options.distance_limit) {
           label = 1;
-          num_positive_labels++;
         }
       }
       feature_cols[feature_idx]->Add(vectors);
@@ -847,9 +846,12 @@ absl::StatusOr<dataset::VerticalDataset> GenerateVectorSequenceSyntheticDataset(
 
     // Set the label.
     label_col->Add(label + 1);
+    if (label == 1) {
+      num_positive_labels++;
+    }
   }
 
-  LOG(INFO) << "Label distribution: "
+  LOG(INFO) << "Ratio of positive labels: "
             << static_cast<float>(num_positive_labels) / options.num_examples;
   dataset.set_nrow(options.num_examples);
   return dataset;

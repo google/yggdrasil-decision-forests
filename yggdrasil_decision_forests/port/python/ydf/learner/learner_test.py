@@ -15,6 +15,7 @@
 """Tests for model learning."""
 
 import os
+import random
 import signal
 from typing import Any, Dict, Optional, Tuple
 
@@ -971,6 +972,35 @@ class RandomForestLearnerTest(LearnerTest):
           label="label", features=[("f1", dataspec.Semantic.HASH)], num_trees=2
       ).train(data)
 
+  def test_numerical_vector_sequence(self):
+    def make_ds():
+      features = []
+      labels = []
+      num_examples = 1_000
+      num_dims = 2
+      distance_limit = 0.2
+      for _ in range(num_examples):
+        num_vectors = random.randint(0, 5)
+        vectors = np.random.uniform(
+            size=(num_vectors, num_dims), low=0.0, high=1.0
+        )
+        label = np.any(
+            np.sum((vectors - np.array([[0.5, 0.5]])) ** 2, axis=1)
+            < distance_limit * distance_limit
+        )
+        features.append(vectors)
+        labels.append(label)
+      return {"label": np.array(labels), "features": features}
+
+    train_ds = make_ds()
+    test_ds = make_ds()
+    model = specialized_learners.RandomForestLearner(
+        label="label", num_trees=50
+    ).train(train_ds)
+    evaluation = model.evaluate(test_ds)
+    logging.info("Evaluation: %s", evaluation)
+    self.assertGreaterEqual(evaluation.accuracy, 0.95)
+
 
 class CARTLearnerTest(LearnerTest):
 
@@ -1001,7 +1031,7 @@ class CARTLearnerTest(LearnerTest):
     )
     model = learner.train(self.two_center_regression.train)
     evaluation = model.evaluate(self.two_center_regression.test)
-    self.assertAlmostEqual(evaluation.rmse, 114.081, places=3)
+    self.assertAlmostEqual(evaluation.rmse, 116, delta=0.5)
 
   def test_monotonic_non_compatible_learner(self):
     with self.assertRaisesRegex(
@@ -1481,7 +1511,7 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
     ).train(data)
     npt.assert_equal(model_1.label_classes(), np.unique(label_data).astype(str))
 
-  def test_adult_poison(self):
+  def test_adult_poisson(self):
     model = specialized_learners.GradientBoostedTreesLearner(
         label="hours_per_week",
         growing_strategy="BEST_FIRST_GLOBAL",
@@ -1531,7 +1561,11 @@ class IsolationForestLearnerTest(LearnerTest):
     _ = model.describe("text")
     _ = model.describe("html")
     _ = model.analyze_prediction(self.gaussians.test_pd.iloc[:1])
-    _ = model.analyze(self.gaussians.test_pd)
+    analysis = model.analyze(self.gaussians.test_pd)
+    if with_labels:
+      self.assertLen(analysis.variable_importances(), 4)
+    else:
+      self.assertEmpty(analysis.variable_importances())
 
   def test_gaussians_evaluation_default_task(self):
     learner = specialized_learners.IsolationForestLearner(label="label")

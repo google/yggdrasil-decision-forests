@@ -20,6 +20,7 @@
 
 #include "absl/log/check.h"
 #include "absl/status/status.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
@@ -34,7 +35,7 @@ namespace {
 template <bool weighted>
 absl::Status SetClassificationLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   if constexpr (weighted) {
@@ -67,7 +68,7 @@ absl::Status SetClassificationLabelDistribution(
 
 absl::Status SetCategoricalUpliftLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   DCHECK(!weights.empty());
@@ -102,7 +103,7 @@ absl::Status SetCategoricalUpliftLabelDistribution(
 
 absl::Status SetRegressiveUpliftLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   const auto* const outcomes =
@@ -137,7 +138,7 @@ absl::Status SetRegressiveUpliftLabelDistribution(
 template <bool weighted>
 absl::Status SetRegressionLabelDistribution(
     const dataset::VerticalDataset& dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfigLinking& config_link, proto::Node* node) {
   if constexpr (weighted) {
@@ -170,7 +171,7 @@ absl::Status SetRegressionLabelDistribution(
 
 absl::Status SetLabelDistribution(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,

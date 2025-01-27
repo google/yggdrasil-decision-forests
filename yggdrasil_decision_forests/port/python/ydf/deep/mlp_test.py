@@ -62,9 +62,22 @@ class MLPTest(parameterized.TestCase):
     str_cart_dataspec = str(cart_dataspec)
 
     # Floating point rounding differences
-    str_cart_dataspec = str_cart_dataspec.replace(
-        "106423.22842824364", "106423.22838733291"
-    ).replace("7509.476552510382", "7509.4764484094385")
+    def clean(x):
+      x = re.sub(
+          "standard_deviation: 7509\\.[0-9]+",
+          "standard_deviation: 7509",
+          x,
+      )
+      x = re.sub(
+          "standard_deviation: 106423\\.[0-9]+",
+          "standard_deviation: 106423",
+          x,
+      )
+      return x
+
+    str_mlp_dataspec = clean(str_mlp_dataspec)
+    str_cart_dataspec = clean(str_cart_dataspec)
+
     # The MLP model computes quantiles.
     str_mlp_dataspec = re.sub(
         r"\s+discretized_numerical {\n(\s+boundaries: \S+\n)*\s+}",

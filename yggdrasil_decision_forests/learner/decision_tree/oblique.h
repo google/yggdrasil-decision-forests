@@ -70,7 +70,7 @@ namespace decision_tree {
 // Classification.
 absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -84,7 +84,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
 // Regression with hessian term.
 absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -98,7 +98,7 @@ absl::StatusOr<bool> FindBestConditionOblique(
 // Regression.
 absl::StatusOr<bool> FindBestConditionOblique(
     const dataset::VerticalDataset& train_dataset,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -114,6 +114,41 @@ absl::StatusOr<bool> FindBestConditionOblique(
 // ceil(num_features ^ num_projections_exponent)).
 int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
                       int num_numerical_features);
+
+// Extraction of label values. Different implementations for different types of
+// labels.
+std::vector<int32_t> ExtractLabels(
+    const ClassificationLabelStats& labels,
+    absl::Span<const UnsignedExampleIdx> selected);
+
+std::vector<float> ExtractLabels(const RegressionLabelStats& labels,
+                                 absl::Span<const UnsignedExampleIdx> selected);
+
+struct GradientAndHessian {
+  const std::vector<float> gradient_data;
+  const std::vector<float> hessian_data;
+};
+
+GradientAndHessian ExtractLabels(const RegressionHessianLabelStats& labels,
+                                 absl::Span<const UnsignedExampleIdx> selected);
+
+// Extracts values using an index i.e. returns "values[selected]".
+template <typename T>
+std::vector<T> Extract(const std::vector<T>& values,
+                       absl::Span<const UnsignedExampleIdx> selected);
+
+// Runs a splitter to finds a "x >= t" condition on
+// (projection_values,selected_labels,selected_weights).
+template <typename LabelStats, typename Labels>
+absl::StatusOr<SplitSearchResult> EvaluateProjection(
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const LabelStats& label_stats,
+    absl::Span<const UnsignedExampleIdx> dense_example_idxs,
+    const std::vector<float>& selected_weights, const Labels& selected_labels,
+    absl::Span<const float> projection_values,
+    const InternalTrainConfig& internal_config, int first_attribute_idx,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 namespace internal {
 
@@ -146,14 +181,12 @@ class ProjectionEvaluator {
   // If one of the input feature of the projection is missing, this input
   // feature is replaced by the mean value of feature as computed on the
   // training dataset. This is the same logic used during inference.
-  absl::Status Evaluate(
-      const Projection& projection,
-      const std::vector<UnsignedExampleIdx>& selected_examples,
-      std::vector<float>* values) const;
+  absl::Status Evaluate(const Projection& projection,
+                        absl::Span<const UnsignedExampleIdx> selected_examples,
+                        std::vector<float>* values) const;
 
   absl::Status ExtractAttribute(
-      int attribute_idx,
-      const std::vector<UnsignedExampleIdx>& selected_examples,
+      int attribute_idx, absl::Span<const UnsignedExampleIdx> selected_examples,
       std::vector<float>* values) const;
 
   const std::vector<float>& AttributeValues(int attribute_idx) const {

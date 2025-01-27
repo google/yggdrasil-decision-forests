@@ -73,6 +73,15 @@ MATCHER(StatusIsOk, "Status is OK") { return arg.ok(); }
   ASSERT_THAT(expr, ::yggdrasil_decision_forests::test::StatusIsOk())
 #endif
 
+#ifndef CHECK_NEAR
+#define CHECK_NEAR(a, b, delta)             \
+  CHECK_LE(std::abs(a - b), delta)          \
+      << "\n"                               \
+      << "    " << #a << " = " << a << "\n" \
+      << "    " << #b << " = " << b << "\n" \
+      << "    abs_diff = " << std::abs(a - b) << "\n"
+#endif
+
 // Gets the root directory for data dependency files.
 std::string DataRootDirectory();
 

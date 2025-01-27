@@ -468,7 +468,8 @@ std::string GetPerClassComparisonMetricLabel(
 std::vector<MetricDefinition> DefaultMetrics(
     model::proto::Task task, const dataset::proto::Column& label) {
   switch (task) {
-    case model::proto::Task::CLASSIFICATION: {
+    case model::proto::Task::CLASSIFICATION:
+    case model::proto::Task::ANOMALY_DETECTION: {
       proto::MetricAccessor accuracy;
       accuracy.mutable_classification()->mutable_accuracy();
       std::vector<MetricDefinition> metrics{{/*.name =*/"ACCURACY",

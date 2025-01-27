@@ -1,3 +1,6 @@
+# TODO: Enbable CUDA build in OSS
+# load("@rules_cuda//cuda:defs.bzl", "cuda_library", "requires_cuda")
+
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
@@ -13,10 +16,12 @@ cc_library_ydf(
     srcs = [
         "oblique.cc",
         "training.cc",
+        "vector_sequence.cc",
     ],
     hdrs = [
         "oblique.h",
         "training.h",
+        "vector_sequence.h",
     ],
     deps = [
         ":decision_tree_cc_proto",
@@ -71,6 +76,7 @@ cc_library_ydf(
     srcs = ["label.cc"],
     hdrs = ["label.h"],
     deps = [
+        ":gpu",
         ":preprocessing",
         ":splitter",
         ":uplift",
@@ -84,6 +90,7 @@ cc_library_ydf(
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -142,6 +149,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
         "@eigen_archive//:eigen3_internal",
     ] + select({
         "//conditions:default": [
@@ -192,6 +200,34 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
     ],
+)
+
+# TODO: Enbable CUDA build in OSS
+
+cc_library_ydf(
+    name = "gpu",
+    srcs = ["gpu.cc"],
+    hdrs = ["gpu.h"],
+    defines = [] + select({
+        # TODO: Add in OSS
+        "//conditions:default": ["CUDA_DISABLED"],
+    }),
+    deps = [
+        "//yggdrasil_decision_forests/dataset:types",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "//yggdrasil_decision_forests/utils:synchronization_primitives",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/types:span",
+    ] + select({
+        # TODO: Add in OSS
+        "//conditions:default": [],
+    }),
 )
 
 # Proto
@@ -265,9 +301,12 @@ cc_test(
     srcs = ["training_test.cc"],
     deps = [
         ":decision_tree_cc_proto",
+        ":gpu",
         ":label",
         ":preprocessing",
         ":training",
+        ":utils",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:types",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
@@ -296,6 +335,27 @@ cc_test(
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "gpu_test",
+    srcs = ["gpu_test.cc"],
+    defines = [] + select({
+        # TODO: Add in OSS
+        "//conditions:default": ["CUDA_DISABLED"],
+    }),
+    tags = ["cuda_dep"],
+    deps = [
+        ":gpu",
+        "//yggdrasil_decision_forests/dataset:types",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -127,11 +127,13 @@ cc_library_ydf(
     ],
     deps = [
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/isolation_forest",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:usage",
+        "@com_google_absl//absl/types:span",
     ],
     alwayslink = 1,
 )

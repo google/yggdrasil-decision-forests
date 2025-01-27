@@ -19,8 +19,8 @@
 #include <functional>
 #include <numeric>
 #include <optional>
-#include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -37,6 +37,8 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -230,19 +232,34 @@ absl::Status ComputePermutationFeatureImportance(
     const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
     ResultFeatureImportance* output,
     const ComputeFeatureImportanceOptions& options) {
-  // Setup the evaluation configuration.
-  metric::proto::EvaluationOptions eval_options;
-  eval_options.set_bootstrapping_samples(0);
-  eval_options.set_task(model->task());
-
   utils::RandomEngine rng;
   utils::concurrency::Mutex rng_mutex;
 
-  ASSIGN_OR_RETURN(const auto base_evaluation,
-                   model->EvaluateWithStatus(dataset, eval_options, &rng));
+  // Setup the evaluation configuration.
+  metric::proto::EvaluationOptions eval_options;
+  eval_options.set_bootstrapping_samples(0);
+  metric::proto::EvaluationResults base_evaluation;
+  int label_col_idx = model->label_col_idx();
+  if (model->task() == model::proto::ANOMALY_DETECTION) {
+    eval_options.set_task(model::proto::CLASSIFICATION);
+    if (label_col_idx == -1) {
+      return absl::InvalidArgumentError(
+          "Feature importance for anomaly detection models requires a label.");
+    }
+    ASSIGN_OR_RETURN(base_evaluation,
+                     model->EvaluateOverrideType(
+                         dataset, eval_options, model::proto::CLASSIFICATION,
+                         label_col_idx, /*override_group_col_idx=*/-1, &rng));
+
+  } else {
+    eval_options.set_task(model->task());
+    ASSIGN_OR_RETURN(base_evaluation,
+                     model->EvaluateWithStatus(dataset, eval_options, &rng));
+  }
 
   const auto permutation_evaluation = [&dataset, &eval_options, &rng,
-                                       &rng_mutex, model](const int feature_idx)
+                                       &rng_mutex, model,
+                                       label_col_idx](const int feature_idx)
       -> std::optional<metric::proto::EvaluationResults> {
     const auto it_input_feature =
         std::find(model->input_features().begin(),
@@ -257,7 +274,15 @@ absl::Status ComputePermutationFeatureImportance(
     }
     const auto perturbed_dataset =
         utils::ShuffleDatasetColumns(dataset, {feature_idx}, &sub_rng);
-    return model->Evaluate(perturbed_dataset, eval_options, &sub_rng);
+    if (model->task() == model::proto::ANOMALY_DETECTION) {
+      return model
+          ->EvaluateOverrideType(perturbed_dataset, eval_options,
+                                 model::proto::CLASSIFICATION, label_col_idx,
+                                 /*override_group_col_idx=*/-1, &sub_rng)
+          .value();
+    } else {
+      return model->Evaluate(perturbed_dataset, eval_options, &sub_rng);
+    }
   };
 
   return utils::ComputePermutationFeatureImportance(

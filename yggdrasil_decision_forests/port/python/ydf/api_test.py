@@ -22,6 +22,7 @@ import sys
 from absl import logging
 from absl.testing import absltest
 import fastavro
+from google.protobuf import text_format
 import numpy as np
 import pandas as pd
 from sklearn import ensemble as skl_ensemble
@@ -89,9 +90,6 @@ class ApiTest(absltest.TestCase):
 
     logging.info("serialized_model size: %s", len(serialized_model))
     tmp_dir = self.create_tempdir().full_path
-
-    model.set_node_format(ydf.NodeFormat.TFE_RECORDIO)
-    model.save(os.path.join(tmp_dir, "rio"))
 
     model.set_node_format(ydf.NodeFormat.BLOB_SEQUENCE)
     model.save(os.path.join(tmp_dir, "blob"))
@@ -323,6 +321,33 @@ class ApiTest(absltest.TestCase):
     learner = ydf.RandomForestLearner(label="l", task=ydf.Task.REGRESSION)
     model = learner.train("avro:" + ds_path)
     logging.info(model)
+
+  def test_train_config_proto(self):
+    pd_ds = pd.DataFrame({
+        "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
+        "label": ["a", "b", "b", "a", "a"] * 3,
+    })
+
+    extra_training_config = text_format.Parse(
+        """
+[yggdrasil_decision_forests.model.random_forest.proto.random_forest_config] {
+  num_trees: 10
+  decision_tree {
+    max_depth: 5
+  }
+}
+""",
+        ydf.TrainingConfig(),
+    )
+
+    model = ydf.RandomForestLearner(
+        label="label",
+        min_examples=2,
+        num_trees=20,  # Ignored as "num_trees" is set in the train config.
+        extra_training_config=extra_training_config,
+    ).train(pd_ds)
+    logging.info(model)
+    self.assertEqual(model.num_trees(), 10)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -56,6 +57,7 @@
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -1310,6 +1312,71 @@ TEST_F(RandomForestOnAdult, Nondeterminism) {
 
   EXPECT_THAT(model_1->DebugCompare(*model_2),
               ::testing::ContainsRegex("Nodes don't match"));
+}
+
+class RandomForestOnSyntheticVectorSequence : public utils::TrainAndTestTester {
+  void SetUp() override {
+    train_config_.set_learner(RandomForestLearner::kRegisteredName);
+    train_config_.set_task(model::proto::Task::CLASSIFICATION);
+    train_config_.set_label("income");
+    auto* rf_config = train_config_.MutableExtension(
+        random_forest::proto::random_forest_config);
+    rf_config->mutable_decision_tree()
+        ->set_internal_error_on_wrong_splitter_statistics(true);
+    rf_config->set_num_trees(5);
+    rf_config->mutable_decision_tree()->set_max_depth(2);
+    rf_config->set_winner_take_all_inference(false);
+    SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
+  }
+};
+
+TEST_F(RandomForestOnSyntheticVectorSequence, Base) {
+  // Build synthetic dataset.
+  dataset::testing::VectorSequenceSyntheticDatasetOptions options;
+  options.vector_dim = 5;
+  options.num_examples = 1'000;
+  options.seed = 1;
+  ASSERT_OK_AND_ASSIGN(
+      train_dataset_,
+      dataset::testing::GenerateVectorSequenceSyntheticDataset(options));
+  options.seed = 2;
+  ASSERT_OK_AND_ASSIGN(
+      test_dataset_,
+      dataset::testing::GenerateVectorSequenceSyntheticDataset(options));
+
+  // Configure learner
+  train_config_.set_label(options.label_key);
+
+  // Runs checks
+  TrainModel();
+  CHECK_OK(PostTrainingChecks());
+  EXPECT_GT(metric::Accuracy(evaluation_), 0.85);
+}
+
+TEST_F(RandomForestOnSyntheticVectorSequence, WithSampling) {
+  // Build synthetic dataset.
+  dataset::testing::VectorSequenceSyntheticDatasetOptions options;
+  options.vector_dim = 5;
+  options.num_examples = 1'000;
+  options.seed = 1;
+  ASSERT_OK_AND_ASSIGN(
+      train_dataset_,
+      dataset::testing::GenerateVectorSequenceSyntheticDataset(options));
+  options.seed = 2;
+  ASSERT_OK_AND_ASSIGN(
+      test_dataset_,
+      dataset::testing::GenerateVectorSequenceSyntheticDataset(options));
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->mutable_decision_tree()
+      ->mutable_numerical_vector_sequence()
+      ->set_max_num_test_examples(200);
+  // Configure learner
+  train_config_.set_label(options.label_key);
+
+  // Runs checks
+  TrainModel();
+  CHECK_OK(PostTrainingChecks());
 }
 
 }  // namespace

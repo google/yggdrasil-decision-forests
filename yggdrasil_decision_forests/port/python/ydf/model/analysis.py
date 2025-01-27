@@ -255,21 +255,28 @@ class PredictionAnalysis:
 
 
 def _pdp_prediction_value(
-    bin: Bin, num_observations: float
+    pdp_bin: Bin, num_observations: float
 ) -> Union[float, np.ndarray]:
   """Extracts a uniform numerical prediction value from a bin."""
-  if bin.prediction.HasField("sum_of_regression_predictions"):
-    return bin.prediction.sum_of_regression_predictions / num_observations
-  elif bin.prediction.HasField("sum_of_ranking_predictions"):
-    return bin.prediction.sum_of_ranking_predictions / num_observations
-  elif bin.prediction.HasField("classification_class_distribution"):
+  if pdp_bin.prediction.HasField("sum_of_regression_predictions"):
+    return pdp_bin.prediction.sum_of_regression_predictions / num_observations
+  elif pdp_bin.prediction.HasField("sum_of_ranking_predictions"):
+    return pdp_bin.prediction.sum_of_ranking_predictions / num_observations
+  elif pdp_bin.prediction.HasField("classification_class_distribution"):
     # Skip OOV item.
     return (
-        np.array(bin.prediction.classification_class_distribution.counts[1:])
-        / bin.prediction.classification_class_distribution.sum
+        np.array(
+            pdp_bin.prediction.classification_class_distribution.counts[1:]
+        )
+        / pdp_bin.prediction.classification_class_distribution.sum
+    )
+  elif pdp_bin.prediction.HasField("sum_of_anomaly_detection_predictions"):
+    return (
+        pdp_bin.prediction.sum_of_anomaly_detection_predictions
+        / num_observations
     )
   else:
-    raise ValueError(f"Unsupported prediction type: {bin}")
+    raise ValueError(f"Unsupported prediction type: {pdp_bin}")
 
 
 def _pdp_feature_name(

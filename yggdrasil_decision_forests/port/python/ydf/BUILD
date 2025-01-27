@@ -14,6 +14,7 @@ py_library(
     deps = [
         ":version",
         ":ydf_protos",
+        "//ydf/api:experimental",
         "//ydf/api:internal",
         "//ydf/api:util",
         "//ydf/dataset",

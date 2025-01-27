@@ -45,6 +45,7 @@
 #include <vector>
 
 #include "absl/base/optimization.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -203,7 +204,7 @@ struct FeatureNumericalBucket {
   class Filler {
    public:
     Filler(const UnsignedExampleIdx num_selected_examples,
-           const float na_replacement, const std::vector<float>& attributes)
+           const float na_replacement, const absl::Span<const float> attributes)
         : num_selected_examples_(num_selected_examples),
           na_replacement_(na_replacement),
           attributes_(attributes) {}
@@ -253,7 +254,7 @@ struct FeatureNumericalBucket {
    private:
     const UnsignedExampleIdx num_selected_examples_;
     const float na_replacement_;
-    const std::vector<float>& attributes_;
+    const absl::Span<const float> attributes_;
   };
 
   friend std::ostream& operator<<(std::ostream& os,

@@ -60,6 +60,7 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
@@ -603,7 +604,7 @@ auto* GetCachedLabelScoreAccumulator(const bool side, PerThreadCacheV2* cache) {
 
 template <typename ExampleBucketSet, bool require_label_sorting>
 void FillExampleBucketSet(
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
     ExampleBucketSet* example_bucket_set, PerThreadCacheV2* cache) {
@@ -976,7 +977,7 @@ template <typename ExampleBucketSet, typename LabelScoreAccumulator,
           bool duplicate_examples = true>
 SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     const UnsignedExampleIdx total_num_examples,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<SparseItem>& sorted_attributes,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
@@ -1155,7 +1156,7 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
 template <typename ExampleBucketSet, typename LabelScoreAccumulator>
 SplitSearchResult ScanSplitsPresortedSparse(
     const UnsignedExampleIdx total_num_examples,
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<SparseItem>& sorted_attributes,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
@@ -1311,7 +1312,7 @@ SplitSearchResult ScanSplitsRandomBuckets(
 template <typename ExampleBucketSet, typename LabelBucketSet,
           bool require_label_sorting, bool bucket_interpolation = false>
 SplitSearchResult FindBestSplit(
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
     const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
@@ -1336,7 +1337,7 @@ SplitSearchResult FindBestSplit(
 // a random scan of the buckets.  See "ScanSplitsRandomBuckets".
 template <typename ExampleBucketSet, typename LabelBucketSet>
 SplitSearchResult FindBestSplitRandom(
-    const std::vector<UnsignedExampleIdx>& selected_examples,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
     const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
     const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
     const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,

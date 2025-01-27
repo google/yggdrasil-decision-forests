@@ -32,6 +32,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -201,6 +202,24 @@ VerticalDataset VerticalDataset::ShallowNonOwningClone() const {
     clone.PushBackNotOwnedColumn(column(col_idx));
   }
   return clone;
+}
+
+absl::StatusOr<std::pair<proto::Column*, VerticalDataset::AbstractColumn*>>
+VerticalDataset::AddColumnV2(const proto::Column& column_spec) {
+  if (ColumnNameToColumnIdx(column_spec.name()) != -1) {
+    return absl::InvalidArgumentError("The column already exists");
+  }
+  *data_spec_.add_columns() = column_spec;
+  ASSIGN_OR_RETURN(auto new_column, CreateColumn(column_spec));
+  PushBackOwnedColumn(std::move(new_column));
+  const int col_idx = columns_.size() - 1;
+
+  VerticalDataset::AbstractColumn* column = mutable_column(col_idx);
+  column->Resize(nrow_);
+  column->set_name(column_spec.name());
+
+  proto::Column* created_column_spec = data_spec_.mutable_columns(col_idx);
+  return std::make_pair(created_column_spec, column);
 }
 
 absl::StatusOr<VerticalDataset::AbstractColumn*> VerticalDataset::AddColumn(
@@ -888,7 +907,7 @@ absl::Status VerticalDataset::Append(const VerticalDataset& src) {
 }
 
 absl::Status VerticalDataset::Append(const VerticalDataset& src,
-                                     const std::vector<row_t>& indices) {
+                                     absl::Span<const row_t> indices) {
   if (columns_.empty()) {
     data_spec_ = src.data_spec();
     RETURN_IF_ERROR(CreateColumnsFromDataspec());

@@ -140,6 +140,12 @@ class Semantic(enum.Enum):
       is greater than the number of bins, the discretization is lossy from the
       point of view of the model. Lossy discretization can reduce and sometime
       increase (due to regularization) the quality of the model.
+    NUMERICAL_VECTOR_SEQUENCE: Each value of a vector-sequence feature is a
+      sequence (i.e., ordered list) of fixed-sized numerical vectors. All the
+      vectors in a vector sequence shoud have the same size, but each
+      vector-sequence can have a different number of vectors. A vector-sequence
+      is suited, for example, to represent a multi-variate time-series or a list
+      of LLM tokens.
   """
 
   NUMERICAL = 1
@@ -148,6 +154,7 @@ class Semantic(enum.Enum):
   CATEGORICAL_SET = 4
   BOOLEAN = 5
   DISCRETIZED_NUMERICAL = 6
+  NUMERICAL_VECTOR_SEQUENCE = 7
 
   def to_proto_type(self) -> ds_pb.ColumnType:
     if self in SEMANTIC_TO_PROTO:
@@ -171,6 +178,7 @@ SEMANTIC_TO_PROTO = {
     Semantic.CATEGORICAL_SET: ds_pb.CATEGORICAL_SET,
     Semantic.BOOLEAN: ds_pb.BOOLEAN,
     Semantic.DISCRETIZED_NUMERICAL: ds_pb.DISCRETIZED_NUMERICAL,
+    Semantic.NUMERICAL_VECTOR_SEQUENCE: ds_pb.NUMERICAL_VECTOR_SEQUENCE,
 }
 PROTO_TO_SEMANTIC = {v: k for k, v in SEMANTIC_TO_PROTO.items()}
 

@@ -74,8 +74,7 @@ absl::Status CheckCompatibleEvaluationTask(const proto::Task model_task,
       return absl::InvalidArgumentError(
           "Anomaly detection models don't have direct evaluation. Instead, "
           "evaluate the model as a classification model e.g. "
-          "`anomaly_detection_model.evaluate(evaluation_task=ydf.Task."
-          "CLASSIFICATION)");
+          "`anomaly_detection_model.evaluate(task=ydf.Task.CLASSIFICATION)");
     } else if (evaluation_task == proto::CLASSIFICATION) {
       return absl::OkStatus();
     }

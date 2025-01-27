@@ -77,6 +77,7 @@ py_test(
         ":dataspec",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
+        # fastavro dep,
         # numpy dep,
         # pandas dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
