@@ -44,6 +44,7 @@
 #include "yggdrasil_decision_forests/utils/plot.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests::model {
 namespace {
@@ -639,10 +640,10 @@ absl::StatusOr<utils::html::Html> VariableImportance(
   return content;
 }
 
-absl::StatusOr<std::string> DescribeModelHtml(
-    const model::AbstractModel& model, const absl::string_view block_id) {
+absl::StatusOr<std::string> DescribeModelHtml(const model::AbstractModel& model,
+                                              std::string block_id) {
   if (block_id.empty()) {
-    return absl::InvalidArgumentError("empty block_id");
+    block_id = utils::GenUniqueId();
   }
 
   namespace h = utils::html;
