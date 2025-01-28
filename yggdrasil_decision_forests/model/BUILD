@@ -158,6 +158,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:plot",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "//yggdrasil_decision_forests/utils:uid",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status",
