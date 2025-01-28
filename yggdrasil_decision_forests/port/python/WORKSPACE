@@ -4,24 +4,29 @@
 workspace(name = "ydf")
 
 # This workspace (YDF Python) relies on YDF C++ located at "../../../"
-local_repository(name = "ydf_cc", path = "../../../")
+local_repository(
+    name = "ydf_cc",
+    path = "../../../",
+)
 
 load("//:library.bzl", ydf_load_deps = "load_dependencies")
+
 ydf_load_deps()
 
 # Load the dependencies of YDF.
 load("@ydf_cc//yggdrasil_decision_forests:library.bzl", ydf_cc_load_deps = "load_dependencies")
+
 ydf_cc_load_deps(repo_name = "@ydf_cc")
 
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
+
 grpc_deps()
+
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
+
 grpc_extra_deps()
 
 # TODO: Enbable CUDA build in OSS
-
-# copybara:strip_begin
-load("@rules_cuda//cuda:repositories.bzl", "register_detected_cuda_toolchains", "rules_cuda_dependencies")
-rules_cuda_dependencies()
-register_detected_cuda_toolchains()
-# copybara:strip_end
+# load("@rules_cuda//cuda:repositories.bzl", "register_detected_cuda_toolchains", "rules_cuda_dependencies")
+# rules_cuda_dependencies()
+# register_detected_cuda_toolchains()

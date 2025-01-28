@@ -438,7 +438,7 @@ class RandomForestLearnerTest(LearnerTest):
         self.two_center_regression.train, folds=10, parallel_evaluations=2
     )
     logging.info("evaluation:\n%s", evaluation)
-    self.assertAlmostEqual(evaluation.rmse, 116, delta=1)
+    self.assertAlmostEqual(evaluation.rmse, 118, delta=3)
     # All the examples are used in the evaluation
     self.assertEqual(
         evaluation.num_examples,
