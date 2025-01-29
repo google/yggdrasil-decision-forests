@@ -52,6 +52,10 @@ class IsolationForestCCModel : public DecisionForestCCModel {
     return if_model_->num_examples_per_trees();
   }
 
+  void set_num_examples_per_tree(int num_examples) {
+    if_model_->set_num_examples_per_trees(num_examples);
+  }
+
  private:
   // This is a non-owning pointer to the model held by `model_`.
   YDFModel* if_model_;

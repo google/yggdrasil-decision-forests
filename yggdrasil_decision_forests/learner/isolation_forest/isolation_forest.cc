@@ -707,8 +707,16 @@ SignedExampleIdx GetNumExamplesPerTrees(
       return static_cast<SignedExampleIdx>(
           std::ceil(static_cast<double>(if_config.subsample_ratio()) *
                     num_training_examples));
-    default:
-      return if_config.subsample_count();
+    default: {
+      auto subsample_count = if_config.subsample_count();
+      if (num_training_examples < subsample_count) {
+        LOG(INFO) << "The number of training examples " << num_training_examples
+                  << " is smaller than the subsample count " << subsample_count
+                  << ". Reducing subsample_count to " << num_training_examples;
+        subsample_count = num_training_examples;
+      }
+      return subsample_count;
+    }
   }
 }
 

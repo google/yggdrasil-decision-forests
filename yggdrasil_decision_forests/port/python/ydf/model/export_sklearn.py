@@ -231,9 +231,7 @@ def _(
 ) -> generic_model.GenericModel:
   """Converts a single scikit-learn iso-forest to a YDF model."""
   ydf_model = specialized_learners.IsolationForestLearner(
-      task=generic_learner.Task.ANOMALY_DETECTION,
-      num_trees=0,
-      subsample_count=sklearn_model._max_samples,  # pylint: disable=protected-access
+      task=generic_learner.Task.ANOMALY_DETECTION, num_trees=0
   ).train(
       {
           options.feature_name: _gen_fake_features(
@@ -242,6 +240,8 @@ def _(
       },
       verbose=0,
   )
+  sklearn_examples_per_tree: int = int(sklearn_model._max_samples)  # pylint: disable=protected-access
+  ydf_model._model.set_num_examples_per_tree(sklearn_examples_per_tree)  # pylint: disable=protected-access
   assert isinstance(ydf_model, isolation_forest_model.IsolationForestModel)
 
   for sklearn_tree, attribute_mapping in zip(
