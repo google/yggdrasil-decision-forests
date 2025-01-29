@@ -74,6 +74,12 @@ class IsolationForestModelTest(absltest.TestCase):
         self.dataset_gaussians_test.iloc[most_similar_example_idx],
     )
 
+  def test_set_num_examples_per_tree(self):
+    self.model_gaussians._model.set_num_examples_per_tree(50)
+    self.assertEqual(self.model_gaussians.num_examples_per_tree(), 50)
+    self.model_gaussians._model.set_num_examples_per_tree(100)
+    self.assertEqual(self.model_gaussians.num_examples_per_tree(), 100)
+
 
 if __name__ == "__main__":
   absltest.main()

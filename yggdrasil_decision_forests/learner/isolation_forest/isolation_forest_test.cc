@@ -301,6 +301,12 @@ TEST(GetNumExamplesPerTrees, Count) {
   EXPECT_EQ(internal::GetNumExamplesPerTrees(if_config, 100), 5);
 }
 
+TEST(GetNumExamplesPerTrees, CountFewExamples) {
+  proto::IsolationForestTrainingConfig if_config;
+  if_config.set_subsample_count(10);
+  EXPECT_EQ(internal::GetNumExamplesPerTrees(if_config, 5), 5);
+}
+
 TEST(GetNumExamplesPerTrees, Rate) {
   proto::IsolationForestTrainingConfig if_config;
   if_config.set_subsample_ratio(0.5f);

@@ -233,6 +233,8 @@ void init_model(py::module_& m) {
            })
       .def("num_examples_per_tree",
            &IsolationForestCCModel::num_examples_per_tree)
+      .def("set_num_examples_per_tree",
+           &IsolationForestCCModel::set_num_examples_per_tree)
       .def_property_readonly_static("kRegisteredName",
                                     [](py::object /* self */) {
                                       return model::isolation_forest::
