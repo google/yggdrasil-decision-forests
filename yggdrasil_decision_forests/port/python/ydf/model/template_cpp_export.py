@@ -140,7 +140,7 @@ def template(
 //      //third_party/absl/status:statusor
 //      //third_party/absl/strings
 //      //external/ydf_cc/yggdrasil_decision_forests/api:serving
-// 3. In your existing code, include the .h file and do:
+// 3. In your existing code, include the .h file. Make predictions as follows:
 //   // Load the model (to do only once).
 //   namespace ydf = yggdrasil_decision_forests;
 //   const auto model = ydf::exported_model_123::Load(<path to model>);
@@ -149,9 +149,9 @@ def template(
 // 4. By default, the "Predict" function takes no inputs and creates fake
 //   examples. In practice, you want to add your input data as arguments to
 //   "Predict" and call "examples->Set..." functions accordingly.
-// 4. (Bonus)
-//   Allocate one "examples" and "predictions" per thread and reuse them to
-//   speed-up the inference.
+// 5. (Bonus)
+//   Allocate one `examples` and `predictions` vector per thread and reuse them
+//   to speed-up the inference.
 //
 #ifndef YGGDRASIL_DECISION_FORESTS_GENERATED_MODEL_{key}
 #define YGGDRASIL_DECISION_FORESTS_GENERATED_MODEL_{key}
