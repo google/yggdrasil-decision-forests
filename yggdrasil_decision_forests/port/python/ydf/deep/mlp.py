@@ -123,7 +123,7 @@ class MultiLayerPerceptronLearner(generic_jax.GenericJaxLearner):
       random_seed: int = 1234,
       early_stopping_epoch_patience: Optional[int] = 10,
       early_stopping_revert_params: bool = True,
-      num_qantiles: int = 1000,
+      num_quantiles: int = 1000,
       zscore: bool = False,
       # General hps
       weights: Optional[str] = None,
@@ -160,7 +160,7 @@ class MultiLayerPerceptronLearner(generic_jax.GenericJaxLearner):
         random_seed=random_seed,
         early_stopping_epoch_patience=early_stopping_epoch_patience,
         early_stopping_revert_params=early_stopping_revert_params,
-        num_qantiles=num_qantiles,
+        num_quantiles=num_quantiles,
         zscore=zscore,
         learner_name=_MODEL_AND_LEARNER_KEY,
         task=task,
