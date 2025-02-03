@@ -17,7 +17,7 @@
 import contextlib
 import datetime
 import functools
-import multiprocessing
+from multiprocessing import pool as multiprocessing_pool
 from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 import numpy as np
 from ydf.util import dataset_io
@@ -185,9 +185,9 @@ def read_tensorflow_examples(
   num_examples = 0
   data: Optional[Dict[str, List[np.ndarray]]] = None
   expected_keys: Optional[Set[str]] = None
-  with multiprocessing.pool.ThreadPool(threads) as pool:
+  with multiprocessing_pool.ThreadPool(threads) as pool:
     # Read the shards in parallel.
-    for local_num_examples, shard_data in pool.map(
+    for local_num_examples, shard_data in pool.imap(
         functools.partial(
             _read_shard,
             reader_generator=reader_generator,
@@ -267,8 +267,9 @@ def write_tensorflow_examples(
           tf_example = process(tf_example)
         writer(tf_example.SerializeToString())
 
-  with multiprocessing.pool.ThreadPool(threads) as pool:
-    pool.map(write_shard, enumerate(paths))
+  with multiprocessing_pool.ThreadPool(threads) as pool:
+    for _ in pool.imap(write_shard, enumerate(paths)):
+      pass
 
   if verbose:
     log.info("Examples written in %s", datetime.datetime.now() - time_begin)

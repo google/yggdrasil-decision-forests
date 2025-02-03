@@ -14,6 +14,7 @@
 
 """Utilities to display metrics."""
 
+import math
 import textwrap
 from typing import Any, Optional, Tuple
 import uuid
@@ -533,7 +534,7 @@ def _field_value_to_str(value: Any) -> Tuple[str, bool]:
     return "", False
 
   if isinstance(value, float):
-    if round(value) == value:
+    if not math.isnan(value) and round(value) == value:
       # Remove decimale point
       str_value = str(int(value))
     else:
