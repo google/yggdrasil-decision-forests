@@ -557,7 +557,7 @@ class AbstractModel {
 
   std::optional<proto::FeatureSelectionLogs> feature_selection_logs_;
 
-  // Indicate if a model is pure for serving i.e. the model was tripped of all
+  // Indicate if a model is pure for serving i.e. the model was stripped of all
   // information not required for serving.
   bool is_pure_model_ = false;
 

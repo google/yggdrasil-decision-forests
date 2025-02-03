@@ -469,6 +469,8 @@ for isolation forest models since they do not provide useful information.
 
 **Anomaly Detection specific**
 
+-   `DIFFI`: Depth-based Isolation Forest Feature Importance. Introduced by
+    Carletti et al., see https://arxiv.org/abs/2007.11117.
 -   `MEAN_PARTITION_SCORE`: Mean of an attribute's partition scores. A node's 
     partition score measures how balanced a split is, with `1-4*x*(1-x)` the 
     ratio of positive examples to total examples. Larger scores indicate more 

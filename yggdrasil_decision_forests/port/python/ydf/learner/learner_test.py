@@ -1563,9 +1563,9 @@ class IsolationForestLearnerTest(LearnerTest):
     _ = model.analyze_prediction(self.gaussians.test_pd.iloc[:1])
     analysis = model.analyze(self.gaussians.test_pd)
     if with_labels:
-      self.assertLen(analysis.variable_importances(), 6)
+      self.assertLen(analysis.variable_importances(), 7)
     else:
-      self.assertLen(analysis.variable_importances(), 2)
+      self.assertLen(analysis.variable_importances(), 3)
 
   def test_gaussians_evaluation_default_task(self):
     learner = specialized_learners.IsolationForestLearner(label="label")

@@ -100,8 +100,9 @@ TEST_F(IsolationForestOnGaussians, VariableImportances) {
   if_config->set_num_trees(2);
   TrainAndEvaluateModel();
 
-  EXPECT_THAT(model_->AvailableVariableImportances(),
-              UnorderedElementsAre("MEAN_PARTITION_SCORE", "NUM_NODES"));
+  EXPECT_THAT(
+      model_->AvailableVariableImportances(),
+      UnorderedElementsAre("DIFFI", "MEAN_PARTITION_SCORE", "NUM_NODES"));
 }
 
 TEST_F(IsolationForestOnGaussians, MaxDepth) {
@@ -171,8 +172,9 @@ TEST_F(IsolationForestOnAdult, NumericalOnly) {
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.759, 0.03);
   EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.615, 0.03);
 
-  EXPECT_THAT(model_->AvailableVariableImportances(),
-              UnorderedElementsAre("MEAN_PARTITION_SCORE", "NUM_NODES"));
+  EXPECT_THAT(
+      model_->AvailableVariableImportances(),
+      UnorderedElementsAre("DIFFI", "MEAN_PARTITION_SCORE", "NUM_NODES"));
   ASSERT_OK_AND_ASSIGN(auto mps,
                        model_->GetVariableImportance("MEAN_PARTITION_SCORE"));
   EXPECT_EQ(utils::GetVariableImportanceRank("capital_gain",
