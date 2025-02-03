@@ -115,6 +115,220 @@ StructureMeanPartitionScore(
   return decision_tree::VariableImportanceMapToSortedVector(importance);
 }
 
+struct DiffiInlierOutlier {
+  UnsignedExampleIdx inliers = 0;
+  UnsignedExampleIdx outliers = 0;
+
+  // Add a constructor for C++17 compatibility.
+  DiffiInlierOutlier(UnsignedExampleIdx inliers_val,
+                     UnsignedExampleIdx outliers_val)
+      : inliers(inliers_val), outliers(outliers_val) {}
+};
+
+struct DiffiIIC {
+  double iic_in = 0.;
+  double iic_out = 0.;
+};
+
+struct DiffiCFI {
+  UnsignedExampleIdx usage_in = 0;
+  UnsignedExampleIdx usage_out = 0;
+  double cfi_in = 0;
+  double cfi_out = 0;
+};
+
+// Score the training examples in `node` as inliers and outliers. The result is
+// stored in pre-order in `inlier_outlier_counter`.
+DiffiInlierOutlier PredictTrainingExamples(
+    const decision_tree::NodeWithChildren& node,
+    const UnsignedExampleIdx num_examples_per_tree,
+    std::vector<DiffiInlierOutlier>& inlier_outlier_counter) {
+  if (node.IsLeaf()) {
+    const UnsignedExampleIdx num_examples =
+        node.node().anomaly_detection().num_examples_without_weight();
+    const int cur_depth = node.depth() + PreissAveragePathLength(num_examples);
+    // Use 0.5 as the hard cutoff for inlier and outlier.
+    if (IsolationForestPrediction(cur_depth, num_examples_per_tree) >= 0.5) {
+      inlier_outlier_counter.emplace_back(0, num_examples);
+    } else {
+      inlier_outlier_counter.emplace_back(num_examples, 0);
+    }
+    return inlier_outlier_counter.back();
+  } else {
+    inlier_outlier_counter.emplace_back(-1, -1);  // Placeholder
+    size_t current_index = inlier_outlier_counter.size() - 1;
+    auto pos_counter = PredictTrainingExamples(
+        *node.pos_child(), num_examples_per_tree, inlier_outlier_counter);
+    auto neg_counter = PredictTrainingExamples(
+        *node.neg_child(), num_examples_per_tree, inlier_outlier_counter);
+
+    UnsignedExampleIdx total_inliers =
+        neg_counter.inliers + pos_counter.inliers;
+    UnsignedExampleIdx total_outliers =
+        neg_counter.outliers + pos_counter.outliers;
+
+    inlier_outlier_counter[current_index] = {total_inliers, total_outliers};
+    return inlier_outlier_counter[current_index];
+  }
+}
+
+// Compute the cumulative feature importances recursively by traversing the
+// paths to the leaves. Corresponds to most of Algorithm 2 in the paper.
+absl::Status ComputeCFIs(
+    std::vector<std::pair<int, DiffiIIC>>& feature_and_iics_on_path,
+    int& node_idx, const decision_tree::NodeWithChildren& node,
+    const std::vector<DiffiIIC>& iics,
+    const std::vector<DiffiInlierOutlier>& training_predictions,
+    absl::flat_hash_map<int, DiffiCFI>& importances) {
+  const auto current_pred = training_predictions[node_idx];
+  STATUS_CHECK_GE(current_pred.inliers, 0);
+  STATUS_CHECK_GE(current_pred.outliers, 0);
+  const auto current_iics = iics[node_idx];
+  STATUS_CHECK_GE(current_iics.iic_in, -1.1);   // Can be -1 for trivial split.
+  STATUS_CHECK_GE(current_iics.iic_out, -1.1);  // Can be -1 for trivial split.
+  node_idx++;
+  if (node.IsLeaf()) {
+    const auto depth = node.depth();
+    STATUS_CHECK_GT(depth, 0);
+    for (const auto [feature, iics] : feature_and_iics_on_path) {
+      auto& importance = importances[feature];
+      // The paper doesn't make it clear if the counter should increase for
+      // nodes with zero IIC. In the official implementation, these node are not
+      // counted.
+      if (iics.iic_in >= 0) {
+        importance.usage_in += current_pred.inliers;
+        importance.cfi_in += current_pred.inliers * (iics.iic_in / depth);
+      }
+      if (iics.iic_out >= 0) {
+        importance.usage_out += current_pred.outliers;
+        importance.cfi_out += current_pred.outliers * (iics.iic_out / depth);
+      }
+    }
+  } else {
+    const auto feature = node.node().condition().attribute();
+    feature_and_iics_on_path.push_back({feature, current_iics});
+    RETURN_IF_ERROR(ComputeCFIs(feature_and_iics_on_path, node_idx,
+                                *node.pos_child(), iics, training_predictions,
+                                importances));
+    RETURN_IF_ERROR(ComputeCFIs(feature_and_iics_on_path, node_idx,
+                                *node.neg_child(), iics, training_predictions,
+                                importances));
+    feature_and_iics_on_path.pop_back();
+  }
+  return absl::OkStatus();
+}
+
+// DIFFI score. See https://arxiv.org/abs/2007.11117.
+absl::StatusOr<std::vector<model::proto::VariableImportance>>
+StructureDIFFIScore(
+    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
+        decision_trees) {
+  struct ImportancePerFeature {
+    double total_score = 0;
+    UnsignedExampleIdx num_usage = 0;
+  };
+  // Compute the Induced Imbalance Coefficient (IIC) of a node according to
+  // equations (4) -- (6) in the paper.
+  const auto compute_iic = [](UnsignedExampleIdx n_cur,
+                              UnsignedExampleIdx n_neg,
+                              UnsignedExampleIdx n_pos) -> double {
+    DCHECK_GE(n_neg, 0);
+    DCHECK_GE(n_pos, 0);
+    DCHECK_EQ(n_cur, n_neg + n_pos);
+    double iic = 0;
+    if (n_cur == 0 || n_cur == 1) {
+      // Do not assign an IIC for trivial splits. This condition is not explicit
+      // in the paper, but it makes sense and exists in the reference
+      // implementation.
+      return -1.;
+    }
+    if (n_neg > 0 && n_pos > 0) {
+      DCHECK_GT(n_cur, 0);
+      const double lambda_min = static_cast<double>(n_cur / 2) / n_cur;
+      const double lambda_max = static_cast<double>(n_cur - 1) / n_cur;
+      iic = static_cast<double>(std::max(n_neg, n_pos)) / n_cur;
+      if (lambda_min != lambda_max) {
+        iic = (iic - lambda_min) / (2 * (lambda_max - lambda_min)) + 0.5;
+      }
+    }
+    DCHECK(!std::isnan(iic));
+    return iic;
+  };
+  bool has_training_information = true;
+
+  // For each feature, stores its CFI.
+  absl::flat_hash_map<int, DiffiCFI> cfis;
+  for (auto& tree : decision_trees) {
+    if (tree->root().IsLeaf()) {
+      continue;
+    }
+    const auto& root = tree->root();
+    if (!root.node().condition().has_num_training_examples_without_weight()) {
+      has_training_information = false;
+      break;
+    }
+    // For each tree node (in pre-order), record the number of
+    // inliers and outliers and, in a second step, the corresponding IICs.
+    std::vector<DiffiInlierOutlier> training_example_predictions;
+    training_example_predictions.reserve(tree->NumNodes());
+    std::vector<DiffiIIC> iics(tree->NumNodes());
+    PredictTrainingExamples(
+        root, root.node().condition().num_training_examples_without_weight(),
+        training_example_predictions);
+    int depth_first_index = 0;
+    // For each internal node, compute the IICs (Algorithm 1 in the paper).
+    // This code assumes that IterateOnNodes follows pre-order.
+    tree->IterateOnNodes([&](const decision_tree::NodeWithChildren& node,
+                             const int depth) {
+      if (!node.IsLeaf()) {
+        DCHECK_LT(depth_first_index + node.pos_child()->NumNodes() + 1,
+                  iics.size());
+        const auto& cur_pred = training_example_predictions[depth_first_index];
+        const auto& pos_pred =
+            training_example_predictions[depth_first_index + 1];
+        const auto& neg_pred =
+            training_example_predictions[depth_first_index +
+                                         node.pos_child()->NumNodes() + 1];
+        const double iic_in =
+            compute_iic(cur_pred.inliers, pos_pred.inliers, neg_pred.inliers);
+        const double iic_out = compute_iic(cur_pred.outliers, pos_pred.outliers,
+                                           neg_pred.outliers);
+        iics[depth_first_index] = {iic_in, iic_out};
+      }
+      depth_first_index++;
+    });
+
+    std::vector<std::pair<int, DiffiIIC>> feature_and_iics_on_path;
+    int node_idx = 0;
+    RETURN_IF_ERROR(ComputeCFIs(feature_and_iics_on_path, node_idx, root, iics,
+                                training_example_predictions, cfis));
+  }
+
+  if (!has_training_information) {
+    LOG(INFO)
+        << "This model is missing some training information, cannot compute "
+        << kVariableImportanceDIFFI;
+    return std::vector<model::proto::VariableImportance>();
+  }
+
+  // Convert the CFIs into feature importances by normalizing between inliers
+  // and outliers.
+  absl::flat_hash_map<int, double> importance;
+  for (const auto& [feature, cfi] : cfis) {
+    STATUS_CHECK_GE(cfi.usage_in, 0);
+    STATUS_CHECK_GE(cfi.usage_out, 0);
+    STATUS_CHECK_GE(cfi.cfi_in, 0);
+    STATUS_CHECK_GE(cfi.cfi_out, 0);
+    if (cfi.cfi_in * cfi.usage_out == 0) {
+      importance[feature] = 0.0;
+    } else {
+      importance[feature] =
+          (cfi.cfi_out * cfi.usage_in) / (cfi.cfi_in * cfi.usage_out);
+    }
+  }
+  return decision_tree::VariableImportanceMapToSortedVector(importance);
+}
+
 }  // namespace
 
 float PreissAveragePathLength(UnsignedExampleIdx num_examples) {
@@ -323,6 +537,12 @@ bool IsolationForestModel::CheckStructure(
   return decision_tree::CheckStructure(options, data_spec(), decision_trees_);
 }
 
+// Add a new tree to the model.
+void IsolationForestModel::AddTree(
+    std::unique_ptr<decision_tree::DecisionTree> decision_tree) {
+  decision_trees_.push_back(std::move(decision_tree));
+}
+
 void IsolationForestModel::AppendDescriptionAndStatistics(
     bool full_definition, std::string* description) const {
   AbstractModel::AppendDescriptionAndStatistics(full_definition, description);
@@ -397,6 +617,7 @@ std::vector<std::string> IsolationForestModel::AvailableVariableImportances()
 std::vector<std::string>
 IsolationForestModel::AvailableStructuralVariableImportances() const {
   std::vector<std::string> variable_importances;
+  variable_importances.push_back(kVariableImportanceDIFFI);
   variable_importances.push_back(kVariableImportanceMeanPartitionScore);
   variable_importances.push_back(
       decision_tree::kVariableImportanceNumberOfNodes);
@@ -409,11 +630,22 @@ IsolationForestModel::GetVariableImportance(absl::string_view key) const {
   if (general_vi.ok()) {
     return std::move(general_vi.value());
   } else if (general_vi.status().code() == absl::StatusCode::kNotFound) {
-    if (key == kVariableImportanceMeanPartitionScore) {
-      return StructureMeanPartitionScore(decision_trees());
-    }
     if (key == decision_tree::kVariableImportanceNumberOfNodes) {
       return decision_tree::StructureNumberOfTimesInNode(decision_trees());
+    }
+    if (key == kVariableImportanceMeanPartitionScore) {
+      if (is_pure_model_) {
+        LOG(INFO) << "Variable importance " << key
+                  << " may not be available for pure serving models.";
+      }
+      return StructureMeanPartitionScore(decision_trees());
+    }
+    if (key == kVariableImportanceDIFFI) {
+      if (is_pure_model_) {
+        LOG(INFO) << "Variable importance " << key
+                  << " may not be available for pure serving models.";
+      }
+      return StructureDIFFIScore(decision_trees());
     }
   }
   return general_vi.status();

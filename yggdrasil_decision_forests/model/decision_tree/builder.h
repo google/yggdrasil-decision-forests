@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_MODEL_DECISION_TREE_BUILDER_H_
 #define YGGDRASIL_DECISION_FORESTS_MODEL_DECISION_TREE_BUILDER_H_
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -36,8 +37,10 @@ class TreeBuilder {
   TreeBuilder(NodeWithChildren* node) : node_(node) {}
 
   // Creates a condition of the type "attribute >= threshold".
-  std::pair<TreeBuilder, TreeBuilder> ConditionIsGreater(int attribute,
-                                                         float threshold);
+  std::pair<TreeBuilder, TreeBuilder> ConditionIsGreater(
+      int attribute, float threshold,
+      std::optional<int> num_examples = std::nullopt,
+      std::optional<int> num_pos_examples = std::nullopt);
 
   // Creates a condition of the type "\sum attributes_i * weights_i >=
   // threshold". "attributes" and "weights" should have the same size.

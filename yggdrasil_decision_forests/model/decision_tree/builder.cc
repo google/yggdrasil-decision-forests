@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -24,7 +25,8 @@
 namespace yggdrasil_decision_forests::model::decision_tree {
 
 std::pair<TreeBuilder, TreeBuilder> TreeBuilder::ConditionIsGreater(
-    const int attribute, const float threshold) {
+    const int attribute, const float threshold, std::optional<int> num_examples,
+    std::optional<int> num_pos_examples) {
   node_->CreateChildren();
   node_->mutable_node()->mutable_condition()->set_attribute(attribute);
   node_->mutable_node()
@@ -32,6 +34,16 @@ std::pair<TreeBuilder, TreeBuilder> TreeBuilder::ConditionIsGreater(
       ->mutable_condition()
       ->mutable_higher_condition()
       ->set_threshold(threshold);
+  if (num_examples.has_value()) {
+    node_->mutable_node()
+        ->mutable_condition()
+        ->set_num_training_examples_without_weight(*num_examples);
+  }
+  if (num_pos_examples.has_value()) {
+    node_->mutable_node()
+        ->mutable_condition()
+        ->set_num_pos_training_examples_without_weight(*num_pos_examples);
+  }
   return {TreeBuilder(node_->mutable_pos_child()),
           TreeBuilder(node_->mutable_neg_child())};
 }

@@ -44,6 +44,7 @@
 namespace yggdrasil_decision_forests::model::isolation_forest {
 
 // Isolation-Forest specific variable importances
+static constexpr char kVariableImportanceDIFFI[] = "DIFFI";
 static constexpr char kVariableImportanceMeanPartitionScore[] =
     "MEAN_PARTITION_SCORE";
 
@@ -67,6 +68,8 @@ class IsolationForestModel : public AbstractModel,
 
   bool CheckStructure(
       const decision_tree::CheckStructureOptions& options) const override;
+
+  void AddTree(std::unique_ptr<decision_tree::DecisionTree> decision_tree);
 
   std::optional<size_t> ModelSizeInBytes() const override;
 
