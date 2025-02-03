@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
@@ -41,6 +42,10 @@
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 
 namespace yggdrasil_decision_forests::model::isolation_forest {
+
+// Isolation-Forest specific variable importances
+static constexpr char kVariableImportanceMeanPartitionScore[] =
+    "MEAN_PARTITION_SCORE";
 
 class IsolationForestModel : public AbstractModel,
                              public DecisionForestInterface {
@@ -119,6 +124,10 @@ class IsolationForestModel : public AbstractModel,
 
   absl::Status Validate() const override;
 
+  // List the variable importances that can be computed from the model
+  // structure.
+  std::vector<std::string> AvailableStructuralVariableImportances() const;
+
  private:
   void PredictLambda(std::function<const decision_tree::NodeWithChildren&(
                          const decision_tree::DecisionTree&)>
@@ -140,6 +149,11 @@ class IsolationForestModel : public AbstractModel,
 
   proto::Header BuildHeaderProto() const;
   void ApplyHeaderProto(const proto::Header& header);
+
+  std::vector<std::string> AvailableVariableImportances() const override;
+
+  absl::StatusOr<std::vector<model::proto::VariableImportance>>
+  GetVariableImportance(absl::string_view key) const override;
 
   // Number of examples used to grow each tree.
   int64_t num_examples_per_trees_ = -1;

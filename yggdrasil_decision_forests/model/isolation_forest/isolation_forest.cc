@@ -17,15 +17,20 @@
 
 #include <stddef.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
@@ -52,6 +57,63 @@ namespace {
 constexpr char kNodeBaseFilename[] = "nodes";
 // Filename containing the isolation forest header.
 constexpr char kHeaderBaseFilename[] = "isolation_forest_header.pb";
+
+absl::StatusOr<std::vector<model::proto::VariableImportance>>
+StructureMeanPartitionScore(
+    const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
+        decision_trees) {
+  struct ImportancePerFeature {
+    double total_score = 0;
+    int num_usage = 0;
+  };
+  absl::flat_hash_map<int, ImportancePerFeature> scores;
+  bool has_training_information = true;
+
+  for (auto& tree : decision_trees) {
+    tree->IterateOnNodes(
+        [&](const decision_tree::NodeWithChildren& node, const int depth) {
+          if (!node.IsLeaf()) {
+            if (!has_training_information ||
+                !node.node()
+                     .condition()
+                     .has_num_training_examples_without_weight() ||
+                !node.node()
+                     .condition()
+                     .has_num_pos_training_examples_without_weight()) {
+              // Missing training set information, abort.
+              has_training_information = false;
+              return;
+            }
+            const double total_examples =
+                node.node().condition().num_training_examples_without_weight();
+            const double pos_examples =
+                node.node()
+                    .condition()
+                    .num_pos_training_examples_without_weight();
+            const double partition_ratio = pos_examples/total_examples;
+            DCHECK_GT(total_examples, 0);
+            const double partition_score =
+                1. - 4. * (partition_ratio) * (1. - partition_ratio);
+            auto& score = scores[node.node().condition().attribute()];
+            score.total_score += partition_score;
+            scores[node.node().condition().attribute()].num_usage++;
+          }
+        });
+  }
+  if (!has_training_information) {
+    LOG(INFO)
+        << "This model is missing some training information, cannot compute "
+        << kVariableImportanceMeanPartitionScore;
+    return std::vector<model::proto::VariableImportance>();
+  }
+  absl::flat_hash_map<int, double> importance;
+  for (const auto x : scores) {
+    STATUS_CHECK_GT(x.second.num_usage, 0);
+    STATUS_CHECK_GE(x.second.total_score, 0);
+    importance[x.first] = x.second.total_score / x.second.num_usage;
+  }
+  return decision_tree::VariableImportanceMapToSortedVector(importance);
+}
 
 }  // namespace
 
@@ -314,6 +376,47 @@ std::string IsolationForestModel::DebugCompare(
   }
   return decision_tree::DebugCompare(
       data_spec_, label_col_idx_, decision_trees_, other_cast->decision_trees_);
+}
+
+std::vector<std::string> IsolationForestModel::AvailableVariableImportances()
+    const {
+  auto variable_importances = AbstractModel::AvailableVariableImportances();
+  const auto structural = AvailableStructuralVariableImportances();
+  variable_importances.insert(variable_importances.end(), structural.begin(),
+                              structural.end());
+
+  // Remove possible duplicates.
+  std::sort(variable_importances.begin(), variable_importances.end());
+  variable_importances.erase(
+      std::unique(variable_importances.begin(), variable_importances.end()),
+      variable_importances.end());
+
+  return variable_importances;
+}
+
+std::vector<std::string>
+IsolationForestModel::AvailableStructuralVariableImportances() const {
+  std::vector<std::string> variable_importances;
+  variable_importances.push_back(kVariableImportanceMeanPartitionScore);
+  variable_importances.push_back(
+      decision_tree::kVariableImportanceNumberOfNodes);
+  return variable_importances;
+}
+
+absl::StatusOr<std::vector<model::proto::VariableImportance>>
+IsolationForestModel::GetVariableImportance(absl::string_view key) const {
+  const auto general_vi = AbstractModel::GetVariableImportance(key);
+  if (general_vi.ok()) {
+    return std::move(general_vi.value());
+  } else if (general_vi.status().code() == absl::StatusCode::kNotFound) {
+    if (key == kVariableImportanceMeanPartitionScore) {
+      return StructureMeanPartitionScore(decision_trees());
+    }
+    if (key == decision_tree::kVariableImportanceNumberOfNodes) {
+      return decision_tree::StructureNumberOfTimesInNode(decision_trees());
+    }
+  }
+  return general_vi.status();
 }
 
 REGISTER_AbstractModel(IsolationForestModel,

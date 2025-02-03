@@ -159,34 +159,6 @@ void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
   }
 }
 
-// Converts a map of variable importance into a vector of variable importance
-// sorted in decreasing order.
-std::vector<model::proto::VariableImportance>
-VariableImportanceMapToSortedVector(
-    const absl::flat_hash_map<int, double>& importance_map) {
-  std::vector<model::proto::VariableImportance> importance_vec;
-  for (const auto& item : importance_map) {
-    model::proto::VariableImportance importance;
-    importance.set_attribute_idx(item.first);
-    importance.set_importance(item.second);
-    importance_vec.push_back(importance);
-  }
-
-  // Sorts the variable importances in decreasing order.
-  const auto var_importance_comparer =
-      [](const model::proto::VariableImportance& a,
-         const model::proto::VariableImportance& b) {
-        if (a.importance() != b.importance()) {
-          return a.importance() > b.importance();
-        } else {
-          return a.attribute_idx() < b.attribute_idx();
-        }
-      };
-  std::sort(importance_vec.begin(), importance_vec.end(),
-            var_importance_comparer);
-  return importance_vec;
-}
-
 std::vector<int> GetAttributes(const decision_tree::NodeWithChildren& node) {
   const auto& condition = node.node().condition();
   if (condition.condition().has_oblique_condition()) {
@@ -294,6 +266,34 @@ float DotProduct(const absl::Span<const float> a,
     acc += a[i] * b[i];
   }
   return acc;
+}
+
+// Converts a map of variable importance into a vector of variable importance
+// sorted in decreasing order.
+std::vector<model::proto::VariableImportance>
+VariableImportanceMapToSortedVector(
+    const absl::flat_hash_map<int, double>& importance_map) {
+  std::vector<model::proto::VariableImportance> importance_vec;
+  for (const auto& item : importance_map) {
+    model::proto::VariableImportance importance;
+    importance.set_attribute_idx(item.first);
+    importance.set_importance(item.second);
+    importance_vec.push_back(importance);
+  }
+
+  // Sorts the variable importances in decreasing order.
+  const auto var_importance_comparer =
+      [](const model::proto::VariableImportance& a,
+         const model::proto::VariableImportance& b) {
+        if (a.importance() != b.importance()) {
+          return a.importance() > b.importance();
+        } else {
+          return a.attribute_idx() < b.attribute_idx();
+        }
+      };
+  std::sort(importance_vec.begin(), importance_vec.end(),
+            var_importance_comparer);
+  return importance_vec;
 }
 
 std::vector<int32_t> ExactElementsFromContainsCondition(

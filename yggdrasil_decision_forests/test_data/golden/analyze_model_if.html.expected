@@ -586,7 +586,13 @@ Input Features (2):
 
 No weights
 
-Variable Importance disabled i.e. compute_oob_variable_importances=false.
+Variable Importance: MEAN_PARTITION_SCORE:
+
+Variable Importance: NUM_NODES:
+    1. &quot;features.0_of_2&quot; 1617.000000 ################
+    2. &quot;features.1_of_2&quot; 1577.000000 
+
+
 Cannot compute model self evaluation:This model does not support evaluation reports.
 
 Number of trees: 100
