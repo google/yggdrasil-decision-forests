@@ -26,8 +26,9 @@ std::vector<std::unique_ptr<FastEngineFactory>> ListAllFastEngines() {
     if (!engine_factory.ok()) {
       LOG(WARNING) << "Error when creating fast engine:" << engine_name << " : "
                    << engine_factory.status();
+    } else {
+      factories.emplace_back(std::move(engine_factory).value());
     }
-    factories.emplace_back(std::move(engine_factory).value());
   }
   return factories;
 }
