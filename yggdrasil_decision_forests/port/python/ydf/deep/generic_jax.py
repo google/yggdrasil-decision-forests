@@ -551,7 +551,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
       random_seed: int,
       early_stopping_epoch_patience: Optional[int],
       early_stopping_revert_params: bool,
-      num_qantiles: int,
+      num_quantiles: int,
       zscore: bool,
   ):
     hyper_parameters = hyper_parameters.copy()
@@ -576,8 +576,8 @@ class GenericJaxLearner(generic_learner.GenericLearner):
         include_all_columns=include_all_columns,
         max_vocab_count=max_vocab_count,
         min_vocab_frequency=min_vocab_frequency,
-        discretize_numerical_columns=num_qantiles > 0,
-        num_discretized_numerical_bins=num_qantiles,
+        discretize_numerical_columns=num_quantiles > 0,
+        num_discretized_numerical_bins=num_quantiles,
         max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
         zscore_numerical_columns=zscore,
