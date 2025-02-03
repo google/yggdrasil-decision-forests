@@ -33,7 +33,6 @@
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
-#include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -52,6 +51,7 @@ namespace {
 
 using test::StatusIs;
 using ::testing::ElementsAre;
+using ::testing::UnorderedElementsAre;
 
 class IsolationForestOnGaussians : public utils::TrainAndTestTester {
   proto::IsolationForestTrainingConfig* if_config() {
@@ -92,6 +92,16 @@ TEST_F(IsolationForestOnGaussians, ModelStructure) {
   auto if_model = dynamic_cast<const IsolationForestModel*>(model_.get());
   EXPECT_EQ(if_model->num_trees(), 5);
   EXPECT_GT(if_model->NumNodes(), if_model->num_trees() * 32);
+}
+
+TEST_F(IsolationForestOnGaussians, VariableImportances) {
+  auto* if_config = train_config_.MutableExtension(
+      isolation_forest::proto::isolation_forest_config);
+  if_config->set_num_trees(2);
+  TrainAndEvaluateModel();
+
+  EXPECT_THAT(model_->AvailableVariableImportances(),
+              UnorderedElementsAre("MEAN_PARTITION_SCORE", "NUM_NODES"));
 }
 
 TEST_F(IsolationForestOnGaussians, MaxDepth) {
@@ -160,6 +170,14 @@ TEST_F(IsolationForestOnAdult, NumericalOnly) {
   // Confirmed with Scikit-learn.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.759, 0.03);
   EXPECT_NEAR(evaluation_.classification().rocs(1).auc(), 0.615, 0.03);
+
+  EXPECT_THAT(model_->AvailableVariableImportances(),
+              UnorderedElementsAre("MEAN_PARTITION_SCORE", "NUM_NODES"));
+  ASSERT_OK_AND_ASSIGN(auto mps,
+                       model_->GetVariableImportance("MEAN_PARTITION_SCORE"));
+  EXPECT_EQ(utils::GetVariableImportanceRank("capital_gain",
+                                             model_->data_spec(), mps),
+            0);
 }
 
 TEST_F(IsolationForestOnAdult, SmallModelNumerical) {

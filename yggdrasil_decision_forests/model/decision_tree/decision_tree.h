@@ -31,6 +31,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/types/span.h"
@@ -48,7 +49,7 @@ namespace decision_tree {
 
 using row_t = dataset::VerticalDataset::row_t;
 
-// Variable importance names to be used for all decision tree based model.
+// Variable importance names common for decision tree based models.
 static constexpr char kVariableImportanceNumberOfNodes[] = "NUM_NODES";
 static constexpr char kVariableImportanceNumberOfTimesAsRoot[] = "NUM_AS_ROOT";
 static constexpr char kVariableImportanceSumScore[] = "SUM_SCORE";
@@ -397,6 +398,10 @@ void AppendModelStructureHeader(
     const DecisionForest& trees,
     const dataset::proto::DataSpecification& data_spec, int label_col_idx,
     std::string* description);
+
+std::vector<model::proto::VariableImportance>
+VariableImportanceMapToSortedVector(
+    const absl::flat_hash_map<int, double>& importance_map);
 
 // Gets the number of time each feature is used as root in a set of trees.
 std::vector<model::proto::VariableImportance> StructureNumberOfTimesAsRoot(

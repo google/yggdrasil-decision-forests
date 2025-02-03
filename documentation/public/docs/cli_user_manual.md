@@ -451,18 +451,28 @@ The available variable importances are:
 
 **Decision Forests specific**
 
--   `SUM_SCORE`: Sum of the split scores using a specific feature. The larger,
-    the most important.
+-   `SUM_SCORE`: Sum of the split scores using a specific feature. Larger scores
+    indicate more important features.
 
--   `NUM_AS_ROOT`: Number of root nodes using a specific feature. The larger,
-    the most important.
+-   `NUM_AS_ROOT`: Number of root nodes using a specific feature. Larger scores
+    indicate more important features.
 
--   `NUM_NODES`: Number of nodes using a specific feature. The larger, the most
-    important.
+-   `NUM_NODES`: Number of nodes using a specific feature. Larger scores
+    indicate more important features.
 
 -   `INV_MEAN_MIN_DEPTH`: Inverse (i.e. 1/(1+x)) of the average minimum depth of
-    the first occurrence of a feature across all the tree paths. **Note:**
-    `MEAN_MIN_DEPTH` was removed.
+    the first occurrence of a feature across all the tree paths. Larger scores
+    indicate more important features. **Note:**: `MEAN_MIN_DEPTH` was removed.
+
+Note that `SUM_SCORE`, `NUM_AS_ROOT` and `INV_MEAN_MIN_DEPTH` are not exposed
+for isolation forest models since they do not provide useful information.
+
+**Anomaly Detection specific**
+
+-   `MEAN_PARTITION_SCORE`: Mean of an attribute's partition scores. A node's 
+    partition score measures how balanced a split is, with `1-4*x*(1-x)` the 
+    ratio of positive examples to total examples. Larger scores indicate more 
+    important features.
 
 ## Automated Hyper-parameter Tuning
 

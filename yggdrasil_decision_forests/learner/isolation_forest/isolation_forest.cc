@@ -26,6 +26,7 @@
 #include <optional>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/container/btree_set.h"
@@ -887,6 +888,12 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
   return hparam_def;
 }
 
+absl::Status FinalizeModel(IsolationForestModel* mdl) {
+  // Cache the structural variable importance in the model data.
+  return mdl->PrecomputeVariableImportances(
+      mdl->AvailableStructuralVariableImportances());
+}
+
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 IsolationForestLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
@@ -949,6 +956,7 @@ IsolationForestLearner::TrainWithStatusImpl(
   }
   RETURN_IF_ERROR(global_status);
   decision_tree::SetLeafIndices(model->mutable_decision_trees());
+  RETURN_IF_ERROR(FinalizeModel(model.get()));
   return std::move(model);
 }
 
