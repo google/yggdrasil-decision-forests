@@ -1281,6 +1281,57 @@ B,3""")
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
+  def test_multidimensional_equal_sized_list_unroll(self):
+    # Constructing the array directly will not trigger the same shape as first
+    # constructing and then modifying it.
+    non_uniform_array = np.array(
+        [np.array([1, 2]), np.array([3])], dtype=object
+    )
+    non_uniform_array[1] = np.array([3, 4])
+    ds = dataset_lib.create_vertical_dataset(
+        {"f": non_uniform_array}, min_vocab_frequency=1
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=2,
+        columns=(
+            ds_pb.Column(
+                name="f.0_of_2",
+                type=ds_pb.ColumnType.NUMERICAL,
+                dtype=ds_pb.DType.DTYPE_INT64,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2.0,
+                    min_value=1.0,
+                    max_value=3.0,
+                    standard_deviation=1.0,
+                ),
+                is_unstacked=True,
+            ),
+            ds_pb.Column(
+                name="f.1_of_2",
+                type=ds_pb.ColumnType.NUMERICAL,
+                dtype=ds_pb.DType.DTYPE_INT64,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=3.0,
+                    min_value=2.0,
+                    max_value=4.0,
+                    standard_deviation=1.0,
+                ),
+                is_unstacked=True,
+            ),
+        ),
+        unstackeds=(
+            ds_pb.Unstacked(
+                original_name="f",
+                begin_column_idx=0,
+                size=2,
+                type=ds_pb.ColumnType.NUMERICAL,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
   @parameterized.parameters(
       (1, "feature.0_of_1"),
       (9, "feature.0_of_9"),

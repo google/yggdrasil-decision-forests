@@ -8,6 +8,11 @@
     information.
 -   Allow users to provide a training proto configuration to the learner.
 
+### Fix
+
+-   Fix recognition of multidimensional features for Numpy arrays of type 
+    object.
+
 ## 0.9.0 - 2024-12-02
 
 ### Feature
