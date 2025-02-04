@@ -108,7 +108,6 @@ py_library(
 py_test(
     name = "func_helpers_test",
     srcs = ["func_helpers_test.py"],
-    python_version = "PY3",
     deps = [
         ":func_helpers",
         # absl/testing:absltest dep,
@@ -118,7 +117,6 @@ py_test(
 py_test(
     name = "html_test",
     srcs = ["html_test.py"],
-    python_version = "PY3",
     deps = [
         ":html",
         # absl/testing:absltest dep,
@@ -128,7 +126,6 @@ py_test(
 py_test(
     name = "paths_test",
     srcs = ["paths_test.py"],
-    python_version = "PY3",
     deps = [
         ":paths",
         # absl/testing:absltest dep,
@@ -138,7 +135,6 @@ py_test(
 py_test(
     name = "string_lib_test",
     srcs = ["string_lib_test.py"],
-    python_version = "PY3",
     deps = [
         ":string_lib",
         # absl/testing:absltest dep,
@@ -148,7 +144,6 @@ py_test(
 py_test(
     name = "test_utils_test",
     srcs = ["test_utils_test.py"],
-    python_version = "PY3",
     deps = [
         ":test_utils",
         # absl/testing:absltest dep,

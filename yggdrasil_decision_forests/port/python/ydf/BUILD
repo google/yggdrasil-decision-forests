@@ -104,7 +104,6 @@ py_test(
     name = "api_test",
     srcs = ["api_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     shard_count = 5,
     deps = [
         ":api",

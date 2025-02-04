@@ -245,7 +245,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     shard_count = 4,
     deps = [
         ":analysis",
@@ -273,7 +272,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     shard_count = 5,
     # TODO: This test fails in OSS due to a package name clash on yggdrasil_decision_forests.
     tags = ["manual"],
@@ -330,7 +328,6 @@ genrule(
 py_binary(
     name = "export_cc_generator",
     srcs = ["export_cc_generator.py"],
-    python_version = "PY3",
     deps = [
         # absl:app dep,
         # absl/flags dep,
@@ -342,7 +339,6 @@ py_binary(
 py_test(
     name = "optimizer_logs_test",
     srcs = ["optimizer_logs_test.py"],
-    python_version = "PY3",
     deps = [
         ":optimizer_logs",
         # absl/testing:absltest dep,
@@ -360,7 +356,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     deps = [
         ":export_jax",
         ":generic_model",
@@ -385,7 +380,6 @@ py_test(
 py_test(
     name = "sklearn_model_test",
     srcs = ["sklearn_model_test.py"],
-    python_version = "PY3",
     deps = [
         ":export_sklearn",
         # absl/testing:absltest dep,
@@ -400,7 +394,6 @@ py_test(
     name = "export_docker_test",
     srcs = ["export_docker_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     deps = [
         ":export_docker",
         ":model_lib",

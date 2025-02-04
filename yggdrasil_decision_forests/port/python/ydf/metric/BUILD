@@ -81,7 +81,6 @@ py_test(
     name = "metric_test",
     srcs = ["metric_test.py"],
     data = ["//test_data"],
-    python_version = "PY3",
     deps = [
         ":metric",
         # absl/testing:absltest dep,
@@ -96,7 +95,6 @@ py_test(
     name = "evaluate_test",
     srcs = ["evaluate_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     deps = [
         ":evaluate",
         # absl/testing:absltest dep,

@@ -48,7 +48,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     deps = [
         ":gradient_boosted_trees_model",
         # absl/logging dep,

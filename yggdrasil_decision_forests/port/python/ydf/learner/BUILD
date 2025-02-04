@@ -15,7 +15,6 @@ package(
 py_binary(
     name = "worker_main",
     srcs = ["worker_main.py"],
-    python_version = "PY3",
     visibility = ["//visibility:public"],
     deps = [
         # absl:app dep,
@@ -208,7 +207,6 @@ py_library(
 py_library(
     name = "tuner",
     srcs = ["tuner.py"],
-    srcs_version = "PY3",
     deps = [
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_py_proto",
@@ -220,7 +218,6 @@ py_library(
 py_library(
     name = "worker",
     srcs = ["worker.py"],
-    srcs_version = "PY3",
     deps = [
         "//ydf/cc:ydf",
     ],
@@ -253,7 +250,6 @@ py_test(
     size = "large",
     srcs = ["learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     shard_count = 10,
     tags = [
     ],
@@ -291,7 +287,6 @@ py_test(
     timeout = "long",
     srcs = ["custom_loss_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     deps = [
         ":custom_loss_py",
         ":generic_learner",
@@ -312,7 +307,6 @@ py_test(
     name = "distributed_learner_test",
     srcs = ["distributed_learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     shard_count = 10,
     deps = [
         ":generic_learner",
@@ -332,7 +326,6 @@ py_test(
 py_test(
     name = "learner_with_tf_test",
     srcs = ["learner_with_tf_test.py"],
-    python_version = "PY3",
     deps = [
         ":generic_learner",
         ":specialized_learners",
@@ -346,7 +339,6 @@ py_test(
 py_test(
     name = "hyperparameters_test",
     srcs = ["hyperparameters_test.py"],
-    python_version = "PY3",
     deps = [
         ":hyperparameters",
         # absl/testing:absltest dep,
@@ -359,7 +351,6 @@ py_test(
     name = "learner_with_xarray_test",
     srcs = ["learner_with_xarray_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     deps = [
         ":specialized_learners",
         # absl/testing:absltest dep,
@@ -372,7 +363,6 @@ py_test(
 py_test(
     name = "tuner_test",
     srcs = ["tuner_test.py"],
-    python_version = "PY3",
     tags = [
     ],
     deps = [
@@ -391,7 +381,6 @@ py_test(
     name = "feature_selector_test",
     srcs = ["feature_selector_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     shard_count = 5,
     deps = [
         ":feature_selector",

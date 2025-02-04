@@ -71,7 +71,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     deps = [
         ":dataset",
         ":dataspec",
@@ -90,7 +89,6 @@ py_test(
     name = "dataset_with_tf_test",
     srcs = ["dataset_with_tf_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     deps = [
         ":dataset",
         # absl/testing:absltest dep,
@@ -103,7 +101,6 @@ py_test(
 py_test(
     name = "dataspec_test",
     srcs = ["dataspec_test.py"],
-    python_version = "PY3",
     deps = [
         ":dataspec",
         # absl/testing:absltest dep,
