@@ -78,9 +78,25 @@ def _unroll_column(
   """
 
   # Numpy is currently the only way to pass multi-dim features.
-  if not isinstance(src, np.ndarray) or src.ndim <= 1:
+  if not isinstance(src, np.ndarray):
     yield name, src, False
     return
+
+  if src.ndim <= 1:
+    # The data is a numpy array containing objects that are numpy arrays.
+    # If the arrays all have the same size, using unrolled multi-dimensional
+    # features is better than CATEGORICAL_SET.
+    if src.ndim > 0 and src.size > 0 and isinstance(src[0], np.ndarray):
+      try:
+        # If columns can be stacked, do it to prevent accidental cast to
+        # CATEGORICAL_SET.
+        src = np.vstack(src)
+      except ValueError:
+        yield name, src, False
+        return
+    else:
+      yield name, src, False
+      return
 
   if not allow_unroll:
     raise ValueError(
