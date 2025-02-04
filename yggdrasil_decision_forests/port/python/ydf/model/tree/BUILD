@@ -88,7 +88,6 @@ py_test(
     data = [
         "//test_data",
     ],
-    python_version = "PY3",
     deps = [
         ":condition",
         ":node",
@@ -104,7 +103,6 @@ py_test(
 py_test(
     name = "value_test",
     srcs = ["value_test.py"],
-    python_version = "PY3",
     deps = [
         ":value",
         # absl/testing:absltest dep,
@@ -117,7 +115,6 @@ py_test(
 py_test(
     name = "node_test",
     srcs = ["node_test.py"],
-    python_version = "PY3",
     deps = [
         ":condition",
         ":node",
@@ -129,7 +126,6 @@ py_test(
 py_test(
     name = "condition_test",
     srcs = ["condition_test.py"],
-    python_version = "PY3",
     deps = [
         ":condition",
         # absl/testing:absltest dep,
@@ -144,7 +140,6 @@ py_test(
     name = "plot_test",
     srcs = ["plot_test.py"],
     data = ["assets"],
-    python_version = "PY3",
     deps = [
         ":plot",
         # absl/testing:absltest dep,

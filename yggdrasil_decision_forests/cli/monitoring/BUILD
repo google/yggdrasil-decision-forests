@@ -47,8 +47,6 @@ cc_binary_ydf(
 py_binary(
     name = "compare_benchmark",
     srcs = ["compare_benchmark.py"],
-    python_version = "PY3",
-    srcs_version = "PY3",
     deps = [
         # absl:app dep,
         # absl/flags dep,

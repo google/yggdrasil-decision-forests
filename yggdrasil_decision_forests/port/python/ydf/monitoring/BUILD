@@ -81,7 +81,6 @@ py_library(
 py_test(
     name = "benchmark_inference_speed_test",
     srcs = ["benchmark_inference_speed_test.py"],
-    python_version = "PY3",
     deps = [
         ":benchmark_inference_speed",
         # absl/testing:absltest dep,

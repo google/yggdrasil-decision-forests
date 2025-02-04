@@ -154,7 +154,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     shard_count = 4,
     deps = [
         ":mlp",
@@ -178,7 +177,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     deps = [
         ":dataset",
         # absl/testing:absltest dep,
@@ -191,7 +189,6 @@ py_test(
 py_test(
     name = "preprocessor_test",
     srcs = ["preprocessor_test.py"],
-    python_version = "PY3",
     deps = [
         ":dataset",
         ":layer",
@@ -210,7 +207,6 @@ py_test(
     name = "hyperparameter_test",
     srcs = ["hyperparameter_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    python_version = "PY3",
     deps = [
         ":hyperparameter",
         # absl/testing:absltest dep,
@@ -221,7 +217,6 @@ py_test(
 py_test(
     name = "layer_test",
     srcs = ["layer_test.py"],
-    python_version = "PY3",
     deps = [
         ":layer",
         # absl/testing:absltest dep,
@@ -233,7 +228,6 @@ py_test(
 py_test(
     name = "metric_test",
     srcs = ["metric_test.py"],
-    python_version = "PY3",
     deps = [
         ":metric",
         # absl/testing:absltest dep,
@@ -249,7 +243,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     shard_count = 4,
     deps = [
         ":layer",

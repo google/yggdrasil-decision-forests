@@ -52,7 +52,6 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
-    python_version = "PY3",
     deps = [
         ":decision_forest_model",
         # absl/testing:absltest dep,

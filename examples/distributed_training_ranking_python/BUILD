@@ -9,7 +9,6 @@ package(licenses = ["notice"])
 py_binary(
     name = "main",
     srcs = ["main.py"],
-    python_version = "PY3",
     deps = [
         # absl:app dep,
         # absl/flags dep,
