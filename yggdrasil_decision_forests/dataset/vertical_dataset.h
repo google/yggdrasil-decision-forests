@@ -1025,9 +1025,9 @@ absl::Status VerticalDataset::TemplateScalarStorage<T>::ExtractAndAppend(
       dynamic_cast<VerticalDataset::TemplateScalarStorage<T>*>(dst);
   STATUS_CHECK(cast_dst != nullptr);
   if (values_.empty() && !indices.empty()) {
-    LOG(FATAL) << "Trying to extract " << indices.size()
-               << " examples from the non-allocated column \"" << name()
-               << "\".";
+    return absl::InternalError(absl::StrCat(
+        "Trying to extract ", indices.size(),
+        " examples from the non-allocated column \"", name(), "\"."));
   }
   const size_t indices_size = indices.size();
   const size_t init_dst_nrows = dst->nrows();

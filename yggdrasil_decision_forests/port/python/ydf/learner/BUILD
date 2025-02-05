@@ -266,6 +266,7 @@ py_test(
         # # polars dep,  # TODO: Re-enable.
         # sklearn dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/dataset:dataspec",

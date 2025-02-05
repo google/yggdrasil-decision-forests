@@ -145,7 +145,7 @@ void InitializeOOBPredictionAccumulators(
 // If "shuffled_attribute_idx" is set, the decision tree will be applied while
 // simulating the random shuffling of the value of the attribute
 // "shuffled_attribute_idx.value()" using "rnd" as source of randomness.
-void UpdateOOBPredictionsWithNewTree(
+absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,

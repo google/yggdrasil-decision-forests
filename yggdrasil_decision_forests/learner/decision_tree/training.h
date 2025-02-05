@@ -44,9 +44,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
-namespace yggdrasil_decision_forests {
-namespace model {
-namespace decision_tree {
+namespace yggdrasil_decision_forests::model::decision_tree {
 
 // A collection of objects used by split-finding methods.
 //
@@ -177,7 +175,7 @@ struct SplitterWorkResponse {
 
 using SplitterFinderStreamProcessor =
     yggdrasil_decision_forests::utils::concurrency::StreamProcessor<
-        SplitterWorkRequest, SplitterWorkResponse>;
+        SplitterWorkRequest, absl::StatusOr<SplitterWorkResponse>>;
 
 // Records the status of workers in a concurrent setup.
 // Part of the worker response (SplitterWorkResponse) that need to be kept in
@@ -313,7 +311,7 @@ absl::Status FindBestConditionStartWorkers(
 // right specialized splitter function.
 //
 // Important: This function closes the "out" channel upon termination.
-SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
+absl::StatusOr<SplitterWorkResponse> FindBestConditionFromSplitterWorkRequest(
     const std::vector<float>& weights,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -325,7 +323,7 @@ SplitterWorkResponse FindBestConditionFromSplitterWorkRequest(
 // Following are the "FindBestCondition" specialized for specific tasks.
 // =============================================================================
 
-SplitSearchResult FindBestConditionClassification(
+absl::StatusOr<SplitSearchResult> FindBestConditionClassification(
     const dataset::VerticalDataset& train_dataset,
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
@@ -337,7 +335,7 @@ SplitSearchResult FindBestConditionClassification(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-SplitSearchResult FindBestConditionRegression(
+absl::StatusOr<SplitSearchResult> FindBestConditionRegression(
     const dataset::VerticalDataset& train_dataset,
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
@@ -349,7 +347,7 @@ SplitSearchResult FindBestConditionRegression(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-SplitSearchResult FindBestConditionRegressionHessianGain(
+absl::StatusOr<SplitSearchResult> FindBestConditionRegressionHessianGain(
     const dataset::VerticalDataset& train_dataset,
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
@@ -361,7 +359,7 @@ SplitSearchResult FindBestConditionRegressionHessianGain(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-SplitSearchResult FindBestConditionUpliftCategorical(
+absl::StatusOr<SplitSearchResult> FindBestConditionUpliftCategorical(
     const dataset::VerticalDataset& train_dataset,
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
@@ -373,7 +371,7 @@ SplitSearchResult FindBestConditionUpliftCategorical(
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, SplitterPerThreadCache* cache);
 
-SplitSearchResult FindBestConditionUpliftNumerical(
+absl::StatusOr<SplitSearchResult> FindBestConditionUpliftNumerical(
     const dataset::VerticalDataset& train_dataset,
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
@@ -395,11 +393,11 @@ SplitSearchResult FindBestConditionUpliftNumerical(
 
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
 // missing") for classification.
-SplitSearchResult FindSplitLabelClassificationFeatureNA(
+absl::StatusOr<SplitSearchResult> FindSplitLabelClassificationFeatureNA(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::AbstractColumn* attributes,
-    const std::vector<int32_t>& labels, const int32_t num_label_classes,
+    const std::vector<int32_t>& labels, int32_t num_label_classes,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
@@ -409,7 +407,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureNA(
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
 // missing") for regression.
 template <bool weighted>
-SplitSearchResult FindSplitLabelRegressionFeatureNA(
+absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureNA(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::AbstractColumn* attributes,
@@ -438,21 +436,20 @@ SplitSearchResult FindSplitLabelRegressionFeatureNA(
 // Search for the best split of the type "Attribute is NA" (i.e. "Attribute is
 // missing") for hessian regression.
 template <bool weighted>
-SplitSearchResult FindSplitLabelHessianRegressionFeatureNA(
+absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureNA(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::AbstractColumn* attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
-    const UnsignedExampleIdx min_num_obs,
-    const proto::DecisionTreeTrainingConfig& dt_config,
-    const double sum_gradient, const double sum_hessian,
-    const double sum_weights, const int32_t attribute_idx,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
+    double sum_hessian, double sum_weights, int32_t attribute_idx,
     const InternalTrainConfig& internal_config,
     const NodeConstraints& constraints, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
 // Search for the best split of the type Boolean for classification.
-SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
+absl::StatusOr<SplitSearchResult> FindSplitLabelClassificationFeatureBoolean(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<int32_t>& labels, int32_t num_label_classes,
@@ -464,7 +461,7 @@ SplitSearchResult FindSplitLabelClassificationFeatureBoolean(
 
 // Search for the best split of the type Boolean for regression.
 template <bool weighted>
-SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
+absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureBoolean(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& labels, bool na_replacement,
@@ -475,7 +472,7 @@ SplitSearchResult FindSplitLabelRegressionFeatureBoolean(
     SplitterPerThreadCache* cache);
 
 template <bool weighted>
-SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
+absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureBoolean(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
@@ -529,9 +526,10 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureBoolean(
 // valid split was found.
 //
 // `weights` may be empty and this is equivalent to unit weights.
-SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelClassificationFeatureNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<float>& weights, const absl::Span<const float> attributes,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<int32_t>& labels, int32_t num_label_classes,
     float na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -543,9 +541,10 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalCart(
 // histogram approach to find the best split.
 //
 // `weights` may be empty and this is equivalent to unit weights.
-SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelClassificationFeatureNumericalHistogram(
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<float>& weights, const absl::Span<const float> attributes,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<int32_t>& labels, int32_t num_label_classes,
     float na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -557,7 +556,8 @@ SplitSearchResult FindSplitLabelClassificationFeatureNumericalHistogram(
 // pre-discretized numerical values.
 //
 // `weights` may be empty and this is equivalent to unit weights.
-SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
@@ -575,9 +575,9 @@ SplitSearchResult FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
 // This functions works similarly as
 // "FindSplitLabelClassificationFeatureNumericalCart" for categorical labels.
 template <bool weighted>
-SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
+absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<float>& weights, const absl::Span<const float> attributes,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<float>& labels, float na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -586,9 +586,10 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalCart(
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 template <bool weighted>
-SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<float>& weights, const absl::Span<const float> attributes,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
     float na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
@@ -598,7 +599,7 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureNumericalCart(
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 template <bool weighted>
-SplitSearchResult
+absl::StatusOr<SplitSearchResult>
 FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
@@ -615,9 +616,10 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
 // Similarly to "FindSplitLabelClassificationFeatureNumericalCart", but uses an
 // histogram approach to find the best split.
 template <bool weighted>
-SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureNumericalHistogram(
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<float>& weights, const absl::Span<const float> attributes,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<float>& labels, float na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
@@ -628,7 +630,8 @@ SplitSearchResult FindSplitLabelRegressionFeatureNumericalHistogram(
 // Similar to "FindSplitLabelClassificationFeatureNumericalCart", but work on
 // pre-discretized numerical values.
 template <bool weighted>
-SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
@@ -651,7 +654,8 @@ SplitSearchResult FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
 // (i.e. the maximum value for the elements in "attributes").
 //
 // `weights` may be empty and this is equivalent to unit weights.
-SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelClassificationFeatureCategorical(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const std::vector<int32_t>& labels, int32_t num_attribute_classes,
@@ -668,22 +672,23 @@ SplitSearchResult FindSplitLabelClassificationFeatureCategorical(
 // This function works similarly as
 // "FindSplitLabelClassificationFeatureCategorical" for categorical labels.
 template <bool weighted>
-SplitSearchResult FindSplitLabelRegressionFeatureCategorical(
+absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureCategorical(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
-    const std::vector<float>& labels, const int32_t num_attribute_classes,
-    int32_t na_replacement, const UnsignedExampleIdx min_num_obs,
+    const std::vector<float>& labels, int32_t num_attribute_classes,
+    int32_t na_replacement, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
-    const int32_t attribute_idx, proto::NodeCondition* condition,
+    int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 template <bool weighted>
-SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureCategorical(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const std::vector<float>& gradients, const std::vector<float>& hessians,
-    const int32_t num_attribute_classes, int32_t na_replacement,
+    int32_t num_attribute_classes, int32_t na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
     double sum_hessian, double sum_weights, int32_t attribute_idx,
@@ -715,16 +720,16 @@ SplitSearchResult FindSplitLabelHessianRegressionFeatureCategorical(
 //    return positive_set
 //
 // `weights` may be empty and this is equivalent to unit weights.
-SplitSearchResult
+absl::StatusOr<SplitSearchResult>
 FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::CategoricalSetColumn& attributes,
-    const std::vector<int32_t>& labels, const int32_t num_attribute_classes,
-    const int32_t num_label_classes, const UnsignedExampleIdx min_num_obs,
+    const std::vector<int32_t>& labels, int32_t num_attribute_classes,
+    int32_t num_label_classes, UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
-    const int32_t attribute_idx, proto::NodeCondition* condition,
+    int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random);
 
 // Similar as the previous
@@ -732,7 +737,8 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
 // regression.
 // The "information gain" is replaced by the "variance reduction".
 template <bool weighted>
-SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights,
     const dataset::VerticalDataset::CategoricalSetColumn& attributes,
@@ -745,9 +751,10 @@ SplitSearchResult FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
 
 // Find the best possible condition for a uplift with categorical treatment,
 // a numerical feature and categorical outcome.
-SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelUpliftCategoricalFeatureNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<float>& weights, const absl::Span<const float> attributes,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
     const CategoricalUpliftLabelStats& label_stats, float na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
@@ -756,9 +763,10 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureNumericalCart(
 
 // Find the best possible condition for a uplift with categorical treatment,
 // a numerical feature and numerical outcome.
-SplitSearchResult FindSplitLabelUpliftNumericalFeatureNumericalCart(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelUpliftNumericalFeatureNumericalCart(
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<float>& weights, const absl::Span<const float> attributes,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
     const NumericalUpliftLabelStats& label_stats, float na_replacement,
     UnsignedExampleIdx min_num_obs,
     const proto::DecisionTreeTrainingConfig& dt_config, int32_t attribute_idx,
@@ -767,7 +775,8 @@ SplitSearchResult FindSplitLabelUpliftNumericalFeatureNumericalCart(
 
 // Find the best possible condition for a uplift with categorical treatment,
 // a categorical feature, and categorical outcome.
-SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelUpliftCategoricalFeatureCategorical(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const CategoricalUpliftLabelStats& label_stats, int num_attribute_classes,
@@ -778,7 +787,8 @@ SplitSearchResult FindSplitLabelUpliftCategoricalFeatureCategorical(
 
 // Find the best possible condition for a uplift with categorical treatment,
 // a categorical feature and numerical outcome.
-SplitSearchResult FindSplitLabelUpliftNumericalFeatureCategorical(
+absl::StatusOr<SplitSearchResult>
+FindSplitLabelUpliftNumericalFeatureCategorical(
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int32_t>& attributes,
     const NumericalUpliftLabelStats& label_stats, int num_attribute_classes,
@@ -821,15 +831,14 @@ void GetCandidateAttributes(
 // missing values from samples from the "examples" in "src". Columns not
 // specified by "attributes" are not copied. If, for a given attribute, all the
 // values are NA, the data is simply copied i.e. "dst" will contain na values.
-void GenerateRandomImputation(const dataset::VerticalDataset& src,
-                              const std::vector<int>& attributes,
-                              absl::Span<const UnsignedExampleIdx> examples,
-                              dataset::VerticalDataset* dst,
-                              utils::RandomEngine* random);
+absl::Status GenerateRandomImputation(
+    const dataset::VerticalDataset& src, const std::vector<int>& attributes,
+    absl::Span<const UnsignedExampleIdx> examples,
+    dataset::VerticalDataset* dst, utils::RandomEngine* random);
 
 // Random imputation on a given column. See documentation of
 // "GenerateRandomImputation".
-void GenerateRandomImputationOnColumn(
+absl::Status GenerateRandomImputationOnColumn(
     const dataset::VerticalDataset::AbstractColumn* src,
     absl::Span<const UnsignedExampleIdx> examples,
     dataset::VerticalDataset::AbstractColumn* dst, utils::RandomEngine* random);
@@ -941,11 +950,10 @@ bool MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
 
 // Create the histogram bins (i.e. candidate threshold values) for an histogram
 // based split finding on a numerical attribute.
-std::vector<float> GenHistogramBins(proto::NumericalSplit::Type type,
-                                    int num_splits,
-                                    const absl::Span<const float> attributes,
-                                    float min_value, float max_value,
-                                    utils::RandomEngine* random);
+absl::StatusOr<std::vector<float>> GenHistogramBins(
+    proto::NumericalSplit::Type type, int num_splits,
+    absl::Span<const float> attributes, float min_value, float max_value,
+    utils::RandomEngine* random);
 
 // Sets in "positive_examples" and "negative_examples" the examples from
 // "examples" that evaluate respectively positively and negatively to the
@@ -965,8 +973,6 @@ absl::StatusOr<ExampleSplitRollingBuffer> SplitExamplesInPlace(
 
 }  // namespace internal
 
-}  // namespace decision_tree
-}  // namespace model
-}  // namespace yggdrasil_decision_forests
+}  // namespace yggdrasil_decision_forests::model::decision_tree
 
 #endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_TRAINING_H_

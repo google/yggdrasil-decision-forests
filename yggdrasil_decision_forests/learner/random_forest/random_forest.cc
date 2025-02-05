@@ -812,10 +812,15 @@ RandomForestLearner::TrainWithStatusImpl(
         if (compute_oob_performances) {
           utils::concurrency::MutexLock lock(&oob_metrics_mutex);
           // Update the prediction accumulator.
-          internal::UpdateOOBPredictionsWithNewTree(
+          auto update_oob_status = internal::UpdateOOBPredictionsWithNewTree(
               train_dataset, config_with_default, selected_examples,
               rf_config.winner_take_all_inference(), *decision_tree, {},
               &random, &oob_predictions);
+          if (!update_oob_status.ok()) {
+            utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+            concurrent_fields.status.Update(update_oob_status);
+            return;
+          }
 
           // Evaluate the accumulated predictions.
           // Compute OOB if one of the condition is true:
@@ -867,11 +872,17 @@ RandomForestLearner::TrainWithStatusImpl(
                    permutation_idx <
                    rf_config.num_oob_variable_importances_permutations();
                    permutation_idx++) {
-                internal::UpdateOOBPredictionsWithNewTree(
-                    train_dataset, config_with_default, selected_examples,
-                    rf_config.winner_take_all_inference(), *decision_tree,
-                    feature_idx, &random,
-                    &oob_predictions_per_input_features[feature_idx]);
+                const auto update_oob_status =
+                    internal::UpdateOOBPredictionsWithNewTree(
+                        train_dataset, config_with_default, selected_examples,
+                        rf_config.winner_take_all_inference(), *decision_tree,
+                        feature_idx, &random,
+                        &oob_predictions_per_input_features[feature_idx]);
+                if (!update_oob_status.ok()) {
+                  utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+                  concurrent_fields.status.Update(update_oob_status);
+                  return;
+                }
               }
             }
           }
@@ -1002,7 +1013,7 @@ void InitializeOOBPredictionAccumulators(
   }
 }
 
-void UpdateOOBPredictionsWithNewTree(
+absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
@@ -1055,7 +1066,7 @@ void UpdateOOBPredictionsWithNewTree(
         AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
         break;
       case model::proto::Task::RANKING:
-        LOG(FATAL) << "OOB not implemented for Uplift.";
+        return absl::InvalidArgumentError("OOB not implemented for Uplift.");
         break;
       case model::proto::Task::CATEGORICAL_UPLIFT:
         AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
@@ -1064,6 +1075,7 @@ void UpdateOOBPredictionsWithNewTree(
         LOG(WARNING) << "Not implemented";
     }
   }
+  return absl::OkStatus();
 }
 
 absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(

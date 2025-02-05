@@ -311,46 +311,56 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
   // Find a good split in the current_projection.
   SplitSearchResult result;
   if constexpr (is_same<LabelStats, ClassificationLabelStats>::value) {
-    result = FindSplitLabelClassificationFeatureNumericalCart(
-        dense_example_idxs, selected_weights, projection_values,
-        selected_labels, label_stats.num_label_classes, na_replacement,
-        min_num_obs, dt_config, label_stats.label_distribution,
-        first_attribute_idx, effective_internal_config, condition, cache);
+    ASSIGN_OR_RETURN(
+        result,
+        FindSplitLabelClassificationFeatureNumericalCart(
+            dense_example_idxs, selected_weights, projection_values,
+            selected_labels, label_stats.num_label_classes, na_replacement,
+            min_num_obs, dt_config, label_stats.label_distribution,
+            first_attribute_idx, effective_internal_config, condition, cache));
   } else if constexpr (is_same<LabelStats,
                                RegressionHessianLabelStats>::value) {
     if (!selected_weights.empty()) {
-      result = FindSplitLabelHessianRegressionFeatureNumericalCart<
-          /*weighted=*/true>(
-          dense_example_idxs, selected_weights, projection_values,
-          selected_labels.gradient_data, selected_labels.hessian_data,
-          na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
-          label_stats.sum_hessian, label_stats.sum_weights, first_attribute_idx,
-          effective_internal_config, constraints, monotonic_direction,
-          condition, cache);
+      ASSIGN_OR_RETURN(
+          result,
+          FindSplitLabelHessianRegressionFeatureNumericalCart<
+              /*weighted=*/true>(
+              dense_example_idxs, selected_weights, projection_values,
+              selected_labels.gradient_data, selected_labels.hessian_data,
+              na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
+              label_stats.sum_hessian, label_stats.sum_weights,
+              first_attribute_idx, effective_internal_config, constraints,
+              monotonic_direction, condition, cache));
 
     } else {
-      result = FindSplitLabelHessianRegressionFeatureNumericalCart<
-          /*weighted=*/false>(
-          dense_example_idxs, selected_weights, projection_values,
-          selected_labels.gradient_data, selected_labels.hessian_data,
-          na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
-          label_stats.sum_hessian, label_stats.sum_weights, first_attribute_idx,
-          effective_internal_config, constraints, monotonic_direction,
-          condition, cache);
+      ASSIGN_OR_RETURN(
+          result,
+          FindSplitLabelHessianRegressionFeatureNumericalCart<
+              /*weighted=*/false>(
+              dense_example_idxs, selected_weights, projection_values,
+              selected_labels.gradient_data, selected_labels.hessian_data,
+              na_replacement, min_num_obs, dt_config, label_stats.sum_gradient,
+              label_stats.sum_hessian, label_stats.sum_weights,
+              first_attribute_idx, effective_internal_config, constraints,
+              monotonic_direction, condition, cache));
     }
   } else if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
     if (!selected_weights.empty()) {
-      result = FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
-          dense_example_idxs, selected_weights, projection_values,
-          selected_labels, na_replacement, min_num_obs, dt_config,
-          label_stats.label_distribution, first_attribute_idx,
-          effective_internal_config, condition, cache);
+      ASSIGN_OR_RETURN(
+          result,
+          FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
+              dense_example_idxs, selected_weights, projection_values,
+              selected_labels, na_replacement, min_num_obs, dt_config,
+              label_stats.label_distribution, first_attribute_idx,
+              effective_internal_config, condition, cache));
     } else {
-      result = FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
-          dense_example_idxs, selected_weights, projection_values,
-          selected_labels, na_replacement, min_num_obs, dt_config,
-          label_stats.label_distribution, first_attribute_idx,
-          effective_internal_config, condition, cache);
+      ASSIGN_OR_RETURN(
+          result,
+          FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
+              dense_example_idxs, selected_weights, projection_values,
+              selected_labels, na_replacement, min_num_obs, dt_config,
+              label_stats.label_distribution, first_attribute_idx,
+              effective_internal_config, condition, cache));
     }
   } else {
     static_assert(!is_same<LabelStats, LabelStats>::value, "Not implemented.");

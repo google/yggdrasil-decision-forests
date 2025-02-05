@@ -447,7 +447,7 @@ bool DoSortedRangesIntersect(Iter1 begin1, Iter1 end1, Iter2 begin2,
 }
 
 // Extracts the list of positive elements from a "contains" type conditions.
-std::vector<int32_t> ExactElementsFromContainsCondition(
+absl::StatusOr<std::vector<int32_t>> ExactElementsFromContainsCondition(
     int vocab_size, const proto::Condition& condition);
 
 // Computes the pairwise distance between examples in "dataset1" and

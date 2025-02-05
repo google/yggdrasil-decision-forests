@@ -774,7 +774,7 @@ std::string EvaluationSnippet(
       return absl::Substitute("qini:$0 auuc:$1", metric::Qini(evaluation),
                               metric::AUUC(evaluation));
     default:
-      LOG(FATAL) << "Not implemented";
+      return "No evaluation for this task";
   }
 }
 

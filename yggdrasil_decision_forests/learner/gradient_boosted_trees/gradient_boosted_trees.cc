@@ -1489,6 +1489,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
         internal_config.vector_sequence_computer =
             vector_sequence_computer.get();
       }
+
       RETURN_IF_ERROR(decision_tree::Train(
           gradient_sub_train_dataset, selected_examples,
           gradients[grad_idx].config, gradients[grad_idx].config_link,
