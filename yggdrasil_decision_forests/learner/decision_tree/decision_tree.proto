@@ -461,6 +461,10 @@ message DecisionTreeTrainingConfig {
     // current algorithm used to create monotonic constraints, this checking
     // algorithm cannot create false positives.
     optional bool check_monotonic_constraints = 23 [default = false];
+
+    // If true, the splitter returns an InvalidArgumentError. This field can be
+    // used to check the propagation of error to the user.
+    optional bool generate_fake_error_in_splitter = 24 [default = false];
   }
 
   // Deprecated tag numbers.

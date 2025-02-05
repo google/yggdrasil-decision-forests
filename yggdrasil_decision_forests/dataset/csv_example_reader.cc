@@ -111,7 +111,8 @@ absl::Status UpdateDataSpecWithCsvExample(
   for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
     proto::Column* col = data_spec->mutable_columns(col_idx);
     if (col->is_unstacked()) {
-      LOG(FATAL) << "Unstacked numerical features not supported for csv files";
+      return absl::InvalidArgumentError(
+          "Unstacked numerical features not supported for csv files");
     }
     auto* col_acc = accumulator->mutable_columns(col_idx);
     // Skip NAs

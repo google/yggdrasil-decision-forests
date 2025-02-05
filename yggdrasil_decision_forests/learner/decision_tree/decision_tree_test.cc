@@ -169,7 +169,8 @@ TEST(DecisionTree, FindBestNumericalSplitCartBase) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 1.5f);
@@ -182,14 +183,16 @@ TEST(DecisionTree, FindBestNumericalSplitCartBase) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kNoBetterSplitFound);
 
   attributes = {1, 1, 1, 1, 1, 1};
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
 }
 
@@ -223,7 +226,8 @@ TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalHistogram(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &random, &best_condition),
+                label_distribution, -1, &random, &best_condition)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(),
@@ -238,7 +242,8 @@ TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalHistogram(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &random, &best_condition),
+                label_distribution, -1, &random, &best_condition)
+                .value(),
             SplitSearchResult::kNoBetterSplitFound);
 
   attributes = {1, 1, 1, 1, 1, 1};
@@ -246,7 +251,8 @@ TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalHistogram(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &random, &best_condition),
+                label_distribution, -1, &random, &best_condition)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
 }
 
@@ -273,7 +279,8 @@ TEST(DecisionTree, FindBestNumericalSplitCartWeighted) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 1.5f);
@@ -310,7 +317,8 @@ TEST(DecisionTree, FindBestNumericalSplitCartVeryClose) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), b);
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 2);
@@ -351,7 +359,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -371,7 +380,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kNoBetterSplitFound);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
@@ -382,7 +392,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseBasic) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kInvalidAttribute);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
@@ -418,7 +429,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -439,7 +451,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kNoBetterSplitFound);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
@@ -450,7 +463,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseWithWeights) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kInvalidAttribute);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
@@ -500,7 +514,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBaseAdvances) {
                     selected_examples, weights, attributes, labels,
                     num_attribute_classes, num_label_classes, na_replacement,
                     min_num_obs, dt_config, label_distribution, -1, &rnd,
-                    &best_condition, &cache),
+                    &best_condition, &cache)
+                    .value(),
                 SplitSearchResult::kBetterSplitFound);
       LOG(INFO) << "num_label_classes:" << num_label_classes
                 << " num_attribute_classes:" << num_attribute_classes;
@@ -559,7 +574,8 @@ TEST(DecisionTree, FindBestCategoricalSplitRandom) {
                   selected_examples, weights, attributes, labels,
                   num_attribute_classes, num_label_classes, na_replacement,
                   min_num_obs, {}, label_distribution, -1, &rnd,
-                  &cart_condition, &cache),
+                  &cart_condition, &cache)
+                  .value(),
               SplitSearchResult::kBetterSplitFound);
 
     proto::NodeCondition random_condition;
@@ -567,7 +583,8 @@ TEST(DecisionTree, FindBestCategoricalSplitRandom) {
                   selected_examples, weights, attributes, labels,
                   num_attribute_classes, num_label_classes, na_replacement,
                   min_num_obs, random_dt_config, label_distribution, -1, &rnd,
-                  &random_condition, &cache),
+                  &random_condition, &cache)
+                  .value(),
               SplitSearchResult::kBetterSplitFound);
 
     EXPECT_LE(random_condition.split_score(), cart_condition.split_score());
@@ -742,7 +759,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNA(
                 selected_examples, weights, &attributes, labels,
                 num_label_classes, min_num_obs, dt_config, label_distribution,
-                -1, &best_condition, &cache),
+                -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -757,7 +775,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartIsNaForClassification) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNA(
                 selected_examples, weights, &attributes, labels,
                 num_label_classes, min_num_obs, dt_config, label_distribution,
-                -1, &best_condition, &cache),
+                -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kNoBetterSplitFound);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
@@ -812,7 +831,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartIsNaForRegression) {
   SplitterPerThreadCache cache;
   EXPECT_EQ(FindSplitLabelRegressionFeatureNA<TestFixture::kWeighted>(
                 selected_examples, weights, &attributes, labels, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &cache),
+                dt_config, label_distribution, -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -828,7 +848,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartIsNaForRegression) {
     // rounding.
     EXPECT_EQ(FindSplitLabelRegressionFeatureNA<TestFixture::kWeighted>(
                   selected_examples, weights, &attributes, labels, min_num_obs,
-                  dt_config, label_distribution, -1, &best_condition, &cache),
+                  dt_config, label_distribution, -1, &best_condition, &cache)
+                  .value(),
               SplitSearchResult::kBetterSplitFound);
   } else {
     EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
@@ -838,7 +859,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartIsNaForRegression) {
     EXPECT_NEAR(best_condition.split_score(), 0.125, 0.01);
     EXPECT_EQ(FindSplitLabelRegressionFeatureNA<TestFixture::kWeighted>(
                   selected_examples, weights, &attributes, labels, min_num_obs,
-                  dt_config, label_distribution, -1, &best_condition, &cache),
+                  dt_config, label_distribution, -1, &best_condition, &cache)
+                  .value(),
               SplitSearchResult::kNoBetterSplitFound);
   }
 
@@ -885,7 +907,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
       FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, -1, &random,
-          &best_condition),
+          &best_condition)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(),
@@ -906,7 +929,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
       FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, -1, &random,
-          &best_condition),
+          &best_condition)
+          .value(),
       SplitSearchResult::kNoBetterSplitFound);
 
   attributes = {1, 1, 1, 1, 1, 1};
@@ -915,7 +939,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
       FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, -1, &random,
-          &best_condition),
+          &best_condition)
+          .value(),
       SplitSearchResult::kInvalidAttribute);
 }
 
@@ -948,7 +973,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitCartNumericalLabelBase) {
       FindSplitLabelRegressionFeatureNumericalCart<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, -1, {}, &best_condition,
-          &cache),
+          &cache)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 1.5f);
@@ -972,7 +998,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitCartNumericalLabelBase) {
       FindSplitLabelRegressionFeatureNumericalCart<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, -1, {}, &best_condition,
-          &cache),
+          &cache)
+          .value(),
       SplitSearchResult::kNoBetterSplitFound);
 
   attributes = {1, 1, 1, 1, 1, 1};
@@ -980,7 +1007,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitCartNumericalLabelBase) {
       FindSplitLabelRegressionFeatureNumericalCart<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, -1, {}, &best_condition,
-          &cache),
+          &cache)
+          .value(),
       SplitSearchResult::kInvalidAttribute);
 }
 
@@ -1071,7 +1099,8 @@ TYPED_TEST(FindBestSplitWithDuplicatesTest,
       FindSplitLabelRegressionFeatureNumericalCart<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, 0, internal_config,
-          &best_condition, &cache),
+          &best_condition, &cache)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 1.5f);
@@ -1095,7 +1124,8 @@ TYPED_TEST(FindBestSplitWithDuplicatesTest,
       FindSplitLabelRegressionFeatureNumericalCart<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, 0, internal_config,
-          &best_condition, &cache),
+          &best_condition, &cache)
+          .value(),
       SplitSearchResult::kNoBetterSplitFound);
 }
 
@@ -1157,7 +1187,8 @@ TYPED_TEST(FindBestSplitTest,
       FindSplitLabelRegressionFeatureNumericalCart<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
           min_num_obs, dt_config, label_distribution, 0, internal_config,
-          &best_condition, &cache),
+          &best_condition, &cache)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   LOG(INFO) << "Condition: " << best_condition.condition().DebugString();
@@ -1207,7 +1238,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
   EXPECT_EQ(FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
                 selected_examples, weights, attributes, labels,
                 num_attribute_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache, &rnd),
+                label_distribution, -1, &best_condition, &cache, &rnd)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1230,7 +1262,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
         FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
             selected_examples, weights, attributes, labels,
             num_attribute_classes, na_replacement, min_num_obs, dt_config,
-            label_distribution, -1, &best_condition, &cache, &rnd),
+            label_distribution, -1, &best_condition, &cache, &rnd)
+            .value(),
         SplitSearchResult::kBetterSplitFound);
   } else {
     EXPECT_EQ(best_condition.num_training_examples_with_weight(), 6);
@@ -1243,7 +1276,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
         FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
             selected_examples, weights, attributes, labels,
             num_attribute_classes, na_replacement, min_num_obs, dt_config,
-            label_distribution, -1, &best_condition, &cache, &rnd),
+            label_distribution, -1, &best_condition, &cache, &rnd)
+            .value(),
         SplitSearchResult::kNoBetterSplitFound);
   }
 
@@ -1255,7 +1289,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSplitCartNumericalLabels) {
   EXPECT_EQ(FindSplitLabelRegressionFeatureCategorical<TestFixture::kWeighted>(
                 selected_examples, weights, attributes, labels,
                 num_attribute_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache, &rnd),
+                label_distribution, -1, &best_condition, &cache, &rnd)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
@@ -1285,7 +1320,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureBoolean(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, false, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache),
+                label_distribution, -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1300,7 +1336,8 @@ TEST(DecisionTree, FindBestCategoricalSplitCartBooleanForClassification) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureBoolean(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, false, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache),
+                label_distribution, -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kNoBetterSplitFound);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
@@ -1338,7 +1375,8 @@ TYPED_TEST(FindBestSplitTest,
   EXPECT_EQ(
       FindSplitLabelRegressionFeatureBoolean<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, false, min_num_obs,
-          dt_config, label_distribution, -1, &best_condition, &cache),
+          dt_config, label_distribution, -1, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1361,7 +1399,8 @@ TYPED_TEST(FindBestSplitTest,
   EXPECT_EQ(
       FindSplitLabelRegressionFeatureBoolean<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, false, min_num_obs,
-          dt_config, label_distribution, -1, &best_condition, &cache),
+          dt_config, label_distribution, -1, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kNoBetterSplitFound);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
@@ -1396,7 +1435,8 @@ TEST(DecisionTree, LocalImputationForNumericalAttribute) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   // > mean(c(1, 1.5)) = 1.25
@@ -1410,14 +1450,16 @@ TEST(DecisionTree, LocalImputationForNumericalAttribute) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kNoBetterSplitFound);
 
   attributes = {1, 1, 1, 1, 1, 1};
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalCart(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, {}, &best_condition, &cache),
+                label_distribution, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
 }
 
@@ -1455,7 +1497,8 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1476,7 +1519,8 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kNoBetterSplitFound);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
@@ -1486,7 +1530,8 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kInvalidAttribute);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 
@@ -1496,7 +1541,8 @@ TEST(DecisionTree, LocalImputationForCategoricalAttribute) {
       FindSplitLabelClassificationFeatureCategorical(
           selected_examples, weights, attributes, labels, num_attribute_classes,
           num_label_classes, na_replacement, min_num_obs, dt_config,
-          label_distribution, -1, &rnd, &best_condition, &cache),
+          label_distribution, -1, &rnd, &best_condition, &cache)
+          .value(),
       SplitSearchResult::kInvalidAttribute);
   LOG(INFO) << "Condition:\n" << best_condition.DebugString();
 }
@@ -1529,7 +1575,8 @@ TEST(DecisionTree, LocalImputationForBooleanAttribute) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureBoolean(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache),
+                label_distribution, -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1543,14 +1590,16 @@ TEST(DecisionTree, LocalImputationForBooleanAttribute) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureBoolean(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache),
+                label_distribution, -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kNoBetterSplitFound);
 
   attributes = {1, 1, 1, 1, 1, 1};
   EXPECT_EQ(FindSplitLabelClassificationFeatureBoolean(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition, &cache),
+                label_distribution, -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
 
   // Test majority positive case.
@@ -1560,7 +1609,8 @@ TEST(DecisionTree, LocalImputationForBooleanAttribute) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureBoolean(
                 selected_examples, weights, attributes, labels,
                 num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &best_condition_pos_na, &cache_pos_na),
+                label_distribution, -1, &best_condition_pos_na, &cache_pos_na)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition_pos_na.condition().type_case(),
@@ -1630,7 +1680,8 @@ TEST(DecisionTree, GenerateRandomImputation) {
 
   utils::RandomEngine rnd(1324);
   dataset::VerticalDataset imputed;
-  GenerateRandomImputation(dataset, {0, 1, 2, 3}, {0, 1, 2}, &imputed, &rnd);
+  EXPECT_OK(GenerateRandomImputation(dataset, {0, 1, 2, 3}, {0, 1, 2}, &imputed,
+                                     &rnd));
 
   EXPECT_EQ(dataset.nrow(), 4);
   EXPECT_EQ(imputed.nrow(), 3);
@@ -1725,19 +1776,22 @@ TEST(DecisionTree,
   EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
                 selected, weights, attributes_bad, labels,
                 num_attribute_classes, num_label_classes, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &rnd),
+                dt_config, label_distribution, -1, &best_condition, &rnd)
+                .value(),
             SplitSearchResult::kNoBetterSplitFound);
 
   EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
                 selected, weights, attributes_non_valid, labels,
                 num_attribute_classes, num_label_classes, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &rnd),
+                dt_config, label_distribution, -1, &best_condition, &rnd)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
 
   EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
                 selected, weights, attributes_perfect, labels,
                 num_attribute_classes, num_label_classes, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &rnd),
+                dt_config, label_distribution, -1, &best_condition, &rnd)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1793,7 +1847,8 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
                 selected, weights, attributes, labels, num_attribute_classes,
                 num_label_classes, min_num_obs, dt_config, label_distribution,
-                -1, &best_condition, &rnd),
+                -1, &best_condition, &rnd)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1888,14 +1943,16 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
                 TestFixture::kWeighted>(
                 selected, weights, attributes_non_valid, labels_v1,
                 num_attribute_classes, min_num_obs, dt_config,
-                label_distribution_v1, -1, &best_condition, &rnd),
+                label_distribution_v1, -1, &best_condition, &rnd)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
 
   EXPECT_EQ(FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<
                 TestFixture::kWeighted>(
                 selected, weights, attributes_perfect, labels_v1,
                 num_attribute_classes, min_num_obs, dt_config,
-                label_distribution_v1, -1, &best_condition, &rnd),
+                label_distribution_v1, -1, &best_condition, &rnd)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
@@ -1927,7 +1984,8 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
                 TestFixture::kWeighted>(
                 selected, weights, attributes_perfect, labels_v2,
                 num_attribute_classes, min_num_obs, dt_config,
-                label_distribution_v2, -1, &best_condition_v2, &rnd),
+                label_distribution_v2, -1, &best_condition_v2, &rnd)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition_v2.condition().type_case(),
@@ -2030,12 +2088,16 @@ TEST(DecisionTree, GenHistogramBins) {
   const int num_bins = 1000;
 
   utils::RandomEngine random;
-  const auto bins_random = internal::GenHistogramBins(
-      proto::NumericalSplit::HISTOGRAM_RANDOM, num_bins, attributes, min_value,
-      max_value, &random);
-  const auto bins_equal_width = internal::GenHistogramBins(
-      proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH, num_bins, attributes,
-      min_value, max_value, &random);
+  const auto bins_random =
+      internal::GenHistogramBins(proto::NumericalSplit::HISTOGRAM_RANDOM,
+                                 num_bins, attributes, min_value, max_value,
+                                 &random)
+          .value();
+  const auto bins_equal_width =
+      internal::GenHistogramBins(proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH,
+                                 num_bins, attributes, min_value, max_value,
+                                 &random)
+          .value();
 
   for (const auto& bins : {
            bins_random,
@@ -2370,7 +2432,8 @@ TEST(DecisionTree, FindBestNumericalDiscretizedSplitCartBase) {
   EXPECT_EQ(FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
                 selected_examples, weights, attributes, num_binds, labels,
                 num_label_classes, /*na_replacement=*/0, /*min_num_obs=*/1,
-                dt_config, label_distribution, -1, &best_condition, &cache),
+                dt_config, label_distribution, -1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   // The equivalent threshold values are in [2,4]. We take the center.
@@ -2535,7 +2598,8 @@ TEST(DecisionTree, FindBestSplitNumericalFeatureTaskCategoricalUplift) {
   EXPECT_EQ(FindSplitLabelUpliftCategoricalFeatureNumericalCart(
                 selected_examples, weights, attributes, label_stats,
                 /*na_replacement=*/2.5,
-                /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache),
+                /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 4.5f);
@@ -2593,7 +2657,8 @@ TEST(DecisionTree, FindBestSplitCategoricalFeatureTaskCategoricalUplift) {
                 num_attribute_classes,
                 /*na_replacement=*/0,
                 /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache,
-                &random),
+                &random)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
@@ -2655,7 +2720,8 @@ TEST(DecisionTree,
                 num_attribute_classes,
                 /*na_replacement=*/0,
                 /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache,
-                &random),
+                &random)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
@@ -2708,12 +2774,12 @@ TEST(DecisionTree, MinNumExamplePerTreatment) {
 
     proto::NodeCondition best_condition;
     SplitterPerThreadCache cache;
-    EXPECT_EQ(
-        FindSplitLabelUpliftCategoricalFeatureNumericalCart(
-            selected_examples, weights, attributes, label_stats,
-            /*na_replacement=*/2.5,
-            /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache),
-        SplitSearchResult::kBetterSplitFound);
+    EXPECT_EQ(FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+                  selected_examples, weights, attributes, label_stats,
+                  /*na_replacement=*/2.5,
+                  /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kBetterSplitFound);
   }
 
   // With constraints, no split is found.
@@ -2722,12 +2788,12 @@ TEST(DecisionTree, MinNumExamplePerTreatment) {
 
     proto::NodeCondition best_condition;
     SplitterPerThreadCache cache;
-    EXPECT_EQ(
-        FindSplitLabelUpliftCategoricalFeatureNumericalCart(
-            selected_examples, weights, attributes, label_stats,
-            /*na_replacement=*/2.5,
-            /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache),
-        SplitSearchResult::kNoBetterSplitFound);
+    EXPECT_EQ(FindSplitLabelUpliftCategoricalFeatureNumericalCart(
+                  selected_examples, weights, attributes, label_stats,
+                  /*na_replacement=*/2.5,
+                  /*min_num_obs=*/1, dt_config, -1, {}, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kNoBetterSplitFound);
   }
 }
 
@@ -2752,7 +2818,8 @@ TEST(Monotonic, FindSplitLabelHessianRegressionFeatureNumericalCart) {
   EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
                 selected_examples, weights, attributes, gradients, hessians, 2,
                 1, dt_config, sum_gradient, sum_hessian, sum_weights, -1, {},
-                {}, 0, &best_condition, &cache),
+                {}, 0, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 2.5f);
@@ -2788,7 +2855,8 @@ TEST(Monotonic,
   EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
                 selected_examples, weights, attributes, gradients, hessians, 2,
                 1, dt_config, sum_gradient, sum_hessian, sum_weights, -1, {},
-                constraints, 0, &best_condition, &cache),
+                constraints, 0, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 2.5f);
@@ -2823,7 +2891,8 @@ TEST(
   EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
                 selected_examples, weights, attributes, gradients, hessians, 2,
                 1, dt_config, sum_gradient, sum_hessian, sum_weights, -1, {},
-                {}, 1, &best_condition, &cache),
+                {}, 1, &best_condition, &cache)
+                .value(),
             SplitSearchResult::kInvalidAttribute);
 }
 

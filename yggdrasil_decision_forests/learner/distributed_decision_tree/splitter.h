@@ -510,12 +510,12 @@ absl::Status ComputeSplitLabelStatisticsFromCategoricalSplit(
     const typename LabelFiller::AccumulatorInitializer& initializer,
     const ExampleBucketSet& example_bucket_set, Split* split) {
   // Compute the label statistics in the child nodes.
-  const auto positive_values =
-      decision_tree::ExactElementsFromContainsCondition(
-          common.dataspec.columns(feature)
-              .categorical()
-              .number_of_unique_values(),
-          split->condition.condition());
+  ASSIGN_OR_RETURN(const auto positive_values,
+                   decision_tree::ExactElementsFromContainsCondition(
+                       common.dataspec.columns(feature)
+                           .categorical()
+                           .number_of_unique_values(),
+                       split->condition.condition()));
 
   // The positive split contains the examples containing the selected
   // items.

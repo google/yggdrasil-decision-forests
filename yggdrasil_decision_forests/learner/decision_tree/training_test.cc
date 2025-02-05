@@ -711,9 +711,12 @@ TEST(VectorSequenceCondition, Classification) {
   proto::NodeCondition condition;
   SplitterPerThreadCache cache;
   utils::RandomEngine random;
-  const auto found_condition = FindBestConditionClassification(
-      dataset, selected_examples, weights, config, config_link, dt_config,
-      parent, internal_config, label_stats, 1, {}, &condition, &random, &cache);
+  const auto found_condition =
+      FindBestConditionClassification(dataset, selected_examples, weights,
+                                      config, config_link, dt_config, parent,
+                                      internal_config, label_stats, 1, {},
+                                      &condition, &random, &cache)
+          .value();
 
   LOG(INFO) << "condition:\n" << condition.DebugString();
   const proto::NodeCondition expected_condition = PARSE_TEST_PROTO(R"pb(

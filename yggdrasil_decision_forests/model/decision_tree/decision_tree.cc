@@ -85,7 +85,7 @@ void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
                             std::string* description) {
   switch (node.output_case()) {
     case proto::Node::OUTPUT_NOT_SET:
-      LOG(FATAL) << "Not supported";
+      absl::StrAppend(description, "OUTPUT_NOT_SET");
       break;
 
     case proto::Node::OutputCase::kClassifier: {
@@ -296,12 +296,13 @@ VariableImportanceMapToSortedVector(
   return importance_vec;
 }
 
-std::vector<int32_t> ExactElementsFromContainsCondition(
+absl::StatusOr<std::vector<int32_t>> ExactElementsFromContainsCondition(
     int vocab_size, const proto::Condition& condition) {
   switch (condition.type_case()) {
     case proto::Condition::TypeCase::kContainsCondition:
-      return {condition.contains_condition().elements().begin(),
-              condition.contains_condition().elements().end()};
+      return std::vector<int32_t>{
+          condition.contains_condition().elements().begin(),
+          condition.contains_condition().elements().end()};
 
     case proto::Condition::TypeCase::kContainsBitmapCondition: {
       const std::string& bitmap =
@@ -315,7 +316,7 @@ std::vector<int32_t> ExactElementsFromContainsCondition(
       return elements;
     }
     default:
-      LOG(FATAL) << "Not a \"contains\" type condition";
+      return absl::InvalidArgumentError("Not a \"contains\" type condition");
   }
 }
 
@@ -358,12 +359,18 @@ void AppendConditionDescription(
       const auto num_possible_values = data_spec.columns(node.attribute())
                                            .categorical()
                                            .number_of_unique_values();
-      const auto elements = ExactElementsFromContainsCondition(
+      const auto elements_or = ExactElementsFromContainsCondition(
           num_possible_values, node.condition());
-      absl::StrAppend(description, " is in [BITMAP] {",
-                      dataset::CategoricalIdxsToRepresentation(
-                          data_spec.columns(node.attribute()), elements, 10),
-                      "}");
+
+      if (!elements_or.ok()) {
+        absl::StrAppend(description, " is in [BITMAP] {INVALID_ELEMENTS}");
+      } else {
+        absl::StrAppend(
+            description, " is in [BITMAP] {",
+            dataset::CategoricalIdxsToRepresentation(
+                data_spec.columns(node.attribute()), *elements_or, 10),
+            "}");
+      }
       break;
     }
     case proto::Condition::kDiscretizedHigherCondition:
@@ -1243,8 +1250,8 @@ absl::StatusOr<bool> EvalConditionFromColumn(
                 categorical_column->values()[example_idx].second);
 
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Cannot evaluate condition on column ", condition.attribute()));
       }
     }
 
@@ -1275,8 +1282,8 @@ absl::StatusOr<bool> EvalConditionFromColumn(
         }
         return false;
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Cannot evaluate condition on column ", condition.attribute()));
       }
     }
 
@@ -1342,12 +1349,12 @@ absl::StatusOr<bool> EvalConditionFromColumn(
           return false;
         } break;
         case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
-          LOG(FATAL) << "Non implemented";
+          return absl::InvalidArgumentError("Non implemented");
       }
     } break;
 
     default:
-      LOG(FATAL) << "Non implemented";
+      return absl::InvalidArgumentError("Non implemented");
   }
   return false;
 }
@@ -1425,8 +1432,8 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
             attribute.categorical_set().values().end());
 
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Cannot evaluate condition on column ", condition.attribute()));
       }
     }
 
@@ -1446,8 +1453,8 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
         }
         return false;
       } else {
-        LOG(FATAL) << "Cannot evaluate condition on column "
-                   << condition.attribute();
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Cannot evaluate condition on column ", condition.attribute()));
       }
     }
 
@@ -1510,7 +1517,7 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
     } break;
 
     default:
-      LOG(FATAL) << "Non implemented";
+      return absl::InvalidArgumentError("Non implemented");
   }
   return false;
 }

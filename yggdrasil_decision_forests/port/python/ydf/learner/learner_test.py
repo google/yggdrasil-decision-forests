@@ -23,6 +23,7 @@ from absl import logging
 from absl.testing import absltest
 from absl.testing import parameterized
 import fastavro
+from google.protobuf import text_format
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
@@ -31,6 +32,8 @@ from sklearn import metrics
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
+from yggdrasil_decision_forests.learner import abstract_learner_pb2
+from yggdrasil_decision_forests.learner.gradient_boosted_trees import gradient_boosted_trees_pb2 as _
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.dataset import dataspec
 from ydf.learner import generic_learner
@@ -1522,6 +1525,29 @@ class GradientBoostedTreesLearnerTest(LearnerTest):
         num_trees=10,
     ).train(self.adult.train_pd)
     _ = model.analyze(self.adult.test_pd, sampling=0.1)
+
+  def test_propagate_error(self):
+    extra_training_config = text_format.Parse(
+        """
+[yggdrasil_decision_forests.model.gradient_boosted_trees.proto.gradient_boosted_trees_config] {
+  decision_tree {
+    internal {
+        generate_fake_error_in_splitter: true
+    }
+  }
+}
+""",
+        abstract_learner_pb2.TrainingConfig(),
+    )
+    logging.info("extra_training_config: %s", extra_training_config)
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="l", extra_training_config=extra_training_config
+    )
+    with self.assertRaisesRegex(RuntimeError, "Fake error"):
+      learner.train(
+          {"l": np.array([0, 1, 0, 1] * 100), "f": np.array([1, 2, 3, 4] * 100)}
+      )
 
 
 class LoggingTest(parameterized.TestCase):
