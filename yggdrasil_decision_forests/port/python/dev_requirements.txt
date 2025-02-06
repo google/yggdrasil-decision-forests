@@ -18,3 +18,4 @@ grain; platform_machine != 'aarch64' and platform_system == 'Linux' and python_v
 fastavro
 polars
 flax; platform_machine != 'aarch64' and platform_system != 'Windows'
+tqdm
