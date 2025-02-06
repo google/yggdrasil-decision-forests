@@ -807,7 +807,10 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamUpliftMinExamplesInTreatment,
       decision_tree::kHParamHonest,
       decision_tree::kHParamHonestRatioLeafExamples,
-      decision_tree::kHParamHonestFixedSeparation};
+      decision_tree::kHParamHonestFixedSeparation,
+      decision_tree::kHParamNumericalVectorSequenceNumExamples,
+      decision_tree::kHParamNumericalVectorSequenceNumRandomAnchors,
+  };
 
   ASSIGN_OR_RETURN(auto hparam_def,
                    AbstractLearner::GetGenericHyperParameterSpecification());

@@ -998,7 +998,9 @@ class RandomForestLearnerTest(LearnerTest):
     train_ds = make_ds()
     test_ds = make_ds()
     model = specialized_learners.RandomForestLearner(
-        label="label", num_trees=50
+        label="label",
+        num_trees=50,
+        numerical_vector_sequence_num_examples=2000,
     ).train(train_ds)
     evaluation = model.evaluate(test_ds)
     logging.info("Evaluation: %s", evaluation)

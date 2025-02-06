@@ -294,6 +294,16 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
     num_trees: Number of individual decision trees. Increasing the number of
       trees can increase the quality of the model at the expense of size,
       training speed, and inference latency. Default: 300.
+    numerical_vector_sequence_num_examples: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). Maximum number of examples to use to find splits. A larger value
+      can improve the model quality but takes longer to train.
+      Default: 1000.
+    numerical_vector_sequence_num_random_anchors: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). The number of randomly generated anchor values. A larger value
+      can improve the model quality but takes longer to train.
+      Default: 100.
     pure_serving_model: Clear the model from any information that is not
       required for model serving. This includes debugging, model interpretation
       and other meta-data. The size of the serialized model can be reduced
@@ -484,6 +494,8 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       num_candidate_attributes_ratio: Optional[float] = None,
       num_oob_variable_importances_permutations: int = 1,
       num_trees: int = 300,
+      numerical_vector_sequence_num_examples: int = 1000,
+      numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
       random_seed: int = 123456,
       sampling_with_replacement: bool = True,
@@ -552,6 +564,12 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             num_oob_variable_importances_permutations
         ),
         "num_trees": num_trees,
+        "numerical_vector_sequence_num_examples": (
+            numerical_vector_sequence_num_examples
+        ),
+        "numerical_vector_sequence_num_random_anchors": (
+            numerical_vector_sequence_num_random_anchors
+        ),
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
         "sampling_with_replacement": sampling_with_replacement,
@@ -1413,6 +1431,16 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       the `num_candidate_attributes` is used. Default: None.
     num_trees: Maximum number of decision trees. The effective number of trained
       tree can be smaller if early stopping is enabled. Default: 300.
+    numerical_vector_sequence_num_examples: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). Maximum number of examples to use to find splits. A larger value
+      can improve the model quality but takes longer to train.
+      Default: 1000.
+    numerical_vector_sequence_num_random_anchors: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). The number of randomly generated anchor values. A larger value
+      can improve the model quality but takes longer to train.
+      Default: 100.
     pure_serving_model: Clear the model from any information that is not
       required for model serving. This includes debugging, model interpretation
       and other meta-data. The size of the serialized model can be reduced
@@ -1658,6 +1686,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
       num_trees: int = 300,
+      numerical_vector_sequence_num_examples: int = 1000,
+      numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
       random_seed: int = 123456,
       sampling_method: str = "RANDOM",
@@ -1749,6 +1779,12 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
         "num_trees": num_trees,
+        "numerical_vector_sequence_num_examples": (
+            numerical_vector_sequence_num_examples
+        ),
+        "numerical_vector_sequence_num_random_anchors": (
+            numerical_vector_sequence_num_random_anchors
+        ),
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
         "sampling_method": sampling_method,
@@ -2513,6 +2549,16 @@ class CartLearner(generic_learner.GenericCCLearner):
       number_of_input_features x num_candidate_attributes_ratio`. The possible
       values are between ]0, and 1] as well as -1. If not set or equal to -1,
       the `num_candidate_attributes` is used. Default: None.
+    numerical_vector_sequence_num_examples: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). Maximum number of examples to use to find splits. A larger value
+      can improve the model quality but takes longer to train.
+      Default: 1000.
+    numerical_vector_sequence_num_random_anchors: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). The number of randomly generated anchor values. A larger value
+      can improve the model quality but takes longer to train.
+      Default: 100.
     pure_serving_model: Clear the model from any information that is not
       required for model serving. This includes debugging, model interpretation
       and other meta-data. The size of the serialized model can be reduced
@@ -2689,6 +2735,8 @@ class CartLearner(generic_learner.GenericCCLearner):
       missing_value_policy: str = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
+      numerical_vector_sequence_num_examples: int = 1000,
+      numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
       random_seed: int = 123456,
       sorting_strategy: str = "IN_NODE",
@@ -2745,6 +2793,12 @@ class CartLearner(generic_learner.GenericCCLearner):
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
+        "numerical_vector_sequence_num_examples": (
+            numerical_vector_sequence_num_examples
+        ),
+        "numerical_vector_sequence_num_random_anchors": (
+            numerical_vector_sequence_num_random_anchors
+        ),
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
         "sorting_strategy": sorting_strategy,
