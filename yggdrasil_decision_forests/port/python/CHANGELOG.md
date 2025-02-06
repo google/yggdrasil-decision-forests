@@ -7,10 +7,12 @@
 -   Expose `model.save(..., pure_serving=True)` for saving a model without debug
     information.
 -   Allow users to provide a training proto configuration to the learner.
+-   Add `ydf.help.loading_data()` to print information about the type of
+    supported dataset formats.
 
 ### Fix
 
--   Fix recognition of multidimensional features for Numpy arrays of type 
+-   Fix recognition of multidimensional features for Numpy arrays of type
     object.
 
 ## 0.9.0 - 2024-12-02

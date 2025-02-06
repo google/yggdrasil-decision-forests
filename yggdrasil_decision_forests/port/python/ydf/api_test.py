@@ -349,6 +349,9 @@ class ApiTest(absltest.TestCase):
     logging.info(model)
     self.assertEqual(model.num_trees(), 10)
 
+  def test_help(self):
+    ydf.help.loading_data()
+
 
 if __name__ == "__main__":
   absltest.main()

@@ -15,6 +15,7 @@ py_library(
         ":version",
         ":ydf_protos",
         "//ydf/api:experimental",
+        "//ydf/api:help",
         "//ydf/api:internal",
         "//ydf/api:util",
         "//ydf/dataset",

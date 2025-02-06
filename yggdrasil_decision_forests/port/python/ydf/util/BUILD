@@ -38,6 +38,12 @@ py_library(
     ],
 )
 
+py_library(
+    name = "help",
+    srcs = ["help.py"],
+    deps = [],
+)
+
 # Tests
 # =====
 
