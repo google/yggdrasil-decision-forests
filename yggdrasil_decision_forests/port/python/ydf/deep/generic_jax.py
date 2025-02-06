@@ -192,7 +192,7 @@ class GenericJAXModel(generic_model.GenericModel):
                     num_classes
                 )
             ],
-            activation_fn=jax.nn.sigmoid,
+            activation_fn=jax.nn.softmax,
             output_dim=num_classes,
         )
     elif self._abstract_model_proto.task == abstract_model_pb2.Task.REGRESSION:
