@@ -76,6 +76,7 @@ nav:
     - pretrained embedding: tutorial/pretrained_embedding.ipynb
     - time sequences: tutorial/time_sequences.ipynb
     - multi-dimensional:  tutorial/multidimensional_feature.ipynb
+    - vector-sequences: tutorial/numerical_vector_sequence.ipynb
     # TODO: boolean, and text
   - Deep learning:
     - with TensorFlow: tutorial/compose_with_tf.ipynb
