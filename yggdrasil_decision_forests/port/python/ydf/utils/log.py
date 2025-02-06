@@ -32,7 +32,7 @@ import contextlib
 import enum
 import io
 import sys
-from typing import Any, Optional, Set, Union
+from typing import Any, Iterator, Optional, Set, TypeVar, Union
 
 from absl import logging
 
@@ -310,3 +310,23 @@ def cc_log_context():
         )
       return _no_op_context()
     # pylint: enable=g-import-not-at-top
+
+
+T = TypeVar("T")
+
+
+def maybe_tqdm(iterable: Iterator[T], *args, **kwargs) -> Iterator[T]:
+  """Shows a tqdm progress bar if tqdm is installed and loggin level>=1."""
+
+  if _VERBOSE_LEVEL == 0:
+    return iterable
+
+  try:
+    # pylint: disable=g-import-not-at-top
+    # pytype: disable=import-error
+    import tqdm
+    # pytype: enable=import-error
+    # pylint: enable=g-import-not-at-top
+    return tqdm.tqdm(iterable, *args, **kwargs)
+  except ImportError:
+    return iterable

@@ -187,14 +187,18 @@ def read_tensorflow_examples(
   expected_keys: Optional[Set[str]] = None
   with multiprocessing_pool.ThreadPool(threads) as pool:
     # Read the shards in parallel.
-    for local_num_examples, shard_data in pool.imap(
-        functools.partial(
-            _read_shard,
-            reader_generator=reader_generator,
-            process=process,
-            verbose=verbose,
+    for local_num_examples, shard_data in log.maybe_tqdm(
+        pool.imap(
+            functools.partial(
+                _read_shard,
+                reader_generator=reader_generator,
+                process=process,
+                verbose=verbose,
+            ),
+            paths,
         ),
-        paths,
+        total=len(paths),
+        desc="Read examples",
     ):
       if local_num_examples == 0:
         continue
@@ -268,7 +272,11 @@ def write_tensorflow_examples(
         writer(tf_example.SerializeToString())
 
   with multiprocessing_pool.ThreadPool(threads) as pool:
-    for _ in pool.imap(write_shard, enumerate(paths)):
+    for _ in log.maybe_tqdm(
+        pool.imap(write_shard, enumerate(paths)),
+        total=len(paths),
+        desc="Write examples",
+    ):
       pass
 
   if verbose:

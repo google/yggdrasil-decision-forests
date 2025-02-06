@@ -50,6 +50,7 @@ py_library(
     srcs = ["log.py"],
     deps = [
         # absl/logging dep,
+        # tqdm dep,
         "//ydf/cc:ydf",
     ],
 )
