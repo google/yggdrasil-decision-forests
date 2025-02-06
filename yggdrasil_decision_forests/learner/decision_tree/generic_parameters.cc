@@ -585,6 +585,26 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
         R"(For honest trees only i.e. honest=true. If true, a new random separation is generated for each tree. If false, the same separation is used for all the trees (e.g., in Gradient Boosted Trees containing multiple trees).)");
   }
 
+  {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamNumericalVectorSequenceNumExamples));
+    param->mutable_integer()->set_default_value(
+        config.numerical_vector_sequence().max_num_test_examples());
+    param->mutable_integer()->set_minimum(1);
+    param->mutable_documentation()->set_description(
+        R"(For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical vectors). Maximum number of examples to use to find splits. A larger value can improve the model quality but takes longer to train.)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(
+        auto param, get_params(kHParamNumericalVectorSequenceNumRandomAnchors));
+    param->mutable_integer()->set_default_value(
+        config.numerical_vector_sequence().num_random_selected_anchors());
+    param->mutable_integer()->set_minimum(1);
+    param->mutable_documentation()->set_description(
+        R"(For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical vectors). The number of randomly generated anchor values. A larger value can improve the model quality but takes longer to train.)");
+  }
+
   RETURN_IF_ERROR(PruneInvalidHyperparameters(hparam_def, valid_hyperparameters,
                                               invalid_hyperparameters));
 
@@ -927,11 +947,11 @@ absl::Status SetHyperParameters(
             ->mutable_integer()
             ->set_minimum(hparam_value);
       } else {
-        return absl::InvalidArgumentError(absl::StrCat(
-            kHParamSplitAxisSparseObliqueWeightsIntegerMinimum,
-            " only works with sparse oblique trees "
-            "(`split_axis=SPARSE_OBLIQUE`) and integer weights "
-            "(`sparse_oblique_weights=INTEGER`)"));
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueWeightsIntegerMinimum,
+                         " only works with sparse oblique trees "
+                         "(`split_axis=SPARSE_OBLIQUE`) and integer weights "
+                         "(`sparse_oblique_weights=INTEGER`)"));
       }
     }
   }
@@ -947,11 +967,11 @@ absl::Status SetHyperParameters(
             ->mutable_integer()
             ->set_maximum(hparam_value);
       } else {
-        return absl::InvalidArgumentError(absl::StrCat(
-            kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
-            " only works with sparse oblique trees "
-            "(`split_axis=SPARSE_OBLIQUE`) and integer weights "
-            "(`sparse_oblique_weights=INTEGER`)"));
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
+                         " only works with sparse oblique trees "
+                         "(`split_axis=SPARSE_OBLIQUE`) and integer weights "
+                         "(`sparse_oblique_weights=INTEGER`)"));
       }
     }
   }
@@ -1118,6 +1138,24 @@ absl::Status SetHyperParameters(
         dt_config->mutable_honest()->set_fixed_separation(
             hparam.value().value().categorical() == kTrue);
       }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamNumericalVectorSequenceNumExamples);
+    if (hparam.has_value()) {
+      dt_config->mutable_numerical_vector_sequence()->set_max_num_test_examples(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamNumericalVectorSequenceNumRandomAnchors);
+    if (hparam.has_value()) {
+      dt_config->mutable_numerical_vector_sequence()
+          ->set_num_random_selected_anchors(hparam.value().value().integer());
     }
   }
 

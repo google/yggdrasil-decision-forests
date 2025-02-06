@@ -127,6 +127,11 @@ constexpr char kHParamHonest[] = "honest";
 constexpr char kHParamHonestRatioLeafExamples[] = "honest_ratio_leaf_examples";
 constexpr char kHParamHonestFixedSeparation[] = "honest_fixed_separation";
 
+constexpr char kHParamNumericalVectorSequenceNumExamples[] =
+    "numerical_vector_sequence_num_examples";
+constexpr char kHParamNumericalVectorSequenceNumRandomAnchors[] =
+    "numerical_vector_sequence_num_random_anchors";
+
 // Fill decision tree specific generic hyper parameter specifications.
 // This function is designed to be called by the learners using decision tree
 // learning.
