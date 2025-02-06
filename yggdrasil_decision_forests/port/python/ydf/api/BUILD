@@ -31,3 +31,11 @@ py_library(
         "//ydf/deep:tabular_transformer",
     ],
 )
+
+py_library(
+    name = "help",
+    srcs = ["help.py"],
+    deps = [
+        "//ydf/util:help",
+    ],
+)

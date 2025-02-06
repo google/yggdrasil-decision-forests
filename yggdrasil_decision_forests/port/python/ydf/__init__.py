@@ -110,6 +110,11 @@ from ydf.model import tree
 
 from ydf.api import util
 
+# Help
+
+from ydf.api import help
+
+
 # Internals
 
 from ydf.api import internal
