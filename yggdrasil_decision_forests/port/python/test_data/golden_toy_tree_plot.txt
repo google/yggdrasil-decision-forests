@@ -294,6 +294,24 @@ function display_condition(options, condition, output) {
     return;
   }
 
+  if (condition.type === 'NUMERICAL_VECTOR_SEQUENCE_CLOSER_THAN') {
+    display_node_text_with_tooltip(
+        options, `Vector sequence closer than...`,
+        `${condition.attribute} contains X with | X - [${
+            condition.anchor}] |² <= ${threshold_format(condition.threshold2)}`,
+        output);
+    return;
+  }
+
+  if (condition.type === 'NUMERICAL_VECTOR_SEQUENCE_PROJECTED_MORE_THAN') {
+    display_node_text_with_tooltip(
+        options, `Vector sequence closer than...`,
+        `${condition.attribute} contains X with X @ [${
+            condition.anchor}] |² >= ${threshold_format(condition.threshold)}`,
+        output);
+    return;
+  }
+
   display_node_text(
       options, `Non supported condition ${condition.type}`, output);
 }
@@ -341,14 +359,14 @@ function display_value(options, value, output) {
         .data(value.distribution)
         .join('li')
         .append('span')
-        .text(
-            (d, i) => {
-              label = i;
-              if (options.labels && options.labels.length >= i + 1) {
-                label = options.labels[i];
-              }
-              return 'class ' + label + ': ' + d3.format('.3%')(value.distribution[i]);
-            });
+        .text((d, i) => {
+          label = i;
+          if (options.labels && options.labels.length >= i + 1) {
+            label = options.labels[i];
+          }
+          return 'class ' + label + ': ' +
+              d3.format('.3%')(value.distribution[i]);
+        });
 
     add_tooltip(options, distribution_plot, () => distribution_details.html());
     add_tooltip(options, num_examples, () => 'Number of examples');
@@ -377,8 +395,7 @@ function display_value(options, value, output) {
 
   if (value.type === 'ANOMALY_DETECTION') {
     display_node_text(
-        options,
-        'Number of examples: ' + d3.format('.6')(value.num_examples),
+        options, 'Number of examples: ' + d3.format('.6')(value.num_examples),
         output);
     return;
   }

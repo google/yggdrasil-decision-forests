@@ -1006,6 +1006,10 @@ class RandomForestLearnerTest(LearnerTest):
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, 0.95)
 
+    _ = model.analyze(test_ds)
+    _ = model.get_tree(0)
+    model.print_tree()
+
 
 class CARTLearnerTest(LearnerTest):
 

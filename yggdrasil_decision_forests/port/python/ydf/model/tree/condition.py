@@ -185,6 +185,48 @@ class NumericalSparseObliqueCondition(AbstractCondition):
     return f"{text} >= {self.threshold:g} [{self._tag()}]"
 
 
+@dataclasses.dataclass
+class NumericalVectorSequenceCloserThanCondition(AbstractCondition):
+  """Condition of the type: exits a in Obs; |a - anchor|^2 <= threshold2.
+
+  Attrs:
+    attribute: Numerical vector sequence attribute.
+    anchor: Anchor to compare to.
+    threshold2: Threshold value of the condition.
+  """
+
+  attribute: int
+  anchor: Sequence[float]
+  threshold2: float
+
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    return (
+        f"{dataspec.columns[self.attribute].name!r} contains X with |X -"
+        f" {self.anchor}|² <= {self.threshold2}"
+    )
+
+
+@dataclasses.dataclass
+class NumericalVectorSequenceProjectedMoreThanCondition(AbstractCondition):
+  """Condition of the type: exits a in Obs; <a|anchor> threshold.
+
+  Attrs:
+    attribute: Numerical vector sequence attribute.
+    anchor: Anchor to compare to.
+    threshold: Threshold value of the condition.
+  """
+
+  attribute: int
+  anchor: Sequence[float]
+  threshold: float
+
+  def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
+    return (
+        f"{dataspec.columns[self.attribute].name!r} contains X with X @"
+        f" {self.anchor} >= {self.threshold}"
+    )
+
+
 def to_condition(
     proto_condition: decision_tree_pb2.NodeCondition,
     dataspec: data_spec_pb2.DataSpecification,
@@ -263,6 +305,31 @@ def to_condition(
         threshold=condition_type.oblique_condition.threshold,
         **base_kwargs,
     )
+
+  elif condition_type.HasField("numerical_vector_sequence"):
+    if condition_type.numerical_vector_sequence.HasField("closer_than"):
+      closer_than = condition_type.numerical_vector_sequence.closer_than
+      return NumericalVectorSequenceCloserThanCondition(
+          attribute=proto_condition.attribute,
+          anchor=closer_than.anchor.grounded,
+          threshold2=closer_than.threshold2,
+          **base_kwargs,
+      )
+    elif condition_type.numerical_vector_sequence.HasField(
+        "projected_more_than"
+    ):
+      projected_more_than = (
+          condition_type.numerical_vector_sequence.projected_more_than
+      )
+      return NumericalVectorSequenceProjectedMoreThanCondition(
+          attribute=proto_condition.attribute,
+          anchor=projected_more_than.anchor.grounded,
+          threshold=projected_more_than.threshold,
+          **base_kwargs,
+      )
+    else:
+      raise ValueError("Invalid attribute type")
+
   else:
     raise ValueError(f"Non supported condition type: {proto_condition}")
 
@@ -378,6 +445,36 @@ def _to_json_numerical_sparse_oblique(
       "type": "NUMERICAL_SPARSE_OBLIQUE",
       "attributes": [dataspec.columns[f].name for f in condition.attributes],
       "weights": list(condition.weights),
+      "threshold": condition.threshold,
+  }
+
+
+@to_json.register
+def _to_json_numerical_vector_sequence_closer_than(
+    condition: NumericalVectorSequenceCloserThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  """Returns a JSON-compatible dict for CloserThan conditions."""
+  attribute_name = dataspec.columns[condition.attribute].name
+  return {
+      "type": "NUMERICAL_VECTOR_SEQUENCE_CLOSER_THAN",
+      "attribute": attribute_name,
+      "anchor": list(condition.anchor),
+      "threshold2": condition.threshold2,
+  }
+
+
+@to_json.register
+def _to_json_numerical_vector_sequence_projected_more_than(
+    condition: NumericalVectorSequenceProjectedMoreThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> Dict[str, Any]:
+  """Returns a JSON-compatible dict for ProjectedMoreThan conditions."""
+  attribute_name = dataspec.columns[condition.attribute].name
+  return {
+      "type": "NUMERICAL_VECTOR_SEQUENCE_PROJECTED_MORE_THAN",
+      "attribute": attribute_name,
+      "anchor": list(condition.anchor),
       "threshold": condition.threshold,
   }
 
@@ -523,6 +620,50 @@ def _to_proto_condition_oblique(
               attributes=condition.attributes,
               weights=condition.weights,
               threshold=condition.threshold,
+          ),
+      ),
+  )
+
+
+@to_proto_condition.register
+def _to_proto_condition_numerical_vector_sequence_closer_than(
+    condition: NumericalVectorSequenceCloserThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  return decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+      attribute=condition.attribute,
+      condition=decision_tree_pb2.Condition(
+          numerical_vector_sequence=decision_tree_pb2.Condition.NumericalVectorSequence(
+              closer_than=decision_tree_pb2.Condition.NumericalVectorSequence.CloserThan(
+                  anchor=decision_tree_pb2.Condition.NumericalVectorSequence.Anchor(
+                      grounded=condition.anchor
+                  ),
+                  threshold2=condition.threshold2,
+              )
+          ),
+      ),
+  )
+
+
+@to_proto_condition.register
+def _to_proto_condition_numerical_vector_sequence_projected_more_than(
+    condition: NumericalVectorSequenceProjectedMoreThanCondition,
+    dataspec: data_spec_pb2.DataSpecification,
+) -> decision_tree_pb2.NodeCondition:
+  return decision_tree_pb2.NodeCondition(
+      na_value=condition.missing,
+      split_score=condition.score,
+      attribute=condition.attribute,
+      condition=decision_tree_pb2.Condition(
+          numerical_vector_sequence=decision_tree_pb2.Condition.NumericalVectorSequence(
+              projected_more_than=decision_tree_pb2.Condition.NumericalVectorSequence.ProjectedMoreThan(
+                  anchor=decision_tree_pb2.Condition.NumericalVectorSequence.Anchor(
+                      grounded=condition.anchor
+                  ),
+                  threshold=condition.threshold,
+              )
           ),
       ),
   )

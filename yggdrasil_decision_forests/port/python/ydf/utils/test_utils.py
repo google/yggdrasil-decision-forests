@@ -146,7 +146,9 @@ def golden_check_string(
     logging.info("os.path.dirname(value_path): %s", os.path.dirname(value_path))
     os.makedirs(os.path.dirname(value_path), exist_ok=True)
     logging.info(
-        "Golden test failed. Save the effetive value to %s", value_path
+        "Golden test failed for %s. Save the effective value to %s",
+        golden_path,
+        value_path,
     )
     with open(value_path, "w") as f:
       f.write(value)

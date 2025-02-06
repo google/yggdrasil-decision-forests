@@ -80,6 +80,12 @@ class ConditionTest(parameterized.TestCase):
                 is_already_integerized=True,
             ),
         ),
+        "f_numerical_vector_sequence": data_spec_pb2.Column(
+            name="f_numerical_vector_sequence",
+            numerical_vector_sequence=data_spec_pb2.NumericalVectorSequenceSpec(
+                vector_length=2,
+            ),
+        ),
     }
     self.full_data_spec = data_spec_pb2.DataSpecification(
         columns=self.data_spec_columns.values()
@@ -518,6 +524,88 @@ class ConditionTest(parameterized.TestCase):
     self.assertEqual(
         condition.pretty(dataspec),
         "*nothing* >= 3 [score=2 missing=False]",
+    )
+
+  def test_condition_closer_than_valid_input(self):
+    condition = condition_lib.NumericalVectorSequenceCloserThanCondition(
+        attribute=0,
+        anchor=[1.0, 2.0],
+        threshold2=3,
+        missing=False,
+        score=2,
+    )
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[
+            data_spec_pb2.Column(
+                name="f",
+                numerical_vector_sequence=data_spec_pb2.NumericalVectorSequenceSpec(
+                    vector_length=2,
+                ),
+            ),
+        ]
+    )
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            numerical_vector_sequence=decision_tree_pb2.Condition.NumericalVectorSequence(
+                closer_than=decision_tree_pb2.Condition.NumericalVectorSequence.CloserThan(
+                    anchor=decision_tree_pb2.Condition.NumericalVectorSequence.Anchor(
+                        grounded=[1.0, 2.0]
+                    ),
+                    threshold2=3,
+                )
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' contains X with |X - [1.0, 2.0]|² <= 3",
+    )
+
+  def test_condition_projected_more_than_valid_input(self):
+    condition = condition_lib.NumericalVectorSequenceProjectedMoreThanCondition(
+        attribute=0,
+        anchor=[1.0, 2.0],
+        threshold=3,
+        missing=False,
+        score=2,
+    )
+    dataspec = data_spec_pb2.DataSpecification(
+        columns=[
+            data_spec_pb2.Column(
+                name="f",
+                numerical_vector_sequence=data_spec_pb2.NumericalVectorSequenceSpec(
+                    vector_length=2,
+                ),
+            ),
+        ]
+    )
+    proto_condition = decision_tree_pb2.NodeCondition(
+        na_value=False,
+        split_score=2,
+        attribute=0,
+        condition=decision_tree_pb2.Condition(
+            numerical_vector_sequence=decision_tree_pb2.Condition.NumericalVectorSequence(
+                projected_more_than=decision_tree_pb2.Condition.NumericalVectorSequence.ProjectedMoreThan(
+                    anchor=decision_tree_pb2.Condition.NumericalVectorSequence.Anchor(
+                        grounded=[1.0, 2.0]
+                    ),
+                    threshold=3,
+                )
+            ),
+        ),
+    )
+
+    self._assert_conditions_equivalent(condition, proto_condition, dataspec)
+
+    self.assertEqual(
+        condition.pretty(dataspec),
+        "'f' contains X with X @ [1.0, 2.0] >= 3",
     )
 
 
