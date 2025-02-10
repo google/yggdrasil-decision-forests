@@ -113,6 +113,8 @@ class MLPTest(parameterized.TestCase):
     logging.info("Evaluation:\n%s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, 0.845)
     self.assertLessEqual(evaluation.loss, 0.33)
+    analysis = model.analyze(self.adult.test_pd, maximum_duration=5)
+    _ = analysis.html()
 
   def test_regression_abalone(self):
     train_ds, test_ds = test_utils.split_ds(self.abalone)
@@ -124,6 +126,8 @@ class MLPTest(parameterized.TestCase):
     self.assertEqual(predictions.shape, (len(test_ds),))
     evaluation = model.evaluate(test_ds)
     logging.info("Evaluation:\n%s", evaluation)
+    analysis = model.analyze(test_ds, maximum_duration=5)
+    _ = analysis.html()
 
   def test_multiclass_iris(self):
     train_ds, test_ds = test_utils.split_ds(self.iris)
@@ -133,6 +137,8 @@ class MLPTest(parameterized.TestCase):
     self.assertEqual(predictions.shape, (len(test_ds), 3))
     evaluation = model.evaluate(test_ds)
     logging.info("Evaluation:\n%s", evaluation)
+    analysis = model.analyze(test_ds, maximum_duration=5)
+    _ = analysis.html()
 
   def test_interrupt_training(self):
     learner = mlp.MultiLayerPerceptronLearner(

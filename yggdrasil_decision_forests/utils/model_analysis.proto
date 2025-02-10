@@ -106,6 +106,9 @@ message Options {
 
   // Maximum duration of the analysis in seconds.
   optional float maximum_duration_seconds = 19;
+
+  // Random seed for randomized tasks.
+  optional int32 random_seed = 20 [default = 1234];
 }
 
 // Results of a model analysis.
