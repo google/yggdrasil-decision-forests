@@ -17,41 +17,19 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_TENSORFLOW_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_FILESYSTEM_TENSORFLOW_H_
 
+#include <initializer_list>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "src/google/protobuf/text_format.h"
-#include "tensorflow/core/platform/file_system.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
-
-// Wrappers to shield tensorflow macros from yggdrasil macros.
-namespace tensorflow {
-class RandomAccessFileWrapper {
- public:
-  explicit RandomAccessFileWrapper(RandomAccessFile* item) : item_(item) {}
-  ~RandomAccessFileWrapper();
-
-  RandomAccessFile* item() { return item_; }
-
- private:
-  RandomAccessFile* item_;
-};
-
-class WritableFileWrapper {
- public:
-  explicit WritableFileWrapper(WritableFile* item) : item_(item) {}
-  ~WritableFileWrapper();
-
-  WritableFile* item() { return item_; }
-
- private:
-  WritableFile* item_;
-};
-
-}  // namespace tensorflow
+#include "yggdrasil_decision_forests/utils/filesystem_tensorflow_interface.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 
 #define EXTERNAL_FILESYSTEM
 
@@ -124,26 +102,30 @@ constexpr int Defaults() { return 0; }
 class FileInputByteStream
     : public yggdrasil_decision_forests::utils::InputByteStream {
  public:
-  absl::Status Open(absl::string_view path);
-  absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
-  absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
-  absl::Status Close();
+  FileInputByteStream() : stream_(Interface().CreateInputByteStream()) {}
+  absl::Status Open(absl::string_view path) { return stream_->Open(path); }
+  absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) {
+    return stream_->ReadUpTo(buffer, max_read);
+  }
+  absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) {
+    return stream_->ReadExactly(buffer, num_read);
+  }
+  absl::Status Close() { return stream_->Close(); }
 
  private:
-  std::unique_ptr<::tensorflow::RandomAccessFileWrapper> file_;
-  uint64_t offset_ = 0;
-  std::string scrath_;
+  std::unique_ptr<impl::FileInputByteStreamInterface> stream_;
 };
 
 class FileOutputByteStream
     : public yggdrasil_decision_forests::utils::OutputByteStream {
  public:
-  absl::Status Open(absl::string_view path);
-  absl::Status Write(absl::string_view chunk) override;
-  absl::Status Close();
+  FileOutputByteStream() : stream_(Interface().CreateOutputByteStream()) {}
+  absl::Status Open(absl::string_view path) { return stream_->Open(path); }
+  absl::Status Write(absl::string_view chunk) { return stream_->Write(chunk); }
+  absl::Status Close() { return stream_->Close(); }
 
  private:
-  std::unique_ptr<::tensorflow::WritableFileWrapper> file_;
+  std::unique_ptr<impl::FileOutputByteStreamInterface> stream_;
 };
 
 // Exports a proto to disk in binary format.
