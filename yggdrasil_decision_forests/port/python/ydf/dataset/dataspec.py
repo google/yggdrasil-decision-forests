@@ -35,6 +35,7 @@ NormalizedColumnDefs = Optional[List["Column"]]
 # yggdrasil_decision_forests/dataset/data_spec.h
 YDF_OOD = "<OOD>"
 YDF_OOD_BYTES = b"<OOD>"
+YDF_OOD_DICTIONARY_ITEM_IDX = 0
 
 # Mapping between Numpy dtypes and YDF dtypes.
 _NP_DTYPE_TO_YDF_DTYPE = {

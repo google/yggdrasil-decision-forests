@@ -851,6 +851,7 @@ cc_library_ydf(
         ":distribution_cc_proto",
         ":logging",
         ":partial_dependence_plot_cc_proto",
+        ":status_macros",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",

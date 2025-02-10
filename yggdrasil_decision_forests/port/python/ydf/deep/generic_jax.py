@@ -36,6 +36,7 @@ from ydf.dataset import dataset as dataset_lib
 from ydf.dataset import dataspec as dataspec_lib
 from ydf.dataset.io import dataset_io as dataset_io_lib
 from ydf.dataset.io import generator as generator_lib
+from ydf.deep import analysis as py_analysis_lib
 from ydf.deep import dataset as deep_dataset_lib
 from ydf.deep import hyperparameter as hyperparameter_lib
 from ydf.deep import metric as deep_metric_lib
@@ -54,6 +55,7 @@ from ydf.model import optimizer_logs
 from ydf.utils import concurrency
 from ydf.utils import html
 from ydf.utils import log
+from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 # Generic hyperparameters of all the deep learning models.
 # Number of training examples in each mini-batch
@@ -69,7 +71,7 @@ _HP_NUM_STEPS = "num_steps"
 # Random seed for the training.
 _HP_RANDOM_SEED = "random_seed"
 # Stops training is the validation loss does not decrease over the last N
-# epoches. If None, ignored, and early stopping is disabled. Ignored if no
+# epochs. If None, ignored, and early stopping is disabled. Ignored if no
 # validation dataset is provided.
 _HP_EARLY_STOPPING_EPOCH_PATIENCE = "early_stopping_epoch_patience"
 # When early stopping triggers, should the model parameters be reverted to the
@@ -432,7 +434,34 @@ class GenericJAXModel(generic_model.GenericModel):
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
   ) -> analysis_lib.Analysis:
-    raise NotImplementedError  # TODO: Implement.
+    enable_permutation_variable_importances = (
+        permutation_variable_importance_rounds > 0
+    )
+    options_proto = model_analysis_pb2.Options(
+        num_threads=num_threads,
+        maximum_duration_seconds=maximum_duration,
+        pdp=model_analysis_pb2.Options.PlotConfig(
+            enabled=partial_dependence_plot,
+            example_sampling=sampling,
+            num_numerical_bins=num_bins,
+        ),
+        cep=model_analysis_pb2.Options.PlotConfig(
+            enabled=conditional_expectation_plot,
+            example_sampling=sampling,
+            num_numerical_bins=num_bins,
+        ),
+        permuted_variable_importance=model_analysis_pb2.Options.PermutedVariableImportance(
+            enabled=enable_permutation_variable_importances,
+            num_rounds=permutation_variable_importance_rounds,
+        ),
+        include_model_structural_variable_importances=True,
+    )
+
+    return py_analysis_lib.model_analysis(
+        self,
+        data,
+        options_proto,
+    )
 
   def to_cpp(self, key: str = "my_model") -> str:
     raise NotImplementedError  # TODO: Implement.
@@ -631,14 +660,14 @@ class GenericJaxLearner(generic_learner.GenericLearner):
             f" {_HP_VALUE_LEARNING_RATE_POLICY_COSINE_DECAY} learning rate"
             " policy"
         )
-      warmup_epoches = 1  # TODO: Make it a parameter
+      warmup_epochs = 1  # TODO: Make it a parameter
       if steps_per_epoch is None:
         log.warning(
             "Impossible to determine the number of steps per epoch. Assuming"
             " 1000 steps/epochs for the dynamic learning-rate policy."
         )
         steps_per_epoch = 1000
-      transition_steps = int(warmup_epoches * steps_per_epoch)
+      transition_steps = int(warmup_epochs * steps_per_epoch)
       warmup_fn = optax.linear_schedule(
           init_value=0.0,
           end_value=learning_rate,
@@ -740,6 +769,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
             name=model_class.name(),
             task=self._task._to_proto_type(),  # pylint: disable=protected-access
             label_col_idx=self._label_col_idx(dataspec),
+            input_features=input_features_col_idxs,
         ),
     )
     model.set_config_from_hyperparameters(hp_consumer)
@@ -1073,7 +1103,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
         if early_stopping_epoch_patience is not None:
           if epoch_idx - best_epoch_idx >= early_stopping_epoch_patience:
             log.info(
-                "The loss did not improve for %d epoches. Stopping training",
+                "The loss did not improve for %d epochs. Stopping training",
                 early_stopping_epoch_patience,
             )
             break

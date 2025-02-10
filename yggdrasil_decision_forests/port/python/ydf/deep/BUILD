@@ -19,11 +19,11 @@ py_library(
     name = "generic_jax",
     srcs = ["generic_jax.py"],
     deps = [
+        ":analysis",
         ":dataset",
         ":hyperparameter",
         ":metric",
         ":preprocessor",
-        # flax:core dep,
         # jax dep,
         # jaxtyping dep,
         # numpy dep,
@@ -50,6 +50,7 @@ py_library(
         "//ydf/utils:concurrency",
         "//ydf/utils:html",
         "//ydf/utils:log",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
     ],
 )
 
@@ -144,6 +145,28 @@ py_library(
     ],
 )
 
+py_library(
+    name = "analysis",
+    srcs = ["analysis.py"],
+    deps = [
+        # absl/logging dep,
+        # jax dep,
+        # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:example_py_proto",
+        "//ydf/dataset",
+        "//ydf/dataset:dataspec",
+        "//ydf/dataset/io:dataset_io",
+        "//ydf/dataset/io:generator",
+        "//ydf/model:analysis",
+        "//ydf/model:generic_model",
+        "//ydf/utils:log",
+        "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils:partial_dependence_plot_py_proto",
+    ],
+)
+
 # Tests
 # =====
 
@@ -233,6 +256,25 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
+    ],
+)
+
+py_test(
+    name = "analysis_test",
+    srcs = ["analysis_test.py"],
+    deps = [
+        ":analysis",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:example_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/model:generic_model",
+        "//ydf/utils:test_utils",
+        "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/utils:partial_dependence_plot_py_proto",
     ],
 )
 
