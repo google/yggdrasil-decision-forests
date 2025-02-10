@@ -15,162 +15,57 @@
 
 #include "yggdrasil_decision_forests/utils/filesystem_tensorflow.h"
 
-#include <algorithm>
-#include <cstdint>
-#include <cstring>
 #include <initializer_list>
 #include <memory>
-#include <regex>  // NOLINT
 #include <string>
 #include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
-#include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
-#include "src/google/protobuf/message.h"
-#include "src/google/protobuf/message_lite.h"
-#include "src/google/protobuf/text_format.h"
-#include "tensorflow/core/platform/env.h"
-#include "tensorflow/core/platform/file_system.h"
-#include "tensorflow/core/platform/path.h"
+#include "yggdrasil_decision_forests/utils/filesystem_tensorflow_interface.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
-
-namespace tensorflow {
-
-RandomAccessFileWrapper::~RandomAccessFileWrapper() {
-  delete item_;
-  item_ = nullptr;
-}
-
-WritableFileWrapper::~WritableFileWrapper() {
-  delete item_;
-  item_ = nullptr;
-}
-
-}  // namespace tensorflow
 
 namespace file {
 
 std::string JoinPathList(std::initializer_list<absl::string_view> paths) {
-  return ::tensorflow::io::internal::JoinPathImpl(paths);
+  return Interface().JoinPathList(paths);
 }
 
 bool GenerateShardedFilenames(absl::string_view spec,
                               std::vector<std::string>* names) {
-  std::regex num_shard_pattern(R"((.*)\@(\*|[0-9]+)(?:(\..+))?)");
-  std::smatch match;
-  std::string str_spec(spec);
-  if (!std::regex_match(str_spec, match, num_shard_pattern)) {
-    return false;
-  }
-  if (match.size() != 4) {
-    return false;
-  }
-  const auto prefix = match[1].str();
-  const auto count = match[2].str();
-  const auto suffix = match[3].str();
-
-  int int_count;
-  if (count == "*") {
-    LOG(WARNING) << "Non defined shard count not supported in " << spec;
-    return false;
-  } else if (absl::SimpleAtoi(count, &int_count)) {
-  } else {
-    return false;
-  }
-
-  for (int idx = 0; idx < int_count; idx++) {
-    names->push_back(
-        absl::StrFormat("%s-%05d-of-%05d%s", prefix, idx, int_count, suffix));
-  }
-  return true;
+  return Interface().GenerateShardedFilenames(spec, names);
 }
 
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
-                   const int options) {
-  RETURN_IF_ERROR(tensorflow::Env::Default()->GetMatchingPaths(
-      std::string(pattern), results));
-  std::sort(results->begin(), results->end());
-  return absl::OkStatus();
+                   int options) {
+  return Interface().Match(pattern, results, options);
 }
 
 absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
-  return tensorflow::Env::Default()->RecursivelyCreateDir(std::string(path));
+  return Interface().RecursivelyCreateDir(path, options);
 }
 
 absl::Status RecursivelyDelete(absl::string_view path, int options) {
-  int64_t ignore_1, ignore_2;
-  return tensorflow::Env::Default()->DeleteRecursively(std::string(path),
-                                                       &ignore_1, &ignore_2);
+  return Interface().RecursivelyDelete(path, options);
 }
 
-absl::Status FileInputByteStream::Open(absl::string_view path) {
-  std::unique_ptr<::tensorflow::RandomAccessFile> file;
-  RETURN_IF_ERROR(tensorflow::Env::Default()->NewRandomAccessFile(
-      std::string(path), &file));
-  file_ =
-      std::make_unique<::tensorflow::RandomAccessFileWrapper>(file.release());
-  offset_ = 0;
-  return absl::OkStatus();
+absl::StatusOr<bool> FileExists(absl::string_view path) {
+  return Interface().FileExists(path);
 }
 
-absl::StatusOr<int> FileInputByteStream::ReadUpTo(char* buffer, int max_read) {
-  absl::string_view result;
-  if (max_read > scrath_.size()) {
-    scrath_.resize(max_read);
-  }
-  const auto status =
-      file_->item()->Read(offset_, max_read, &result, &scrath_[0]);
-  if (!status.ok() && status.code() != absl::StatusCode::kOutOfRange) {
-    return status;
-  }
-  offset_ += result.size();
-  std::memcpy(buffer, result.data(), result.size());
-  return result.size();
+absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
+  return Interface().Rename(from, to, options);
 }
 
-absl::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
-                                                      int num_read) {
-  absl::string_view result;
-  if (num_read > scrath_.size()) {
-    scrath_.resize(num_read);
-  }
-  const auto status =
-      file_->item()->Read(offset_, num_read, &result, &scrath_[0]);
-  if (!status.ok()) {
-    if (status.code() == absl::StatusCode::kOutOfRange && result.empty() &&
-        num_read > 0) {
-      return false;
-    }
-    return status;
-  }
-  offset_ += result.size();
-  std::memcpy(buffer, result.data(), result.size());
-  return true;
+std::string GetBasename(absl::string_view path) {
+  return Interface().GetBasename(path);
 }
 
-absl::Status FileInputByteStream::Close() {
-  file_.reset();
-  return absl::OkStatus();
-}
-
-absl::Status FileOutputByteStream::Open(absl::string_view path) {
-  std::unique_ptr<::tensorflow::WritableFile> file;
-  RETURN_IF_ERROR(
-      tensorflow::Env::Default()->NewWritableFile(std::string(path), &file));
-  file_ = std::make_unique<::tensorflow::WritableFileWrapper>(file.release());
-  return absl::OkStatus();
-}
-
-absl::Status FileOutputByteStream::Write(absl::string_view chunk) {
-  return file_->item()->Append(chunk);
-}
-
-absl::Status FileOutputByteStream::Close() { return file_->item()->Close(); }
+absl::Status SetImmutable(absl::string_view path) { return absl::OkStatus(); }
 
 absl::Status SetBinaryProto(absl::string_view path,
                             const google::protobuf::MessageLite& message, int unused) {
@@ -220,28 +115,5 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
   }
   return absl::OkStatus();
 }
-
-absl::StatusOr<bool> FileExists(absl::string_view path) {
-  const auto exist_status =
-      tensorflow::Env::Default()->FileExists(std::string(path));
-  if (exist_status.ok()) {
-    return true;
-  }
-  if (exist_status.code() == absl::StatusCode::kNotFound) {
-    return false;
-  }
-  return exist_status;
-}
-
-absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
-  return tensorflow::Env::Default()->RenameFile(std::string(from),
-                                                std::string(to));
-}
-
-std::string GetBasename(absl::string_view path) {
-  return std::string(tensorflow::io::Basename(path));
-}
-
-absl::Status SetImmutable(absl::string_view path) { return absl::OkStatus(); }
 
 }  // namespace file

@@ -113,6 +113,7 @@ cc_library_ydf(
 )
 
 # TensorFlow::io based filesystem.
+
 cc_library_ydf(
     name = "filesystem_tensorflow",
     srcs = [
@@ -123,18 +124,52 @@ cc_library_ydf(
         "filesystem.h",
         "filesystem_tensorflow.h",
     ],
-    copts = ["-fexceptions"],
     defines = [
         "YGG_FILESYSTEM_USES_DEFAULT",
         "YGG_FILESYSTEM_USES_TENSORFLOW",
     ],
-    features = ["-use_header_modules"],  # Incompatible with -fexceptions.
-    tags = ["tf_dep"],
     visibility = ["//visibility:private"],
     deps = [
         ":bytestream",
-        ":compatibility",
+        ":filesystem_tensorflow_interface",
         ":logging",
+        ":protobuf",
+        ":status_macros",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
+cc_library_ydf(
+    name = "filesystem_tensorflow_interface",
+    srcs = ["filesystem_tensorflow_interface.cc"],
+    hdrs = ["filesystem_tensorflow_interface.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":bytestream",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library_ydf(
+    name = "filesystem_tensorflow_impl",
+    srcs = ["filesystem_tensorflow_impl.cc"],
+    copts = ["-fexceptions"],
+    features = ["-use_header_modules"],  # Incompatible with -fexceptions.
+    tags = ["tf_dep"],
+    deps = [
+        ":bytestream",
+        ":compatibility",
+        ":filesystem_tensorflow_interface",
+        ":logging",
+        ":protobuf",
         ":status_macros",
         "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/log",
@@ -156,6 +191,7 @@ cc_library_ydf(
             "@org_tensorflow//tensorflow/core/platform:path",
         ],
     }),
+    alwayslink = 1,
 )
 
 cc_library_ydf(
@@ -970,9 +1006,7 @@ cc_test(
 cc_test(
     name = "filesystem_test",
     srcs = ["filesystem_test.cc"],
-    data = [
-        "//yggdrasil_decision_forests/test_data",
-    ],
+    data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
         ":distribution_cc_proto",
         ":filesystem",
