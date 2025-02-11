@@ -129,9 +129,9 @@ You can contact the core development team at
 Yggdrasil Decision Forests and TensorFlow Decision Forests are developed by:
 
 -   Mathieu Guillame-Bert (gbm AT google DOT com)
+-   Richard Stotz (richardstotz AT google DOT com)
 -   Jan Pfeifer (janpf AT google DOT com)
 -   Sebastian Bruch (sebastian AT bruch DOT io)
--   Richard Stotz (richardstotz AT google DOT com)
 -   Arvind Srinivasan (arvnd AT google DOT com)
 
 ## Contributing
