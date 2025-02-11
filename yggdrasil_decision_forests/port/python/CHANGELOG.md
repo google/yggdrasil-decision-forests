@@ -1,19 +1,35 @@
 # Changelog
 
-## HEAD
+## 0.10.0 - 2025-02-11
 
 ### Feature
 
 -   Expose `model.save(..., pure_serving=True)` for saving a model without debug
     information.
 -   Allow users to provide a training proto configuration to the learner.
+-   Add vector sequence feature support.
+-   Add Variable importances for Isolation Forest Models.
 -   Add `ydf.help.loading_data()` to print information about the type of
     supported dataset formats.
+-   Add experimental Tabular Transformer implementation.
+-   Add gzipped blob sequence as new model format (still optional).
+-   Enabled Poisson Loss for model analysis and fast inference.
 
 ### Fix
 
 -   Fix recognition of multidimensional features for Numpy arrays of type
     object.
+-   Fix subsample count for small number of training examples for Isolation 
+    Forests.
+-   Fix NUM_NODES variable importance for oblique splits.
+
+### Other
+
+-   Updated OSS dependencies of protobuf, grpc and abseil.
+
+### Release music
+
+3. Sinfonie in Es-Dur "Sinfonia Eroica", op. 55. Ludwig van Beethoven
 
 ## 0.9.0 - 2024-12-02
 

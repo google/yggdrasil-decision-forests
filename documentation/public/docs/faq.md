@@ -128,6 +128,11 @@ paper our paper titled
 in KDD 2023 for a comparison of model performances trained with different
 libraries.
 
+### Can I use the ydf.experimental?
+
+Any API under `ydf.experimental` should not be used in production environments
+and may break, be unstable or slow.
+
 ### Is it PYDF or YDF?
 
 The name of the library is simply `ydf`, and so is the name of the corresponding
