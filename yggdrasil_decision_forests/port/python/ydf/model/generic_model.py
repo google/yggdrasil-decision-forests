@@ -291,7 +291,11 @@ Use `model.describe()` for more details
 
   @abc.abstractmethod
   def save(
-      self, path: str, advanced_options=ModelIOOptions(), *, pure_serving=False
+      self,
+      path: str,
+      advanced_options: ModelIOOptions = ModelIOOptions(),
+      *,
+      pure_serving: bool = False,
   ) -> None:
     """Save the model to disk.
 
@@ -1141,8 +1145,6 @@ Use `model.describe()` for more details
     learning algorithm and its hyper-parameters. For example, the hyperparameter
     `compute_oob_variable_importances=True` of the Random Forest learner enables
     the computation of permutation out-of-bag variable importances.
-
-    # TODO: Add variable importances to documentation.
 
     Features are sorted by decreasing importance.
 

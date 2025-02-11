@@ -15,10 +15,17 @@
 """Empty fallback learner and model classes when jax is not available."""
 
 
+_jax_fallback_error = None
+
+
 def raise_error():
+  if _jax_fallback_error is not None:
+    detailed_error = f"The detailed error was: {_jax_fallback_error}"
+  else:
+    detailed_error = ""
   raise ValueError(
       '"jax" is needed to run this model. Make sure it installed and try'
-      " again. See https://jax.readthedocs.io/en/latest/installation.html"
+      " again. See https://jax.readthedocs.io/en/latest/installation.html. The detailed error was: " + detailed_error
   )
 
 

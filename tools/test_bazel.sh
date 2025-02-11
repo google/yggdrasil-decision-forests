@@ -17,53 +17,42 @@
 # Compile and runs the unit tests.
 #
 # Options:
-#  CPP_VERSIONS: C++ Versions to build, separated by semicolon. Can be 14 or 17.
-#                Defaults to 17
 #  RUN_TESTS: Run the unit tests, 0 or 1 (default).
 #  COMPILERS: Compilers to build, separated by semicolon. Defaults to gcc-9
 #  INSTALL_DEPENDENCIES: Installs required dependencies.
 #
 # Usage example:
 #
-#   # Compilation GCC 9, C++17. running tests.
+#   # Compilation GCC 9, running tests.
 #   ./tools/test_bazel.sh
 #
 set -xev
 
 build_and_maybe_test () {
    echo "Building YDF the following settings:"
-   echo "   C++ Version: $1"
-   echo "   Compiler : $2"
+   echo "   Compiler : $1"
 
-    BAZEL=bazel
-    ${BAZEL} version
+   bazel version
 
-    local flags="--config=linux_cpp${1} --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${2} --build_tag_filters=-tf_dep,-cuda_dep --test_tag_filters=-tf_dep,-cuda_dep"
+    local flags="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${1} --build_tag_filters=-tf_dep,-cuda_dep --test_tag_filters=-tf_dep,-cuda_dep"
     # TODO: By default, disable GPU build with --@rules_cuda//cuda:enable=False
 
-    # Do not build the PYDF targets, use tools/build_test_linux.sh instead
-    local exclude_pydf_targets="-//yggdrasil_decision_forests/port/python/...:all"
-
-    time ${BAZEL} build ${flags} -- //yggdrasil_decision_forests/...:all ${exclude_pydf_targets} //examples:beginner_cc
+    time bazel build ${flags} -- //yggdrasil_decision_forests/...:all //examples:beginner_cc
     if [ "$RUN_TESTS" = 1 ]; then
-      time ${BAZEL} test ${flags} -- //yggdrasil_decision_forests/...:all ${exclude_pydf_targets} //examples:beginner_cc
+      time bazel test ${flags} -- //yggdrasil_decision_forests/...:all
     fi
     echo "Building and maybe testing YDF complete."
 } 
 
 main () {
   # Set default values
-  : "${CPP_VERSIONS:=17}"
   : "${COMPILERS:="gcc-9"}"
   : "${RUN_TESTS:=1}"
 
-  local cpp_version_array=(${CPP_VERSIONS//;/ })
   local compilers_array=(${COMPILERS//;/ })
 
-  for cpp_version in ${cpp_version_array[@]}; do
-    for compiler in ${compilers_array[@]}; do
-        build_and_maybe_test $cpp_version $compiler
-    done
+  for compiler in ${compilers_array[@]}; do
+      build_and_maybe_test $cpp_version $compiler
   done
 }
 
@@ -91,7 +80,7 @@ if [[ ! -z ${INSTALL_DEPENDENCIES+z} ]]; then
 
   python3 -m pip install numpy
 
-  wget -O bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.14.0/bazelisk-linux-amd64
+  wget -O bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64
   chmod +x bazel
   PATH="$(pwd):$PATH"
 fi

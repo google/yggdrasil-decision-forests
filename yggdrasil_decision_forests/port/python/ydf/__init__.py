@@ -39,6 +39,7 @@ from ydf.version import version as __version__
 
 # Learner
 from ydf.learner.generic_learner import GenericLearner
+from ydf.learner.generic_learner import GenericCCLearner
 from ydf.learner.specialized_learners import CartLearner
 from ydf.learner.specialized_learners import RandomForestLearner
 from ydf.learner.specialized_learners import GradientBoostedTreesLearner
@@ -49,6 +50,7 @@ DecisionTreeLearner = CartLearner
 
 # Model
 from ydf.model.generic_model import GenericModel
+from ydf.model.decision_forest_model.decision_forest_model import DecisionForestModel
 from ydf.model.random_forest_model.random_forest_model import RandomForestModel
 from ydf.model.gradient_boosted_trees_model.gradient_boosted_trees_model import GradientBoostedTreesModel
 from ydf.model.isolation_forest_model.isolation_forest_model import IsolationForestModel
@@ -87,8 +89,11 @@ from ydf.model.generic_model import from_sklearn
 from ydf.model.generic_model import NodeFormat
 from ydf.metric.evaluate import evaluate_predictions
 
-from yggdrasil_decision_forests.dataset.data_spec_pb2 import DataSpecification
-from yggdrasil_decision_forests.learner.abstract_learner_pb2 import TrainingConfig
+from yggdrasil_decision_forests.dataset.data_spec_pb2 import DataSpecification as _DataSpecification
+from yggdrasil_decision_forests.learner.abstract_learner_pb2 import TrainingConfig as _TrainingConfig
+
+DataSpecification = _DataSpecification
+TrainingConfig = _TrainingConfig
 
 # Silent proto exentions
 from yggdrasil_decision_forests.learner.gradient_boosted_trees import gradient_boosted_trees_pb2 as _
