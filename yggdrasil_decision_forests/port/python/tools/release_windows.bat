@@ -71,8 +71,8 @@ EXIT /B 0
 :: Compiles and runs the tests.
 :Compile
 set PYTHON=%~1
-%PYTHON% -m pip install -r requirements.txt || goto :error
 %PYTHON% -m pip install -r dev_requirements.txt || goto :error
+%PYTHON% -m pip install -r requirements.txt || goto :error
 %BAZEL% build %BAZEL_FLAGS% -- //ydf/...:all || goto :error
 :: Non blocking tests
 :: TODO: Figure how to get pybind11 + bazel + window to work with the ".pyd" trick.

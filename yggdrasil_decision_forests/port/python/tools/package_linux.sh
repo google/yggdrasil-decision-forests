@@ -92,8 +92,8 @@ function test_package() {
   # Run a small example (in different folder to avoid clashes)
   local current_folder=$(basename "$PWD")
   pushd ..
-  ${PIP} install -r $current_folder/requirements.txt
   ${PIP} install -r $current_folder/dev_requirements.txt
+  ${PIP} install -r $current_folder/requirements.txt
   python $current_folder/examples/minimal.py
   popd
 

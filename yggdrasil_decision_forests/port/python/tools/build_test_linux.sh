@@ -41,8 +41,8 @@ build_and_maybe_test () {
     fi
     local pydf_targets="//ydf/...:all"
     # Install PYDF components
-    python -m pip install -r requirements.txt
     python -m pip install -r dev_requirements.txt
+    python -m pip install -r requirements.txt
 
     time bazel build ${flags} -- ${pydf_targets}
     if [[ "$RUN_TESTS" = 1 ]]; then

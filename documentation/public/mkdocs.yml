@@ -176,6 +176,8 @@ plugins:
             signature_crossrefs: true
             show_signature: true
             separate_signature: true
+            show_if_no_docstring: true
+            filters: ["!^_", "^__init__$"]
 
   - macros
   - mkdocs-jupyter:

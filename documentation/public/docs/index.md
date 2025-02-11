@@ -160,7 +160,7 @@ model.save("/tmp/my_model")
 
 **Serving**
 
--   [Benchmark](tutorial/getting_started.md#benchmark-model-speed) model
+-   [Benchmark](tutorial/getting_started/#benchmark-model-speed) model
     inference.
 -   Run models in Python, [C++](tutorial/cpp.ipynb),
     [Go](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/go),

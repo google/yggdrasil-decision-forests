@@ -57,7 +57,7 @@ $SUDO apt-get -y --no-install-recommends install \
 
 python3 -m pip install numpy
 
-wget -O bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.14.0/bazelisk-linux-amd64
+wget -O bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64
 chmod +x bazelisk
 
 fi
@@ -65,10 +65,8 @@ fi
 # Build the CLI
 if [[ ! -z ${BUILD+z} ]]; then
   # TensorFlow compatible build.
-  cp -f WORKSPACE_WITH_TF WORKSPACE
-
   BAZEL="./bazelisk"
-  FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --config=use_tensorflow_io --repo_env=CC=clang-12"
+  FLAGS="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --build_tag_filters=-tf_dep,-cuda_dep --test_tag_filters=-tf_dep,-cuda_dep --repo_env=CC=clang-12"
   ${BAZEL} build //yggdrasil_decision_forests/cli/...:all \
     //yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_worker_main ${FLAGS}
 

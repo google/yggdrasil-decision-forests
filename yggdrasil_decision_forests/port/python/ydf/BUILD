@@ -36,6 +36,7 @@ py_library(
         "//ydf/model:model_lib",
         "//ydf/model:model_metadata",
         "//ydf/model:optimizer_logs",
+        "//ydf/model/decision_forest_model",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/isolation_forest_model",
         "//ydf/model/random_forest_model",

@@ -80,7 +80,7 @@ template <bool weighted>
 absl::Status SetLeafValueWithNewtonRaphsonStep(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config,
     absl::Span<const UnsignedExampleIdx> selected_examples,
-    const absl::Span<const float> weights, const GradientData& gradients,
+    absl::Span<const float> weights, const GradientData& gradients,
     decision_tree::NodeWithChildren* node);
 
 absl::Status UpdatePredictions(

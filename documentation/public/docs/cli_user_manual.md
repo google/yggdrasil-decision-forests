@@ -4,7 +4,7 @@ This page contains an in-depth introduction to Yggdrasil Decision Forests (YDF)
 CLI API. The content presented on this page is generally not necessary to use
 YDF, but it will help users improve their understanding and use advance options.
 
-New users should first check out the [Quick start](cli_quick_start.md).
+New users should first check out the [Quick start](cli_quickstart.md).
 
 Most concepts presented here apply to the other APIs, notably the C++ API.
 

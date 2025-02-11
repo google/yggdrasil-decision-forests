@@ -3389,6 +3389,30 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
   }
 }
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::CategoricalSetColumn& attributes,
+    const std::vector<float>& labels, int32_t num_attribute_classes,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, proto::NodeCondition* condition,
+    utils::RandomEngine* random);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::CategoricalSetColumn& attributes,
+    const std::vector<float>& labels, int32_t num_attribute_classes,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, proto::NodeCondition* condition,
+    utils::RandomEngine* random);
+
 template <typename LabelBucket, typename ExampleBucketSet,
           typename LabelScoreAccumulator>
 absl::StatusOr<SplitSearchResult>

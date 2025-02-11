@@ -20,17 +20,30 @@ import sys
 import logging
 import importlib.util
 
-if importlib.util.find_spec("jax") is not None:
-  from ydf.deep.mlp import MultiLayerPerceptronModel
-  from ydf.deep.mlp import MultiLayerPerceptronLearner
+_has_experimental = False
+_experimental_import_error = None
 
-  from ydf.deep.tabular_transformer import TabularTransformerModel
-  from ydf.deep.tabular_transformer import TabularTransformerLearner
-else:
+if sys.version_info < (3, 9):
+  _experimental_import_error = "ydf.experimental requires Python>=3.9"
+elif importlib.util.find_spec("jax") is not None:
+  try:
+    from ydf.deep.mlp import MultiLayerPerceptronModel
+    from ydf.deep.mlp import MultiLayerPerceptronLearner
+
+    from ydf.deep.tabular_transformer import TabularTransformerModel
+    from ydf.deep.tabular_transformer import TabularTransformerLearner
+
+    _has_experimental = True
+  except Exception as e:
+    _experimental_import_error = str(e)
+
+if not _has_experimental:
   logging.debug(
-      "jax package is not available. Jax based models are not available"
+      "ydf.experimental is not available: %s", _experimental_import_error
   )
   from ydf.deep import jax_fallback
+
+  jax_fallback._jax_fallback_error = _experimental_import_error  # pylint:disable=protected-access
 
   MultiLayerPerceptronModel = jax_fallback.JaxFallBack
   MultiLayerPerceptronLearner = jax_fallback.JaxFallBack

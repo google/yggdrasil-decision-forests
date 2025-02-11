@@ -120,6 +120,18 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
   return absl::OkStatus();
 }
 
+template absl::Status SetLeafValueWithNewtonRaphsonStep<true>(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    absl::Span<const float> weights, const GradientData& gradients,
+    decision_tree::NodeWithChildren* node);
+
+template absl::Status SetLeafValueWithNewtonRaphsonStep<false>(
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    absl::Span<const float> weights, const GradientData& gradients,
+    decision_tree::NodeWithChildren* node);
+
 decision_tree::CreateSetLeafValueFunctor
 SetLeafValueWithNewtonRaphsonStepFunctor(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config,

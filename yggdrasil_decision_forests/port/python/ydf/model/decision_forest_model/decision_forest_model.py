@@ -15,7 +15,7 @@
 """Definitions for generic decision forest models."""
 
 import sys
-from typing import Iterator, Optional, Sequence
+from typing import Any, Iterator, Optional, Sequence
 
 import numpy as np
 
@@ -58,7 +58,10 @@ class DecisionForestModel(generic_model.GenericCCModel):
     return (self.get_tree(tree_idx) for tree_idx in range(self.num_trees()))
 
   def print_tree(
-      self, tree_idx: int = 0, max_depth: Optional[int] = 6, file=sys.stdout
+      self,
+      tree_idx: int = 0,
+      max_depth: Optional[int] = 6,
+      file: Any = sys.stdout,
   ) -> None:
     """Prints a tree in the terminal.
 
