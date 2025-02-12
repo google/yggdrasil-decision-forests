@@ -77,6 +77,7 @@ nav:
     - time sequences: tutorial/time_sequences.ipynb
     - multi-dimensional:  tutorial/multidimensional_feature.ipynb
     - vector-sequences: tutorial/numerical_vector_sequence.ipynb
+    - text & categorical-set: tutorial/categorical_set_feature.ipynb
     # TODO: boolean, and text
   - Deep learning:
     - with TensorFlow: tutorial/compose_with_tf.ipynb
