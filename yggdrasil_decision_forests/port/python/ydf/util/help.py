@@ -17,12 +17,16 @@ def loading_data():
   class Help:
 
     def __str__(self) -> str:
-      return """\
+
+      extra_in_files = ""
+      extra_utilities = ""
+
+      return f"""\
 YDF supports the following dataset formats.
 
 In-Memory
 
-- Dict: {column_name: column_data}, where column_data can be lists of basic types or NumPy arrays (1D or 2D arrays for multi-dimensional columns).
+- Dict: {{column_name: column_data}}, where column_data can be lists of basic types or NumPy arrays (1D or 2D arrays for multi-dimensional columns).
 - Pandas DataFrame: No support for multi-dimensional columns.
 - Polars DataFrame.
 - Xarray Dataset.
@@ -38,19 +42,26 @@ Use typed paths (e.g., "format:/path") which can be sharded (e.g.`format:/path@n
 - `avro:`: Large datasets. Supports multi-dimensional columns.
 - `tfrecord:`: Compressed TensorFlow Record. Note: TFRecord are not RecordIOs.
 - `tfrecord-nocompression:`: Uncompressed TensorFlow Record.
+{extra_in_files}
 
-See `ydf.util.*` contains utilities for utilities to import datasets in memory.
+See `ydf.util.*` contains utilities for utilities to import datasets in memory:
+- `ydf.utils.read_tf_record`: Read TF Records.
+- `ydf.utils.write_tf_record`: Write TF Records.
+{extra_utilities}
 
 Googlers: See go/ydf/in_google for additional internal-only formats.
 """
 
     def _repr_html_(self) -> str:
-      return """\
+      extra_in_files = ""
+      extra_utilities = ""
+
+      return f"""\
 <p>YDF supports the following dataset formats.</p>
 
 <p><b>In-Memory</b></p>
 <ul>
-  <li><b>Dict:</b> <code>{column_name: column_data}</code>, where <code>column_data</code> can be lists of basic types or NumPy arrays (1D or 2D arrays for multi-dimensional columns).</li>
+  <li><b>Dict:</b> <code>{{column_name: column_data}}</code>, where <code>column_data</code> can be lists of basic types or NumPy arrays (1D or 2D arrays for multi-dimensional columns).</li>
   <li><b>Pandas DataFrame:</b> No support for multi-dimensional columns.</li>
   <li><b>Polars DataFrame</b>.</li>
   <li><b>Xarray Dataset</b>.</li>
@@ -68,9 +79,15 @@ Googlers: See go/ydf/in_google for additional internal-only formats.
   <li><b><code>avro:</code></b> Large datasets. Supports multi-dimensional columns.</li>
   <li><b><code>tfrecord:</code></b> Compressed TensorFlow Record. <i>Note:</i> TFRecord are not RecordIOs.</li>
   <li><b><code>tfrecord-nocompression:</code></b> Uncompressed TensorFlow Record.</li>
+  {extra_in_files}
 </ul>
 
-<p>See <code>ydf.util.*</code> for utilities to import datasets in memory.</p>
+<p>See <code>ydf.util.*</code> for utilities to import datasets in memory:</p>
+<ul>
+<li><b><code>ydf.utils.read_tf_record:</code></b> Read TF Records.</li>
+<li><b><code>ydf.utils.write_tf_record:</code></b> Write TF Records.</li>
+{extra_utilities}
+</ul>
 
 <p><b>Googlers:</b> See <a href="http://go/ydf/in_google">go/ydf/in_google</a> for additional internal-only formats.</p>
 """

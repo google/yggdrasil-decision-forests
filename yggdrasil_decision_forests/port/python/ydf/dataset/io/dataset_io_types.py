@@ -82,24 +82,5 @@ Do:
 
 
 SUPPORTED_INPUT_DATA_DESCRIPTION = """\
-A dataset can be one of the following:
-  1. A dictionary of string (column names) to column values. The values of a column can be a list of int, float, bool, str, bytes, or a NumPy array. A 2D NumPy array is treated as a multi-dimensional column.
-  2. A Pandas DataFrame. Does not support multi-dimensional columns.
-  3. A Polars DataFrame.
-  4. A Xarray dataset.
-  5. A YDF VerticalDataset created with `ydf.create_vertical_dataset`. This option is the most efficient when the same dataset is used multiple times.
-  6. A batched TensorFlow Dataset.
-  7. A typed path to a csv file e.g. "csv:/tmp/dataset.csv". See supported types below. The path can be sharded (e.g. "csv:/tmp/dataset@10") or globbed ("csv:/tmp/dataset*").
-  8. A list of typed paths e.g. ["csv:/tmp/data1.csv", "csv:/tmp/data2.csv"]. See supported types below.
-  9. A PyGrain DataLoader or Dataset (experimental, Linux only).
-
-The supported file formats and corresponding prefixes are:
-  - 'csv:' CSV files. Great for small datasets and integration with other
-    tools. CSV file do not support multi-dimensional columns.
-  - 'avro:' Avro files. Great for large datasets. Avro files support
-    multi-dimensional columns.
-  - 'tfrecord:' Compressed TFRecord of Tensorflow Examples. Official dataset format for TensorFlow. Great to work with TensorFlow and TFX pipelines.
-  - 'tfrecord-nocompression:' Non-compressed TFRecord of Tensorflow Examples. Only here is you forgot to enable compression when creating the TFRecord.
-  
-For Googlers, see go/ydf for more formats.
+To see all the ways to feed a dataset into ydf, run `ydf.help.loading_data()`.
 """
