@@ -121,17 +121,17 @@ class GenericLearner(abc.ABC):
     if tuner:
       tuner.set_base_learner(learner_name)
 
-    self.post_init()
+    self._post_init()
 
   # === Following are the virtual methods that a learner should implement ===
 
   @abc.abstractmethod
-  def post_init(self):
+  def _post_init(self):
     """Called after __init__."""
     raise NotImplementedError
 
   @abc.abstractmethod
-  def train_imp(
+  def _train_imp(
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset],
@@ -217,12 +217,12 @@ class GenericLearner(abc.ABC):
     raise NotImplementedError
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     raise NotImplementedError
 
   @abc.abstractmethod
   def extract_input_feature_names(self, ds: dataset.InputDataset) -> List[str]:
-    """Extracts the input features available in a dataset."""
+    """Extracts which input features of this model are available in the data."""
     raise NotImplementedError
 
   # === Following are the non virtual and general methods for all learners ===
@@ -309,7 +309,7 @@ class GenericLearner(abc.ABC):
     if valid is not None:
       if (
           self._feature_selector is None
-          and not self.__class__.capabilities().support_validation_dataset
+          and not self.__class__._capabilities().support_validation_dataset
       ):
         raise ValueError(
             f"The learner {self.__class__.__name__!r} does not use a"
@@ -337,7 +337,7 @@ class GenericLearner(abc.ABC):
     # Training
     saved_verbose = log.verbose(verbose) if verbose is not None else None
     try:
-      return self.train_imp(ds, valid, verbose)
+      return self._train_imp(ds, valid, verbose)
     finally:
       if saved_verbose is not None:
         log.verbose(saved_verbose)
@@ -472,14 +472,14 @@ Hyper-parameters: ydf.{self._hyperparameters}
 class GenericCCLearner(GenericLearner):
   """A generic YDF learner using YDF C++ for training."""
 
-  def post_init(self):
+  def _post_init(self):
     if self._explicit_learner_arguments is not None:
       self._hyperparameters = self._clean_up_hyperparameters(
           self._explicit_learner_arguments
       )
     self.validate_hyperparameters()
 
-  def train_imp(
+  def _train_imp(
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset],

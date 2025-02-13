@@ -179,6 +179,9 @@ plugins:
             separate_signature: true
             show_if_no_docstring: true
             filters: ["!^_", "^__init__$"]
+            extensions:
+            - griffe_inherited_docstrings
+
 
   - macros
   - mkdocs-jupyter:

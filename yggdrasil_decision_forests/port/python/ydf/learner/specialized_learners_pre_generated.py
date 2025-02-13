@@ -685,7 +685,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
     return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
         support_max_training_duration=True,
         resume_training=False,
@@ -1102,7 +1102,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
     return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
         support_max_training_duration=False,
         resume_training=False,
@@ -1908,7 +1908,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
         support_max_training_duration=True,
         resume_training=True,
@@ -2312,7 +2312,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
         support_max_training_duration=False,
         resume_training=True,
@@ -2913,7 +2913,7 @@ class CartLearner(generic_learner.GenericCCLearner):
     return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
         support_max_training_duration=True,
         resume_training=False,

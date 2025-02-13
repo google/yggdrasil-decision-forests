@@ -776,7 +776,7 @@ $8
   absl::SubstituteAndAppend(
       &wrapper, R"(
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
       support_max_training_duration=$0,
       resume_training=$1,

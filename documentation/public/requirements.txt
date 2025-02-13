@@ -9,3 +9,4 @@ mkdocs-gen-files
 mkdocstrings[python]
 mkdocstrings-crystal
 black
+griffe_inherited_docstrings

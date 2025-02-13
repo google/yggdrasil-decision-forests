@@ -367,7 +367,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
     return super().train(ds=ds, valid=valid, verbose=verbose)
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
       support_max_training_duration=False,
       resume_training=True,

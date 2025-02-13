@@ -39,7 +39,6 @@ from ydf.version import version as __version__
 
 # Learner
 from ydf.learner.generic_learner import GenericLearner
-from ydf.learner.generic_learner import GenericCCLearner
 from ydf.learner.specialized_learners import CartLearner
 from ydf.learner.specialized_learners import RandomForestLearner
 from ydf.learner.specialized_learners import GradientBoostedTreesLearner

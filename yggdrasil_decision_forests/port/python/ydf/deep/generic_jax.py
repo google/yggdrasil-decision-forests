@@ -629,7 +629,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
     )
 
   @classmethod
-  def capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
+  def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
         support_validation_dataset=True,
         require_label=True,
@@ -640,7 +640,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
   def model_class(self) -> GenericJAXModelClass:
     raise NotImplementedError
 
-  def post_init(self):
+  def _post_init(self):
     pass
 
   def _learning_rate(
@@ -698,7 +698,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
         f" columns are: {[c.name for c in dataspec.columns]!r}"
     )
 
-  def train_imp(
+  def _train_imp(
       self,
       ds: dataset_lib.InputDataset,
       valid: Optional[dataset_lib.InputDataset],
