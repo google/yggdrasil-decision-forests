@@ -52,7 +52,7 @@ BinaryFocalLoss::BinaryFocalLoss(
 absl::Status BinaryFocalLoss::Status() const {
   if (task_ != model::proto::Task::CLASSIFICATION)
     return absl::InvalidArgumentError(
-        "Focal loss is only compatible with a classification task");
+        "Focal loss is only compatible with a binary classification task");
   if (label_column_.categorical().number_of_unique_values() != 3)
     return absl::InvalidArgumentError(
         "Focal loss is only compatible with a BINARY classification task");

@@ -1,5 +1,11 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+-   Expose losses for distributed training.
+
 ## 0.10.0 - 2025-02-11
 
 ### Feature

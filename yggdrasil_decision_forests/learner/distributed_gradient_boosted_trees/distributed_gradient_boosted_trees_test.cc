@@ -15,10 +15,13 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include <cstddef>
 #include <random>
 #include <string>
+#include <vector>
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "absl/debugging/leak_check.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
@@ -29,11 +32,10 @@
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
-#include "yggdrasil_decision_forests/utils/concurrency.h"
-#include "yggdrasil_decision_forests/utils/csv.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
-#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 
@@ -102,6 +104,23 @@ TEST_F(DatasetAdult, Base_2workers) {
   // Note: This result does not take early stopping into account.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
+}
+
+TEST_F(DatasetAdult, BinaryFocalLoss) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(1);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_shrinkage(0.1f);
+  gbt_config->set_validation_set_ratio(0.0);
+  gbt_config->set_loss(gradient_boosted_trees::proto::BINARY_FOCAL_LOSS);
+  TrainAndEvaluateModel();
+
+  LOG(INFO) << train_config_;
+  LOG(INFO) << model_->DescriptionAndStatistics(true);
+
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.866, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.27, 0.01);
 }
 
 TEST_F(DatasetAdult, Base_5workers) {
