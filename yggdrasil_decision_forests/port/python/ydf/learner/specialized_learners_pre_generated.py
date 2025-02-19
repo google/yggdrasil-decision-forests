@@ -2066,6 +2066,14 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       returns the pre-link function model output. For example, in the case of
       binary classification, the pre-link function output is a logic while the
       post-link function is a probability. Default: True.
+    focal_loss_alpha: EXPERIMENTAL, default 0.5. Weighting parameter for focal
+      loss, positive samples weighted by alpha, negative samples by (1-alpha).
+      The default 0.5 value means no active class-level weighting. Only used
+      with focal loss i.e. `loss="BINARY_FOCAL_LOSS"` Default: None.
+    focal_loss_gamma: EXPERIMENTAL, default 2.0. Exponent of the misprediction
+      exponent term in focal loss, corresponds to gamma parameter in
+      https://arxiv.org/pdf/1708.02002.pdf. Only used with focal loss i.e.
+        `loss="BINARY_FOCAL_LOSS"` Default: None.
     force_numerical_discretization: If false, only the numerical column
       safisfying "max_unique_values_for_discretized_numerical" will be
       discretized. If true, all the numerical columns will be discretized.
@@ -2073,6 +2081,25 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       unique values will be approximated with
       "max_unique_values_for_discretized_numerical" bins. This parameter will
       impact the model training. Default: False.
+    loss: The loss optimized by the model. If not specified (DEFAULT) the loss
+      is selected automatically according to the \\"task\\" and label
+      statistics. For example, if task=CLASSIFICATION and the label has two
+      possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible
+      values are: - `DEFAULT`: Select the loss automatically according to the
+      task and label statistics. - `BINOMIAL_LOG_LIKELIHOOD`: Binomial log
+      likelihood. Only valid for binary classification. - `SQUARED_ERROR`: Least
+      square loss. Only valid for regression. - `POISSON`: Poisson log
+      likelihood loss. Mainly used for counting problems. Only valid for
+      regression. - `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood
+      i.e. cross-entropy. Only valid for binary or multi-class classification. -
+      `LAMBDA_MART_NDCG`: LambdaMART with NDCG@5. - `XE_NDCG_MART`:  Cross
+      Entropy Loss NDCG. See arxiv.org/abs/1911.09798. - `BINARY_FOCAL_LOSS`:
+      Focal loss. Only valid for binary classification. See
+      https://arxiv.org/pdf/1708.02002.pdf. - `POISSON`: Poisson log likelihood.
+        Only valid for regression. - `MEAN_AVERAGE_ERROR`: Mean average error
+        a.k.a. MAE. - `LAMBDA_MART_NDCG5`: DEPRECATED, use LAMBDA_MART_NDCG.
+        LambdaMART with NDCG@5.
+        Default: "DEFAULT".
     max_depth: Maximum depth of the tree. `max_depth=1` means that all trees
       will be roots. `max_depth=-1` means that tree depth is not restricted by
       this parameter. Values <= -2 will be ignored. Default: 6.
@@ -2180,7 +2207,10 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
           abstract_learner_pb2.TrainingConfig
       ] = None,
       apply_link_function: bool = True,
+      focal_loss_alpha: Optional[float] = None,
+      focal_loss_gamma: Optional[float] = None,
       force_numerical_discretization: bool = False,
+      loss: str = "DEFAULT",
       max_depth: int = 6,
       max_unique_values_for_discretized_numerical: int = 16000,
       maximum_model_size_in_memory_in_bytes: float = -1.0,
@@ -2208,7 +2238,10 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
 
     hyper_parameters = {
         "apply_link_function": apply_link_function,
+        "focal_loss_alpha": focal_loss_alpha,
+        "focal_loss_gamma": focal_loss_gamma,
         "force_numerical_discretization": force_numerical_discretization,
+        "loss": loss,
         "max_depth": max_depth,
         "max_unique_values_for_discretized_numerical": (
             max_unique_values_for_discretized_numerical
