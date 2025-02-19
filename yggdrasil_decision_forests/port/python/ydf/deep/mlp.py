@@ -20,6 +20,7 @@ from flax import linen as nn
 import jax
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.dataset import dataspec as dataspec_lib
+from ydf.deep import deep_model_pb2
 from ydf.deep import generic_jax
 from ydf.deep import hyperparameter as hyperparameter_lib
 from ydf.deep import layer as layer_lib
@@ -49,6 +50,13 @@ class MultiLayerPerceptronModel(generic_jax.GenericJAXModel):
   def name(cls) -> str:
     return _MODEL_AND_LEARNER_KEY
 
+  def _build_proto_config(self, model_proto: deep_model_pb2.DeepModel) -> None:
+    if self.config is None:
+      raise ValueError("Empty configuration")
+    model_proto.Extensions[deep_model_pb2.mlp_config].CopyFrom(
+        self.config._to_proto()
+    )
+
   def set_config_from_hyperparameters(
       self, hps: hyperparameter_lib.HyperparameterConsumer
   ) -> None:
@@ -57,6 +65,9 @@ class MultiLayerPerceptronModel(generic_jax.GenericJAXModel):
         layer_size=hps.get_int(_HP_LAYER_SIZE),
         drop_out=hps.get_float(_HP_DROP_OUT),
     )
+
+  def set_config_from_proto(self, config_proto: deep_model_pb2.MLP):
+    self.config = MultiLayerPerceptronImpl.Config._from_proto(config_proto)
 
   def make_jax_module(self):
     return MultiLayerPerceptronImpl(model=self, config=self.config)
@@ -67,9 +78,29 @@ class MultiLayerPerceptronImpl(nn.Module):
 
   @dataclasses.dataclass
   class Config:
+    """Configuration objects for the MLP.
+
+    Attributes:
+      num_layers: Number of hidden layers.
+      layer_size: Number of neurons in each hidden layer.
+      drop_out: Dropout rate.
+    """
+    # LINT.IfChange(MLP)
     num_layers: int
     layer_size: int
     drop_out: float
+
+    def _to_proto(self) -> deep_model_pb2.MLP:
+      return deep_model_pb2.MLP(**dataclasses.asdict(self))
+
+    @classmethod
+    def _from_proto(
+        cls, proto: deep_model_pb2.MLP
+    ) -> "MultiLayerPerceptronImpl.Config":
+      proto_fields = {
+          field_name.name: value for field_name, value in proto.ListFields()
+      }
+      return cls(**proto_fields)
 
   model: MultiLayerPerceptronModel
   config: Config

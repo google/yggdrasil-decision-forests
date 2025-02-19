@@ -21,6 +21,7 @@ import jax
 import jax.numpy as jnp
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.dataset import dataspec as dataspec_lib
+from ydf.deep import deep_model_pb2
 from ydf.deep import generic_jax
 from ydf.deep import hyperparameter as hyperparameter_lib
 from ydf.deep import layer as layer_lib
@@ -51,19 +52,32 @@ class TabularTransformerModel(generic_jax.GenericJAXModel):
   def name(cls) -> str:
     return _MODEL_AND_LEARNER_KEY
 
+  def _build_proto_config(self, model_proto: deep_model_pb2.DeepModel) -> None:
+    if self.config is not None:
+      model_proto.Extensions[
+          deep_model_pb2.tabular_transformer_config
+      ].CopyFrom(self.config._to_proto())
+
   def set_config_from_hyperparameters(
       self, hps: hyperparameter_lib.HyperparameterConsumer
   ) -> None:
     self.config = TabularTransformerImpl.Config(
         num_layers=hps.get_int(_HP_NUM_LAYERS),
         drop_out=hps.get_float(_HP_DROP_OUT),
-        token_dim=hps.get_int(_HP_TOKEN_DIM),
         num_heads=hps.get_int(_HP_NUM_HEADS),
         qkv_features=hps.get_int(_HP_QKV_FEATURES),
+        tokenizer=FTTransformerTokenizer.Config(
+            token_dim=hps.get_int(_HP_TOKEN_DIM)
+        ),
     )
 
   def make_jax_module(self):
     return TabularTransformerImpl(model=self, config=self.config)
+
+  def set_config_from_proto(
+      self, config_proto: deep_model_pb2.TabularTransformer
+  ) -> None:
+    self.config = TabularTransformerImpl.Config._from_proto(config_proto)
 
 
 class TabularTransformerImpl(nn.Module):
@@ -71,11 +85,45 @@ class TabularTransformerImpl(nn.Module):
 
   @dataclasses.dataclass
   class Config:
+    """Configuration objects for the Tabular Transformer.
+
+    Attributes:
+      num_layers: Number of attention layers.
+      drop_out: Dropout rate.
+      num_heads: Number of attention heads per layer.
+      qkv_features: Dimension of the key, query, and value inside the attention
+        module.
+      tokenizer: Configuration of the Tokenizer
+    """
+    # LINT.IfChange(TabularTransformer)
     num_layers: int
     drop_out: float
-    token_dim: int
     num_heads: int
     qkv_features: int
+    tokenizer: "FTTransformerTokenizer.Config"
+
+    def _to_proto(self) -> deep_model_pb2.TabularTransformer:
+      return deep_model_pb2.TabularTransformer(
+          num_layers=self.num_layers,
+          drop_out=self.drop_out,
+          num_heads=self.num_heads,
+          qkv_features=self.qkv_features,
+          ft_tokenizer=deep_model_pb2.FTTokenizer(
+              token_dim=self.tokenizer.token_dim
+          ),
+      )
+
+    @classmethod
+    def _from_proto(cls, config_proto: deep_model_pb2.TabularTransformer):
+      return TabularTransformerImpl.Config(
+          num_layers=config_proto.num_layers,
+          drop_out=config_proto.drop_out,
+          num_heads=config_proto.num_heads,
+          qkv_features=config_proto.qkv_features,
+          tokenizer=FTTransformerTokenizer.Config(
+              token_dim=config_proto.ft_tokenizer.token_dim
+          ),
+      )
 
   model: TabularTransformerModel
   config: Config
@@ -90,7 +138,7 @@ class TabularTransformerImpl(nn.Module):
       x = self.model._preprocessor.apply_inmodel(x)
 
     with jax.profiler.TraceAnnotation("tokenize"):
-      x = FTTransformerTokenizer(token_dim=self.config.token_dim)(x)
+      x = FTTransformerTokenizer(config=self.config.tokenizer)(x)
       assert len(x.shape) == 3
 
     for i in range(self.config.num_layers):
@@ -111,13 +159,13 @@ class TabularTransformerImpl(nn.Module):
       with jax.profiler.TraceAnnotation("dense"):
         save_x = x
         x = batch_norm(x, name=f"layer_{i}_batchnorm_2")
-        x = nn.Dense(features=self.config.token_dim, name=f"layer_{i}_dense_1")(
-            x
-        )
+        x = nn.Dense(
+            features=self.config.tokenizer.token_dim, name=f"layer_{i}_dense_1"
+        )(x)
         x = nn.gelu(x)
-        x = nn.Dense(features=self.config.token_dim, name=f"layer_{i}_dense_2")(
-            x
-        )
+        x = nn.Dense(
+            features=self.config.tokenizer.token_dim, name=f"layer_{i}_dense_2"
+        )(x)
         x = x + save_x
         assert len(x.shape) == 3
 
@@ -136,7 +184,18 @@ class FTTransformerTokenizer(nn.Module):
     token_dim: Number of dimensions of the feature embeddings.
   """
 
-  token_dim: int = 192
+  @dataclasses.dataclass
+  class Config:
+    """Configuration objects for the FT-Transformer tokenizer.
+
+    Attributes:
+      token_dim: Number of dimensions of the feature embeddings.
+    """
+
+    # LINT.IfChange(FTTokenizer)
+    token_dim: int = 192
+
+  config: Config
 
   @nn.compact
   def __call__(self, x: List[Tuple[layer_lib.Feature, jax.Array]]) -> jax.Array:
@@ -145,7 +204,7 @@ class FTTransformerTokenizer(nn.Module):
         v = jnp.expand_dims(v, axis=1)
       return v
 
-    # List of feature tokens. Each token is of shape [batch, n, token_dim]
+    # List of feature tokens. Each token is of shape [batch, n, config.token_dim]
     tokens: List[jax.Array] = []
 
     # Encode numerical features
@@ -165,7 +224,7 @@ class FTTransformerTokenizer(nn.Module):
           nn.initializers.kaiming_uniform(),
           (
               numerical_values.shape[1],
-              self.token_dim,
+              self.config.token_dim,
           ),
       )
       numerical_tokens = jnp.einsum(
@@ -180,7 +239,7 @@ class FTTransformerTokenizer(nn.Module):
         value = ensure_shape2(value)
         embedded_value = nn.Embed(
             num_embeddings=feature.num_categorical_values,
-            features=self.token_dim,
+            features=self.config.token_dim,
             name=f"embedding_{feature.name}",
         )(value)
         if len(embedded_value.shape) == 2:
@@ -193,7 +252,9 @@ class FTTransformerTokenizer(nn.Module):
 
     # Start token
     batch_size = tokens[0].shape[0]
-    cls_token = jnp.zeros((batch_size, 1, self.token_dim), dtype=jnp.float32)
+    cls_token = jnp.zeros(
+        (batch_size, 1, self.config.token_dim), dtype=jnp.float32
+    )
 
     # Group tokens
     token_array = jnp.concatenate([cls_token] + tokens, axis=1)

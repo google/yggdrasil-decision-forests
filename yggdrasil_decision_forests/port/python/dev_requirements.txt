@@ -20,3 +20,4 @@ fastavro
 polars
 flax; platform_machine != 'aarch64' and platform_system != 'Windows'
 tqdm
+safetensors

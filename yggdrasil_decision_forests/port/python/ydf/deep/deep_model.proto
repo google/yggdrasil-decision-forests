@@ -1,0 +1,84 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.deep.proto;
+
+option java_multiple_files = true;
+
+message DeepModel {
+  optional Preprocessor preprocessor = 1;
+
+  optional Weights weights = 2;
+
+  // Learner-specific configuration.
+  extensions 1000 to max;
+}
+
+message Weights {
+  enum Format {
+    INVALID = 0;
+    // Use the safetensors library. See
+    // https://huggingface.co/docs/safetensors/index for a description of the
+    // format.
+    SAFETENSORS = 1;
+  }
+  // How the model weights are stored.
+  optional Format format = 1;
+}
+
+// LINT.IfChange(Preprocessor)
+message Preprocessor {
+  // Compute the z-scores of numerical features.
+  optional bool numerical_zscore = 1;
+  // Compute the quantiles of numerical features.
+  optional bool numerical_quantiles = 2;
+}
+
+// LINT.IfChange(TabularTransformer)
+message TabularTransformer {
+  // How many attention layers are stacked inside the transformer.
+  optional int32 num_layers = 1;
+  // Dropout fraction at each level.
+  optional float drop_out = 2;
+  // Number of attention heads per layer.
+  optional int32 num_heads = 3;
+  // Dimension of the key, query, and value inside the attention module.
+  optional int32 qkv_features = 4;
+  // Configuration of the FTTokenizer.
+  optional FTTokenizer ft_tokenizer = 5;
+}
+
+// LINT.IfChange(FTTokenizer)
+message FTTokenizer {
+  // Dimensionality of the initial embedding tokens.
+  optional int32 token_dim = 1;
+}
+
+// LINT.IfChange(MLP)
+message MLP {
+  // How many dense layers stacked in the MLP.
+  optional int32 num_layers = 1 [default = 8];
+  // The number of neurons per layer.
+  optional int32 layer_size = 2 [default = 200];
+  // Dropout fraction at each level.
+  optional float drop_out = 3 [default = 0.05];
+}
+
+extend DeepModel {
+  optional MLP mlp_config = 1000;
+  optional TabularTransformer tabular_transformer_config = 1001;
+}

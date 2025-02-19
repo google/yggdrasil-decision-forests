@@ -103,8 +103,31 @@ py_library(
     deps = [":log"],
 )
 
+py_library(
+    name = "filesystem",
+    srcs = ["filesystem.py"],
+    deps = [
+        ":filesystem_default",
+    ],
+)
+
+py_library(
+    name = "filesystem_default",
+    srcs = ["filesystem_default.py"],
+    deps = [],
+)
+
 # Tests
 # =====
+
+py_test(
+    name = "filesystem_test",
+    srcs = ["filesystem_test.py"],
+    deps = [
+        ":filesystem",
+        # absl/testing:parameterized dep,
+    ],
+)
 
 py_test(
     name = "func_helpers_test",

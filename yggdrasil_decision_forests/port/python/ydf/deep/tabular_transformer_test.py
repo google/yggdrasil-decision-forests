@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from ydf.deep import layer as layer_lib
+from ydf.deep import model_lib
 from ydf.deep import tabular_transformer
 from ydf.model import generic_model as generic_model_lib
 from ydf.utils import test_utils
@@ -41,7 +42,9 @@ Feature = layer_lib.Feature
 class FTTransformerTokenizerTest(parameterized.TestCase):
 
   def test_basic(self):
-    m = tabular_transformer.FTTransformerTokenizer(token_dim=3)
+    m = tabular_transformer.FTTransformerTokenizer(
+        tabular_transformer.FTTransformerTokenizer.Config(token_dim=3)
+    )
     x = [
         (Feature("n1", FeatureType.NUMERICAL), jnp.array([1, 2])),
         (Feature("n2", FeatureType.NUMERICAL), jnp.array([[1, 2], [3, 4]])),
@@ -182,6 +185,22 @@ class TabularTransformerTest(parameterized.TestCase):
     self.assertEqual(predictions.shape, (len(test_ds), 3))
     evaluation = model.evaluate(test_ds)
     logging.info("Evaluation:\n%s", evaluation)
+
+  def test_save_and_load(self):
+    train_ds, test_ds = test_utils.split_ds(self.abalone)
+    learner = tabular_transformer.TabularTransformerLearner(
+        label="Rings",
+        allow_cpu=True,
+        task=generic_model_lib.Task.REGRESSION,
+        num_epochs=5,
+    )
+    model = learner.train(train_ds, valid=test_ds, verbose=2)
+    predictions = model.predict(test_ds)
+    ydf_model_path = os.path.join(self.create_tempdir().full_path, "ydf_model")
+    model.save(ydf_model_path)
+    loaded_model = model_lib.load_model(ydf_model_path)
+    loaded_model_predictions = loaded_model.predict(test_ds)
+    np.testing.assert_almost_equal(predictions, loaded_model_predictions)
 
 
 if __name__ == "__main__":

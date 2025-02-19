@@ -26,6 +26,7 @@ import pandas as pd
 from ydf.dataset import dataspec as dataspec_lib
 from ydf.dataset.io import dataset_io as dataset_io_lib
 from ydf.deep import mlp
+from ydf.deep import model_lib
 from ydf.learner import specialized_learners
 from ydf.model import generic_model as generic_model_lib
 from ydf.utils import test_utils
@@ -184,6 +185,24 @@ class MLPTest(parameterized.TestCase):
     _ = model.predict(test_ds)
     evaluation = model.evaluate(test_ds)
     logging.info("Evaluation:\n%s", evaluation)
+
+  def test_save_and_load(self):
+    train_ds, test_ds = test_utils.split_ds(self.abalone)
+    learner = mlp.MultiLayerPerceptronLearner(
+        label="Rings",
+        task=generic_model_lib.Task.REGRESSION,
+        num_epochs=5,
+        num_layers=2,
+        layer_size=100,
+        drop_out=0.1,
+    )
+    model = learner.train(train_ds, valid=test_ds, verbose=2)
+    predictions = model.predict(test_ds)
+    ydf_model_path = os.path.join(self.create_tempdir().full_path, "ydf_model")
+    model.save(ydf_model_path)
+    loaded_model = model_lib.load_model(ydf_model_path)
+    loaded_model_predictions = loaded_model.predict(test_ds)
+    np.testing.assert_almost_equal(predictions, loaded_model_predictions)
 
 
 if __name__ == "__main__":

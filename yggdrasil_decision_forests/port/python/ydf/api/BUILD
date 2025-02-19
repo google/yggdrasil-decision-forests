@@ -28,6 +28,7 @@ py_library(
     deps = [
         "//ydf/deep:jax_fallback",
         "//ydf/deep:mlp",
+        "//ydf/deep:model_lib",
         "//ydf/deep:tabular_transformer",
     ],
 )

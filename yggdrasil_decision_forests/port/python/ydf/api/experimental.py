@@ -33,6 +33,9 @@ elif importlib.util.find_spec("jax") is not None:
     from ydf.deep.tabular_transformer import TabularTransformerModel
     from ydf.deep.tabular_transformer import TabularTransformerLearner
 
+    # TODO: Hook into ydf.load_model
+    from ydf.deep.model_lib import load_model
+
     _has_experimental = True
   except Exception as e:
     _experimental_import_error = str(e)

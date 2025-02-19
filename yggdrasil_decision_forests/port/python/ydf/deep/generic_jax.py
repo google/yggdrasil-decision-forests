@@ -19,6 +19,7 @@ import dataclasses
 import functools
 import logging
 import math
+import os
 import time
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Tuple, Type, TypeVar, Union
 
@@ -27,6 +28,8 @@ import jax.numpy as jnp
 import jaxtyping
 import numpy as np
 import optax
+import safetensors
+import safetensors.flax
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
@@ -38,9 +41,11 @@ from ydf.dataset.io import dataset_io as dataset_io_lib
 from ydf.dataset.io import generator as generator_lib
 from ydf.deep import analysis as py_analysis_lib
 from ydf.deep import dataset as deep_dataset_lib
+from ydf.deep import deep_model_pb2
 from ydf.deep import hyperparameter as hyperparameter_lib
 from ydf.deep import metric as deep_metric_lib
 from ydf.deep import preprocessor as preprocessor_lib
+from ydf.deep import safetensors as safetensors_lib
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters as hp_lib
@@ -53,6 +58,7 @@ from ydf.model import generic_model
 from ydf.model import model_metadata
 from ydf.model import optimizer_logs
 from ydf.utils import concurrency
+from ydf.utils import filesystem
 from ydf.utils import html
 from ydf.utils import log
 from yggdrasil_decision_forests.utils import model_analysis_pb2
@@ -87,6 +93,12 @@ LearningRatePolicy = Literal[
 
 _HP_MAXIMUM_TRAINING_DURATION_SECONDS = "maximum_training_duration_seconds"
 
+_WEIGHTS_FILE_NAME = "weights"
+_ABSTRACT_MODEL_FILE_NAME = "abstract_model.pb"
+_DATA_SPEC_FILE_NAME = "data_spec.pb"
+_DEEP_MODEL_PROTO_FILE_NAME = "config.pb"
+_DONE_FILE_NAME = "done"
+
 PyTree = jaxtyping.PyTree
 Batch = deep_dataset_lib.JaxExampleBatch  # Batch of observations
 ModelState = PyTree  # The state of the model (generally Params + BatchState).
@@ -100,14 +112,13 @@ ApplyModelFn = Callable[
 GenericJAXModelClass = Type[TypeVar("B", bound="GenericJAXModel")]
 
 
-# Bath size used to generate model predictions
+# Batch size used to generate model predictions
 # TODO: Is there value to parametrize it?
 _PREDICT_BATCH_SIZE = 256
 
 # If true, print the value of intermediate JAX arrays during training. Great for
 # debugging.
 _DEBUG_PRINT = False
-
 
 def jax_debug(name: str, x: jax.Array) -> None:
   """Prints the content of a jax array at runtime if debug prints is enabled."""
@@ -131,7 +142,7 @@ class Objective:
 
 
 class GenericJAXModel(generic_model.GenericModel):
-  """Abstract class for all the JAX based YDF models."""
+  """Abstract base class for all the JAX based YDF models."""
 
   def __init__(
       self,
@@ -220,6 +231,10 @@ class GenericJAXModel(generic_model.GenericModel):
   def __setstate__(self, state):
     raise NotImplementedError  # TODO: Implement.
 
+  @abc.abstractmethod
+  def _build_proto_config(self, model_proto: deep_model_pb2.DeepModel) -> None:
+    raise NotImplementedError
+
   def task(self) -> generic_model.Task:
     return generic_model.Task._from_proto_type(self._abstract_model_proto.task)  # pylint: disable=protected-access
 
@@ -291,7 +306,37 @@ class GenericJAXModel(generic_model.GenericModel):
       advanced_options=generic_model.ModelIOOptions(),
       pure_serving: bool = False,
   ) -> None:
-    raise NotImplementedError  # TODO: Implement.
+    if self._model_state is None:
+      raise ValueError("This model has not been trained")
+
+    weights_file = filesystem.Path(path) / _WEIGHTS_FILE_NAME
+    abstract_model_file = filesystem.Path(path) / _ABSTRACT_MODEL_FILE_NAME
+    data_spec_file = filesystem.Path(path) / _DATA_SPEC_FILE_NAME
+    deep_model_proto_file = filesystem.Path(path) / _DEEP_MODEL_PROTO_FILE_NAME
+    done_file = filesystem.Path(path) / _DONE_FILE_NAME
+
+    deep_model_proto = deep_model_pb2.DeepModel(
+        preprocessor=self._preprocessor.to_proto(),
+        weights=deep_model_pb2.Weights(
+            format=deep_model_pb2.Weights.SAFETENSORS
+        ),
+    )
+    self._build_proto_config(deep_model_proto)
+
+    os.makedirs(path, exist_ok=False)
+    with filesystem.Open(weights_file, "wb") as f:
+      f.write(
+          safetensors.flax.save(
+              safetensors_lib.flatten_weights(self._model_state)
+          )
+      )
+    with filesystem.Open(abstract_model_file, "wb") as f:
+      f.write(self._abstract_model_proto.SerializeToString())
+    with filesystem.Open(data_spec_file, "wb") as f:
+      f.write(self._dataspec.SerializeToString())
+    with filesystem.Open(deep_model_proto_file, "wb") as f:
+      f.write(deep_model_proto.SerializeToString())
+    done_file.touch()
 
   def serialize(self) -> bytes:
     raise NotImplementedError  # TODO: Implement.
@@ -491,7 +536,7 @@ class GenericJAXModel(generic_model.GenericModel):
       can_be_saved: bool = True,
       squeeze_binary_classification: bool = True,
       force: bool = False,
-  ) -> "tensorflow.Module":
+  ) -> Any:
     raise NotImplementedError  # TODO: Implement.
 
   def to_jax_function(  # pytype: disable=name-error
@@ -499,8 +544,8 @@ class GenericJAXModel(generic_model.GenericModel):
       jit: bool = True,
       apply_activation: bool = True,
       leaves_as_params: bool = False,
-      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",
-  ) -> "export_jax.JaxModel":
+      compatibility: Union[str, Any] = "XLA",
+  ) -> Any:
     raise NotImplementedError  # TODO: Implement.
 
   def update_with_jax_params(self, params: Dict[str, Any]):
