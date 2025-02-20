@@ -60,7 +60,7 @@ class ConfusionMatrix:
     )
 
   def value(self, prediction_idx: int, label_idx: int) -> float:
-    return self.matrix[label_idx, prediction_idx]
+    return self.matrix[prediction_idx, label_idx]
 
 
 @dataclasses.dataclass

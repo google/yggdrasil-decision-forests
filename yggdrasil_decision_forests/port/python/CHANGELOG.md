@@ -6,6 +6,10 @@
 
 -   Expose losses for distributed training.
 
+### Fix
+
+-   Fix incorrectly transposed confusion table in HTML.
+
 ## 0.10.0 - 2025-02-11
 
 ### Feature
