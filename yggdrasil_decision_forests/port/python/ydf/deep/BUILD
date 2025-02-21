@@ -328,6 +328,7 @@ py_test(
 
 py_test(
     name = "tabular_transformer_test",
+    size = "large",
     srcs = ["tabular_transformer_test.py"],
     data = [
         "//test_data",
