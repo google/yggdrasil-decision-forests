@@ -964,7 +964,7 @@ Use `model.describe()` for more details
       can_be_saved: bool = True,
       squeeze_binary_classification: bool = True,
       force: bool = False,
-  ) -> "tensorflow.Module":
+  ) -> "tensorflow.Module":  # pylint: disable=undefined-variable
     """Converts the YDF model into a @tf.function callable TensorFlow Module.
 
     The output module can be composed with other TensorFlow operations,
@@ -1033,8 +1033,8 @@ Use `model.describe()` for more details
       jit: bool = True,
       apply_activation: bool = True,
       leaves_as_params: bool = False,
-      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",
-  ) -> "export_jax.JaxModel":
+      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",  # pylint: disable=undefined-variable
+  ) -> "export_jax.JaxModel":  # pylint: disable=undefined-variable
     """Converts the YDF model into a JAX function.
 
     Usage example:
@@ -1738,7 +1738,7 @@ class GenericCCModel(GenericModel):
       can_be_saved: bool = True,
       squeeze_binary_classification: bool = True,
       force: bool = False,
-  ) -> "tensorflow.Module":
+  ) -> "tensorflow.Module":  # pylint: disable=undefined-variable
     return _get_export_tf().ydf_model_to_tf_function(
         ydf_model=self,
         temp_dir=temp_dir,
@@ -1751,8 +1751,8 @@ class GenericCCModel(GenericModel):
       jit: bool = True,
       apply_activation: bool = True,
       leaves_as_params: bool = False,
-      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",
-  ) -> "export_jax.JaxModel":
+      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",  # pylint: disable=undefined-variable
+  ) -> "export_jax.JaxModel":  # pylint: disable=undefined-variable
     return _get_export_jax().to_jax_function(
         model=self,
         jit=jit,
