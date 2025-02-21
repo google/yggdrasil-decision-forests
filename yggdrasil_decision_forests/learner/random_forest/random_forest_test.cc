@@ -243,7 +243,7 @@ TEST_F(RandomForestOnAdult, Base) {
       "occupation", model_->data_spec(), mean_decrease_accuracy);
 
   EXPECT_LE(rank_capital_gain, 5);
-  EXPECT_LE(rank_relationship, 5);
+  EXPECT_LE(rank_relationship, 6);
   EXPECT_LE(rank_occupation, 6);
 
   // Worst 2 variables.

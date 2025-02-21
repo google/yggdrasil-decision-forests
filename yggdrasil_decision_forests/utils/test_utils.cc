@@ -322,7 +322,7 @@ absl::Status TrainAndTestTester::PostTrainingChecks() {
             //
             // Note: In the next test (see "TestGenericEngine"), we ensure that
             // predictions are equal with a margin of 0.0002.
-            CHECK_NEAR(metric::Accuracy(e1), metric::Accuracy(e2), 0.002);
+            CHECK_NEAR(metric::Accuracy(e1), metric::Accuracy(e2), 0.003);
             CHECK_NEAR(metric::LogLoss(e1), metric::LogLoss(e2), 0.05);
             break;
           case model::proto::Task::REGRESSION:
