@@ -245,39 +245,126 @@ pybind_library(
 # Tests
 # =====
 
+py_library(
+    name = "learner_test_utils",
+    testonly = 1,
+    srcs = ["learner_test_utils.py"],
+    deps = [
+        ":generic_learner",
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/metric",
+        "//ydf/model:generic_model",
+        "//ydf/model:model_lib",
+        "//ydf/utils:test_utils",
+    ],
+)
+
 py_test(
-    name = "learner_test",
+    name = "generic_learner_test",
+    srcs = ["generic_learner_test.py"],
+    deps = [
+        ":generic_learner",
+        ":specialized_learners",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # fastavro dep,
+        # numpy dep,
+        # # polars dep,  # TODO: Re-enable.
+        # pandas dep,
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/model:generic_model",
+        "//ydf/utils:log",
+    ],
+)
+
+py_test(
+    name = "random_forest_learner_test",
     size = "large",
-    srcs = ["learner_test.py"],
+    srcs = ["random_forest_learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     shard_count = 10,
     tags = [
     ],
     deps = [
         ":generic_learner",
+        ":learner_test_utils",
         ":specialized_learners",
         ":tuner",
         # absl/logging dep,
         # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # fastavro dep,
         # numpy dep,
         # pandas dep,
-        # # polars dep,  # TODO: Re-enable.
-        # sklearn dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
+        "//ydf/dataset:dataspec",
+        "//ydf/model/decision_forest_model",
+        "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
+    name = "gradient_boosted_trees_learner_test",
+    size = "large",
+    srcs = ["gradient_boosted_trees_learner_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    shard_count = 10,
+    deps = [
+        ":generic_learner",
+        ":learner_test_utils",
+        ":specialized_learners",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/dataset:dataspec",
-        "//ydf/metric",
-        "//ydf/model:generic_model",
-        "//ydf/model:model_lib",
         "//ydf/model/decision_forest_model",
+        "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
+    name = "cart_learner_test",
+    srcs = ["cart_learner_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":generic_learner",
+        ":learner_test_utils",
+        ":specialized_learners",
+        ":tuner",
+        # absl/testing:absltest dep,
+        # numpy dep,
+        "//ydf/dataset:dataspec",
+        "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
+    name = "isolation_forest_learner_test",
+    size = "large",
+    srcs = ["isolation_forest_learner_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    shard_count = 10,
+    deps = [
+        ":generic_learner",
+        ":learner_test_utils",
+        ":specialized_learners",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # sklearn dep,
         "//ydf/model/tree:condition",
         "//ydf/model/tree:node",
-        "//ydf/utils:log",
-        "//ydf/utils:test_utils",
     ],
 )
 
