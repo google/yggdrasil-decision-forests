@@ -5,6 +5,7 @@
 ### Feature
 
 -   Expose losses for distributed training.
+-   Add `class_weights` parameter to the learners.
 
 ### Fix
 

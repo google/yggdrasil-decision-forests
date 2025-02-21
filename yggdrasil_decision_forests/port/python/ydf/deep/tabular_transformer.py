@@ -15,7 +15,7 @@
 """Tabular Transformer."""
 
 import dataclasses
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 from flax import linen as nn
 import jax
 import jax.numpy as jnp
@@ -315,6 +315,7 @@ class TabularTransformerLearner(generic_jax.GenericJaxLearner):
       allow_cpu: bool = False,
       # General hps
       weights: Optional[str] = None,
+      class_weights: Optional[Dict[str, float]] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
@@ -369,6 +370,7 @@ class TabularTransformerLearner(generic_jax.GenericJaxLearner):
         task=task,
         label=label,
         weights=weights,
+        class_weights=class_weights,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec=data_spec,

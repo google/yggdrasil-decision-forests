@@ -84,7 +84,8 @@ TEST(Weight, BadWeightLinking) {
       )pb");
   EXPECT_THAT(GetLinkedWeightDefinition(weight_def_2, data_spec, &weight_link),
               StatusIs(absl::StatusCode::kInvalidArgument,
-                       "\"b\" does not have any defined weight"));
+                       "The categorical weight value \"b\" in the column "
+                       "\"Cat_1\" does not have a corresponding weight."));
 
   const proto::WeightDefinition weight_def_3 = PARSE_TEST_PROTO(
       R"pb(

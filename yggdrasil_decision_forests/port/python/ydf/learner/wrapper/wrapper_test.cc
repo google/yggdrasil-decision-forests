@@ -151,6 +151,12 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
     weights: Name of a feature that identifies the weight of each example. If
       weights are not specified, unit weights are assumed. The weight column
       should not be identified as a feature in the `features` parameter.
+    class_weights: Dictionary of class weights in the form
+      `{class_label: weight}`. The dictionary must specify a weight for each
+      label value in the training data. All weights must be non-negative 
+      floating-point numbers. It is not possible to specify both `weights`
+      (sample weights) and `class_weights`.
+      If None (default), all classes have weight 1.
     ranking_group: Only for `task=Task.RANKING`. Name of a feature
       that identifies queries in a query/document ranking task. The ranking
       group should not be identified as a feature in the `features` parameter.
@@ -251,6 +257,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       task: generic_learner.Task = generic_learner.Task.CLASSIFICATION,
       *,
       weights: Optional[str] = None,
+      class_weights: Optional[Dict[str, float]] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
       features: Optional[dataspec.ColumnDefs] = None,
@@ -309,6 +316,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       task=task,
       label=label,
       weights=weights,
+      class_weights=class_weights,
       ranking_group=ranking_group,
       uplift_treatment=uplift_treatment,
       data_spec_args=data_spec_args,

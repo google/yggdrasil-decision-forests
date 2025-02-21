@@ -15,7 +15,7 @@
 """Multi-Layer Perceptron."""
 
 import dataclasses
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 from flax import linen as nn
 import jax
 from yggdrasil_decision_forests.dataset import data_spec_pb2
@@ -158,6 +158,7 @@ class MultiLayerPerceptronLearner(generic_jax.GenericJaxLearner):
       zscore: bool = False,
       # General hps
       weights: Optional[str] = None,
+      class_weights: Optional[Dict[str, float]] = None,
       ranking_group: Optional[str] = None,
       uplift_treatment: Optional[str] = None,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
@@ -197,6 +198,7 @@ class MultiLayerPerceptronLearner(generic_jax.GenericJaxLearner):
         task=task,
         label=label,
         weights=weights,
+        class_weights=class_weights,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec=data_spec,

@@ -202,6 +202,30 @@ class TabularTransformerTest(parameterized.TestCase):
     loaded_model_predictions = loaded_model.predict(test_ds)
     np.testing.assert_almost_equal(predictions, loaded_model_predictions)
 
+  def test_weights_not_supported(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Training with sample weights or class weights is not yet supported for"
+        " deep models.",
+    ):
+      _ = tabular_transformer.TabularTransformerLearner(
+          label="Rings",
+          weights="weights",
+          allow_cpu=True,
+      )
+
+  def test_class_weights_not_supported(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Training with sample weights or class weights is not yet supported for"
+        " deep models.",
+    ):
+      _ = tabular_transformer.TabularTransformerLearner(
+          label="Rings",
+          class_weights={"a": 1.0, "b": 2.0},
+          allow_cpu=True,
+      )
+
 
 if __name__ == "__main__":
   absltest.main()

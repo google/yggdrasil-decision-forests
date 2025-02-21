@@ -114,8 +114,8 @@ absl::Status GetLinkedWeightDefinition(
               "The categorical weight value \"",
               CategoricalIdxToRepresentation(data_spec.columns(attribute_idx),
                                              weight_idx),
-              "\" does not have any defined weight or the defined weight is "
-              "negative."));
+              "\" in the column \"", data_spec.columns(attribute_idx).name(),
+              "\" does not have a corresponding weight."));
         }
       }
       break;

@@ -599,6 +599,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
       task: generic_model.Task,
       label: Optional[str],
       weights: Optional[str],
+      class_weights: Optional[Dict[str, float]],
       ranking_group: Optional[str],
       uplift_treatment: Optional[str],
       data_spec: Optional[data_spec_pb2.DataSpecification],
@@ -645,6 +646,12 @@ class GenericJaxLearner(generic_learner.GenericLearner):
         maximum_training_duration_seconds
     )
 
+    if weights is not None or class_weights is not None:
+      raise ValueError(
+          "Training with sample weights or class weights is not yet supported"
+          " for deep models."
+      )
+
     data_spec_args = dataspec_lib.DataSpecInferenceArgs(
         columns=dataspec_lib.normalize_column_defs(features),
         include_all_columns=include_all_columns,
@@ -661,6 +668,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
         task=task,
         label=label,
         weights=weights,
+        class_weights=class_weights,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec_args=data_spec_args,

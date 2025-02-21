@@ -1183,6 +1183,92 @@ class CARTLearnerTest(LearnerTest):
     acceptable_weights_2 = [x * y for x in (1.0, -1.0) for y in range(7, 15)]
     self.assertTrue(all(x in acceptable_weights_2 for x in root_weights_2))
 
+  def test_no_two_weight_definitions(self):
+    with self.assertRaisesRegex(
+        ValueError, "Cannot specify both `weights` and `class_weights`."
+    ):
+      _ = specialized_learners.CartLearner(
+          label="label",
+          weights="w",
+          class_weights={"a": 1.1},
+      )
+
+  def test_fails_missing_class_weights(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    with self.assertRaisesRegex(
+        ValueError,
+        'The categorical weight value "c" in the column "label" does not have a'
+        " corresponding weight.",
+    ):
+      _ = specialized_learners.CartLearner(
+          label="label",
+          min_examples=1,
+          features=["f"],
+          max_depth=2,
+          # Missing value for class "c"
+          class_weights={
+              "a": 1.0,
+              "b": 1.0,
+          },
+      ).train(ds)
+
+  def test_fails_negative_class_weights(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    with self.assertRaisesRegex(
+        ValueError,
+        'The categorical weight value "c" is defined with a negative weight.',
+    ):
+      _ = specialized_learners.CartLearner(
+          label="label",
+          min_examples=1,
+          features=["f"],
+          max_depth=2,
+          # Negative value for class "c"
+          class_weights={"a": 1.0, "b": 1.0, "c": -1.0},
+      ).train(ds)
+
+  def test_class_weights(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.CartLearner(
+        label="label",
+        min_examples=1,
+        features=["f"],
+        max_depth=2,
+        # Over-weight class c to force a "a, b" vs. "c" split.
+        class_weights={"a": 1.0, "b": 1.0, "c": 100.0},
+    ).train(ds)
+    tree = model.get_tree(0)
+    self.assertFalse(tree.root.is_leaf)
+    root_condition = tree.root.condition
+    self.assertEqual(root_condition.threshold, 5.5)
+
+  def test_zero_class_weights(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.CartLearner(
+        label="label",
+        min_examples=1,
+        features=["f"],
+        max_depth=2,
+        # Class "b" has 0 weight, so the split becomes "a" vs. "b, c"
+        class_weights={"a": 1.0, "b": 0.0, "c": 100.0},
+    ).train(ds)
+    tree = model.get_tree(0)
+    self.assertFalse(tree.root.is_leaf)
+    root_condition = tree.root.condition
+    self.assertEqual(root_condition.threshold, 2.5)
+
 
 class GradientBoostedTreesLearnerTest(LearnerTest):
 
@@ -1710,6 +1796,48 @@ class IsolationForestLearnerTest(LearnerTest):
     self.assertIsInstance(
         first_root.condition, condition_lib.NumericalSparseObliqueCondition
     )
+
+  def test_weights_not_supported(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "w": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    with self.assertRaisesRegex(
+        ValueError, "Isolation forest does not support weights"
+    ):
+      _ = specialized_learners.IsolationForestLearner(
+          weights="w",
+      ).train(ds)
+
+  def test_class_weights_not_supported_with_label(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "w": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    with self.assertRaisesRegex(
+        ValueError, "Isolation forest does not support weights"
+    ):
+      _ = specialized_learners.IsolationForestLearner(
+          label="label",
+          class_weights={"a": 1.0, "b": 1.0, "c": 1.0},
+      ).train(ds)
+
+  def test_class_weights_not_supported_no_label(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "w": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    with self.assertRaisesRegex(
+        ValueError,
+        "Class weights require a label and are not supported for unsupervised"
+        " learning",
+    ):
+      _ = specialized_learners.IsolationForestLearner(
+          class_weights={"a": 1.0, "b": 1.0, "c": 1.0},
+      ).train(ds)
 
 
 class DatasetFormatsTest(parameterized.TestCase):

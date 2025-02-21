@@ -18,7 +18,7 @@ import abc
 import copy
 import datetime
 import re
-from typing import List, Optional, Sequence, Set, Union
+from typing import Dict, List, Optional, Sequence, Set, Union
 
 from absl import logging
 
@@ -56,6 +56,7 @@ class GenericLearner(abc.ABC):
       task: Task,
       label: Optional[str],
       weights: Optional[str],
+      class_weights: Optional[Dict[str, float]],
       ranking_group: Optional[str],
       uplift_treatment: Optional[str],
       data_spec_args: dataspec.DataSpecInferenceArgs,
@@ -75,6 +76,7 @@ class GenericLearner(abc.ABC):
     self._learner_name = learner_name
     self._label = label
     self._weights = weights
+    self._class_weights: Optional[Dict[str, float]] = class_weights
     self._ranking_group = ranking_group
     self._uplift_treatment = uplift_treatment
     self._hyperparameters = hyper_parameters
@@ -113,6 +115,8 @@ class GenericLearner(abc.ABC):
       raise ValueError(
           "The uplift treatment must be specified for uplifting tasks."
       )
+    if weights is not None and class_weights is not None:
+      raise ValueError("Cannot specify both `weights` and `class_weights`.")
     if data_spec is not None:
       logging.info(
           "Data spec was provided explicitly, so any other dataspec"
@@ -753,11 +757,34 @@ class GenericCCLearner(GenericLearner):
   def _build_weight_definition(
       self,
   ) -> Optional[weight_pb2.WeightDefinition]:
+    """Build the weights for the CC learner."""
+    assert (
+        self._weights is None or self._class_weights is None
+    ), "Cannot specify both weight and class_weights"
     weight_definition = None
     if self._weights is not None:
       weight_definition = weight_pb2.WeightDefinition(
           attribute=self._weights,
           numerical=weight_pb2.WeightDefinition.NumericalWeight(),
+      )
+    if self._class_weights is not None:
+      if self._label is None:
+        raise ValueError(
+            "Class weights require a label and are not supported for"
+            " unsupervised learning"
+        )
+      if not isinstance(self._class_weights, dict):
+        raise TypeError("`class_weights` must be a dictionary.")
+      categorical_weights = weight_pb2.WeightDefinition.CategoricalWeight()
+      for value, weight in self._class_weights.items():
+        categorical_weights.items.append(
+            weight_pb2.WeightDefinition.CategoricalWeight.Item(
+                weight=weight, value=value
+            )
+        )
+      weight_definition = weight_pb2.WeightDefinition(
+          attribute=self._label,
+          categorical=categorical_weights,
       )
     return weight_definition
 
