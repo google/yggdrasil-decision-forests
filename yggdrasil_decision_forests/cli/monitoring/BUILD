@@ -13,12 +13,6 @@ cc_binary_ydf(
     name = "benchmark_training",
     srcs = ["benchmark_training.cc"],
     deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/log",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-        "@com_google_absl//absl/time",
         "//yggdrasil_decision_forests/dataset:all_dataset_formats",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:data_spec",
@@ -41,6 +35,12 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:usage",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/time",
     ],
 )
 

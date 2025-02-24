@@ -289,13 +289,10 @@ py_test(
     srcs = ["random_forest_learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     shard_count = 10,
-    tags = [
-    ],
     deps = [
         ":generic_learner",
         ":learner_test_utils",
         ":specialized_learners",
-        ":tuner",
         # absl/logging dep,
         # absl/testing:absltest dep,
         # numpy dep,
@@ -314,10 +311,13 @@ py_test(
     srcs = ["gradient_boosted_trees_learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     shard_count = 10,
+    tags = [
+    ],
     deps = [
         ":generic_learner",
         ":learner_test_utils",
         ":specialized_learners",
+        ":tuner",
         # absl/logging dep,
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,

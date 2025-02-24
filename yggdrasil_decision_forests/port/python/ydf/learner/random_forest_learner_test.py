@@ -31,7 +31,6 @@ from ydf.dataset import dataspec
 from ydf.learner import generic_learner
 from ydf.learner import learner_test_utils
 from ydf.learner import specialized_learners
-from ydf.learner import tuner as tuner_lib
 from ydf.model.decision_forest_model import decision_forest_model
 from ydf.utils import test_utils
 
@@ -316,8 +315,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
         evaluation.num_examples, self.adult.train.data_spec().created_num_rows
     )
 
-    with open(self.create_tempfile(), "w") as f:
-      f.write(evaluation._repr_html_())
+    _ = evaluation._repr_html_()
 
   def test_cross_validation_regression(self):
     learner = specialized_learners.RandomForestLearner(
@@ -334,8 +332,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
         self.two_center_regression.train.data_spec().created_num_rows,
     )
 
-    with open(self.create_tempfile(), "w") as f:
-      f.write(evaluation._repr_html_())
+    _ = evaluation._repr_html_()
 
   def test_cross_validation_uplift(self):
     learner = specialized_learners.RandomForestLearner(
@@ -354,82 +351,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
         evaluation.num_examples, self.sim_pte.train.data_spec().created_num_rows
     )
 
-    with open(self.create_tempfile(), "w") as f:
-      f.write(evaluation._repr_html_())
-
-  def test_cross_validation_ranking(self):
-    learner = specialized_learners.GradientBoostedTreesLearner(
-        label="LABEL",
-        ranking_group="GROUP",
-        task=generic_learner.Task.RANKING,
-        num_trees=10,
-    )
-    evaluation = learner.cross_validation(
-        self.synthetic_ranking.train, folds=10, parallel_evaluations=2
-    )
-    logging.info("evaluation:\n%s", evaluation)
-    self.assertGreaterEqual(evaluation.ndcg, 0.70)
-    self.assertLessEqual(evaluation.ndcg, 0.75)
-    # All the examples are used in the evaluation
-    self.assertEqual(
-        evaluation.num_examples,
-        self.synthetic_ranking.train.data_spec().created_num_rows,
-    )
-
-    with open(self.create_tempfile(), "w") as f:
-      f.write(evaluation._repr_html_())
-
-  def test_tuner_manual(self):
-    tuner = tuner_lib.RandomSearchTuner(
-        num_trials=5,
-        automatic_search_space=True,
-        parallel_trials=2,
-    )
-    learner = specialized_learners.GradientBoostedTreesLearner(
-        label="income",
-        tuner=tuner,
-        num_trees=30,
-    )
-
-    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.864)
-    logs = model.hyperparameter_optimizer_logs()
-    self.assertIsNotNone(logs)
-    self.assertLen(logs.trials, 5)
-
-  def test_tuner_predefined(self):
-    tuner = tuner_lib.RandomSearchTuner(
-        num_trials=5,
-        automatic_search_space=True,
-        parallel_trials=2,
-    )
-    learner = specialized_learners.GradientBoostedTreesLearner(
-        label="income",
-        tuner=tuner,
-        num_trees=30,
-    )
-
-    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.864)
-    logs = model.hyperparameter_optimizer_logs()
-    self.assertIsNotNone(logs)
-    self.assertLen(logs.trials, 5)
-
-  def test_label_type_error_message(self):
-    with self.assertRaisesRegex(
-        ValueError,
-        "Cannot import column 'l' with semantic=Semantic.CATEGORICAL",
-    ):
-      _ = specialized_learners.GradientBoostedTreesLearner(
-          label="l", task=generic_learner.Task.CLASSIFICATION
-      ).train(pd.DataFrame({"l": [1.0, 2.0], "f": [0, 1]}))
-
-    with self.assertRaisesRegex(
-        ValueError,
-        "Cannot convert NUMERICAL column 'l' of type numpy's array of 'object'"
-        " and with content=",
-    ):
-      _ = specialized_learners.GradientBoostedTreesLearner(
-          label="l", task=generic_learner.Task.REGRESSION
-      ).train(pd.DataFrame({"l": ["A", "B"], "f": [0, 1]}))
+    _ = evaluation._repr_html_()
 
   def test_with_validation(self):
     with self.assertRaisesRegex(
@@ -830,7 +752,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     model = specialized_learners.RandomForestLearner(
         label="label", task=generic_learner.Task.REGRESSION
     ).train(create_dataset(1_000))
-    _ = model.analyze(create_dataset(100_000))
+    _ = model.analyze(create_dataset(100_000), maximum_duration=5)
 
   def test_boolean_feature(self):
     data = {
@@ -895,6 +817,23 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     _ = model.analyze(test_ds)
     _ = model.get_tree(0)
     model.print_tree()
+
+  def test_predict_iris(self):
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "iris.csv"
+    )
+    ds = pd.read_csv(dataset_path)
+    model = specialized_learners.RandomForestLearner(label="class").train(ds)
+
+    predictions = model.predict(ds)
+
+    self.assertEqual(predictions.shape, (ds.shape[0], 3))
+
+    row_sums = np.sum(predictions, axis=1)
+    # Make sure a multi-dimensional prediction always (mostly) sums to 1.
+    npt.assert_array_almost_equal(
+        row_sums, np.ones(predictions.shape[0]), decimal=5
+    )
 
 
 if __name__ == "__main__":

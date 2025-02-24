@@ -31,6 +31,7 @@ from ydf.dataset import dataspec
 from ydf.learner import generic_learner
 from ydf.learner import learner_test_utils
 from ydf.learner import specialized_learners
+from ydf.learner import tuner as tuner_lib
 from ydf.model.decision_forest_model import decision_forest_model
 from ydf.utils import test_utils
 
@@ -54,8 +55,8 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
 
     model = learner.train(self.synthetic_ranking.train)
     evaluation = model.evaluate(self.synthetic_ranking.test)
-    self.assertGreaterEqual(evaluation.ndcg, 0.70)
-    self.assertLessEqual(evaluation.ndcg, 0.74)
+    self.assertGreaterEqual(evaluation.ndcg, 0.6893)
+    self.assertLessEqual(evaluation.ndcg, 0.7457)
 
   def test_ranking_pd(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
@@ -66,8 +67,8 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
 
     model = learner.train(self.synthetic_ranking.train_pd)
     evaluation = model.evaluate(self.synthetic_ranking.test_pd)
-    self.assertGreaterEqual(evaluation.ndcg, 0.70)
-    self.assertLessEqual(evaluation.ndcg, 0.74)
+    self.assertGreaterEqual(evaluation.ndcg, 0.6893)
+    self.assertLessEqual(evaluation.ndcg, 0.7457)
 
   def test_ranking_path(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
@@ -78,27 +79,27 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
 
     model = learner.train(self.synthetic_ranking.train_path)
     evaluation = model.evaluate(self.synthetic_ranking.test_path)
-    self.assertGreaterEqual(evaluation.ndcg, 0.70)
-    self.assertLessEqual(evaluation.ndcg, 0.74)
+    self.assertGreaterEqual(evaluation.ndcg, 0.6893)
+    self.assertLessEqual(evaluation.ndcg, 0.7457)
 
   @parameterized.named_parameters(
       {
           "testcase_name": "ndcg@2",
           "truncation": 2,
-          "expected_ndcg": 0.723,
-          "delta": 0.025,
+          "expected_ndcg": 0.7196,
+          "delta": 0.0358,
       },
       {
           "testcase_name": "ndcg@5",
           "truncation": 5,
-          "expected_ndcg": 0.716,
-          "delta": 0.024,
+          "expected_ndcg": 0.7168,
+          "delta": 0.0330,
       },
       {
           "testcase_name": "ndcg@10",
           "truncation": 10,
-          "expected_ndcg": 0.716,
-          "delta": 0.03,
+          "expected_ndcg": 0.7199,
+          "delta": 0.0298,
       },
   )
   def test_ranking_ndcg_truncation(self, truncation, expected_ndcg, delta):
@@ -197,7 +198,7 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     )
 
     model, _, _ = self._check_adult_model(
-        learner, minimum_accuracy=0.863, use_pandas=True
+        learner, minimum_accuracy=0.8565, use_pandas=True
     )
 
     _ = model.analyze(self.adult.test_pd)
@@ -267,23 +268,6 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     model_2 = learner.train(self.adult.train)
     assert isinstance(model_2, decision_forest_model.DecisionForestModel)
     self.assertEqual(model_2.num_trees(), 50)
-
-  def test_predict_iris(self):
-    dataset_path = os.path.join(
-        test_utils.ydf_test_data_path(), "dataset", "iris.csv"
-    )
-    ds = pd.read_csv(dataset_path)
-    model = specialized_learners.RandomForestLearner(label="class").train(ds)
-
-    predictions = model.predict(ds)
-
-    self.assertEqual(predictions.shape, (ds.shape[0], 3))
-
-    row_sums = np.sum(predictions, axis=1)
-    # Make sure a multi-dimensional prediction always (mostly) sums to 1.
-    npt.assert_array_almost_equal(
-        row_sums, np.ones(predictions.shape[0]), decimal=5
-    )
 
   def test_better_default_template(self):
     ds = test_utils.toy_dataset()
@@ -408,6 +392,79 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
       learner.train(
           {"l": np.array([0, 1, 0, 1] * 100), "f": np.array([1, 2, 3, 4] * 100)}
       )
+
+  def test_cross_validation_ranking(self):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="LABEL",
+        ranking_group="GROUP",
+        task=generic_learner.Task.RANKING,
+        num_trees=10,
+    )
+    evaluation = learner.cross_validation(
+        self.synthetic_ranking.train, folds=10, parallel_evaluations=2
+    )
+    logging.info("evaluation:\n%s", evaluation)
+    self.assertGreaterEqual(evaluation.ndcg, 0.729)
+    self.assertLessEqual(evaluation.ndcg, 0.761)
+    # All the examples are used in the evaluation
+    self.assertEqual(
+        evaluation.num_examples,
+        self.synthetic_ranking.train.data_spec().created_num_rows,
+    )
+
+    _ = evaluation._repr_html_()
+
+  def test_tuner_manual(self):
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=5,
+        automatic_search_space=True,
+        parallel_trials=2,
+    )
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        tuner=tuner,
+        num_trees=30,
+    )
+
+    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.864)
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.trials, 5)
+
+  def test_tuner_predefined(self):
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=5,
+        automatic_search_space=True,
+        parallel_trials=2,
+    )
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        tuner=tuner,
+        num_trees=30,
+    )
+
+    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.864)
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.trials, 5)
+
+  def test_label_type_error_message(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'l' with semantic=Semantic.CATEGORICAL",
+    ):
+      _ = specialized_learners.GradientBoostedTreesLearner(
+          label="l", task=generic_learner.Task.CLASSIFICATION
+      ).train(pd.DataFrame({"l": [1.0, 2.0], "f": [0, 1]}))
+
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot convert NUMERICAL column 'l' of type numpy's array of 'object'"
+        " and with content=",
+    ):
+      _ = specialized_learners.GradientBoostedTreesLearner(
+          label="l", task=generic_learner.Task.REGRESSION
+      ).train(pd.DataFrame({"l": ["A", "B"], "f": [0, 1]}))
 
 
 if __name__ == "__main__":

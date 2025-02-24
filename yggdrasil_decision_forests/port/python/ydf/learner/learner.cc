@@ -74,7 +74,6 @@ void (*existing_signal_handler_alarm)(int) = nullptr;
 
 void ReceiveSignal(int signal) {
   if (!stop_training) {
-    LOG(INFO) << "Stopping all active trainings";
     stop_training = true;
   } else {
     // Pass the signal to any existing handler.
