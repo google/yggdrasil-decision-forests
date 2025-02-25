@@ -78,6 +78,9 @@ constexpr char kFilenamePartialMetaData[] = "partial_metadata.pb";
 // Path of the directory containing the column data.
 std::string ColumnPath(absl::string_view directory, int column_idx);
 
+// Path of the directory contained an indexed column data.
+std::string IndexedColumnPath(absl::string_view directory, int column_idx);
+
 // Path of the file containing the meta data of a single shard.
 std::string ShardMetadataPath(absl::string_view directory, int shard_idx,
                               int num_shards);

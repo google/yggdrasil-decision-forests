@@ -66,6 +66,7 @@ class CreateDatasetCacheWorker : public distribute::AbstractWorker {
       const proto::WorkerRequest::SortNumericalColumn& request,
       const std::vector<std::pair<float, model::SignedExampleIdx>>&
           value_and_example_idxs,
+      std::string_view final_directory, std::string_view temp_directory,
       proto::WorkerResult::SortNumericalColumn* result);
 
   // Export discretized numerical values. Used by "SortNumericalColumn".
@@ -73,7 +74,8 @@ class CreateDatasetCacheWorker : public distribute::AbstractWorker {
       const proto::WorkerRequest::SortNumericalColumn& request,
       const std::vector<std::pair<float, model::SignedExampleIdx>>&
           value_and_example_idxs,
-      int64_t num_unique_values,
+      int64_t num_unique_values, std::string_view final_directory,
+      std::string_view temp_directory,
       proto::WorkerResult::SortNumericalColumn* result);
 
   proto::WorkerWelcome welcome_;

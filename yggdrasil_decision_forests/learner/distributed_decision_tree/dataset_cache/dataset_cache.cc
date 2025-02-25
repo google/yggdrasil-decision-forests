@@ -583,11 +583,9 @@ absl::Status SortNumericalColumns(
   // Common part of the requests.
   proto::WorkerRequest generic_request;
   auto& request = *generic_request.mutable_sort_numerical_column();
-  request.set_output_base_directory(
-      file::JoinPath(cache_directory, kFilenameTmp));
+  request.set_output_directory(std::string(cache_directory));
   request.set_num_examples(cache_metadata->num_examples());
   request.set_delta_bit_idx(cache_metadata->delta_bit_idx());
-  request.set_cache_directory(std::string(cache_directory));
 
   // We assume that a cache entry takes 4 bytes.
   request.set_num_example_per_output_shards(
@@ -610,9 +608,9 @@ absl::Status SortNumericalColumns(
     }
 
     // Check if the job was already executed.
-    const auto metadata_path = file::JoinPath(
-        cache_directory, kFilenameIndexed,
-        absl::StrCat(kFilenameColumn, column_idx), kFilenamePresortedMetaData);
+    const auto metadata_path =
+        file::JoinPath(IndexedColumnPath(cache_directory, column_idx),
+                       kFilenamePresortedMetaData);
     ASSIGN_OR_RETURN(const bool already_exist, file::FileExists(metadata_path));
     if (already_exist) {
       proto::SortedColumnMetadata metadata;
@@ -649,23 +647,10 @@ absl::Status SortNumericalColumns(
         distribute_manager->NextAsynchronousProtoAnswer<proto::WorkerResult>());
     const auto& result = generic_result.sort_numerical_column();
 
-    // Rename the output directory.
-    const auto final_directory =
-        file::JoinPath(cache_directory, kFilenameIndexed,
-                       absl::StrCat(kFilenameColumn, result.column_idx()));
-    ASSIGN_OR_RETURN(const bool already_exist,
-                     file::FileExists(final_directory));
-    if (already_exist) {
-      LOG(WARNING) << "The directory result of job on column #"
-                   << result.column_idx() << " already exist.";
-    } else {
-      RETURN_IF_ERROR(file::Rename(result.output_directory(), final_directory,
-                                   file::Defaults()));
-    }
-
     // Save the meta-data information.
     const auto metadata_path =
-        file::JoinPath(final_directory, kFilenamePresortedMetaData);
+        file::JoinPath(IndexedColumnPath(cache_directory, result.column_idx()),
+                       kFilenamePresortedMetaData);
 
     proto::SortedColumnMetadata metadata;
     *metadata.mutable_metadata() = result.metadata();

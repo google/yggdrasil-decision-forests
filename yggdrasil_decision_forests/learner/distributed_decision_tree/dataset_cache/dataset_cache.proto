@@ -122,8 +122,8 @@ message WorkerRequest {
   }
 
   message SortNumericalColumn {
-    // Where to save the sorted columns.
-    optional string output_base_directory = 1;
+    // Output directory.
+    optional string output_directory = 1;
 
     // Total number of example in the column.
     optional int64 num_examples = 2;
@@ -136,9 +136,6 @@ message WorkerRequest {
 
     // Number of shards in the input data.
     optional int32 num_shards = 4;
-
-    // Root directory of the cache. Contains the input columns.
-    optional string cache_directory = 5;
 
     // Number of examples to write in each output shard.
     optional int32 num_example_per_output_shards = 6;
@@ -165,6 +162,8 @@ message WorkerRequest {
 
     // Number of expected shards in the output.
     optional int32 num_shards_in_output_shards = 10;
+
+    reserved 5;
   }
 
   message ConvertPartialToFinalRawData {
@@ -209,15 +208,14 @@ message WorkerResult {
   }
 
   message SeparateDatasetColumns {
-    // optional string output_directory = 1;
     optional int32 shard_idx = 2;
     optional int64 num_examples = 3;
   }
 
   message SortNumericalColumn {
-    optional string output_directory = 1;
     optional int32 column_idx = 2;
     optional CacheMetadata.NumericalColumn metadata = 3;
+    reserved 1;
   }
 
   message ConvertPartialToFinalRawData {}

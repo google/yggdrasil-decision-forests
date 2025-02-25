@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -58,6 +59,26 @@ using Blob = distribute::Blob;
 //
 // TODO: Parametrize.
 constexpr int kNumThreads = 10;
+
+// Moves the files "filenames" from "src_dir" to "dst_dir". If anything goes
+// wrong, print a warning and continue.
+void MoveFilenamesNoFailures(const std::string_view src_dir,
+                             const std::string_view dst_dir,
+                             const std::vector<std::string>& filenames) {
+  utils::concurrency::ThreadPool thread_pool(
+      kNumThreads, {.name_prefix = std::string("MoveFilenamesNoFailures")});
+  thread_pool.StartWorkers();
+  for (const auto& filename : filenames) {
+    thread_pool.Schedule([filename, src_dir, dst_dir]() {
+      const auto src_file = file::JoinPath(src_dir, filename);
+      const auto dst_file = file::JoinPath(dst_dir, filename);
+      if (!file::Rename(src_file, dst_file, file::Defaults()).ok()) {
+        LOG(WARNING) << "Already existing final file. Multiple workers seems "
+                        "to work on the same shard.";
+      }
+    });
+  }
+}
 
 absl::Status SeparateNumericalColumn(const int column_idx,
                                      const dataset::proto::Column& column_spec,
@@ -317,7 +338,7 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
   const int input_buffer_size = kIOBufferSizeInBytes / sizeof(float);
   ShardedFloatColumnReader reader;
   RETURN_IF_ERROR(reader.Open(
-      file::JoinPath(request.cache_directory(), kFilenameRaw,
+      file::JoinPath(request.output_directory(), kFilenameRaw,
                      absl::StrCat(kFilenameColumn, request.column_idx()),
                      kFilenameShardNoUnderscore),
       /*max_num_values=*/input_buffer_size,
@@ -344,10 +365,14 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
   LOG(INFO) << "Save sorted numerical values [column #" << request.column_idx()
             << "]";
 
-  result->set_output_directory(
-      file::JoinPath(request.output_base_directory(), utils::GenUniqueId()));
+  const auto temp_directory = file::JoinPath(
+      request.output_directory(), kFilenameTmp, utils::GenUniqueId());
+  const auto final_directory = file::JoinPath(
+      IndexedColumnPath(request.output_directory(), request.column_idx()));
+  RETURN_IF_ERROR(file::RecursivelyCreateDir(temp_directory, file::Defaults()));
   RETURN_IF_ERROR(
-      file::RecursivelyCreateDir(result->output_directory(), file::Defaults()));
+      file::RecursivelyCreateDir(final_directory, file::Defaults()));
+
   result->set_column_idx(request.column_idx());
   result->mutable_metadata()->set_replacement_missing_value(
       request.replacement_missing_value());
@@ -376,13 +401,17 @@ absl::Status CreateDatasetCacheWorker::SortNumericalColumn(
     LOG(INFO) << "Exported column column #" << request.column_idx()
               << " as pre-discretized";
     RETURN_IF_ERROR(ExportSortedDiscretizedNumericalColumn(
-        request, value_and_example_idxs, num_unique_values, result));
+        request, value_and_example_idxs, num_unique_values, final_directory,
+        temp_directory, result));
   } else {
     LOG(INFO) << "Exported column column #" << request.column_idx()
               << " as pre-sorted";
-    RETURN_IF_ERROR(
-        ExportSortedNumericalColumn(request, value_and_example_idxs, result));
+    RETURN_IF_ERROR(ExportSortedNumericalColumn(request, value_and_example_idxs,
+                                                final_directory, temp_directory,
+                                                result));
   }
+
+  RETURN_IF_ERROR(file::RecursivelyDelete(temp_directory, file::Defaults()));
 
   LOG(INFO) << "Done exporting column #" << request.column_idx() << " with "
             << num_unique_values << "/" << request.num_examples()
@@ -394,6 +423,7 @@ absl::Status CreateDatasetCacheWorker::ExportSortedNumericalColumn(
     const proto::WorkerRequest::SortNumericalColumn& request,
     const std::vector<std::pair<float, model::SignedExampleIdx>>&
         value_and_example_idxs,
+    std::string_view final_directory, std::string_view temp_directory,
     proto::WorkerResult::SortNumericalColumn* result) {
   proto::CreateDatasetCacheConfig config;
 
@@ -406,9 +436,15 @@ absl::Status CreateDatasetCacheWorker::ExportSortedNumericalColumn(
   int64_t remaining_examples_in_shard = 0;
   int next_output_shard_idx = 0;
 
-  RETURN_IF_ERROR(values_writer.Open(
-      file::JoinPath(result->output_directory(),
-                     ShardFilename(kFilenameDeltaValueNoUnderscore, 0, 1))));
+  // Filename of the created files.
+  std::vector<std::string> filenames;
+  {
+    const std::string filename =
+        ShardFilename(kFilenameDeltaValueNoUnderscore, 0, 1);
+    RETURN_IF_ERROR(
+        values_writer.Open(file::JoinPath(temp_directory, filename)));
+    filenames.push_back(std::move(filename));
+  }
 
   RETURN_IF_ERROR(
       values_writer.WriteValues({value_and_example_idxs.front().first}));
@@ -449,13 +485,15 @@ absl::Status CreateDatasetCacheWorker::ExportSortedNumericalColumn(
         RETURN_IF_ERROR(example_idx_writer.Close());
       }
       // Open a new shard.
-      RETURN_IF_ERROR(example_idx_writer.Open(
-          file::JoinPath(result->output_directory(),
-                         ShardFilename(kFilenameExampleIdxNoUnderscore,
-                                       next_output_shard_idx++,
-                                       request.num_shards_in_output_shards())),
-
-          /*max_value=*/max_value_example_idx));
+      {
+        const std::string filename = ShardFilename(
+            kFilenameExampleIdxNoUnderscore, next_output_shard_idx++,
+            request.num_shards_in_output_shards());
+        RETURN_IF_ERROR(
+            example_idx_writer.Open(file::JoinPath(temp_directory, filename),
+                                    /*max_value=*/max_value_example_idx));
+        filenames.push_back(std::move(filename));
+      }
       remaining_examples_in_shard = request.num_example_per_output_shards();
     }
 
@@ -486,6 +524,9 @@ absl::Status CreateDatasetCacheWorker::ExportSortedNumericalColumn(
                          request.num_shards_in_output_shards()));
   }
 
+  // Move the files to their final location.
+  MoveFilenamesNoFailures(temp_directory, final_directory, filenames);
+
   return absl::OkStatus();
 }
 
@@ -493,7 +534,8 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
     const proto::WorkerRequest::SortNumericalColumn& request,
     const std::vector<std::pair<float, model::SignedExampleIdx>>&
         value_and_example_idxs,
-    int64_t num_unique_values,
+    int64_t num_unique_values, std::string_view final_directory,
+    std::string_view temp_directory,
     proto::WorkerResult::SortNumericalColumn* result) {
   proto::CreateDatasetCacheConfig config;
 
@@ -519,11 +561,18 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
       NumericalToDiscretizedNumerical(boundaries,
                                       request.replacement_missing_value()));
 
+  // Filename of the created files.
+  std::vector<std::string> filenames;
+
   // Export the boundary values.
   FloatColumnWriter boundary_writer;
-  RETURN_IF_ERROR(boundary_writer.Open(
-      file::JoinPath(result->output_directory(),
-                     ShardFilename(kFilenameBoundaryValueNoUnderscore, 0, 1))));
+  {
+    const std::string filename =
+        ShardFilename(kFilenameBoundaryValueNoUnderscore, 0, 1);
+    RETURN_IF_ERROR(
+        boundary_writer.Open(file::JoinPath(temp_directory, filename)));
+    filenames.push_back(std::move(filename));
+  }
   RETURN_IF_ERROR(boundary_writer.WriteValues(boundaries));
   RETURN_IF_ERROR(boundary_writer.Close());
 
@@ -536,7 +585,7 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
   std::vector<DiscretizedIndexedNumericalType> indexed_value_buffer;
 
   RETURN_IF_ERROR(values_reader.Open(
-      file::JoinPath(request.cache_directory(), kFilenameRaw,
+      file::JoinPath(request.output_directory(), kFilenameRaw,
                      absl::StrCat(kFilenameColumn, request.column_idx()),
                      kFilenameShardNoUnderscore),
       /*max_num_values=*/buffer_size,
@@ -560,13 +609,15 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
           RETURN_IF_ERROR(indexed_values_writer.Close());
         }
         // Open a new shard.
-        RETURN_IF_ERROR(indexed_values_writer.Open(
-            file::JoinPath(
-                result->output_directory(),
-                ShardFilename(kFilenameDiscretizedValuesNoUnderscore,
-                              next_output_shard_idx++,
-                              request.num_shards_in_output_shards())),
-            /*max_value=*/num_discretized_values));
+        {
+          const std::string filename = ShardFilename(
+              kFilenameDiscretizedValuesNoUnderscore, next_output_shard_idx++,
+              request.num_shards_in_output_shards());
+          RETURN_IF_ERROR(indexed_values_writer.Open(
+              file::JoinPath(temp_directory, filename),
+              /*max_value=*/num_discretized_values));
+          filenames.push_back(std::move(filename));
+        }
         indexed_values_writer_is_open = true;
         remaining_examples_in_shard = request.num_example_per_output_shards();
       }
@@ -612,6 +663,9 @@ absl::Status CreateDatasetCacheWorker::ExportSortedDiscretizedNumericalColumn(
   }
 
   result->mutable_metadata()->set_num_discretized_shards(next_output_shard_idx);
+
+  // Move the files to their final location.
+  MoveFilenamesNoFailures(temp_directory, final_directory, filenames);
   return absl::OkStatus();
 }
 

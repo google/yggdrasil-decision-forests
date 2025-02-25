@@ -50,6 +50,11 @@ std::string ColumnPath(absl::string_view directory, int column_idx) {
   return file::JoinPath(directory, absl::StrCat(kFilenameColumn, column_idx));
 }
 
+std::string IndexedColumnPath(absl::string_view directory, int column_idx) {
+  return file::JoinPath(directory, kFilenameIndexed,
+                        absl::StrCat(kFilenameColumn, column_idx));
+}
+
 std::string ShardMetadataPath(absl::string_view directory, int shard_idx,
                               int num_shards) {
   return file::JoinPath(
