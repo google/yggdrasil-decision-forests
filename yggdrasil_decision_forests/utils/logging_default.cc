@@ -29,7 +29,13 @@ ABSL_FLAG(bool, alsologtostderr, false, "Log all messages to stderr");
 #endif
 
 namespace yggdrasil_decision_forests::logging {
-void InitLoggingLib() { absl::InitializeLog(); }
+void InitLoggingLib() {
+  absl::InitializeLog();
+  // By default, absl is configured to:
+  //    minloglevel = info
+  //    stderrthreshold = error
+  // So, no LOG(INFO) is visible.
+}
 }  // namespace yggdrasil_decision_forests::logging
 
 void InitLogging(const char* usage, int* argc, char*** argv,

@@ -271,45 +271,77 @@ def _hide_cc_logs():
     ydf.SetLoggingLevel(2, True)
 
 
+@contextlib.contextmanager
+def _show_cc_logs():
+  """Show the CC logs in stderr for the public build."""
+  ydf.SetLoggingLevel(2, False)
+  try:
+    yield
+  finally:
+    ydf.SetLoggingLevel(0, True)
+
+
+@contextlib.contextmanager
 def cc_log_context():
-  """Creates a context to display correctly C++ logs to the user."""
+  """Creates a context to display correctly C++ logs to the user.
 
-  if _VERBOSE_LEVEL == 0:
-    return _hide_cc_logs()
+  "cc_log_context" should wrap all the C++ calls.
 
-  elif _VERBOSE_LEVEL == 1:
-    # Only show CC logs in the console, but not in colab / notebook cells
+  Informally, C++ logs are only directly visible to the user when verbose == 2
+  i.e. visible in colab or in a terminal if using one. However, c++ logs are
+  always visible to absl sinks (e.g., for google cloud logging).
 
+  Assumes the current status is the output of "InitLoggingLib":
+    minloglevel = info
+    stderrthreshold = error
+
+  Yields:
+    Empty yield in context.
+  """
+
+  if _VERBOSE_LEVEL <= 1:
+    # Don't show anything (except for fatal messages).
+    with _no_op_context():
+      yield
+    return
+
+  # Show as much c++ logs as possible.
+
+  # pylint: disable=g-import-not-at-top
+  try:
+    from colabtools.googlelog import CaptureLog  # pytype: disable=import-error
+    # We are in a Google Colab
+    with _show_cc_logs():
+      with CaptureLog():
+        yield
+    return
+
+  except ImportError:
     if is_direct_output():
-      return _no_op_context()
-
-    # Hide logs if in notebook. Logs are already hidden in colabs.
-    return _hide_cc_logs()
-
-  else:
-    # Show CC logs everywhere
-
-    # pylint: disable=g-import-not-at-top
+      # We are in a terminal
+      # Note: Wurlitzer hangs when logs are shown directly.
+      with _show_cc_logs():
+        yield
+      return
     try:
-      from colabtools.googlelog import CaptureLog  # pytype: disable=import-error
-      # This is a Google Colab
-      return CaptureLog()
+      # We are in a Notebook
+      from wurlitzer import sys_pipes  # pytype: disable=import-error
+      # We are in a Notebook with Wurlitzer
+      with _show_cc_logs():
+        with sys_pipes():
+          yield
+      return
     except ImportError:
-      # Wurlitzer hangs when logs are shown directly.
-      if is_direct_output():
-        return _no_op_context()
-      try:
-        from wurlitzer import sys_pipes  # pytype: disable=import-error
-
-        return sys_pipes()
-      except ImportError:
-        warning(
-            "ydf.verbose(2) but logs cannot be displayed in the cell. Check"
-            " colab logs or install wurlitzer with 'pip install wurlitzer'",
-            message_id=WarningMessage.CANNOT_SHOW_DETAILS_LOGS,
-        )
-      return _no_op_context()
-    # pylint: enable=g-import-not-at-top
+      # We are in a Notebook without Wurlitzer
+      warning(
+          "ydf.verbose(2) but logs cannot be displayed in the cell. Check"
+          " colab logs or install wurlitzer with 'pip install wurlitzer'",
+          message_id=WarningMessage.CANNOT_SHOW_DETAILS_LOGS,
+      )
+    with _show_cc_logs():
+      yield
+    return
+  # pylint: enable=g-import-not-at-top
 
 
 T = TypeVar("T")

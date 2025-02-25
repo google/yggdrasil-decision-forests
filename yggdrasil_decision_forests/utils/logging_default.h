@@ -51,7 +51,7 @@ inline void SetLoggingLevel(int level) {
       absl_level = absl::LogSeverityAtLeast::kInfo;
       break;
   }
-  absl::log_internal::RawSetMinLogLevel(absl_level);
+  absl::log_internal::RawSetStderrThreshold(absl_level);
 }
 
 // If true, logging messages include the timestamp, filename and line. True by
