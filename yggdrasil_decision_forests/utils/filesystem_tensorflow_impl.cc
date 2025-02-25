@@ -34,33 +34,37 @@
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
 #include "tensorflow/core/platform/path.h"
+#include "yggdrasil_decision_forests/utils/bytestream.h"
+#include "yggdrasil_decision_forests/utils/filesystem_interface.h"
 #include "yggdrasil_decision_forests/utils/filesystem_tensorflow_interface.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 // Wrappers to shield tensorflow macros from yggdrasil macros.
-namespace tensorflow {
+namespace yggdrasil_decision_forests::utils::filesystem::tf_impl {
 
 class RandomAccessFileWrapper {
  public:
-  explicit RandomAccessFileWrapper(RandomAccessFile* item) : item_(item) {}
+  explicit RandomAccessFileWrapper(::tensorflow::RandomAccessFile* item)
+      : item_(item) {}
   ~RandomAccessFileWrapper();
 
-  RandomAccessFile* item() { return item_; }
+  ::tensorflow::RandomAccessFile* item() { return item_; }
 
  private:
-  RandomAccessFile* item_;
+  ::tensorflow::RandomAccessFile* item_;
 };
 
 class WritableFileWrapper {
  public:
-  explicit WritableFileWrapper(WritableFile* item) : item_(item) {}
+  explicit WritableFileWrapper(::tensorflow::WritableFile* item)
+      : item_(item) {}
   ~WritableFileWrapper();
 
-  WritableFile* item() { return item_; }
+  ::tensorflow::WritableFile* item() { return item_; }
 
  private:
-  WritableFile* item_;
+  ::tensorflow::WritableFile* item_;
 };
 
 RandomAccessFileWrapper::~RandomAccessFileWrapper() {
@@ -73,12 +77,8 @@ WritableFileWrapper::~WritableFileWrapper() {
   item_ = nullptr;
 }
 
-}  // namespace tensorflow
-
-namespace file {
-namespace impl {
-
-class FileInputByteStream : public FileInputByteStreamInterface {
+class FileInputByteStream
+    : public yggdrasil_decision_forests::utils::FileInputByteStream {
  public:
   absl::Status Open(absl::string_view path) override;
   absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
@@ -86,27 +86,27 @@ class FileInputByteStream : public FileInputByteStreamInterface {
   absl::Status Close() override;
 
  private:
-  std::unique_ptr<::tensorflow::RandomAccessFileWrapper> file_;
+  std::unique_ptr<RandomAccessFileWrapper> file_;
   uint64_t offset_ = 0;
   std::string scrath_;
 };
 
-class FileOutputByteStream : public FileOutputByteStreamInterface {
+class FileOutputByteStream
+    : public yggdrasil_decision_forests::utils::FileOutputByteStream {
  public:
   absl::Status Open(absl::string_view path) override;
   absl::Status Write(absl::string_view chunk) override;
   absl::Status Close() override;
 
  private:
-  std::unique_ptr<::tensorflow::WritableFileWrapper> file_;
+  std::unique_ptr<WritableFileWrapper> file_;
 };
 
 absl::Status FileInputByteStream::Open(absl::string_view path) {
   std::unique_ptr<::tensorflow::RandomAccessFile> file;
   RETURN_IF_ERROR(tensorflow::Env::Default()->NewRandomAccessFile(
       std::string(path), &file));
-  file_ =
-      std::make_unique<::tensorflow::RandomAccessFileWrapper>(file.release());
+  file_ = std::make_unique<RandomAccessFileWrapper>(file.release());
   offset_ = 0;
   return absl::OkStatus();
 }
@@ -155,7 +155,7 @@ absl::Status FileOutputByteStream::Open(absl::string_view path) {
   std::unique_ptr<::tensorflow::WritableFile> file;
   RETURN_IF_ERROR(
       tensorflow::Env::Default()->NewWritableFile(std::string(path), &file));
-  file_ = std::make_unique<::tensorflow::WritableFileWrapper>(file.release());
+  file_ = std::make_unique<WritableFileWrapper>(file.release());
   return absl::OkStatus();
 }
 
@@ -214,9 +214,9 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
   return absl::OkStatus();
 }
 
-class Implementation : public Interface {
+class FileSystemImplementation : public FileSystemInterface {
  public:
-  ~Implementation() {}
+  ~FileSystemImplementation() {}
 
   std::string JoinPathList(
       std::initializer_list<absl::string_view> paths) override {
@@ -296,23 +296,24 @@ class Implementation : public Interface {
     return std::string(tensorflow::io::Basename(path));
   }
 
-  virtual std::unique_ptr<FileInputByteStreamInterface> CreateInputByteStream()
-      override {
+  virtual std::unique_ptr<
+      yggdrasil_decision_forests::utils::FileInputByteStream>
+  CreateInputByteStream() override {
     return std::make_unique<FileInputByteStream>();
   }
 
-  virtual std::unique_ptr<FileOutputByteStreamInterface>
+  virtual std::unique_ptr<
+      yggdrasil_decision_forests::utils::FileOutputByteStream>
   CreateOutputByteStream() override {
     return std::make_unique<FileOutputByteStream>();
   }
 };
 
 int init() {
-  SetInterface(std::make_unique<Implementation>());
+  SetInterface(std::make_unique<FileSystemImplementation>());
   return 0;
 }
 
 static const int a = init();
 
-}  // namespace impl
-}  // namespace file
+}  // namespace yggdrasil_decision_forests::utils::filesystem::tf_impl

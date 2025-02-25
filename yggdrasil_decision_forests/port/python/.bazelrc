@@ -11,6 +11,14 @@ build --define=use_fast_cpp_protos=true
 build --define=allow_oversize_protos=true
 build --define=grpc_no_ares=true
 
+# Hardcode certificate paths for Google cloud storage to be compatible with
+# Debian. If the certificate path is wrong, you will get the error:
+#   PerformWork() - CURL error [77]=Problem with the SSL CA cert (path? access
+#   rights?)
+# See:
+# https://github.com/googleapis/google-cloud-cpp/blob/b76d2d66693f11eee2b04b3f0963cf77cd1934d3/bazel/curl.BUILD#L37-L64
+build --define ca_bundle_style=debian
+
 # Do not dependent on TF for protobuffers
 build --define=use_ydf_tensorflow_proto=1
 

@@ -101,15 +101,35 @@ cc_library_ydf(
     visibility = ["//visibility:private"],
     deps = [
         ":bytestream",
+        ":filesystem_interface",
         ":logging_default",
         ":protobuf",
         ":status_macros",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_absl//absl/types:optional",
     ],
+)
+
+# Linking this rule add support for GCS filenames to the "filesystem_default" filesystem.
+cc_library_ydf(
+    name = "filesystem_default_gcs",
+    srcs = ["filesystem_default_gcs.cc"],
+    deps = [
+        ":bytestream",
+        ":filesystem_default",
+        ":filesystem_interface",
+        ":logging",
+        ":status_macros",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@google_cloud_cpp//:storage",
+    ],
+    alwayslink = 1,
 )
 
 # TensorFlow::io based filesystem.
@@ -131,6 +151,7 @@ cc_library_ydf(
     visibility = ["//visibility:private"],
     deps = [
         ":bytestream",
+        ":filesystem_interface",
         ":filesystem_tensorflow_interface",
         ":logging",
         ":protobuf",
@@ -151,6 +172,7 @@ cc_library_ydf(
     visibility = ["//visibility:private"],
     deps = [
         ":bytestream",
+        ":filesystem_interface",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -158,6 +180,19 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "filesystem_interface",
+    hdrs = ["filesystem_interface.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":bytestream",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+# Linking this rule is necessary for the "filesystem_tensorflow" filesystem to work.
 cc_library_ydf(
     name = "filesystem_tensorflow_impl",
     srcs = ["filesystem_tensorflow_impl.cc"],
@@ -167,6 +202,7 @@ cc_library_ydf(
     deps = [
         ":bytestream",
         ":compatibility",
+        ":filesystem_interface",
         ":filesystem_tensorflow_interface",
         ":logging",
         ":protobuf",
@@ -1014,6 +1050,24 @@ cc_test(
         # "@com_google_googletest//:gtest_main",  # When fixed
         "@com_google_googletest//:gtest_main",
         ":test",
+    ],
+)
+
+cc_test(
+    name = "filesystem_default_gcs_test",
+    srcs = ["filesystem_default_gcs_test.cc"],
+    tags = [
+        "manual",
+        "notap",
+    ],
+    deps = [
+        ":filesystem_default",
+        ":filesystem_default_gcs",
+        ":test",
+        ":uid",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

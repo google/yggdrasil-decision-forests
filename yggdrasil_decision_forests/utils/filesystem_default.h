@@ -19,17 +19,62 @@
 
 #include <fstream>
 #include <initializer_list>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
+#include "yggdrasil_decision_forests/utils/filesystem_interface.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 
 #define EXTERNAL_FILESYSTEM
+
+namespace yggdrasil_decision_forests::utils::filesystem {
+
+// A Google Cloud Storage path.
+struct GCSPath {
+  // Parse a path as a GCS path. If the path is not a valid GCS path, returns
+  // {}.
+  static absl::optional<GCSPath> Parse(absl::string_view path);
+  std::string bucket;
+  std::string object;
+
+  bool operator==(const GCSPath& other) const {
+    return (bucket == other.bucket) && (object == other.object);
+  }
+};
+
+void SetGCSImplementation(std::unique_ptr<FileSystemInterface>&& value);
+
+class STLFileInputByteStream
+    : public yggdrasil_decision_forests::utils::FileInputByteStream {
+ public:
+  absl::Status Open(absl::string_view path) override;
+  absl::StatusOr<int> ReadUpTo(char* buffer, int max_read) override;
+  absl::StatusOr<bool> ReadExactly(char* buffer, int num_read) override;
+  absl::Status Close() override;
+
+ private:
+  std::ifstream file_stream_;
+};
+
+class STLFileOutputByteStream
+    : public yggdrasil_decision_forests::utils::FileOutputByteStream {
+ public:
+  absl::Status Open(absl::string_view path) override;
+  absl::Status Write(absl::string_view chunk) override;
+  absl::Status Close() override;
+
+ private:
+  std::ofstream file_stream_;
+};
+
+}  // namespace yggdrasil_decision_forests::utils::filesystem
 
 namespace file {
 
@@ -110,7 +155,8 @@ class FileInputByteStream
   absl::Status Close() override;
 
  private:
-  std::ifstream file_stream_;
+  std::unique_ptr<yggdrasil_decision_forests::utils::FileInputByteStream>
+      stream_;
 };
 
 class FileOutputByteStream
@@ -121,7 +167,8 @@ class FileOutputByteStream
   absl::Status Close() override;
 
  private:
-  std::ofstream file_stream_;
+  std::unique_ptr<yggdrasil_decision_forests::utils::FileOutputByteStream>
+      stream_;
 };
 
 // Exports a proto to disk in binary format.

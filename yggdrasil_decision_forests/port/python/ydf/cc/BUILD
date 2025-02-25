@@ -1,4 +1,4 @@
-load("@pybind11_bazel//:build_defs.bzl", "pybind_extension")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -16,6 +16,7 @@ pybind_extension(
         "//conditions:default": [],
     }),
     deps = [
+        ":maybe_gcs_filesystem",
         "//ydf/dataset:dataset_cc",
         "//ydf/learner:learner_cc",
         "//ydf/learner:worker_cc",
@@ -26,6 +27,15 @@ pybind_extension(
         "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
     ],
 )
+
+pybind_library(
+    name = "maybe_gcs_filesystem",
+    deps = [
+        # GCS support is enabled by default in the external build.
+        "@ydf_cc//yggdrasil_decision_forests/utils:filesystem_default_gcs",
+    ],
+)
+
 # Libraries
 # =========
 

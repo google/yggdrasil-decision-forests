@@ -23,18 +23,26 @@
 #include <memory>
 #include <regex>  // NOLINT
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "yggdrasil_decision_forests/utils/filesystem_interface.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
+#if __cplusplus > 201402L
 namespace fs = std::filesystem;
+#else
+namespace fs = std::experimental::filesystem;
+#endif
 
 // Converts a absl::string_view into an object compatible with std::filesystem.
 #ifdef ABSL_USES_STD_STRING_VIEW
@@ -42,6 +50,107 @@ namespace fs = std::filesystem;
 #else
 #define SV_ABSL_TO_STD(X) std::string(X)
 #endif
+
+namespace yggdrasil_decision_forests::utils::filesystem {
+
+// GCS implementation; if linked.
+std::unique_ptr<FileSystemInterface> gcs_implementation;
+
+void SetGCSImplementation(std::unique_ptr<FileSystemInterface>&& value) {
+  gcs_implementation = std::move(value);
+}
+
+bool HasGCSImplementation() { return gcs_implementation != nullptr; }
+
+FileSystemInterface& GCSImplementation() {
+  if (!gcs_implementation) {
+    LOG(FATAL)
+        << "TensorFlow filesystem dependency not linked. Make sure to add "
+           "yggdrasil_decision_forests/utils:filesystem_tensorflow_impl as a "
+           "dependency to your project.";
+  }
+  return *gcs_implementation;
+}
+
+absl::optional<GCSPath> GCSPath::Parse(absl::string_view path) {
+  constexpr char kPrefix[] = "gs://";
+  constexpr int kPrefixLen = 5;
+  if (!absl::StartsWith(path, kPrefix)) {
+    return {};
+  }
+  const auto sep = path.find('/', kPrefixLen);
+  if (sep == -1) {
+    return {};
+  }
+  const auto x = GCSPath{
+      .bucket = std::string(path.substr(kPrefixLen, sep - kPrefixLen)),
+      .object = std::string(path.substr(sep + 1)),
+  };
+  return x;
+}
+
+absl::Status STLFileInputByteStream::Open(absl::string_view path) {
+  file_stream_.open(std::string(path), std::ios::binary);
+  if (!file_stream_.is_open()) {
+    return absl::Status(absl::StatusCode::kUnknown,
+                        absl::StrCat("Failed to open ", path));
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<int> STLFileInputByteStream::ReadUpTo(char* buffer,
+                                                     int max_read) {
+  file_stream_.read(buffer, max_read);
+  if (file_stream_.bad()) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
+  }
+  return file_stream_.gcount();
+}
+
+absl::StatusOr<bool> STLFileInputByteStream::ReadExactly(char* buffer,
+                                                         int num_read) {
+  file_stream_.read(buffer, num_read);
+  const auto read_count = file_stream_.gcount();
+  if (file_stream_.bad() || (read_count > 0 && read_count < num_read)) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
+  }
+  return read_count > 0 || num_read == 0;
+}
+
+absl::Status STLFileInputByteStream::Close() {
+  file_stream_.close();
+  if (file_stream_.bad()) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
+  }
+  return absl::OkStatus();
+}
+
+absl::Status STLFileOutputByteStream::Open(absl::string_view path) {
+  file_stream_.open(std::string(path), std::ios::binary);
+  if (!file_stream_.is_open()) {
+    return absl::Status(absl::StatusCode::kUnknown,
+                        absl::StrCat("Failed to open ", path));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status STLFileOutputByteStream::Write(absl::string_view chunk) {
+  file_stream_.write(chunk.data(), chunk.size());
+  if (file_stream_.bad()) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to write chunk");
+  }
+  return absl::OkStatus();
+}
+
+absl::Status STLFileOutputByteStream::Close() {
+  file_stream_.close();
+  if (file_stream_.bad()) {
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
+  }
+  return absl::OkStatus();
+}
+
+}  // namespace yggdrasil_decision_forests::utils::filesystem
 
 namespace file {
 
@@ -86,6 +195,18 @@ bool GenerateShardedFilenames(absl::string_view spec,
 
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
                    const int options) {
+  // Support for GCS
+  if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
+    const auto cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(
+            pattern);
+    if (cloud_path.has_value()) {
+      return ::yggdrasil_decision_forests::utils::filesystem::
+          GCSImplementation()
+              .Match(pattern, results, options);
+    }
+  }
+
   try {
     const auto search_dir = fs::path(SV_ABSL_TO_STD(pattern)).parent_path();
     const auto filename = fs::path(SV_ABSL_TO_STD(pattern)).filename().string();
@@ -116,6 +237,17 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
 }
 
 absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
+  // Support for GCS
+  if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
+    const auto cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(path);
+    if (cloud_path.has_value()) {
+      return ::yggdrasil_decision_forests::utils::filesystem::
+          GCSImplementation()
+              .RecursivelyCreateDir(path, options);
+    }
+  }
+
   try {
     fs::create_directories(SV_ABSL_TO_STD(path));
     return absl::OkStatus();
@@ -126,6 +258,17 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
 
 // Delete the directory "path".
 absl::Status RecursivelyDelete(absl::string_view path, int options) {
+  // Support for GCS
+  if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
+    const auto cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(path);
+    if (cloud_path.has_value()) {
+      return ::yggdrasil_decision_forests::utils::filesystem::
+          GCSImplementation()
+              .RecursivelyDelete(path, options);
+    }
+  }
+
   try {
     fs::remove(SV_ABSL_TO_STD(path));
     return absl::OkStatus();
@@ -135,64 +278,63 @@ absl::Status RecursivelyDelete(absl::string_view path, int options) {
 }
 
 absl::Status FileInputByteStream::Open(absl::string_view path) {
-  file_stream_.open(std::string(path), std::ios::binary);
-  if (!file_stream_.is_open()) {
-    return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path));
+  stream_.reset();
+
+  // Support for GCS
+  if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
+    const auto cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(path);
+    if (cloud_path.has_value()) {
+      stream_ =
+          ::yggdrasil_decision_forests::utils::filesystem::GCSImplementation()
+              .CreateInputByteStream();
+    }
   }
-  return absl::OkStatus();
+
+  if (!stream_) {
+    stream_ = std::make_unique<yggdrasil_decision_forests::utils::filesystem::
+                                   STLFileInputByteStream>();
+  }
+  return stream_->Open(path);
 }
 
 absl::StatusOr<int> FileInputByteStream::ReadUpTo(char* buffer, int max_read) {
-  file_stream_.read(buffer, max_read);
-  if (file_stream_.bad()) {
-    return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
-  }
-  return file_stream_.gcount();
+  return stream_->ReadUpTo(buffer, max_read);
 }
 
 absl::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
                                                       int num_read) {
-  file_stream_.read(buffer, num_read);
-  const auto read_count = file_stream_.gcount();
-  if (file_stream_.bad() || (read_count > 0 && read_count < num_read)) {
-    return absl::Status(absl::StatusCode::kUnknown, "Failed to read chunk");
-  }
-  return read_count > 0 || num_read == 0;
+  return stream_->ReadExactly(buffer, num_read);
 }
 
-absl::Status FileInputByteStream::Close() {
-  file_stream_.close();
-  if (file_stream_.bad()) {
-    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
-  }
-  return absl::OkStatus();
-}
+absl::Status FileInputByteStream::Close() { return stream_->Close(); }
 
 absl::Status FileOutputByteStream::Open(absl::string_view path) {
-  file_stream_.open(std::string(path), std::ios::binary);
-  if (!file_stream_.is_open()) {
-    return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path));
+  stream_.reset();
+
+  // Support for GCS
+  if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
+    const auto cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(path);
+    if (cloud_path.has_value()) {
+      stream_ =
+          ::yggdrasil_decision_forests::utils::filesystem::GCSImplementation()
+              .CreateOutputByteStream();
+    }
   }
-  return absl::OkStatus();
+
+  if (!stream_) {
+    stream_ = std::make_unique<yggdrasil_decision_forests::utils::filesystem::
+                                   STLFileOutputByteStream>();
+  }
+  return stream_->Open(path);
 }
 
 absl::Status FileOutputByteStream::Write(absl::string_view chunk) {
-  file_stream_.write(chunk.data(), chunk.size());
-  if (file_stream_.bad()) {
-    return absl::Status(absl::StatusCode::kUnknown, "Failed to write chunk");
-  }
-  return absl::OkStatus();
+  return stream_->Write(chunk);
 }
 
-absl::Status FileOutputByteStream::Close() {
-  file_stream_.close();
-  if (file_stream_.bad()) {
-    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
-  }
-  return absl::OkStatus();
-}
+absl::Status FileOutputByteStream::Close() { return stream_->Close(); }
 
 absl::Status SetBinaryProto(absl::string_view path,
                             const google::protobuf::MessageLite& message, int unused) {
@@ -244,10 +386,38 @@ absl::Status GetTextProto(absl::string_view path, google::protobuf::Message* mes
 }
 
 absl::StatusOr<bool> FileExists(absl::string_view path) {
+  // Support for GCS
+  if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
+    const auto cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(path);
+    if (cloud_path.has_value()) {
+      return ::yggdrasil_decision_forests::utils::filesystem::
+          GCSImplementation()
+              .FileExists(path);
+    }
+  }
+
   return fs::exists(SV_ABSL_TO_STD(path));
 }
 
 absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
+  // Support for GCS
+  if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
+    const auto from_cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(from);
+    const auto to_cloud_path =
+        ::yggdrasil_decision_forests::utils::filesystem::GCSPath::Parse(to);
+    if (from_cloud_path.has_value() != to_cloud_path.has_value()) {
+      return absl::InvalidArgumentError(
+          "Cannot move object between google cloud storage and local.");
+    }
+    if (from_cloud_path.has_value()) {
+      return ::yggdrasil_decision_forests::utils::filesystem::
+          GCSImplementation()
+              .Rename(from, to, options);
+    }
+  }
+
   try {
     fs::rename(SV_ABSL_TO_STD(from), SV_ABSL_TO_STD(to));
   } catch (const std::exception& e) {

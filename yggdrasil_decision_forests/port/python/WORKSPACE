@@ -18,6 +18,8 @@ load("@ydf_cc//yggdrasil_decision_forests:library.bzl", ydf_cc_load_deps = "load
 
 ydf_cc_load_deps(repo_name = "@ydf_cc")
 
+# Note: GRPC import several other libraries:
+# https://github.com/grpc/grpc/blob/master/bazel/grpc_deps.bzl
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 
 grpc_deps()

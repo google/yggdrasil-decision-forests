@@ -6,8 +6,8 @@ package(
 )
 
 # ==========================
-# Following is a quick recap of the most useful compilation flags of YDF. Look at the individual
-# flags documentation for more details.
+# Following is a quick recap of the most useful compilation flags and other options of YDF. Look at
+# the individual flags documentation for more details.
 #
 # - YDF benefits from AVX an other special instructions. Compile YDF with
 #   "--copt=-mfma --copt=-mavx2 --copt=-mavx " for maximum performances.
@@ -25,6 +25,10 @@ package(
 #
 # - Compile YDF with Google public only libraries (e.g., filesystem, logging, threading) with
 #   "--define=ydf_use_default_libs=1".
+#
+# - Adding the //yggdrasil_decision_forests/utils:filesystem_default_gcs dependency on
+#   top of "ydf_use_default_libs=1" adds support for Google Cloud Storage file support
+#   e.g. gs://....
 # ==========================
 
 exports_files(["LICENSE"])

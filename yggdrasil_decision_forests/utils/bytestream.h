@@ -55,6 +55,11 @@ class InputByteStream {
   virtual absl::Status Close() { return absl::OkStatus(); }
 };
 
+class FileInputByteStream : public InputByteStream {
+ public:
+  virtual absl::Status Open(absl::string_view path) = 0;
+};
+
 // Wraps a InputByteStream around a absl::string_view.
 class StringViewInputByteStream : public InputByteStream {
  public:
@@ -115,6 +120,11 @@ class StringOutputByteStream : public OutputByteStream {
 
  private:
   absl::Cord content_;
+};
+
+class FileOutputByteStream : public OutputByteStream {
+ public:
+  virtual absl::Status Open(absl::string_view path) = 0;
 };
 
 }  // namespace utils

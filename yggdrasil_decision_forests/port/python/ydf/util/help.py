@@ -36,7 +36,7 @@ In-Memory
 
 File-Based
 
-Use typed paths (e.g., "format:/path") which can be sharded (e.g.`format:/path@n`) or use globs (e.g. `format:/path*`). Lists of paths are also supported.
+Use typed paths (e.g., "format:/path") which can be sharded (e.g.`format:/path@n`) or use globs (e.g. `format:/path*`). Lists of paths are also supported. Use the prefix "gs://" for files hosted on Google Cloud Storage e.g. "csv:gs://my_bucket/dataset*".
 
 - `csv:`: Small datasets. No multi-dimensional columns.
 - `avro:`: Large datasets. Supports multi-dimensional columns.
@@ -72,7 +72,7 @@ Googlers: See go/ydf/in_google for additional internal-only formats.
 
 <p><b>File-Based</b></p>
 
-<p>Use typed paths (e.g., <code>"format:/path"</code>) which can be sharded (e.g., <code>format:/path@n</code>) or use globs (e.g., <code>format:/path*</code>). Lists of paths are also supported.</p>
+<p>Use typed paths (e.g., <code>"format:/path"</code>) which can be sharded (e.g., <code>format:/path@n</code>) or use globs (e.g., <code>format:/path*</code>). Lists of paths are also supported. Use the prefix <code>gs://</code> for files hosted on Google Cloud Storage e.g. <code>csv:gs://my_bucket/dataset*</code>.</p>
 
 <ul>
   <li><b><code>csv:</code></b> Small datasets. No multi-dimensional columns.</li>

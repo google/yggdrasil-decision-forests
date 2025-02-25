@@ -13,10 +13,27 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/utils/filesystem_tensorflow_interface.h"
-
 #include <memory>
+#include <utility>
 
-namespace file::impl {
-std::unique_ptr<Interface> implementation;
+#include "absl/log/log.h"
+#include "yggdrasil_decision_forests/utils/filesystem_interface.h"
+
+namespace yggdrasil_decision_forests::utils::filesystem::tf_impl {
+std::unique_ptr<FileSystemInterface> implementation;
+
+void SetInterface(std::unique_ptr<FileSystemInterface>&& value) {
+  implementation = std::move(value);
 }
+
+FileSystemInterface& Interface() {
+  if (!implementation) {
+    LOG(FATAL)
+        << "TensorFlow filesystem dependency not linked. Make sure to add "
+           "yggdrasil_decision_forests/utils:filesystem_tensorflow_impl as a "
+           "dependency to your project.";
+  }
+  return *implementation;
+}
+
+}  // namespace yggdrasil_decision_forests::utils::filesystem::tf_impl

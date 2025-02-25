@@ -201,7 +201,8 @@ absl::Status IntegerColumnReader<Value>::Open(absl::string_view path,
   if (!same_user_and_file_precision_) {
     user_buffer_.resize(kUserNumBytes * max_num_values);
   }
-  return file_.Open(path);
+  ASSIGN_OR_RETURN(file_, ::file::OpenInputFile(path));
+  return absl::OkStatus();
 }
 
 template <typename Value>
@@ -218,7 +219,7 @@ absl::Span<const char> IntegerColumnReader<Value>::ActiveFileBuffer() {
 template <typename Value>
 absl::Status IntegerColumnReader<Value>::Next() {
   ASSIGN_OR_RETURN(const auto read_bytes,
-                   file_.ReadUpTo(file_buffer_.data(), file_buffer_.size()));
+                   file_->ReadUpTo(file_buffer_.data(), file_buffer_.size()));
   DCHECK_EQ(read_bytes % file_num_bytes_, 0);
   const auto num_values = read_bytes / file_num_bytes_;
   if (!same_user_and_file_precision_) {
@@ -240,7 +241,7 @@ absl::Status IntegerColumnReader<Value>::Next() {
 
 template <typename Value>
 absl::Status IntegerColumnReader<Value>::Close() {
-  return file_.Close();
+  return file_->Close();
 }
 
 template class IntegerColumnReader<int8_t>;
@@ -468,7 +469,8 @@ absl::Status FloatColumnWriter::Close() {
 absl::Status FloatColumnReader::Open(absl::string_view path,
                                      int max_num_values) {
   buffer_.resize(max_num_values);
-  return file_.Open(path);
+  ASSIGN_OR_RETURN(file_, ::file::OpenInputFile(path));
+  return absl::OkStatus();
 }
 
 absl::Span<const float> FloatColumnReader::Values() {
@@ -477,8 +479,8 @@ absl::Span<const float> FloatColumnReader::Values() {
 
 absl::Status FloatColumnReader::Next() {
   ASSIGN_OR_RETURN(const auto read_bytes,
-                   file_.ReadUpTo(reinterpret_cast<char*>(buffer_.data()),
-                                  buffer_.size() * sizeof(float)));
+                   file_->ReadUpTo(reinterpret_cast<char*>(buffer_.data()),
+                                   buffer_.size() * sizeof(float)));
   num_values_ = read_bytes / sizeof(float);
   return absl::OkStatus();
 }
@@ -500,7 +502,7 @@ absl::Status FloatColumnReader::ReadAndAppend(absl::string_view path,
   return reader.Close();
 }
 
-absl::Status FloatColumnReader::Close() { return file_.Close(); }
+absl::Status FloatColumnReader::Close() { return file_->Close(); }
 
 absl::Status ShardedFloatColumnReader::ReadAndAppend(
     absl::string_view base_path, int begin_shard_idx, int end_shard_idx,

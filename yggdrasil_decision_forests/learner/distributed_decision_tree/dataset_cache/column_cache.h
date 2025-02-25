@@ -154,7 +154,7 @@ class IntegerColumnReader : public AbstractIntegerColumnIterator<Value> {
 
  private:
   // File stream.
-  file::FileInputByteStream file_;
+  std::unique_ptr<file::FileInputByteStream> file_;
 
   // Number of bytes used to store one value in the file data.
   uint8_t file_num_bytes_ = 0;
@@ -333,7 +333,7 @@ class FloatColumnReader : public AbstractFloatColumnIterator {
                                     std::vector<float>* output);
 
  private:
-  file::FileInputByteStream file_;
+  std::unique_ptr<file::FileInputByteStream> file_;
 
   // Buffer containing the last read values.
   std::vector<float> buffer_;

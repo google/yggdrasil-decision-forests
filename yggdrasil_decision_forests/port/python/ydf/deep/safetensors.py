@@ -16,13 +16,14 @@ from typing import Any, Dict, Union
 
 import jaxtyping
 import numpy as np
+import numpy.typing as np_typing
 
 _FLATTENING_TOKEN = "::"
 
 
 def flatten_weights(
     weights: Dict[str, Any], prefix=""
-) -> Dict[str, Union[jaxtyping.Array, np.typing.NDArray]]:
+) -> Dict[str, Union[jaxtyping.Array, np_typing.NDArray]]:
   """Flatten weights for use with safetensors."""
   result = {}
   for k, v in weights.items():

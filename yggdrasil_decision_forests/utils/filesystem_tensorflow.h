@@ -28,12 +28,18 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
+#include "yggdrasil_decision_forests/utils/filesystem_interface.h"
 #include "yggdrasil_decision_forests/utils/filesystem_tensorflow_interface.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 
 #define EXTERNAL_FILESYSTEM
 
 namespace file {
+
+inline yggdrasil_decision_forests ::utils::filesystem::FileSystemInterface&
+Interface() {
+  return yggdrasil_decision_forests ::utils::filesystem::tf_impl::Interface();
+}
 
 // Joins a list of directory or file names with a directory separator.
 //
@@ -113,7 +119,8 @@ class FileInputByteStream
   absl::Status Close() { return stream_->Close(); }
 
  private:
-  std::unique_ptr<impl::FileInputByteStreamInterface> stream_;
+  std::unique_ptr<yggdrasil_decision_forests::utils::FileInputByteStream>
+      stream_;
 };
 
 class FileOutputByteStream
@@ -125,7 +132,8 @@ class FileOutputByteStream
   absl::Status Close() { return stream_->Close(); }
 
  private:
-  std::unique_ptr<impl::FileOutputByteStreamInterface> stream_;
+  std::unique_ptr<yggdrasil_decision_forests::utils::FileOutputByteStream>
+      stream_;
 };
 
 // Exports a proto to disk in binary format.
