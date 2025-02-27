@@ -4024,16 +4024,6 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
   }
 }
 
-template <class T, class S, class C>
-S& Container(std::priority_queue<T, S, C>& q) {
-  struct HackedQueue : private std::priority_queue<T, S, C> {
-    static S& Container(std::priority_queue<T, S, C>& q) {
-      return q.*&HackedQueue::c;
-    }
-  };
-  return HackedQueue::Container(q);
-}
-
 absl::Status GrowTreeBestFirstGlobal(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
