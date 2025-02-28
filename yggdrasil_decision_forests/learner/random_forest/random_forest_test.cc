@@ -471,7 +471,7 @@ TEST_F(RandomForestOnAdult, MaximumDuration) {
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(100000);  // Would take a very long time.
   rf_config->set_winner_take_all_inference(false);
-  train_config_.set_maximum_training_duration_seconds(10);
+  train_config_.set_maximum_training_duration_seconds(8);
 
   TrainAndEvaluateModel();
   // Note: The "TrainAndEvaluateModel" function last a bit more because it is
@@ -515,7 +515,7 @@ TEST_F(RandomForestOnAdult, MaximumDurationInTree) {
       ->mutable_sparse_oblique_split()
       ->set_num_projections_exponent(10);
   rf_config->set_winner_take_all_inference(false);
-  train_config_.set_maximum_training_duration_seconds(10);
+  train_config_.set_maximum_training_duration_seconds(8);
 
   SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
 
@@ -555,7 +555,7 @@ TEST_F(RandomForestOnAdult, MaximumDurationAdaptSampling) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(1000);  // Would take a very long time.
-  train_config_.set_maximum_training_duration_seconds(10);
+  train_config_.set_maximum_training_duration_seconds(8);
   rf_config->set_adapt_bootstrap_size_ratio_for_maximum_training_duration(true);
 
   TrainAndEvaluateModel();
@@ -598,6 +598,8 @@ TEST_F(RandomForestOnAdult, MHLDTOblique) {
       random_forest::proto::random_forest_config);
   deployment_config_.set_num_threads(0);
   rf_config->set_winner_take_all_inference(false);
+  // Prevent timeouts with a smaller model.
+  rf_config->set_num_trees(150);
   rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
   SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
@@ -1110,6 +1112,9 @@ TEST_F(RandomForestOnSyntheticClassification, MHLDTOblique) {
 
 TEST(RandomForest, PredefinedHyperParameters) {
   model::proto::TrainingConfig train_config;
+  auto* rf_config =
+      train_config.MutableExtension(random_forest::proto::random_forest_config);
+  rf_config->set_num_trees(150);
   train_config.set_learner(RandomForestLearner::kRegisteredName);
   utils::TestPredefinedHyperParametersAdultDataset(train_config, 2, 0.86);
 }

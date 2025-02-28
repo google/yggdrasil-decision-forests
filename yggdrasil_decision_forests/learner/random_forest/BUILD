@@ -90,7 +90,7 @@ cc_test(
     # By default, do not fail with tests with a "maximum training duration" last longer than
     # indicated. This can create flakiness with concurrent execution of tests.
     defines = ["SKIP_TIMING_TESTS"],
-    shard_count = 20,
+    shard_count = 30,
     deps = [
         ":random_forest",
         ":random_forest_cc_proto",
