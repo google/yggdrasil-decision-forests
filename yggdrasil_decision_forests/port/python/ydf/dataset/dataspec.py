@@ -16,11 +16,12 @@
 
 import dataclasses
 import enum
-from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
+from ydf.utils import log
 
 
 # The different ways a user can specify the columns of VerticalDataset.
@@ -484,6 +485,8 @@ def categorical_column_dictionary_to_list(
   dictionary), returns the string representation of the indices e.g. ["0", "1",
   "2"].
 
+  The column values are encoded to utf-8 with error handling "ignore".
+
   Args:
     column_spec: Dataspec column.
   """
@@ -495,12 +498,25 @@ def categorical_column_dictionary_to_list(
 
   items = [None] * column_spec.categorical.number_of_unique_values
 
-  for key, value in column_spec.categorical.items.items():
+  # Warn for every column every time. Poor encodings could lead to surprising
+  # behaviour.
+  shown_unicode_warning = False
+  for key, value in categorical_vocab_iterator(column_spec.categorical):
     if items[value.index] is not None:
       raise ValueError(
           f"Invalid dictionary. Duplicated index {value.index} in dictionary"
       )
-    items[value.index] = key
+    try:
+      decoded_key = key.decode()
+    except UnicodeDecodeError:
+      if not shown_unicode_warning:
+        log.warning(
+            f"Column {column_spec.name} could not be decoded to utf-8. Decoding"
+            " with silenced errors. Prefer UTF-8 encoded data when using YDF."
+        )
+        shown_unicode_warning = True
+      decoded_key = key.decode(encoding="utf-8", errors="ignore")
+    items[value.index] = decoded_key
 
   for index, value in enumerate(items):
     if value is None:
@@ -658,3 +674,31 @@ def column_defs_contains_column(column_name: str, columns: ColumnDefs) -> bool:
     raise ValueError(
         f"Unsupported column definition with type: {type(columns)}"
     )
+
+
+def categorical_vocab_iterator(
+    categorical_spec: ds_pb.CategoricalSpec,
+) -> Iterator[Tuple[bytes, ds_pb.CategoricalSpec.VocabValue]]:
+  """Returns a categorical spec's vocabulary as a list.
+
+  The data spec currently encodes the vocabulary as a map from string to
+  VocabValue. If a key of this map is of type bytes, protobuf's python
+  implementation may fail to retrieve the values from this map. This is a helper
+  function to work around this limitation.
+
+  Note that this function is internal and may change or be removed at any time.
+
+  Args:
+    categorical_spec: A categorical spec.
+
+  Yields:
+    The vocabulary as (key, value) tuples.
+  """
+  serialized_message = categorical_spec.SerializeToString()
+  fixed_message = (
+      ds_pb.CategoricalSpec.InternalCategoricalSpecWithoutMap.FromString(
+          serialized_message
+      )
+  )
+  for item in fixed_message.items:
+    yield (item.key, item.value)

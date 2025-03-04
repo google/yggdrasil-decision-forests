@@ -861,7 +861,7 @@ def validate_dataspec(
     count_look_numerical = 0
     count_total = 0
     examples_of_value = []
-    for k, v in column.categorical.items.items():
+    for k, v in dataspec_lib.categorical_vocab_iterator(column.categorical):
       count_total += v.count
       if look_numerical(k):
         count_look_numerical += v.count
@@ -869,16 +869,17 @@ def validate_dataspec(
           examples_of_value.append(k)
 
     if count_look_numerical >= 0.8 * count_total:
+      examples_for_warning = b", ".join(examples_of_value)
       warnings.append(
           f"Column {column.name!r} is detected as CATEGORICAL but its values"
-          f" look like numbers (e.g., {', '.join(examples_of_value)}). Should"
+          f" look like numbers (e.g., {examples_for_warning}). Should"
           " the column not be NUMERICAL instead? If so, feed numerical values"
           " instead of strings or objects."
       )
   return warnings
 
 
-def look_numerical(v: str) -> bool:
+def look_numerical(v: Union[str, bytes]) -> bool:
   """Tests if a string look like a numerical value."""
   try:
     float(v)

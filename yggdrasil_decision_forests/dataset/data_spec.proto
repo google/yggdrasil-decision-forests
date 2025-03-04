@@ -194,6 +194,18 @@ message CategoricalSpec {
   // by 1. Such pre-processing is done in TensorFlow Decision Forests. See
   // "CATEGORICAL_INTEGER_OFFSET".
   optional bool offset_value_by_one_during_training = 8 [default = false];
+
+  // This is an alternative to the CategoricalSpec without using a map. This
+  // message is for internal use only. It is binary compatible to
+  // CategoricalSpec. This message may be removed at any point without warning.
+  message InternalCategoricalSpecWithoutMap {
+    reserved 1, 2, 3, 4, 5, 6, 8;
+    message ItemsEntry {
+      optional bytes key = 1;
+      optional CategoricalSpec.VocabValue value = 2;
+    }
+    repeated ItemsEntry items = 7;
+  }
 }
 
 // Specification of a numerical column.

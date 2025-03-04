@@ -24,6 +24,7 @@ import jax.numpy as jnp
 import numpy as np
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
+from ydf.dataset import dataspec as dataspec_lib
 from ydf.deep import dataset as deep_dataset_lib
 from ydf.deep import deep_model_pb2
 from ydf.deep import layer as layer_lib
@@ -84,9 +85,12 @@ class Preprocessor:
       if column.type != data_spec_pb2.ColumnType.CATEGORICAL:
         continue
 
-      items = sorted(
-          [(item.index, key) for key, item in column.categorical.items.items()]
-      )
+      items = sorted([
+          (item.index, key.decode())
+          for key, item in dataspec_lib.categorical_vocab_iterator(
+              column.categorical
+          )
+      ])
       # Item key sorted by index
       keys = np.array([x[1] for x in items]).astype(np.bytes_)
 

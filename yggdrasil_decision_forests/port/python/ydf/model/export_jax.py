@@ -177,8 +177,10 @@ class FeatureEncoder:
           and not column_spec.categorical.is_already_integerized
       ):
         categorical[input_feature.name] = {
-            key: item.index
-            for key, item in column_spec.categorical.items.items()
+            key.decode("utf-8", errors="strict"): item.index
+            for key, item in dataspec_lib.categorical_vocab_iterator(
+                column_spec.categorical
+            )
         }
     return FeatureEncoder(categorical=categorical)
 

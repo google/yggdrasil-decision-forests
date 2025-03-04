@@ -14,6 +14,8 @@
 
 """Tests for CART learners."""
 
+import os
+
 from absl.testing import absltest
 import numpy as np
 
@@ -284,6 +286,24 @@ class CARTLearnerTest(learner_test_utils.LearnerTest):
     self.assertFalse(tree.root.is_leaf)
     root_condition = tree.root.condition
     self.assertEqual(root_condition.threshold, 2.5)
+
+  def test_non_unicode_feature_values(self):
+    text = "feature,label\nCafé,oné\nfoobar,zéro"
+    encoded_text = text.encode("windows-1252")
+    with self.assertRaises(UnicodeDecodeError):
+      encoded_text.decode()
+    data_path = self.create_tempfile().full_path
+    model_path = self.create_tempdir().full_path
+    with open(data_path, "wb") as f:
+      f.write(encoded_text)
+    model = specialized_learners.CartLearner(
+        label="label",
+        min_examples=1,
+        min_vocab_frequency=1,
+    ).train("csv:" + data_path)
+    evaluation = model.evaluate("csv:" + data_path)
+    self.assertEqual(evaluation.accuracy, 1)
+    model.save(model_path)
 
 
 if __name__ == "__main__":

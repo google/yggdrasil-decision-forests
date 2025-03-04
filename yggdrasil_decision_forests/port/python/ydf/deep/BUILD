@@ -117,6 +117,7 @@ py_library(
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
+        "//ydf/dataset:dataspec",
     ],
 )
 

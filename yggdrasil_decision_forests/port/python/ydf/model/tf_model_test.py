@@ -1325,6 +1325,23 @@ class TfModelTest(parameterized.TestCase):
         pre_processing=pre_processing,
     )
 
+  @parameterized.product(mode=["tf", "keras"])
+  def test_export_non_unicode_feature_values(self, mode):
+    text = "feature,label\nCafé,oné\nfoobar,zéro"
+    encoded_text = text.encode("windows-1252")
+    with self.assertRaises(UnicodeDecodeError):
+      encoded_text.decode()
+    data_path = self.create_tempfile().full_path
+    model_path = self.create_tempdir().full_path
+    with open(data_path, "wb") as f:
+      f.write(encoded_text)
+    model = specialized_learners.CartLearner(
+        label="label",
+        min_examples=1,
+        min_vocab_frequency=1,
+    ).train("csv:" + data_path)
+    model.to_tensorflow_saved_model(path=model_path, mode=mode)
+
 
 if __name__ == "__main__":
   absltest.main()

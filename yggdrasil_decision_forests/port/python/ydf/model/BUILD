@@ -134,6 +134,7 @@ py_library(
     srcs = ["export_jax.py"],
     deps = [
         ":generic_model",
+        # jax dep,
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",

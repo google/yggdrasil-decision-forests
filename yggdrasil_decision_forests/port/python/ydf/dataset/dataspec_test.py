@@ -350,6 +350,34 @@ class DataspecTest(absltest.TestCase):
   def test_normalize_column_defs_none(self):
     self.assertIsNone(dataspec_lib.normalize_column_defs(None))
 
+  def test_categorical_vocab_iterator(self):
+    cat_spec = ds_pb.CategoricalSpec()
+    cat_spec.items["foo"].CopyFrom(VocabValue(index=0, count=1))
+    cat_spec.items["bar"].CopyFrom(VocabValue(index=1, count=2))
+    expected_vocabulary = [
+        (b"foo", VocabValue(index=0, count=1)),
+        (b"bar", VocabValue(index=1, count=2)),
+    ]
+    self.assertCountEqual(
+        expected_vocabulary,
+        list(dataspec_lib.categorical_vocab_iterator(cat_spec)),
+    )
+
+  def test_categorical_vocab_iterator_unicode(self):
+    cat_spec = ds_pb.CategoricalSpec.FromString(
+        b"\x08\x01\x10\x03\x18\x01"
+        b" \xd0\x0f(\x00:\x0e\n\x06foobar\x12\x04\x08\x01\x10\x01:\x0c\n\x04Caf\xe9\x12\x04\x08\x02\x10\x01:\r\n\x05<OOD>\x12\x04\x08\x00\x10\x00"
+    )
+    expected_vocabulary = [
+        (b"Caf\351", VocabValue(index=2, count=1)),
+        (b"foobar", VocabValue(index=1, count=1)),
+        (b"<OOD>", VocabValue(index=0, count=0)),
+    ]
+    self.assertCountEqual(
+        expected_vocabulary,
+        list(dataspec_lib.categorical_vocab_iterator(cat_spec)),
+    )
+
 
 class MonotonicTest(parameterized.TestCase):
 
@@ -385,7 +413,6 @@ class MonotonicTest(parameterized.TestCase):
         ValueError, "with monotonic constraint is expected to have"
     ):
       _ = Column("feature", semantic=Semantic.CATEGORICAL, monotonic=+1)
-
 
 if __name__ == "__main__":
   absltest.main()
