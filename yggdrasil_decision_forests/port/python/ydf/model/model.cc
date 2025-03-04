@@ -157,7 +157,8 @@ void init_model(py::module_& m) {
            py::arg("dataset"), py::arg("benchmark_duration"),
            py::arg("warmup_duration"), py::arg("batch_size"),
            py::arg("num_threads"))
-      .def("VariableImportances", &GenericCCModel::VariableImportances)
+      .def("VariableImportances",
+           WithStatusOr(&GenericCCModel::VariableImportances))
       .def("ForceEngine", &GenericCCModel::ForceEngine, py::arg("engine_name"))
       .def("ListCompatibleEngines", &GenericCCModel::ListCompatibleEngines)
       // TODO: Remove when solved.

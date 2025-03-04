@@ -155,10 +155,9 @@ class GenericCCModel {
     return model_->hyperparameter_optimizer_logs();
   }
 
-  absl::flat_hash_map<std::string, model::proto::VariableImportanceSet>
-  VariableImportances() const {
-    return model_->precomputed_variable_importances();
-  }
+  absl::StatusOr<
+      absl::flat_hash_map<std::string, model::proto::VariableImportanceSet>>
+  VariableImportances() const;
 
   void invalidate_engine() { invalidate_engine_ = true; }
 

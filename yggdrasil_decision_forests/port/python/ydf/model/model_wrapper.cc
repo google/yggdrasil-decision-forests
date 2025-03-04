@@ -26,6 +26,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -310,6 +311,14 @@ absl::StatusOr<std::string> GenericCCModel::Describe(
   } else {
     return model::DescribeModelHtml(*model_, utils::GenUniqueId());
   }
+}
+
+absl::StatusOr<
+    absl::flat_hash_map<std::string, model::proto::VariableImportanceSet>>
+GenericCCModel::VariableImportances() const {
+  RETURN_IF_ERROR(model_->PrecomputeVariableImportances(
+      model_->AvailableVariableImportances()));
+  return model_->precomputed_variable_importances();
 }
 
 // TODO: Pass utils::BenchmarkInferenceRunOptions directly.

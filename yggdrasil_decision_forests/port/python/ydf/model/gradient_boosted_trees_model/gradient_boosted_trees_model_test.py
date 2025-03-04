@@ -184,7 +184,7 @@ class GradientBoostedTreesTest(parameterized.TestCase):
     self.assertIsNotNone(validation_evaluation)
     self.assertAlmostEqual(validation_evaluation.accuracy, 0.8498403)
 
-  def test_variable_importances(self):
+  def test_variable_importances_stored_in_model(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(),
         "model",
@@ -217,6 +217,55 @@ class GradientBoostedTreesTest(parameterized.TestCase):
                 (35.0, "num_0"),
                 (12.0, "num_2"),
                 (1.0, "num_3"),
+            ],
+        },
+    )
+
+  def test_variable_importances_not_stored_in_model(self):
+    model_path = os.path.join(
+        test_utils.ydf_test_data_path(),
+        "model",
+        "synthetic_ranking_gbdt",
+    )
+    model = model_lib.load_model(model_path)
+    variable_importances = model.variable_importances()
+    self.assertEqual(
+        variable_importances,
+        {
+            "INV_MEAN_MIN_DEPTH": [
+                (0.823529411764706, "cat_str_0"),
+                (0.3409269442262372, "num_0"),
+                (0.33853354134165364, "num_2"),
+                (0.2407099278979479, "cat_str_1"),
+                (0.16596558317399618, "num_1"),
+                (0.15816326530612249, "cat_int_0"),
+                (0.15645277577505406, "num_3"),
+                (0.1550553769203287, "cat_int_1"),
+            ],
+            "NUM_AS_ROOT": [
+                (11.0, "cat_str_0"),
+                (2.0, "num_0"),
+                (1.0, "num_2"),
+            ],
+            "NUM_NODES": [
+                (128.0, "cat_str_1"),
+                (101.0, "cat_str_0"),
+                (65.0, "num_0"),
+                (64.0, "num_2"),
+                (26.0, "num_1"),
+                (15.0, "cat_int_0"),
+                (11.0, "cat_int_1"),
+                (10.0, "num_3"),
+            ],
+            "SUM_SCORE": [
+                (357.5797439698363, "cat_str_0"),
+                (290.9118405326153, "num_0"),
+                (225.41135752020637, "cat_str_1"),
+                (183.18018738733372, "num_2"),
+                (37.17157095257426, "num_1"),
+                (19.275285203708336, "cat_int_0"),
+                (10.371429289167281, "cat_int_1"),
+                (8.130908778170124, "num_3"),
             ],
         },
     )
