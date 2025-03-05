@@ -1340,7 +1340,19 @@ class TfModelTest(parameterized.TestCase):
         min_examples=1,
         min_vocab_frequency=1,
     ).train("csv:" + data_path)
+    ydf_predictions = model.predict("csv:" + data_path)
+
     model.to_tensorflow_saved_model(path=model_path, mode=mode)
+
+    if mode == "keras":
+      tf_dataset = tf.data.Dataset.from_tensor_slices({
+          "feature": np.array(
+              ["Café".encode("windows-1252"), "foobar".encode("windows-1252")]
+          ).reshape(-1, 1)
+      })
+      tfdf_model = tf.keras.models.load_model(model_path)
+      tfdf_predictions = tfdf_model.predict(tf_dataset)
+      npt.assert_equal(tfdf_predictions.flatten(), ydf_predictions)
 
 
 if __name__ == "__main__":
