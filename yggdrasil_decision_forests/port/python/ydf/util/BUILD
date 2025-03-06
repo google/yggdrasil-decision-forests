@@ -44,6 +44,12 @@ py_library(
     deps = [],
 )
 
+py_library(
+    name = "vertex_ai",
+    srcs = ["vertex_ai.py"],
+    deps = [],
+)
+
 # Tests
 # =====
 
@@ -61,5 +67,14 @@ py_test(
         # numpy dep,
         # tensorflow dep,
         "//ydf/utils:test_utils",
+    ],
+)
+
+py_test(
+    name = "vertex_ai_test",
+    srcs = ["vertex_ai_test.py"],
+    deps = [
+        ":vertex_ai",
+        # absl/testing:absltest dep,
     ],
 )

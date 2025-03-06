@@ -7,6 +7,7 @@
 -   Expose losses for distributed training.
 -   Add `class_weights` parameter to the learners.
 -   Support for Google Cloud paths for datasets and model IO.
+-   Add utility to facilitate distributed training on VertexAI.
 
 ### Fix
 

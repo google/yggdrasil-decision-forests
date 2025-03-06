@@ -13,6 +13,7 @@ py_library(
     srcs = ["util.py"],
     deps = [
         "//ydf/util:tf_example",
+        "//ydf/util:vertex_ai",
     ],
 )
 

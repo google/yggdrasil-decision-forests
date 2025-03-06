@@ -60,7 +60,8 @@ A **Feature Selector** finds the optimal set of input features for the model.
     classification.
 -   [Semantic](utilities.md#ydf.Semantic): How an input feature in interpreted
     e.g. numerical, categorical.
--   [evaluate_predictions](utilities.md#ydf.evaluate_predictions): Evaluates predictions of YDF and non-YDF models.
+-   [evaluate_predictions](utilities.md#ydf.evaluate_predictions): Evaluates
+    predictions of YDF and non-YDF models.
 -   [verbose](utilities.md#ydf.verbose): Control the amount of logging.
 -   [start_worker](utilities.md#ydf.start_worker): Start a worker for
     distributed training.
@@ -72,6 +73,8 @@ A **Feature Selector** finds the optimal set of input features for the model.
     dataset in memory.
 -   [ydf.util.write_tf_record](util.md#ydf.util.write_tf_record): Write a TF
     Record dataset from memory.
+-   [ydf.util.get_vertex_ai_cluster_spec](util.md#ydf.util.get_vertex_ai_cluster_spec):
+    Parses the Vertex AI cluster specification for distributed training.
 
 ## Advanced Utilities
 
@@ -91,7 +94,6 @@ A **Feature Selector** finds the optimal set of input features for the model.
     specification proto. Describe the columns of the model.
 -   [TrainingConfig](utilities.md#ydf.TrainingConfig): Internal training
     configuration proto. Describe the training configuration of a learner.
-
 
 ## Custom Loss
 

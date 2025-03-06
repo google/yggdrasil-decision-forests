@@ -16,6 +16,9 @@
 
 # pylint: disable=unused-import,g-importing-member,g-import-not-at-top,g-bad-import-order,reimported
 
+from ydf.util.vertex_ai import get_vertex_ai_cluster_spec
+from ydf.util.vertex_ai import VertexAIClusterSpec
+
 
 from ydf.util.tf_example import read_tf_record
 from ydf.util.tf_example import write_tf_record
