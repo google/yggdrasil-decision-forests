@@ -303,6 +303,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
     std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
   utils::usage::OnTrainingStart(train_dataset.data_spec(), training_config(),
+                                GetMetadataWithDefaults(training_config()),
                                 train_dataset.nrow());
   const auto begin_training = absl::Now();
 
@@ -343,6 +344,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
   utils::usage::OnLoadDataset(path);
 
   utils::usage::OnTrainingStart(data_spec, training_config(),
+                                GetMetadataWithDefaults(training_config()),
                                 /*num_examples=*/-1);
   const auto begin_training = absl::Now();
 
@@ -873,30 +875,7 @@ void InitializeModelWithAbstractTrainingConfig(
 void InitializeModelMetadataWithAbstractTrainingConfig(
     const proto::TrainingConfig& training_config, AbstractModel* model) {
   auto* dst = model->mutable_metadata();
-  dst->Import(training_config.metadata());
-
-  // Owner
-  if (dst->owner().empty()) {
-    auto opt_username = utils::UserName();
-    if (opt_username.has_value()) {
-      dst->set_owner(std::move(opt_username).value());
-    }
-  }
-
-  // Date
-  if (dst->created_date() == 0) {
-    dst->set_created_date(absl::ToUnixSeconds(absl::Now()));
-  }
-
-  // UID
-  if (dst->uid() == 0) {
-    dst->set_uid(utils::GenUniqueIdUint64());
-  }
-
-  // Framework
-  if (dst->framework().empty()) {
-    dst->set_framework("Yggdrasil c++");
-  }
+  dst->Import(GetMetadataWithDefaults(training_config));
 }
 
 absl::Status AbstractLearner::CheckCapabilities() const {
@@ -1047,6 +1026,36 @@ dataset::LoadConfig OptimalDatasetLoadingConfig(
         };
   }
   return load_config;
+}
+
+proto::Metadata GetMetadataWithDefaults(
+    const proto::TrainingConfig& training_config) {
+  proto::Metadata metadata;
+  metadata.CopyFrom(training_config.metadata());
+
+  // Owner
+  if (metadata.owner().empty()) {
+    auto opt_username = utils::UserName();
+    if (opt_username.has_value()) {
+      metadata.set_owner(std::move(opt_username).value());
+    }
+  }
+
+  // Date
+  if (metadata.created_date() == 0) {
+    metadata.set_created_date(absl::ToUnixSeconds(absl::Now()));
+  }
+
+  // UID
+  if (metadata.uid() == 0) {
+    metadata.set_uid(utils::GenUniqueIdUint64());
+  }
+
+  // Framework
+  if (metadata.framework().empty()) {
+    metadata.set_framework("Yggdrasil C++");
+  }
+  return metadata;
 }
 
 }  // namespace model

@@ -39,6 +39,7 @@ namespace usage {
 // Should be called at the start of the "Train" methods of learners.
 void OnTrainingStart(const dataset::proto::DataSpecification& data_spec,
                      const model::proto::TrainingConfig& train_config,
+                     const model::proto::Metadata& metadata,
                      int64_t num_examples);
 
 // Complete a model training.

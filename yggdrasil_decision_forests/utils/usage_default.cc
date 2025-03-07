@@ -25,6 +25,7 @@ namespace usage {
 
 void OnTrainingStart(const dataset::proto::DataSpecification& data_spec,
                      const model::proto::TrainingConfig& train_config,
+                     const model::proto::Metadata& metadata,
                      int64_t num_examples) {
   // Add usage tracking here.
 }

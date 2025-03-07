@@ -295,6 +295,11 @@ absl::Status CopyProblemDefinition(const proto::TrainingConfig& src,
 dataset::LoadConfig OptimalDatasetLoadingConfig(
     const proto::TrainingConfigLinking& link_config);
 
+// Returns a copy of the metadata from the training config with appropriate
+// default values if no metadata is included.
+proto::Metadata GetMetadataWithDefaults(
+    const proto::TrainingConfig& training_config);
+
 }  // namespace model
 }  // namespace yggdrasil_decision_forests
 
