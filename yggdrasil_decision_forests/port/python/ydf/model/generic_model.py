@@ -244,7 +244,7 @@ Use `model.describe()` for more details
   def set_data_spec(self, data_spec: data_spec_pb2.DataSpecification) -> None:
     """Changes the dataspec of the model.
 
-    This operation is tageret to advances user.
+    This operation is targeted to advanced users.
 
     Args:
       data_spec: New dataspec.
@@ -511,7 +511,7 @@ Use `model.describe()` for more details
     model = ydf.RandomForestLearner(label="label").train(train_ds)
 
     test_ds = pd.read_csv("test.csv")
-    evaluation = model.evaluates(test_ds)
+    evaluation = model.evaluate(test_ds)
     ```
 
     In a notebook, if a cell returns an evaluation object, this evaluation will
@@ -535,10 +535,10 @@ Use `model.describe()` for more details
     task=ydf.Task.REGRESSION).train(train_ds)
 
     # Evaluate the model as a regressive model
-    regressive_evaluation = model.evaluates(test_ds)
+    regressive_evaluation = model.evaluate(test_ds)
 
     # Evaluate the model as a ranking model model
-    regressive_evaluation = model.evaluates(test_ds,
+    regressive_evaluation = model.evaluate(test_ds,
       task=ydf.Task.RANKING, group="group_column")
     ```
 
@@ -636,14 +636,14 @@ Use `model.describe()` for more details
   ) -> analysis.Analysis:
     """Analyzes a model on a test dataset.
 
-    An analysis contains structual information about the model (e.g., variable
+    An analysis contains structural information about the model (e.g., variable
     importances), and the information about the application of the model on the
     given dataset (e.g. partial dependence plots).
 
     For a large dataset (many examples and / or features), computing the
     analysis can take significant time.
 
-    While some information might be valid, it is generatly not recommended to
+    While some information might be valid, it is generally not recommended to
     analyze a model on its training dataset.
 
     Usage example:
@@ -806,7 +806,7 @@ Use `model.describe()` for more details
     serialized TensorFlow Example proto (instead of raw tensor values) and/or
     wrap the model raw output (e.g. probability predictions) into a special
     structure (called the Serving API). You can create models compatible with
-    those two convensions with `feed_example_proto=True` and `servo_api=True`
+    those two conventions with `feed_example_proto=True` and `servo_api=True`
     respectively:
 
     ```python
@@ -946,7 +946,7 @@ Use `model.describe()` for more details
         compatible with mode="tf".
       feature_specs: Optional dictionary of `tf.io.parse_example` parsing
         feature specs e.g. `tf.io.FixedLenFeature` or `tf.io.RaggedFeature`. If
-        not provided, the praising feature specs are automatically generated
+        not provided, the parsing feature specs are automatically generated
         based on the model features seen during training. This means that
         "feature_specs" is only necessary when using a "pre_processing" argument
         that expects different features than what the model was trained with.
@@ -1075,7 +1075,7 @@ Use `model.describe()` for more details
 
     Returns:
       A dataclass containing the JAX prediction function (`predict`) and
-      optionnaly the model parameteres (`params`) and feature encoder
+      optionally the model parameters (`params`) and feature encoder
       (`encoder`).
     """
     raise NotImplementedError

@@ -2193,7 +2193,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_integer()->set_default_value(gbt_config.num_trees());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Maximum number of decision trees. The effective number of trained tree can be smaller if early stopping is enabled.)");
+        R"(Maximum number of decision trees. The effective number of trained tree can be smaller if early stopping is enabled. For multi-class classification problems, the number of decision trees is at most this parameter times the number of classes.)");
   }
   {
     auto& param = hparam_def.mutable_fields()->operator[](kHParamShrinkage);
@@ -2211,7 +2211,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_real()->set_default_value(gbt_config.l1_regularization());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(L1 regularization applied to the training loss. Impact the tree structures and lead values.)");
+        R"(L1 regularization applied to the training loss. Impact the tree structures and leaf values.)");
   }
 
   {
@@ -2234,7 +2234,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_proto_field(
         "l2_regularization_categorical");
     param.mutable_documentation()->set_description(
-        R"(L2 regularization applied to the training loss for categorical features. Impact the tree structures and lead values.)");
+        R"(L2 regularization applied to the training loss for categorical features. Impact the tree structures and leaf values.)");
   }
 
   {
@@ -2286,7 +2286,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Control how the maximum training duration (if set) is applied. If false, the training stop when the time is used. If true, the size of the sampled datasets used train individual trees are adapted dynamically so that all the trees are trained in time.)");
+        R"(Control how the maximum training duration (if set) is applied. If false, the training stops when the time is used. If true, the size of the sampled datasets used to train individual trees are adapted dynamically so that all the trees are trained in time.)");
   }
 
   {
@@ -2298,7 +2298,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Use true, uses a formulation of split gain with a hessian term i.e. optimizes the splits to minimize the variance of "gradient / hessian. Available for all losses except regression.)");
+        R"(If true, uses a formulation of split gain with a hessian term i.e. optimizes the splits to minimize the variance of "gradient / hessian. Available for all losses except regression.)");
   }
 
   {
@@ -2418,7 +2418,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
         kHParamEarlyStoppingLossIncrease);
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Early stopping detects the overfitting of the model and halts it training using the validation dataset. If not provided directly, the validation dataset is extracted from the training dataset (see "validation_ratio" parameter):
+        R"(Early stopping detects the overfitting of the model and halts its training using the validation dataset. If not provided directly, the validation dataset is extracted from the training dataset (see "validation_ratio" parameter):
 - `NONE`: No early stopping. All the num_trees are trained and kept.
 - `MIN_LOSS_FINAL`: All the num_trees are trained. The model is then truncated to minimize the validation loss i.e. some of the trees are discarded as to minimum the validation loss.
 - `LOSS_INCREASE`: Classical early stopping. Stop the training when the validation does not decrease for `early_stopping_num_trees_look_ahead` trees.)");
@@ -2434,7 +2434,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(If true, applies the link function (a.k.a. activation function), if any, before returning the model prediction. If false, returns the pre-link function model output.
-For example, in the case of binary classification, the pre-link function output is a logic while the post-link function is a probability.)");
+For example, in the case of binary classification, the pre-link function output is a logit while the post-link function is a probability.)");
   }
 
   {

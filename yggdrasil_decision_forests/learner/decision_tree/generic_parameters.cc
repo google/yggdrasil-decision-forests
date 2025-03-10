@@ -245,7 +245,7 @@ absl::Status GetGenericHyperParameterSpecification(
         R"(What structure of split to consider for numerical features.
 - `AXIS_ALIGNED`: Axis aligned splits (i.e. one condition at a time). This is the "classical" way to train a tree. Default value.
 - `SPARSE_OBLIQUE`: Sparse oblique splits (i.e. random splits on a small number of features) from "Sparse Projection Oblique Random Forests", Tomita et al., 2020.
-- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2029)");
+- `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes et al., 2019)");
   }
   {
     ASSIGN_OR_RETURN(
@@ -260,7 +260,7 @@ absl::Status GetGenericHyperParameterSpecification(
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
         R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections to test at each node.
-Increasing this value very likely improves the quality of the model, drastically increases the training time, and doe not impact the inference time.
+Increasing this value very likely improves the quality of the model, drastically increases the training time, and does not impact the inference time.
 Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Therefore, increasing this `num_projections_exponent` and possibly `max_num_projections` may improve model quality, but will also significantly increase training time.
 Note that the complexity of (classic) Random Forests is roughly proportional to `num_projections_exponent=0.5`, since it considers sqrt(num_features) for a split. The complexity of (classic) GBDT is roughly proportional to `num_projections_exponent=1`, since it considers all features for a split.
 The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) recommends values in [1/4, 2].)");
@@ -426,7 +426,7 @@ Use only if a hard maximum on the number of variables is needed, otherwise prefe
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
         R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after the num_projections_exponent).
-Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy if important, increase this value.
+Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy is important, increase this value.
 The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does not define this hyperparameter.)");
   }
 
@@ -471,7 +471,7 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
     param->mutable_documentation()->set_description(
         R"(How to learn splits on categorical attributes.
 - `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.
-- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.
+- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.
 - `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.)");
   }
 

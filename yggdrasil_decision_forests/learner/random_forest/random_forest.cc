@@ -276,7 +276,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Control how the maximum training duration (if set) is applied. If false, the training stop when the time is used. If true, adapts the size of the sampled dataset used to train each tree such that `num_trees` will train within `maximum_training_duration`. Has no effect if there is no maximum training duration specified.)");
+        R"(Control how the maximum training duration (if set) is applied. If false, the training stops when the time is used. If true, adapts the size of the sampled dataset used to train each tree such that `num_trees` will train within `maximum_training_duration`. Has no effect if there is no maximum training duration specified.)");
   }
   {
     auto& param =
@@ -332,7 +332,7 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_real()->set_default_value(rf_config.bootstrap_size_ratio());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Number of examples used to train each trees; expressed as a ratio of the training dataset size.)");
+        R"(Number of examples used to train each tree; expressed as a ratio of the training dataset size.)");
   }
 
   {
