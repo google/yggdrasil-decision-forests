@@ -3,7 +3,7 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
-## HEAD
+## 1.11.0 - 2025-03-12
 
 ### Features
 
@@ -14,13 +14,23 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 -   Allow configuring the truncation of NDCG losses.
 -   Add support for distributed training for ranking gradient boosted tree
     models.
+-   Add support for NUMERICAL_VECTOR_SEQUENCE features.
 -   Add support for AVRO data file using the "avro:" prefix.
+-   Additional hyperparameters restricting weights of sparse oblique splits
+    to integers or powers of 2.
+-   Facilitate training on VertexAI.
 -   Deprecated `SparseObliqueSplit.binary_weights` hyperparameter in favor of
     `SparseObliqueSplit.weights`.
+-   Add Gzip-compressed BLOB_SEQUENCE serialization
+-   Enable Poisson loss for model analysis and fast inference.
+-   Add config for compatibility with protobuf lite.
 
 ### Fix
 
 -   Fix structural variable importances for oblique splits.
+-   Deflake tests.
+-   Remove CHECK/FATAL from training code.
+-   Fix crash in YDF distributed training.
 
 ### Misc
 
@@ -28,6 +38,7 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
     model/gradient_boosted_trees/gradient_boosted_trees.proto (previously
     learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 -   Remove C++14 support.
+-   Various documentation improvements.
 
 ## 1.10.0 - 2024-08-21
 

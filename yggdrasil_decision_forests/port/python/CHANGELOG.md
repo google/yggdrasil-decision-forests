@@ -1,6 +1,6 @@
 # Changelog
 
-## HEAD
+## 0.11.0 - 2025-03-12
 
 ### Feature
 
@@ -8,10 +8,23 @@
 -   Add `class_weights` parameter to the learners.
 -   Support for Google Cloud paths for datasets and model IO.
 -   Add utility to facilitate distributed training on VertexAI.
+-   Improved support for non-unicode data in categorical features.
+-   Add support for saving and analyzing deep models.
 
 ### Fix
 
 -   Fix incorrectly transposed confusion table in HTML.
+-   Various documentation fixes.
+-   Better requirements management.
+
+### Documentation
+
+-   Add tutorial for Categorical Set features.
+-   Add tutorial for training on VertexAI.
+
+### Release music
+
+3\. Sinfonie in d-Moll. Gustav Mahler
 
 ## 0.10.0 - 2025-02-11
 
@@ -42,7 +55,7 @@
 
 ### Release music
 
--   Sinfonie in Es-Dur "Sinfonia Eroica", op. 55. Ludwig van Beethoven
+Sinfonie in Es-Dur "Sinfonia Eroica", op. 55. Ludwig van Beethoven
 
 ## 0.9.0 - 2024-12-02
 

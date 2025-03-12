@@ -6,9 +6,9 @@
 
 ::: ydf.util.tf_example.write_tf_record
 
-::: ydf.util.get_vertex_ai_cluster_spec
+::: ydf.util.vertex_ai.get_vertex_ai_cluster_spec
 
-::: ydf.util.VertexAIClusterSpec
+::: ydf.util.vertex_ai.VertexAIClusterSpec
 
 **Google Internal**
 
