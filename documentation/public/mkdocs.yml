@@ -97,6 +97,7 @@ nav:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb
   - Advanced:
+    - Vertex AI: tutorial/distributed_training_vertex_ai.ipynb
     - Inspecting trees: tutorial/inspecting_trees.ipynb
     - Editing trees: tutorial/editing_trees.ipynb
     - Custom loss: tutorial/custom_loss.ipynb
