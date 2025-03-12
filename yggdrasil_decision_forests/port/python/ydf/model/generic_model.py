@@ -1543,16 +1543,17 @@ class GenericCCModel(GenericModel):
       task = evaluation_task
 
     # Warning about change default value of "weighted")
-    if weighted is None and self._model.weighted_training():
-      # TODO: Change default to true and remove warning.
-      log.warning(
-          "Non-weighted evaluation of a model trained with weighted training."
-          " Are you sure you don't want to do a weighted evaluation? Set"
-          " `model.evaluate(weighted=True, ...)` or"
-          " `model.evaluate(weighted=False, ...)` accordingly.",
-          message_id=log.WarningMessage.WEIGHTED_NOT_SET_IN_EVAL,
-      )
+    if weighted is None:
       weighted = False
+      if self._model.weighted_training():
+        # TODO: Change default to true and remove warning.
+        log.warning(
+            "Non-weighted evaluation of a model trained with weighted training."
+            " Are you sure you don't want to do a weighted evaluation? Set"
+            " `model.evaluate(weighted=True, ...)` or"
+            " `model.evaluate(weighted=False, ...)` accordingly.",
+            message_id=log.WarningMessage.WEIGHTED_NOT_SET_IN_EVAL,
+        )
 
     # Warning about unnecessary arguments
     if task is not None and task == self.task():
@@ -1583,15 +1584,18 @@ class GenericCCModel(GenericModel):
 
     with log.cc_log_context():
 
-      effective_dataspec, label_col_idx, group_col_idx = (
+      effective_dataspec, label_col_idx, group_col_idx, required_columns = (
           self._build_evaluation_dataspec(
               override_task=task._to_proto_type(),  # pylint: disable=protected-access
               override_label=label,
               override_group=group,
+              weighted=weighted,
           )
       )
 
-      ds = dataset.create_vertical_dataset(data, data_spec=effective_dataspec)
+      ds = dataset.create_vertical_dataset(
+          data, data_spec=effective_dataspec, required_columns=required_columns
+      )
 
       options_proto = metric_pb2.EvaluationOptions(
           bootstrapping_samples=bootstrapping_samples,
@@ -1848,16 +1852,19 @@ class GenericCCModel(GenericModel):
       override_task: abstract_model_pb2.Task,
       override_label: Optional[str],
       override_group: Optional[str],
-  ) -> Tuple[data_spec_pb2.DataSpecification, int, int]:
+      weighted: bool,
+  ) -> Tuple[data_spec_pb2.DataSpecification, int, int, List[str]]:
     """Creates a dataspec for evaluation.
 
     Args:
       override_task: Override task to use for the evaluation.
       override_label: Override name of the label column.
       override_group: Override name of the group column.
+      weighted: Whether or not the evaluation is weighted.
 
     Returns:
-      The dataspec, the label column index and the group column index.
+      The dataspec, the label column index, the group column index and the
+      required columns.
     """
 
     # Default dataspec of the model
@@ -1957,7 +1964,34 @@ class GenericCCModel(GenericModel):
         self._model.group_col_idx(),
         "group",
     )
-    return effective_dataspec, effective_label_col_idx, effective_group_col_idx
+
+    required_columns = [c.name for c in effective_dataspec.columns]
+    if weighted:
+      if not self._model.weighted_training():
+        raise ValueError(
+            "Weighted evaluation is only supported for models trained with"
+            " weights."
+        )
+    else:
+      if self._model.weighted_training():
+        weight_col_to_remove = self._model.weight_col_idx()
+        if weight_col_to_remove is None:
+          raise ValueError("No weight column found in the model.")
+        # Pick the weight column from the original data spec.
+        if weight_col_to_remove >= len(self.data_spec().columns):
+          raise ValueError(
+              f"Weight column has index {weight_col_to_remove}, but the data"
+              f" spec only has {len(self.data_spec().columns)} columns."
+          )
+        required_columns.remove(
+            self.data_spec().columns[weight_col_to_remove].name
+        )
+    return (
+        effective_dataspec,
+        effective_label_col_idx,
+        effective_group_col_idx,
+        required_columns,
+    )
 
 
 def from_sklearn(

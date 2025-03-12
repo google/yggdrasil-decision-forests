@@ -21,6 +21,7 @@ from typing import Dict
 
 from absl import logging
 from absl.testing import absltest
+from absl.testing import parameterized
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
@@ -571,15 +572,18 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     ):
       _ = learner.train(ds)
 
-  def test_weighted_training_and_evaluation(self):
+  @parameterized.parameters(
+      {"weight_column_in_test": False}, {"weight_column_in_test": True}
+  )
+  def test_weighted_training_and_evaluation(self, weight_column_in_test):
 
-    def gen_ds(seed, n=10000):
+    def gen_ds(seed: int, n: int, include_weight_column: bool):
       np.random.seed(seed)
       f1 = np.random.uniform(size=n)
       f2 = np.random.uniform(size=n)
       f3 = np.random.uniform(size=n)
       weights = np.random.uniform(size=n)
-      return {
+      ds = {
           "f1": f1,
           "f2": f2,
           "f3": f3,
@@ -588,42 +592,49 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
               f1 + f2 * 0.5 + f3 * 0.5 + np.random.uniform(size=n) * weights
               >= 1.5
           ),
-          "weights": weights,
       }
+      if include_weight_column:
+        ds["weights"] = weights
+      return ds
 
     model = specialized_learners.RandomForestLearner(
         label="label",
         weights="weights",
         num_trees=300,
         winner_take_all=False,
-    ).train(gen_ds(0))
+    ).train(gen_ds(0, 10000, include_weight_column=True))
 
-    test_ds = gen_ds(1)
+    test_ds = gen_ds(1, 10000, include_weight_column=weight_column_in_test)
 
     self_evaluation = model.self_evaluation()
     non_weighted_evaluation = model.evaluate(test_ds, weighted=False)
-    weighted_evaluation = model.evaluate(test_ds, weighted=True)
 
     self.assertIsNotNone(self_evaluation)
     self.assertAlmostEqual(self_evaluation.accuracy, 0.824501, delta=0.005)
     self.assertAlmostEqual(
         non_weighted_evaluation.accuracy, 0.8417, delta=0.005
     )
-    self.assertAlmostEqual(weighted_evaluation.accuracy, 0.8172290, delta=0.005)
-    predictions = model.predict(test_ds)
 
+    predictions = model.predict(test_ds)
     manual_non_weighted_evaluation = np.mean(
         (predictions >= 0.5) == test_ds["label"]
     )
-    manual_weighted_evaluation = np.sum(
-        ((predictions >= 0.5) == test_ds["label"]) * test_ds["weights"]
-    ) / np.sum(test_ds["weights"])
     self.assertAlmostEqual(
         manual_non_weighted_evaluation, non_weighted_evaluation.accuracy
     )
-    self.assertAlmostEqual(
-        manual_weighted_evaluation, weighted_evaluation.accuracy
-    )
+    # Weighted evaluation only if the test dataset contains weights.
+    if weight_column_in_test:
+      weighted_evaluation = model.evaluate(test_ds, weighted=True)
+      self.assertAlmostEqual(
+          weighted_evaluation.accuracy, 0.8172290, delta=0.005
+      )
+
+      manual_weighted_evaluation = np.sum(
+          ((predictions >= 0.5) == test_ds["label"]) * test_ds["weights"]
+      ) / np.sum(test_ds["weights"])
+      self.assertAlmostEqual(
+          manual_weighted_evaluation, weighted_evaluation.accuracy
+      )
 
   def test_learn_and_predict_when_label_is_not_last_column(self):
     label = "age"

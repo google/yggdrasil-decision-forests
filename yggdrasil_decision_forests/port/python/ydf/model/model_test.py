@@ -767,28 +767,52 @@ Use `model.describe()` for more details
   def test_build_evaluation_dataspec_classification_default(self):
     model = self.adult_binary_class_gbdt
     original_column_names = [col.name for col in model.data_spec().columns]
-    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
-        override_task=abstract_model_pb2.Task.CLASSIFICATION,
-        override_label=None,
-        override_group=None,
+    dataspec, label_idx, group_idx, required_columns = (
+        model._build_evaluation_dataspec(
+            override_task=abstract_model_pb2.Task.CLASSIFICATION,
+            override_label=None,
+            override_group=None,
+            weighted=False,
+        )
     )
     self.assertListEqual(
         [col.name for col in dataspec.columns], original_column_names
     )
+    self.assertListEqual(required_columns, original_column_names)
     self.assertEqual(label_idx, model._model.label_col_idx())
     self.assertEqual(group_idx, -1)
+
+  def test_build_evaluation_dataspec_classification_weighted_fails(self):
+    model = self.adult_binary_class_gbdt
+    with self.assertRaisesRegex(
+        ValueError,
+        "Weighted evaluation is only supported for models trained with"
+        " weights.",
+    ):
+      _ = model._build_evaluation_dataspec(
+          override_task=abstract_model_pb2.Task.CLASSIFICATION,
+          override_label=None,
+          override_group=None,
+          weighted=True,
+      )
 
   def test_build_evaluation_dataspec_classification_new_label(self):
     model = self.adult_binary_class_gbdt
     original_column_names = [col.name for col in model.data_spec().columns]
-    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
-        override_task=abstract_model_pb2.Task.CLASSIFICATION,
-        override_label="NEW_LABEL",
-        override_group=None,
+    dataspec, label_idx, group_idx, required_columns = (
+        model._build_evaluation_dataspec(
+            override_task=abstract_model_pb2.Task.CLASSIFICATION,
+            override_label="NEW_LABEL",
+            override_group=None,
+            weighted=False,
+        )
     )
     self.assertListEqual(
         [col.name for col in dataspec.columns],
         original_column_names + ["NEW_LABEL"],
+    )
+    self.assertListEqual(
+        required_columns, original_column_names + ["NEW_LABEL"]
     )
     expected_label_col = len(original_column_names)
     self.assertEqual(label_idx, expected_label_col)
@@ -801,14 +825,20 @@ Use `model.describe()` for more details
   def test_build_evaluation_dataspec_classification_to_regression(self):
     model = self.adult_binary_class_gbdt
     original_column_names = [col.name for col in model.data_spec().columns]
-    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
-        override_task=abstract_model_pb2.Task.REGRESSION,
-        override_label="NEW_LABEL",
-        override_group=None,
+    dataspec, label_idx, group_idx, required_columns = (
+        model._build_evaluation_dataspec(
+            override_task=abstract_model_pb2.Task.REGRESSION,
+            override_label="NEW_LABEL",
+            override_group=None,
+            weighted=False,
+        )
     )
     self.assertListEqual(
         [col.name for col in dataspec.columns],
         original_column_names + ["NEW_LABEL"],
+    )
+    self.assertListEqual(
+        required_columns, original_column_names + ["NEW_LABEL"]
     )
     expected_label_col = len(original_column_names)
     self.assertEqual(label_idx, expected_label_col)
@@ -821,14 +851,20 @@ Use `model.describe()` for more details
   def test_build_evaluation_dataspec_classification_to_ranking(self):
     model = self.adult_binary_class_gbdt
     original_column_names = [col.name for col in model.data_spec().columns]
-    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
-        override_task=abstract_model_pb2.Task.RANKING,
-        override_label="NEW_LABEL",
-        override_group="NEW_GROUP",
+    dataspec, label_idx, group_idx, required_columns = (
+        model._build_evaluation_dataspec(
+            override_task=abstract_model_pb2.Task.RANKING,
+            override_label="NEW_LABEL",
+            override_group="NEW_GROUP",
+            weighted=False,
+        )
     )
     self.assertListEqual(
         [col.name for col in dataspec.columns],
         original_column_names + ["NEW_LABEL", "NEW_GROUP"],
+    )
+    self.assertListEqual(
+        required_columns, original_column_names + ["NEW_LABEL", "NEW_GROUP"]
     )
     expected_label_col = len(original_column_names) + 0
     expected_group_col = len(original_column_names) + 1
@@ -846,14 +882,20 @@ Use `model.describe()` for more details
   def test_build_evaluation_dataspec_regression_new_label(self):
     model = self.abalone_regression_gbdt
     original_column_names = [col.name for col in model.data_spec().columns]
-    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
-        override_task=abstract_model_pb2.Task.REGRESSION,
-        override_label="NEW_LABEL",
-        override_group=None,
+    dataspec, label_idx, group_idx, required_columns = (
+        model._build_evaluation_dataspec(
+            override_task=abstract_model_pb2.Task.REGRESSION,
+            override_label="NEW_LABEL",
+            override_group=None,
+            weighted=False,
+        )
     )
     self.assertListEqual(
         [col.name for col in dataspec.columns],
         original_column_names + ["NEW_LABEL"],
+    )
+    self.assertListEqual(
+        required_columns, original_column_names + ["NEW_LABEL"]
     )
     expected_label_col = len(original_column_names)
     self.assertEqual(label_idx, expected_label_col)
@@ -866,15 +908,19 @@ Use `model.describe()` for more details
   def test_build_evaluation_dataspec_ranking_to_regression(self):
     model = self.synthetic_ranking_gbdt
     original_column_names = [col.name for col in model.data_spec().columns]
-    dataspec, label_idx, group_idx = model._build_evaluation_dataspec(
-        override_task=abstract_model_pb2.Task.REGRESSION,
-        override_label=None,
-        override_group=None,
+    dataspec, label_idx, group_idx, required_columns = (
+        model._build_evaluation_dataspec(
+            override_task=abstract_model_pb2.Task.REGRESSION,
+            override_label=None,
+            override_group=None,
+            weighted=False,
+        )
     )
     self.assertListEqual(
         [col.name for col in dataspec.columns],
         original_column_names,
     )
+    self.assertListEqual(required_columns, original_column_names)
     self.assertEqual(label_idx, model._model.label_col_idx())
     self.assertEqual(group_idx, -1)
 

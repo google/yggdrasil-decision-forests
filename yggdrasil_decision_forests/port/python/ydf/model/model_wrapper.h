@@ -87,6 +87,8 @@ class GenericCCModel {
 
   int group_col_idx() const { return model_->ranking_group_col_idx(); }
 
+  std::optional<int> weight_col_idx() const;
+
   // Benchmark the inference speed of the model.
   absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
       const dataset::VerticalDataset& dataset, double benchmark_duration,

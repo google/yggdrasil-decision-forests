@@ -367,6 +367,13 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
   };
 }
 
+std::optional<int> GenericCCModel::weight_col_idx() const {
+  if (!model_->weights()) {
+    return std::nullopt;
+  }
+  return model_->weights()->attribute_idx();
+}
+
 std::string BenchmarkInferenceCCResult::ToString() const {
   return absl::StrFormat(
       R"BLOCK(Single-thread inference time per example: %.3f us (microseconds)

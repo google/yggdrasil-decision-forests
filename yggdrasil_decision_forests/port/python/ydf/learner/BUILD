@@ -295,6 +295,7 @@ py_test(
         ":specialized_learners",
         # absl/logging dep,
         # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
         # numpy dep,
         # pandas dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
