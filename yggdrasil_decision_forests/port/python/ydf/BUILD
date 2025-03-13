@@ -26,6 +26,7 @@ py_library(
         "//ydf/learner:specialized_learners",
         "//ydf/learner:tuner",
         "//ydf/learner:worker",
+        "//ydf/metric",
         "//ydf/metric:evaluate",
         "//ydf/model:export_docker",  # buildcleaner: keep
         "//ydf/model:export_jax",  # buildcleaner: keep

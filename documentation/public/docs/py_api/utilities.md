@@ -45,3 +45,5 @@
 ::: ydf.MultiClassificationLoss
 
 ::: ydf.Activation
+
+::: ydf.Evaluation

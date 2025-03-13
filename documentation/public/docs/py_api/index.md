@@ -66,6 +66,8 @@ A **Feature Selector** finds the optimal set of input features for the model.
 -   [start_worker](utilities.md#ydf.start_worker): Start a worker for
     distributed training.
 -   [strict](utilities.md#ydf.strict): Show more logs.
+-   [Evaluation](utilities.md#ydf.Evaluation): Result of a model evaluation i.e.
+    `model.evaluate(...)`.
 
 ## Utilities
 

@@ -87,6 +87,8 @@ from ydf.model.model_lib import from_tensorflow_decision_forests
 from ydf.model.generic_model import from_sklearn
 from ydf.model.generic_model import NodeFormat
 from ydf.metric.evaluate import evaluate_predictions
+from ydf.metric.metric import Evaluation
+
 
 from yggdrasil_decision_forests.dataset.data_spec_pb2 import DataSpecification as _DataSpecification
 from yggdrasil_decision_forests.learner.abstract_learner_pb2 import TrainingConfig as _TrainingConfig
