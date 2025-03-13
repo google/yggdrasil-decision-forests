@@ -4,8 +4,8 @@ pydantic
 requests
 urllib3
 fastapi[standard]>=0.112.0,<0.113.0
-tensorflow_decision_forests; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.12'
-tensorflow; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.12'
+tensorflow_decision_forests; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.13'
+tensorflow; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.13'
 portpicker
 matplotlib
 scikit-learn
@@ -15,7 +15,7 @@ jaxtyping
 optax; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.9'
 flatbuffers; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.12'
 tensorflow-datasets; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.9'
-grain; platform_machine != 'aarch64' and platform_system == 'Linux' and python_version >= '3.10'
+grain; platform_machine != 'aarch64' and platform_system == 'Linux' and python_version >= '3.10' and python_version < '3.13'
 fastavro
 polars
 flax; platform_machine != 'aarch64' and platform_system != 'Windows'

@@ -1,5 +1,11 @@
 # Changelog
 
+## HEAD
+
+### Feature
+
+-   Support Python 3.13.
+
 ## 0.11.0 - 2025-03-12
 
 ### Feature

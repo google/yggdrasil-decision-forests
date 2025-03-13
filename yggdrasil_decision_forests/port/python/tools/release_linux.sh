@@ -21,7 +21,7 @@ set -vex
 if [[ "$INTERACTIVE" = 1 ]]; then
   PYTHON_VERSIONS=( 3.12 )
 else
-  PYTHON_VERSIONS=( 3.8 3.9 3.10 3.11 3.12 )
+  PYTHON_VERSIONS=( 3.8 3.9 3.10 3.11 3.12 3.13)
 fi
 
 function build_py() {
