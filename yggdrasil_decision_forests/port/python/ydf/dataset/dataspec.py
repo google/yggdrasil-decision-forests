@@ -702,3 +702,43 @@ def categorical_vocab_iterator(
   )
   for item in fixed_message.items:
     yield (item.key, item.value)
+
+
+def print_common_dataspec_issues_for_training(
+    data_spec: ds_pb.DataSpecification,
+):
+  """Prints common issues with the data spec to log.info()."""
+  for c in data_spec.columns:
+    if c.type == ds_pb.CATEGORICAL or c.type == ds_pb.CATEGORICAL_SET:
+      if c.categorical.number_of_unique_values == 1:
+        log.info(
+            f"Feature {c.name} is a {ds_pb.ColumnType.Name(c.type)} feature"
+            " with an empty dictionary. The feature will not be useful during"
+            " model training."
+        )
+      if c.categorical.number_of_unique_values == 2:
+        log.info(
+            f"Feature {c.name} is a {ds_pb.ColumnType.Name(c.type)} feature"
+            " whose dictionary has a single element. The feature will not be"
+            " useful during model training."
+        )
+    if c.type == ds_pb.BOOLEAN:
+      if c.boolean.count_true == 0:
+        log.info(
+            f"Feature {c.name} is a BOOLEAN feature  with all values recorded"
+            " in the data spec set to false. The feature will likely not be"
+            " useful during model training."
+        )
+      if c.boolean.count_false == 0:
+        log.info(
+            f"Feature {c.name} is a BOOLEAN feature  with all values recorded"
+            " in the data spec set to true. The feature will likely not be"
+            " useful during model training."
+        )
+    if c.type == ds_pb.NUMERICAL:
+      if c.numerical.max_value == c.numerical.min_value:
+        log.info(
+            f"Feature {c.name} is a NUMERICAL feature with all values recorded"
+            " in the data spec set to the same value. The feature will likely"
+            " not be useful during model training."
+        )

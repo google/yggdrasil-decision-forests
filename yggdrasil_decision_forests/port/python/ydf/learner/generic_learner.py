@@ -545,6 +545,8 @@ class GenericCCLearner(GenericLearner):
     with log.cc_log_context():
       train_ds = self._get_vertical_dataset(ds)._dataset  # pylint: disable=protected-access
 
+      dataspec.print_common_dataspec_issues_for_training(train_ds.data_spec())
+
       train_args = {"dataset": train_ds}
 
       if valid is not None:
