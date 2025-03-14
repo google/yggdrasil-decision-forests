@@ -32,6 +32,7 @@ py_library(
         ":tensorflow_io",
         ":xarray_io",
         # numpy dep,
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 

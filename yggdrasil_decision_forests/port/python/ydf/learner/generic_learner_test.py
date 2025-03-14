@@ -34,7 +34,7 @@ from ydf.utils import log
 
 ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 Column = dataspec.Column
-
+Semantic = dataspec.Semantic
 
 class LoggingTest(parameterized.TestCase):
 
@@ -261,6 +261,84 @@ class DatasetFormatsTest(parameterized.TestCase):
     )
     model = learner.train("avro:" + ds_path)
     self.assertEqual(model.num_trees(), 3)
+
+
+class EmptyListFeatureTest(parameterized.TestCase):
+
+  @parameterized.parameters([
+      specialized_learners.GradientBoostedTreesLearner(label="l"),
+      specialized_learners.RandomForestLearner(label="l"),
+      specialized_learners.IsolationForestLearner(),
+      specialized_learners.CartLearner(label="l"),
+  ])
+  def test_empty_feature_default_semantic(self, learner):
+    ds = {"l": [1, 0], "f": np.array([[], []], dtype=object)}
+    with self.assertRaisesRegex(
+        ValueError,
+        "Feature 'f' is detected as a multi-dimensional fixed-length feature"
+        " with dimension zero",
+    ):
+      _ = learner.train(ds)
+
+  def test_empty_feature_catset_nonempty_prediction(self):
+    ds_train = {"l": [1, 0], "f": np.array([[], []], dtype=object)}
+    ds_test = {"f": np.array([["a"], []], dtype=object)}
+    # Note: Random Forests with bootstrapping might have unbalanced predictions.
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="l", num_trees=1, features=[("f", Semantic.CATEGORICAL_SET)]
+    ).train(ds_train)
+    np.testing.assert_equal(model.predict(ds_test), np.array([0.5, 0.5]))
+
+  def test_empty_feature_catset_empty_prediction(self):
+    ds_train = {"l": [1, 0], "f": np.array([[], []], dtype=object)}
+    ds_test = {"f": np.array([[], []], dtype=object)}
+    # Note: Random Forests with bootstrapping might have unbalanced predictions.
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="l", num_trees=1, features=[("f", Semantic.CATEGORICAL_SET)]
+    ).train(ds_train)
+    np.testing.assert_equal(model.predict(ds_test), np.array([0.5, 0.5]))
+
+  def test_nonempty_feature_catset_empty_prediction(self):
+    ds_train = {"l": [1, 0], "f": np.array([["a"], ["b"]], dtype=object)}
+    ds_test = {"f": np.array([[], []], dtype=object)}
+    # Note: Random Forests with bootstrapping might have unbalanced predictions.
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="l",
+        num_trees=1,
+        features=[("f", Semantic.CATEGORICAL_SET)],
+        min_vocab_frequency=1,
+        min_examples=1,
+    ).train(ds_train)
+    np.testing.assert_equal(model.predict(ds_test), np.array([0.5, 0.5]))
+
+  def test_nonempty_feature_default_multidim_empty_prediction(self):
+    ds_train = {"l": [1, 0], "f": np.array([["a"], ["b"]], dtype=object)}
+    ds_test = {"f": np.array([[], []], dtype=object)}
+    # Note: Random Forests with bootstrapping might have unbalanced predictions.
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="l",
+        num_trees=1,
+        min_vocab_frequency=1,
+        min_examples=1,
+    ).train(ds_train)
+    with self.assertRaisesRegex(
+        ValueError,
+        "Feature 'f' is expected as a multi-dimensional feature of dimension 1"
+        " and type CATEGORICAL.",
+    ):
+      _ = model.predict(ds_test)
+
+  def test_nonempty_feature_default_catset_empty_prediction(self):
+    ds_train = {"l": [1, 0], "f": np.array([["a"], ["b", "c"]], dtype=object)}
+    ds_test = {"f": np.array([[], []], dtype=object)}
+    # Note: Random Forests with bootstrapping might have unbalanced predictions.
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="l",
+        num_trees=1,
+        min_vocab_frequency=1,
+        min_examples=1,
+    ).train(ds_train)
+    np.testing.assert_equal(model.predict(ds_test), np.array([0.5, 0.5]))
 
 
 class UtilityTest(absltest.TestCase):

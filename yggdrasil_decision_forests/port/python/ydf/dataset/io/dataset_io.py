@@ -20,6 +20,7 @@ from typing import Iterator, Optional, Sequence, Tuple
 
 import numpy as np
 
+from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset.io import dataset_io_types
 from ydf.dataset.io import numpy_io
 from ydf.dataset.io import pandas_io
@@ -60,7 +61,10 @@ def parse_unrolled_feature_name(name: str) -> Optional[Tuple[str, int, int]]:
 
 
 def _unroll_column(
-    name: str, src: dataset_io_types.InputValues, allow_unroll: bool
+    name: str,
+    src: dataset_io_types.InputValues,
+    allow_unroll: bool,
+    expect_unroll_info: Optional[ds_pb.Unstacked],
 ) -> Iterator[Tuple[str, dataset_io_types.InputValues, bool]]:
   """Unrolls a possibly multi-dim. column into multiple single-dim columns.
 
@@ -113,7 +117,24 @@ def _unroll_column(
 
   num_features = src.shape[1]
   if num_features == 0:
-    raise ValueError(f"Multi-dimention feature {name!r} has no features.")
+    if expect_unroll_info is not None:
+      raise ValueError(
+          f"Feature {name!r} is expected as a multi-dimensional feature of"
+          f" dimension {expect_unroll_info.size} and type"
+          f" {ds_pb.ColumnType.Name(expect_unroll_info.type)}. The given"
+          " dataset has a feature of dimension 0. If the feature is expected"
+          " to be a variable_length categorical feature, specify semantic"
+          " CATEGORICAL_SET during training. Note that variable length"
+          " numerical features are not supported by YDF."
+      )
+
+    else:
+      error_msg = f"""Feature {name!r} is detected as a multi-dimensional fixed-length feature with dimension zero i.e. the feature does not contain any data. This is not allowed. You can:
+1) If the feature is effectively a multi-dimensional fixed-length feature, remove it from the training.
+2) If the feature is a possibly missing value that is always missing from the training dataset, remove it from the training.
+3) If the feature is in fact a variable length categorical feature (a.k.a. Categorical-set feature), specify the feature semantic in the trainer constructor e.g. `features=[("Feature_name", ydf.Semantic.CATEGORICAL_SET)]`.
+4) If the feature is in fact a variable length numerical feature, you need to feature engineer it as YDF does not support numerical-set features natively. For example, you can compute feature statistics (e.g., mean, max, sd), use Temporian if the feature is a timeseries, or use the ydf.Semantic.NUMERICAL_VECTOR_SEQUENCE semantic if the feature is a collection of embeddings."""
+      raise ValueError(error_msg)
 
   sub_names = unrolled_feature_names(name, num_features)
   for dim_idx, sub_name in enumerate(sub_names):
@@ -124,6 +145,7 @@ def _unroll_dict(
     src: dataset_io_types.DictInputValues,
     single_dim_columns: Sequence[str],
     not_unrolled_multi_dim_columns: Sequence[str],
+    expected_unrolled_columns: Sequence[ds_pb.Unstacked],
 ) -> Tuple[
     dataset_io_types.DictInputValues, dataset_io_types.UnrolledFeaturesInfo
 ]:
@@ -135,6 +157,8 @@ def _unroll_dict(
       one such column is multi-dimensional, raise an error.
     not_unrolled_multi_dim_columns: List of columns that should be
       multi-dimensional and not unrolled.
+    expected_unrolled_columns: List of columns that are known to be
+      multi-dimensional and unrolled.
 
   Returns:
     Dictionary containing only single-dimensional values.
@@ -143,6 +167,9 @@ def _unroll_dict(
   # Index the columns for fast query.
   single_dim_columns_set = set(single_dim_columns)
   not_unrolled_multi_dim_columns_set = set(not_unrolled_multi_dim_columns)
+  expected_unrolled_columns_dict = {
+      c.original_name: c for c in expected_unrolled_columns
+  }
 
   unrolled_features_info = {}
 
@@ -156,8 +183,12 @@ def _unroll_dict(
 
     any_is_unrolling = False
     sub_dst = {}
+    expect_unroll_info = expected_unrolled_columns_dict.get(name, None)
     for sub_name, sub_value, is_unrolling in _unroll_column(
-        name, value, allow_unroll=name not in single_dim_columns_set
+        name,
+        value,
+        allow_unroll=name not in single_dim_columns_set,
+        expect_unroll_info=expect_unroll_info,
     ):
       sub_dst[sub_name] = sub_value
       any_is_unrolling |= is_unrolling
@@ -174,6 +205,7 @@ def cast_input_dataset_to_dict(
     data: dataset_io_types.IODataset,
     single_dim_columns: Optional[Sequence[str]] = None,
     not_unrolled_multi_dim_columns: Optional[Sequence[str]] = None,
+    expected_unrolled_columns: Optional[Sequence[ds_pb.Unstacked]] = None,
 ) -> Tuple[
     dataset_io_types.DictInputValues, dataset_io_types.UnrolledFeaturesInfo
 ]:
@@ -188,6 +220,8 @@ def cast_input_dataset_to_dict(
       error.
     not_unrolled_multi_dim_columns: Optional list of columns that should be
       multi-dimensional and not unrolled.
+    expected_unrolled_columns: Information from the data spec about columns
+      expected to be unrolled.
 
   Returns:
     The normalized features, and information about unrolled features.
@@ -196,6 +230,7 @@ def cast_input_dataset_to_dict(
   unroll_dict_kwargs = {
       "single_dim_columns": single_dim_columns or [],
       "not_unrolled_multi_dim_columns": not_unrolled_multi_dim_columns or [],
+      "expected_unrolled_columns": expected_unrolled_columns or [],
   }
 
   if pandas_io.is_pandas_dataframe(data):

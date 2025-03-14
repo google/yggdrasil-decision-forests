@@ -578,14 +578,24 @@ def create_vertical_dataset_with_spec_or_args(
     )
   else:
     # Ignore unrolling for list or set features.
-    if inference_args is None or inference_args.columns is None:
-      not_unrolled_multi_dim_columns = None
-    else:
+    if inference_args is None:
+      assert data_spec is not None
       not_unrolled_multi_dim_columns = [
           c.name
-          for c in inference_args.columns
-          if c.semantic == dataspec_lib.Semantic.CATEGORICAL_SET
+          for c in data_spec.columns
+          if c.type == data_spec_pb2.CATEGORICAL_SET
       ]
+      expected_unrolled_columns = data_spec.unstackeds
+    else:
+      expected_unrolled_columns = None
+      if inference_args.columns is None:
+        not_unrolled_multi_dim_columns = None
+      else:
+        not_unrolled_multi_dim_columns = [
+            c.name
+            for c in inference_args.columns
+            if c.semantic == dataspec_lib.Semantic.CATEGORICAL_SET
+        ]
 
     # Convert the data to an in-memory dictionary of numpy array.
     # Also unroll multi-dimensional features.
@@ -593,6 +603,7 @@ def create_vertical_dataset_with_spec_or_args(
         data,
         single_dim_columns=single_dim_columns,
         not_unrolled_multi_dim_columns=not_unrolled_multi_dim_columns,
+        expected_unrolled_columns=expected_unrolled_columns,
     )
     return create_vertical_dataset_from_dict_of_values(
         data_dict,

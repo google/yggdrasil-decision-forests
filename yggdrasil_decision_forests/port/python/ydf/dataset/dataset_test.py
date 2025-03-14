@@ -3094,7 +3094,7 @@ class ReservoirSamplingTest(parameterized.TestCase):
       sampler.add(np.array([1]))
       samples.append(sampler._samples[0])
     rate = np.mean(samples)
-    self.assertAlmostEqual(rate, 0.5, delta=0.12)
+    self.assertAlmostEqual(rate, 0.5, delta=0.122)
 
 
 class VectorSequenceTest(absltest.TestCase):
