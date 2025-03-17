@@ -236,6 +236,13 @@ class MLPTest(parameterized.TestCase):
     predictions_without_label = model.predict(adult_test_without_label)
     np.testing.assert_equal(predictions_with_label, predictions_without_label)
 
+  def test_loaded_model_name(self):
+    model: mlp.MultiLayerPerceptronModel = model_lib.load_model(
+        model_path("multilayerperceptron_adult")
+    )
+    self.assertEqual(model.name(), "MULTILAYER_PERCEPTRON")
+    self.assertEqual(model.task(), generic_model_lib.Task.CLASSIFICATION)
+
 
 if __name__ == "__main__":
   absltest.main()
