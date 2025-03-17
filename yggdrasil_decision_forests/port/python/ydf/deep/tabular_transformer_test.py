@@ -35,6 +35,10 @@ def dataset_path(filename: str) -> str:
   return os.path.join(test_utils.ydf_test_data_path(), "dataset", filename)
 
 
+def model_path(model_name: str) -> str:
+  return os.path.join(test_utils.pydf_test_data_path(), model_name)
+
+
 FeatureType = layer_lib.FeatureType
 Feature = layer_lib.Feature
 
@@ -225,6 +229,16 @@ class TabularTransformerTest(parameterized.TestCase):
           class_weights={"a": 1.0, "b": 2.0},
           allow_cpu=True,
       )
+
+  def test_predict_without_label(self):
+    model = model_lib.load_model(model_path("tabulartransformer_adult"))
+    adult_test_with_label = self.adult.test_pd
+    adult_test_without_label = self.adult.test_pd.copy(deep=True).drop(
+        "income", axis=1
+    )
+    predictions_with_label = model.predict(adult_test_with_label)
+    predictions_without_label = model.predict(adult_test_without_label)
+    np.testing.assert_equal(predictions_with_label, predictions_without_label)
 
 
 if __name__ == "__main__":

@@ -378,7 +378,7 @@ class GenericJAXModel(generic_model.GenericModel):
             "prepare_data", step_num=batch_idx
         ):
           numpy_batch = self._preprocessor.apply_premodel(
-              raw_numpy_batch, has_labels=True
+              raw_numpy_batch, has_labels=False
           )
           jax_batch = deep_dataset_lib.batch_numpy_to_jax(numpy_batch)
         with jax.profiler.StepTraceAnnotation(
