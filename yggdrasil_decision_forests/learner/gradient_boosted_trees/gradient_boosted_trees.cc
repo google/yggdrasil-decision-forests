@@ -3230,7 +3230,7 @@ absl::Status SetDefaultHyperParameters(
            "Setting early_stopping=\"NONE\" (was \""
         << proto::GradientBoostedTreesTrainingConfig::EarlyStopping_Name(
                gbt_config->early_stopping())
-        << "\") i.e. sabling early stopping.";
+        << "\") i.e. disabling early stopping.";
     gbt_config->set_early_stopping(
         proto::GradientBoostedTreesTrainingConfig::NONE);
   }
