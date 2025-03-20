@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
@@ -116,10 +117,19 @@ absl::Status NDCGLoss::UpdateGradients(
     // Note: We shuffle the predictions so that the expected gradient value is
     // aligned with the metric value with ties taken into account (which is
     // too expensive to do here).
-    std::shuffle(pred_and_in_ground_idx.begin(), pred_and_in_ground_idx.end(),
-                 *random);
     std::sort(pred_and_in_ground_idx.begin(), pred_and_in_ground_idx.end(),
               [](const auto& a, const auto& b) { return a.first > b.first; });
+
+    auto it = pred_and_in_ground_idx.begin();
+    while (it != pred_and_in_ground_idx.end()) {
+      auto next_it = std::next(it);
+      while (next_it != pred_and_in_ground_idx.end() &&
+             it->first == next_it->first) {
+        next_it++;
+      }
+      std::shuffle(it, next_it, *random);
+      it = next_it;
+    }
 
     const int num_pred_and_in_ground = pred_and_in_ground_idx.size();
 
