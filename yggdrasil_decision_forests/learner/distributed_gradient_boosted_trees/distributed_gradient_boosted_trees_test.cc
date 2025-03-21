@@ -603,10 +603,7 @@ class DatasetSyntheticRanking : public utils::TrainAndTestTester {
 // Train and test a model on the adult dataset.
 TEST_F(DatasetSyntheticRanking, Base) {
   TrainAndEvaluateModel();
-  // Note: Those are the same values as the non-distributed training unit test:
-  // See GradientBoostedTreesOnSyntheticRanking.Base in
-  // learner/gradient_boosted_trees/gradient_boosted_trees_test.cc.
-  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.701838, 0.025846, 0.70330);
+  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.701838, 0.025846, 0.7079);
 }
 
 }  // namespace

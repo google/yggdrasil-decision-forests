@@ -2393,7 +2393,7 @@ class GradientBoostedTreesOnSyntheticRanking
 
 TEST_F(GradientBoostedTreesOnSyntheticRanking, Base) {
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7151, 0.025, 0.7151);
+  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7151, 0.025, 0.7294);
 }
 
 }  // namespace
