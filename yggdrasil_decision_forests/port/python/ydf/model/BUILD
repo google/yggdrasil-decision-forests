@@ -153,7 +153,7 @@ py_library(
     deps = [
         ":generic_model",
         # numpy dep,
-        # sklearn:v1_0_2 dep,
+        # sklearn dep,
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",
         "//ydf/model/gradient_boosted_trees_model",
@@ -386,7 +386,7 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # numpy dep,
-        # sklearn:v1_0_2 dep,
+        # sklearn dep,
         "//ydf/model/decision_forest_model",
     ],
 )

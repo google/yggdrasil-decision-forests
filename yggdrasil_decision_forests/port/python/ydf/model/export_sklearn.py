@@ -175,7 +175,7 @@ def _(
       {
           options.label_name: [0.0, 1.0],
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_
+              sklearn_model.n_features_in_  # pytype: disable=attribute-error
           ),
       },
       verbose=0,
@@ -208,7 +208,8 @@ def _(
       {
           options.label_name: [str(c) for c in sklearn_model.classes_],
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_, len(sklearn_model.classes_)
+              sklearn_model.n_features_in_,  # pytype: disable=attribute-error
+              len(sklearn_model.classes_),
           ),
       },
       verbose=0,
@@ -235,7 +236,7 @@ def _(
   ).train(
       {
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_
+              sklearn_model.n_features_in_  # pytype: disable=attribute-error
           ),
       },
       verbose=0,
@@ -294,7 +295,7 @@ def _(
       {
           options.label_name: [0.0, 1.0],
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_
+              sklearn_model.n_features_in_  # pytype: disable=attribute-error
           ),
       },
       verbose=0,
