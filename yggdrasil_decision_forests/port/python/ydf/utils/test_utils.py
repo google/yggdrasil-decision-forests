@@ -157,12 +157,12 @@ def golden_check_string(
 
 
 def assert_almost_equal(a, b):
-  msg = test_almost_equal(a, b)
+  msg = _test_almost_equal(a, b)
   if msg is not None:
     raise AssertionError(f"Missmatch: {msg}\nWhen comparing:\n{a}\nwith:\n{b}")
 
 
-def test_almost_equal(a, b) -> Optional[str]:
+def _test_almost_equal(a, b) -> Optional[str]:
   """Checks that two dataclasses are almost equal.
 
   Unlike "assert_almost_equal_dataclasses" and "self.assertEqual", this method
@@ -176,11 +176,11 @@ def test_almost_equal(a, b) -> Optional[str]:
     None if "a" and "b" are equal. A description of the different otherwise.
   """
 
-  if type(a) != type(b):
+  if type(a) != type(b):  # pylint: disable=unidiomatic-typecheck
     return f"Type mismatch: {type(a)} != {type(b)}"
 
   elif dataclasses.is_dataclass(a):
-    sub_msg = test_almost_equal(dataclasses.asdict(a), dataclasses.asdict(b))
+    sub_msg = _test_almost_equal(dataclasses.asdict(a), dataclasses.asdict(b))
     if sub_msg is not None:
       return sub_msg
 
@@ -196,7 +196,7 @@ def test_almost_equal(a, b) -> Optional[str]:
         return f"numpy array mismatch: {a!r} != {b!r}"
 
   elif isinstance(a, jax.Array):
-    return test_almost_equal(np.array(a), np.array(b))
+    return _test_almost_equal(np.array(a), np.array(b))
 
   elif isinstance(a, (enum.Enum, bool, str, bytes, int, float, type(None))):
     if a != b:
@@ -207,7 +207,7 @@ def test_almost_equal(a, b) -> Optional[str]:
       return f"list len mismatch: {len(a)} != {len(b)}"
 
     for sa, sb in zip(a, b):
-      sub_msg = test_almost_equal(sa, sb)
+      sub_msg = _test_almost_equal(sa, sb)
       if sub_msg is not None:
         return sub_msg
 
@@ -215,14 +215,14 @@ def test_almost_equal(a, b) -> Optional[str]:
     if set(a) != set(b):
       return f"dict field mismatch: {set(a)} != {set(b)}"
     for field in a:
-      sub_msg = test_almost_equal(a[field], b[field])
+      sub_msg = _test_almost_equal(a[field], b[field])
       if sub_msg is not None:
         return sub_msg
 
   elif dataclasses.is_dataclass(a):
     fields_a = dataclasses.asdict(a)
-    fields_b = dataclasses.asdict(a)
-    test_almost_equal(fields_a, fields_b)
+    fields_b = dataclasses.asdict(b)
+    _test_almost_equal(fields_a, fields_b)
 
   else:
     raise ValueError(f"Non implemented comparison for type: {type(a)}")

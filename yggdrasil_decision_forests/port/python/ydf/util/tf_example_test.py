@@ -17,6 +17,7 @@ import os
 from absl import logging
 from absl.testing import absltest
 import numpy as np
+import tensorflow as tf
 from ydf.util import tf_example
 from ydf.utils import test_utils
 
@@ -28,15 +29,17 @@ class TFExampleTest(absltest.TestCase):
         "f1": np.array([1, 2, 3]),
         "f2": np.array([1.1, 2.2, math.nan]),
         "f3": np.array([[1.1, 2.2, 3.3], [4.4, 5.5, 6.6], [7.7, 8.8, 9.9]]),
-        "f4": np.array(["X", "Y", "Z"]),
-        "f5": np.array([["X", "Y", "Z"], ["Z", "Y", "X"], ["Z", "Y", "X"]]),
+        "f4": np.array([b"X", b"Y", b"Z"]),
+        "f5": np.array(
+            [[b"X", b"Y", b"Z"], [b"Z", b"Y", b"X"], [b"Z", b"Y", b"X"]]
+        ),
     }
     tmp_dir = self.create_tempdir().full_path
     path = os.path.join(tmp_dir, "file")
     tf_example.write_tf_record(original_ds, path=path)
     read_ds = tf_example.read_tf_record(path)
     logging.info("read_ds:\n%s", read_ds)
-    test_utils.test_almost_equal(original_ds, read_ds)
+    test_utils.assert_almost_equal(original_ds, read_ds)
 
   def test_read_compressed(self):
     ds_path = os.path.join(
@@ -71,6 +74,58 @@ class TFExampleTest(absltest.TestCase):
     ds = tf_example.read_tf_record(ds_path, compressed=False, process=process)
     logging.info("%s", ds)
     self.assertEqual(ds["Num_1"].shape, (3,))
+
+  def test_read_inconsistent(self):
+    path1 = self.create_tempfile().full_path
+    path2 = self.create_tempfile().full_path
+    with tf.io.TFRecordWriter(
+        path1,
+        options=tf.io.TFRecordOptions(compression_type="GZIP"),
+    ) as writer:
+      # 0
+      example = tf.train.Example()
+      example.features.feature["a"].float_list.value.append(1.0)
+      writer.write(example.SerializeToString())
+      # 1
+      example = tf.train.Example()
+      example.features.feature["b"].int64_list.value.append(1)
+      example.features.feature["f"].bytes_list.value.extend([b"Y", b"Z"])
+      writer.write(example.SerializeToString())
+      # 2
+      example = tf.train.Example()
+      example.features.feature["c"].bytes_list.value.append(b"X")
+      example.features.feature["g"].bytes_list.value.append(b"X")
+      writer.write(example.SerializeToString())
+    with tf.io.TFRecordWriter(
+        path2,
+        options=tf.io.TFRecordOptions(compression_type="GZIP"),
+    ) as writer:
+      # 3
+      example = tf.train.Example()
+      example.features.feature["d"].bytes_list.value.extend([b"Y", b"Z"])
+      example.features.feature["e"].int64_list.value.append(3)
+      writer.write(example.SerializeToString())
+      # 4
+      example = tf.train.Example()
+      example.features.feature["a"].float_list.value.append(2.0)
+      example.features.feature["g"].bytes_list.value.append(b"XYZ")
+      writer.write(example.SerializeToString())
+
+    read_ds = tf_example.read_tf_record([path1, path2])
+    expected_ds = {
+        "a": np.array([1.0, math.nan, math.nan, math.nan, 2.0]),
+        "b": np.array([0, 1, 0, 0, 0]),
+        "c": np.array([b"", b"", b"X", b"", b""]),
+        "d": np.array(
+            [[b"", b""], [b"", b""], [b"", b""], [b"Y", b"Z"], [b"", b""]],
+        ),
+        "e": np.array([0, 0, 0, 3, 0]),
+        "f": np.array(
+            [[b"", b""], [b"Y", b"Z"], [b"", b""], [b"", b""], [b"", b""]],
+        ),
+        "g": np.array([b"", b"", b"X", b"", b"XYZ"]),
+    }
+    test_utils.assert_almost_equal(expected_ds, read_ds)
 
 
 if __name__ == "__main__":

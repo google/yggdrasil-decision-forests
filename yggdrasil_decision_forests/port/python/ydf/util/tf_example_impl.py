@@ -14,12 +14,16 @@
 
 """Reader and writer implementations of TF Examples formats."""
 
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
+
 import contextlib
+import dataclasses
 import datetime
 import functools
+import math
 from multiprocessing import pool as multiprocessing_pool
-from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 import numpy as np
+
 from ydf.util import dataset_io
 from ydf.utils import log
 
@@ -31,6 +35,12 @@ except ImportError as exc:
   raise ImportError("Cannot import tensorflow") from exc
 # pylint: enable=g-import-not-at-top
 # pytype: enable=import-error
+
+
+@dataclasses.dataclass
+class ColumnSpec:
+  default_value: Any
+  dim: int
 
 
 def read_tf_record(
@@ -119,11 +129,22 @@ def _read_shard(
     ],
     process: Optional[Callable[[tf.train.Example], tf.train.Example]],
     verbose: bool,
-) -> Tuple[int, Dict[str, np.ndarray]]:
-  """Reads a single shard of data."""
+) -> Tuple[int, Dict[str, Tuple[np.ndarray, ColumnSpec]]]:
+  """Reads a single shard of data.
 
-  local_expected_keys: Optional[Set[str]] = None
-  local_pending_data: Optional[Dict[str, List[Any]]] = None
+  Args:
+    shard: The file shard to read.
+    reader_generator: The implementation able to read the shard examples.
+    process: Optional preprocessing of the examples.
+    verbose: If true, print more loggings.
+
+  Returns:
+    The number of read rows, and a map of column names to columns values +
+    column spec.
+  """
+
+  # Map to each column name, the list of observed values and the missing value.
+  local_data: Dict[str, Tuple[List[Any], ColumnSpec]] = {}
   local_num_examples = 0
 
   if verbose:
@@ -134,34 +155,58 @@ def _read_shard(
       if process is not None:
         example = process(example)
 
-      if local_num_examples == 0:
-        local_expected_keys = set(example.features.feature.keys())
-        local_pending_data = {key: [] for key in local_expected_keys}
-      else:
-        keys = set(example.features.feature.keys())
-        if local_expected_keys != keys:
-          key_difference = local_expected_keys ^ keys
-          if key_difference:
-            raise ValueError(_inconsistent_error_message(key_difference))
+      # Columns without values for this example
+      example_keys = set(example.features.feature.keys())
+      for key, (values, spec) in local_data.items():
+        if key in example_keys:
+          continue
+        values.append(spec.default_value)
 
+      # Column with values for this example
       for key, value in example.features.feature.items():
         if value.HasField("float_list"):
           dst_value = value.float_list.value
+          single_default_value = math.nan
         elif value.HasField("bytes_list"):
           dst_value = value.bytes_list.value
+          single_default_value = b""
         elif value.HasField("int64_list"):
           dst_value = value.int64_list.value
+          single_default_value = 0
         else:
           raise ValueError(f"Unsupported value {value!r}")
-        local_pending_data[key].append(dst_value)
+
+        dim = len(dst_value)
+        if dim == 0:
+          # Giving an empty array of values is equivalent to not giving the
+          # value.
+          continue
+
+        if key not in local_data:
+          # This is a new column
+          default_value = [single_default_value] * dim
+          local_data[key] = (
+              [default_value] * local_num_examples,
+              ColumnSpec(
+                  default_value=default_value,
+                  dim=dim,
+              ),
+          )
+
+        local_data[key][0].append(dst_value)
+
       local_num_examples += 1
 
-  if local_pending_data is None:
+  if not local_data:
     assert local_num_examples == 0
     return 0, {}
 
   return local_num_examples, {
-      key: np.array(value) for key, value in local_pending_data.items()
+      key: (
+          np.array(values),
+          ColumnSpec(default_value=np.array(spec.default_value), dim=spec.dim),
+      )
+      for key, (values, spec) in local_data.items()
   }
 
 
@@ -183,8 +228,8 @@ def read_tensorflow_examples(
     log.info("Reading %d shards", len(paths))
 
   num_examples = 0
-  data: Optional[Dict[str, List[np.ndarray]]] = None
-  expected_keys: Optional[Set[str]] = None
+  num_examples_per_shard = []
+  data: Dict[str, Tuple[List[np.ndarray], ColumnSpec]] = {}
   with multiprocessing_pool.ThreadPool(threads) as pool:
     # Read the shards in parallel.
     for local_num_examples, shard_data in log.maybe_tqdm(
@@ -203,20 +248,26 @@ def read_tensorflow_examples(
       if local_num_examples == 0:
         continue
 
-      keys = set(shard_data.keys())
-      if num_examples == 0:
-        expected_keys = keys
-        data = {key: [] for key in expected_keys}
-      else:
-        if expected_keys != keys:
-          key_difference = expected_keys ^ keys
-          if key_difference:
-            raise ValueError(_inconsistent_error_message(key_difference))
+      # Existing columns without values for this shard.
+      shard_keys = set(shard_data.keys())
+      for key, (values, spec) in data.items():
+        if key in shard_keys:
+          continue
+        values.append(np.tile(spec.default_value, (local_num_examples, 1)))
 
-      # Partially aggregate the shard results
-      for key in keys:
-        data[key].append(shard_data[key])
+      # Columns with values for this shard
+      for key, (values, spec) in shard_data.items():
+        if key not in data:
+          # This is a new column.
+          default_value = [
+              np.tile(spec.default_value, (n, 1))
+              for n in num_examples_per_shard
+          ]
+          data[key] = (default_value, spec)
+        data[key][0].append(values)
+
       num_examples += local_num_examples
+      num_examples_per_shard.append(local_num_examples)
 
   if data is None:
     raise ValueError("No data was read.")
@@ -235,7 +286,7 @@ def read_tensorflow_examples(
       value = np.squeeze(value, axis=1)
     return value
 
-  return {key: finalize_data(value) for key, value in data.items()}
+  return {key: finalize_data(values) for key, (values, _) in data.items()}
 
 
 def write_tensorflow_examples(
