@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 
+#include <string>
+#include <tuple>
 #include <vector>
 
 #include "gmock/gmock.h"
@@ -27,6 +29,8 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_cross_entropy_ndcg.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -35,6 +39,9 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 namespace {
+
+using ::testing::Bool;
+using ::testing::Combine;
 
 // Margin of error for numerical tests. Note that this is by a factor of 10
 // larger than for the other loss functions.
@@ -64,7 +71,7 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   return dataset;
 }
 
-class NDCGLossTest : public testing::TestWithParam<bool> {};
+class NDCGLossTest : public testing::TestWithParam<std::tuple<bool, bool>> {};
 
 TEST(NDCGLossTest, RankingIndexInitialization) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
@@ -87,7 +94,7 @@ TEST(NDCGLossTest, RankingIndexInitialization) {
 
 TEST_P(NDCGLossTest, InitialPredictions) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {2.f, 4.f, 2.f, 4.f};
@@ -102,10 +109,11 @@ TEST_P(NDCGLossTest, InitialPredictions) {
   EXPECT_THAT(init_pred, ElementsAre(0.f));
 }
 
-TEST(NDCGLossTest, UpdateGradients) {
+TEST_P(NDCGLossTest, UpdateGradients) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   std::vector<float> weights;
+  const bool threaded = std::get<1>(GetParam());
 
   RankingGroupsIndices index;
   EXPECT_OK(index.Initialize(dataset, 0, 1));
@@ -128,9 +136,19 @@ TEST(NDCGLossTest, UpdateGradients) {
                                   &predictions);
 
   utils::RandomEngine random(1234);
-  ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
-                                     /* label_col_idx= */ 0, predictions,
-                                     &index, &gradients, &random));
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool(
+        6, {.name_prefix = std::string("")});
+    thread_pool.StartWorkers();
+    ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
+                                       /* label_col_idx= */ 0, predictions,
+                                       &index, &gradients, &random,
+                                       &thread_pool));
+  } else {
+    ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
+                                       /* label_col_idx= */ 0, predictions,
+                                       &index, &gradients, &random));
+  }
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   const std::vector<float>& gradient = gradients.front().gradient;
@@ -188,7 +206,7 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {1.f, 3.f, 1.f, 3.f};
@@ -224,7 +242,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {1.f, 3.f, 1.f, 3.f};
@@ -264,7 +282,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {1.f, 3.f, 1.f, 3.f};
@@ -288,7 +306,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectGroupedPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const bool weighted = GetParam();
+  const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
     weights = {1.f, 3.f, 1.f, 3.f};
@@ -334,7 +352,8 @@ TEST(NDCGLossTest, InvalidTruncation) {
   EXPECT_EQ(loss_imp.Status().code(), absl::StatusCode::kInvalidArgument);
 }
 
-INSTANTIATE_TEST_SUITE_P(NDCGLossTestSuite, NDCGLossTest, testing::Bool());
+INSTANTIATE_TEST_SUITE_P(NDCGLossTestSuite, NDCGLossTest,
+                         Combine(Bool(), Bool()));
 
 }  // namespace
 }  // namespace gradient_boosted_trees

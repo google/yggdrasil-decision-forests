@@ -17,12 +17,15 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
+#include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -37,61 +40,32 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
+namespace {
 
-absl::Status NDCGLoss::Status() const {
-  if (task_ != model::proto::Task::RANKING) {
-    return absl::InvalidArgumentError(
-        "NDCG loss is only compatible with a ranking task.");
-  }
-  if (ndcg_truncation_ < 1) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("The NDCG truncation must be set to a positive integer, "
-                     "currently found: ",
-                     ndcg_truncation_));
-  }
-  return absl::OkStatus();
-}
-
-absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
-    const dataset::VerticalDataset& dataset, int label_col_idx,
-    const absl::Span<const float> weights) const {
-  return std::vector<float>{0.f};
-}
-
-absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
-    const decision_tree::proto::LabelStatistics& label_statistics) const {
-  return std::vector<float>{0.f};
-}
-
-absl::Status NDCGLoss::UpdateGradients(
+absl::Status UpdateGradientsSingleThread(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
-    utils::concurrency::ThreadPool* thread_pool) const {
-  // TODO: Implement thread_pool.
-
-  std::vector<float>& gradient_data = *(*gradients)[0].gradient;
-  std::vector<float>& hessian_data = *(*gradients)[0].hessian;
+    const absl::Span<const RankingGroupsIndices::Group>& groups,
+    const int ndcg_truncation, const float lambda_loss,
+    const bool gradient_use_non_normalized_dcg, const int64_t seed,
+    absl::Span<float> gradient_data, absl::Span<float> hessian_data) {
+  utils::RandomEngine local_random(seed);
   DCHECK_EQ(gradient_data.size(), hessian_data.size());
 
-  metric::NDCGCalculator ndcg_calculator(ndcg_truncation_);
+  metric::NDCGCalculator ndcg_calculator(ndcg_truncation);
 
-  const float lambda_loss = gbt_config_.lambda_loss();
   const float lambda_loss_squared = lambda_loss * lambda_loss;
-
-  // Reset gradient accumulators.
-  std::fill(gradient_data.begin(), gradient_data.end(), 0.f);
-  std::fill(hessian_data.begin(), hessian_data.end(), 0.f);
 
   // "pred_and_in_ground_idx[j].first" is the prediction for the example
   // "group[pred_and_in_ground_idx[j].second].example_idx".
   std::vector<std::pair<float, int>> pred_and_in_ground_idx;
-  for (const auto& group : ranking_index->groups()) {
+  for (const auto& group : groups) {
     // Extract predictions.
     const int group_size = group.items.size();
     pred_and_in_ground_idx.resize(group_size);
@@ -104,8 +78,8 @@ absl::Status NDCGLoss::UpdateGradients(
     // Note: At this point, "pred_and_in_ground_idx" is sorted by relevance
     // i.e. ground truth.
     float utility_norm_factor = 1.;
-    if (!gbt_config_.lambda_mart_ndcg().gradient_use_non_normalized_dcg()) {
-      const int max_rank = std::min(ndcg_truncation_, group_size);
+    if (!gradient_use_non_normalized_dcg) {
+      const int max_rank = std::min(ndcg_truncation, group_size);
       float max_ndcg = 0;
       for (int rank = 0; rank < max_rank; rank++) {
         max_ndcg += ndcg_calculator.Term(group.items[rank].relevance, rank);
@@ -127,7 +101,7 @@ absl::Status NDCGLoss::UpdateGradients(
              it->first == next_it->first) {
         next_it++;
       }
-      std::shuffle(it, next_it, *random);
+      std::shuffle(it, next_it, local_random);
       it = next_it;
     }
 
@@ -161,11 +135,11 @@ absl::Status NDCGLoss::UpdateGradients(
 
         // "delta_utility" corresponds to "Z_{i,j}" in the paper.
         float delta_utility = 0;
-        if (item_1_idx < ndcg_truncation_) {
+        if (item_1_idx < ndcg_truncation) {
           delta_utility += ndcg_calculator.Term(relevance_2, item_1_idx) -
                            ndcg_calculator.Term(relevance_1, item_1_idx);
         }
-        if (item_2_idx < ndcg_truncation_) {
+        if (item_2_idx < ndcg_truncation) {
           delta_utility += ndcg_calculator.Term(relevance_1, item_2_idx) -
                            ndcg_calculator.Term(relevance_2, item_2_idx);
         }
@@ -207,6 +181,94 @@ absl::Status NDCGLoss::UpdateGradients(
     }
   }
   return absl::OkStatus();
+}
+
+}  // namespace
+
+absl::Status NDCGLoss::Status() const {
+  if (task_ != model::proto::Task::RANKING) {
+    return absl::InvalidArgumentError(
+        "NDCG loss is only compatible with a ranking task.");
+  }
+  if (ndcg_truncation_ < 1) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("The NDCG truncation must be set to a positive integer, "
+                     "currently found: ",
+                     ndcg_truncation_));
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
+    const dataset::VerticalDataset& dataset, int label_col_idx,
+    const absl::Span<const float> weights) const {
+  return std::vector<float>{0.f};
+}
+
+absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
+    const decision_tree::proto::LabelStatistics& label_statistics) const {
+  return std::vector<float>{0.f};
+}
+
+absl::Status NDCGLoss::UpdateGradients(
+    const absl::Span<const float> labels,
+    const absl::Span<const float> predictions,
+    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    utils::RandomEngine* random,
+    utils::concurrency::ThreadPool* thread_pool) const {
+  STATUS_CHECK_EQ(gradients->size(), 1);
+  std::vector<float>& gradient_data = *(*gradients)[0].gradient;
+  std::vector<float>& hessian_data = *(*gradients)[0].hessian;
+  STATUS_CHECK_EQ(gradient_data.size(), hessian_data.size());
+  // Reset gradient accumulators.
+  std::fill(gradient_data.begin(), gradient_data.end(), 0.f);
+  std::fill(hessian_data.begin(), hessian_data.end(), 0.f);
+
+  if (thread_pool == nullptr) {
+    RETURN_IF_ERROR(UpdateGradientsSingleThread(
+        labels, predictions, absl::MakeConstSpan(ranking_index->groups()),
+        ndcg_truncation_, gbt_config_.lambda_loss(),
+        gbt_config_.lambda_mart_ndcg().gradient_use_non_normalized_dcg(),
+        (*random)(), absl::Span<float>(gradient_data),
+        absl::Span<float>(hessian_data)));
+    return absl::OkStatus();
+  } else {
+    absl::Status global_status;
+    utils::concurrency::Mutex global_mutex;
+    std::vector<int64_t> random_seeds(thread_pool->num_threads());
+    for (size_t i = 0; i < random_seeds.size(); i++) {
+      random_seeds[i] = (*random)();
+    }
+    utils::concurrency::ConcurrentForLoop(
+        thread_pool->num_threads(), thread_pool, ranking_index->groups().size(),
+        [&labels, &predictions, ranking_index, &gradient_data, &hessian_data,
+         &random_seeds, lambda_loss = gbt_config_.lambda_loss(),
+         gradient_use_non_normalized_dcg =
+             gbt_config_.lambda_mart_ndcg().gradient_use_non_normalized_dcg(),
+         ndcg_truncation = this->ndcg_truncation_, &global_status,
+         &global_mutex](const size_t block_idx, const size_t begin_idx,
+                        const size_t end_idx) -> void {
+          {
+            utils::concurrency::MutexLock lock(&global_mutex);
+            if (!global_status.ok()) {
+              return;
+            }
+          }
+          absl::Status thread_status = UpdateGradientsSingleThread(
+              absl::MakeConstSpan(labels), absl::MakeConstSpan(predictions),
+              absl::MakeConstSpan(ranking_index->groups())
+                  .subspan(begin_idx, end_idx - begin_idx),
+              ndcg_truncation, lambda_loss, gradient_use_non_normalized_dcg,
+              random_seeds[block_idx], absl::MakeSpan(gradient_data),
+              absl::MakeSpan(hessian_data));
+          if (!thread_status.ok()) {
+            utils::concurrency::MutexLock lock(&global_mutex);
+            global_status.Update(thread_status);
+            return;
+          }
+        });
+    return global_status;
+  }
 }
 
 std::vector<std::string> NDCGLoss::SecondaryMetricNames() const {
