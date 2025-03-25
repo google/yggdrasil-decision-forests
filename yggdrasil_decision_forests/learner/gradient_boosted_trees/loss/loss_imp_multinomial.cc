@@ -252,7 +252,10 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
 
     for (const auto& block : per_threads) {
       sum_loss += block.sum_loss;
-      confusion_matrix.Add(block.confusion_matrix);
+      // Maybe the number of labels is so small that not all threads were used.
+      if (block.confusion_matrix.ncol() > 0) {
+        confusion_matrix.Add(block.confusion_matrix);
+      }
     }
   }
 

@@ -702,6 +702,16 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         typed_path, all_shards.size()));
   }
 
+  // Threadpool.
+  std::unique_ptr<utils::concurrency::ThreadPool> thread_pool;
+  if (deployment_.num_threads() > 1) {
+    LOG(INFO) << "Create thread pool with " << deployment_.num_threads()
+              << " threads";
+    thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
+        "GBTLossThreadpool", deployment_.num_threads());
+    thread_pool->StartWorkers();
+  }
+
   // Split the shards between train and validation.
   std::vector<std::string> training_shards;
   std::vector<std::string> validation_shards;
@@ -992,7 +1002,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     RETURN_IF_ERROR(config.loss->UpdateGradients(
         current_train_dataset->gradient_dataset,
         config.train_config_link.label(), current_train_dataset->predictions,
-        nullptr, &current_train_dataset->gradients, &random));
+        nullptr, &current_train_dataset->gradients, &random,
+        thread_pool.get()));
 
     // Train a tree on the gradient.
     DCHECK_EQ(current_train_dataset->predictions_from_num_trees,
@@ -1049,7 +1060,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           config.loss->Loss(current_train_dataset->gradient_dataset,
                             config.train_config_link.label(),
                             current_train_dataset->predictions,
-                            current_train_dataset->weights, nullptr));
+                            current_train_dataset->weights,
+                            /*ranking_index=*/nullptr, thread_pool.get()));
 
       auto* log_entry = mdl->training_logs_.mutable_entries()->Add();
       log_entry->set_number_of_trees(iter_idx + 1);
@@ -1073,11 +1085,12 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
       }
 
       if (has_validation_dataset) {
-        ASSIGN_OR_RETURN(const LossResults validation_loss_result,
-                         config.loss->Loss(validation->gradient_dataset,
-                                           config.train_config_link.label(),
-                                           validation->predictions,
-                                           validation->weights, nullptr));
+        ASSIGN_OR_RETURN(
+            const LossResults validation_loss_result,
+            config.loss->Loss(validation->gradient_dataset,
+                              config.train_config_link.label(),
+                              validation->predictions, validation->weights,
+                              /*ranking_index=*/nullptr, thread_pool.get()));
         log_entry->set_validation_loss(validation_loss_result.loss);
         *log_entry->mutable_validation_secondary_metrics() = {
             validation_loss_result.secondary_metrics.begin(),
@@ -1390,6 +1403,16 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   // Sorted deque of the past iterations with snapshots.
   std::deque<int> snapshots_idxs;
 
+  // Threadpool.
+  std::unique_ptr<utils::concurrency::ThreadPool> thread_pool;
+  if (deployment_.num_threads() > 1) {
+    LOG(INFO) << "Create thread pool with " << deployment_.num_threads()
+              << " threads";
+    thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
+        "GBTLossThreadpool", deployment_.num_threads());
+    thread_pool->StartWorkers();
+  }
+
   // Try to resume training.
   if (deployment_.try_resume_training()) {
     if (deployment_.cache_path().empty()) {
@@ -1433,7 +1456,8 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     // Compute the gradient of the residual relative to the examples.
     RETURN_IF_ERROR(config.loss->UpdateGradients(
         gradient_sub_train_dataset, config.train_config_link.label(),
-        sub_train_predictions, train_ranking_index.get(), &gradients, &random));
+        sub_train_predictions, train_ranking_index.get(), &gradients, &random,
+        thread_pool.get()));
 
     float subsample_factor = 1.f;
     // Select a random set of examples (without replacement).
@@ -1547,11 +1571,12 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
 
     if (((iter_idx + 1) % config.gbt_config->validation_interval_in_trees()) ==
         0) {
-      ASSIGN_OR_RETURN(const LossResults training_loss_result,
-                       config.loss->Loss(gradient_sub_train_dataset,
-                                         config.train_config_link.label(),
-                                         sub_train_predictions, weights,
-                                         train_ranking_index.get()));
+      ASSIGN_OR_RETURN(
+          const LossResults training_loss_result,
+          config.loss->Loss(gradient_sub_train_dataset,
+                            config.train_config_link.label(),
+                            sub_train_predictions, weights,
+                            train_ranking_index.get(), thread_pool.get()));
 
       auto* log_entry = training_logs.mutable_entries()->Add();
       log_entry->set_number_of_trees(iter_idx + 1);
@@ -1585,7 +1610,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
             config.loss->Loss(gradient_validation_dataset,
                               config.train_config_link.label(),
                               validation_predictions, validation_weights,
-                              valid_ranking_index.get()));
+                              valid_ranking_index.get(), thread_pool.get()));
         log_entry->set_validation_loss(validation_loss_result.loss);
         *log_entry->mutable_validation_secondary_metrics() = {
             validation_loss_result.secondary_metrics.begin(),

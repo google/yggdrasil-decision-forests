@@ -93,7 +93,7 @@ class MeanAverageErrorLossWeightAndThreadingTest
   void SetUp() override {
     const bool threaded = std::get<1>(GetParam()) == UseMultithreading::kYes;
     if (threaded) {
-      thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>("", 4);
+      thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>("", 6);
       thread_pool_->StartWorkers();
     }
   }

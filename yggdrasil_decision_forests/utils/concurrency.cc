@@ -34,17 +34,23 @@ void ConcurrentForLoop(
     function(0, 0, num_items);
     return;
   }
-  BlockingCounter blocker(num_blocks);
+  const size_t effective_num_blocks = std::min(num_blocks, num_items);
+  BlockingCounter blocker(effective_num_blocks);
   size_t begin_idx = 0;
-  const size_t block_size = (num_items + num_blocks - 1) / num_blocks;
-  for (size_t block_idx = 0; block_idx < num_blocks; block_idx++) {
+  const size_t block_size =
+      (num_items + effective_num_blocks - 1) / effective_num_blocks;
+  for (size_t block_idx = 0; block_idx < effective_num_blocks; block_idx++) {
     const auto end_idx = std::min(begin_idx + block_size, num_items);
-    thread_pool->Schedule(
-        [block_idx, begin_idx, end_idx, &blocker, &function]() -> void {
-          function(block_idx, begin_idx, end_idx);
-          blocker.DecrementCount();
-        });
-    begin_idx += block_size;
+    if (begin_idx <= end_idx) {
+      thread_pool->Schedule(
+          [block_idx, begin_idx, end_idx, &blocker, &function]() -> void {
+            function(block_idx, begin_idx, end_idx);
+            blocker.DecrementCount();
+          });
+      begin_idx += block_size;
+    } else {
+      blocker.DecrementCount();
+    }
   }
   blocker.Wait();
 }

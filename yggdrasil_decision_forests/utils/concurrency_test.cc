@@ -163,6 +163,25 @@ TEST(Utils, ConcurrentForLoop) {
   EXPECT_EQ(sum, items.size() * 2);
 }
 
+TEST(Utils, ConcurrentForLoopFewItemsManyBlocks) {
+  std::atomic<int> sum{0};
+  std::vector<int> items(5, 2);
+  {
+    ThreadPool pool(20, {.name_prefix = std::string("")});
+    pool.StartWorkers();
+    ConcurrentForLoop(
+        pool.num_threads(), &pool, items.size(),
+        [&sum, &items](size_t block_idx, size_t begin_idx, size_t end_idx) {
+          int a = 0;
+          for (int i = begin_idx; i < end_idx; i++) {
+            a += items[i];
+          }
+          sum += a;
+        });
+  }
+  EXPECT_EQ(sum, items.size() * 2);
+}
+
 struct ConcurrentForLoopWithWorkerTestCase {
   size_t max_num_threads;
 };
