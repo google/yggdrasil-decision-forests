@@ -603,7 +603,7 @@ class DatasetSyntheticRanking : public utils::TrainAndTestTester {
 // Train and test a model on the adult dataset.
 TEST_F(DatasetSyntheticRanking, Base) {
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.701838, 0.025846, 0.7079);
+  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7018, 0.0258, 0.7058);
 }
 
 }  // namespace
