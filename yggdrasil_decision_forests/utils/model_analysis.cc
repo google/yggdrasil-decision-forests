@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -33,6 +34,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -679,6 +681,34 @@ absl::StatusOr<utils::plot::MultiPlot> Plot(
   return multiplot;
 }
 
+// Gets the list of features to analyse from a list of string features provided
+// by the user.
+typedef std::vector<int> RequestedFeatures;
+absl::StatusOr<RequestedFeatures> GetRequestedFeatures(
+    std::vector<int> input_features,
+    const dataset::proto::DataSpecification& dataspec,
+    absl::Span<const std::string* const> requested_features) {
+  if (requested_features.empty()) {
+    return input_features;
+  }
+  RequestedFeatures ret;
+  ret.reserve(requested_features.size());
+  absl::flat_hash_set<int> visited_features;
+  for (const auto* str_feature : requested_features) {
+    ASSIGN_OR_RETURN(
+        const auto int_feature,
+        dataset::GetColumnIdxFromNameWithStatus(*str_feature, dataspec));
+    ret.push_back(int_feature);
+    if (visited_features.find(int_feature) != visited_features.end()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Duplicated feature \"", *str_feature,
+                       "\" in the requested features"));
+    }
+    visited_features.insert(int_feature);
+  }
+  return ret;
+}
+
 }  // namespace
 
 namespace internal {
@@ -738,6 +768,10 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
     return absl::InvalidArgumentError("The dataset is empty.");
   }
 
+  ASSIGN_OR_RETURN(const auto features,
+                   GetRequestedFeatures(model.input_features(),
+                                        model.data_spec(), options.features()));
+
   const std::optional<float> maximum_duration_seconds =
       options.has_maximum_duration_seconds()
           ? options.maximum_duration_seconds()
@@ -760,11 +794,12 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
 
   // Partial Dependence Plots
   if (options.pdp().enabled()) {
-    ASSIGN_OR_RETURN(const auto attribute_idxs,
-                     GenerateAttributesCombinations(
-                         *effective_model, /*flag_1d=*/true,
-                         /*flag_2d=*/false,
-                         /*flag_2d_categorical_numerical=*/false));
+    ASSIGN_OR_RETURN(
+        const auto attribute_idxs,
+        GenerateAttributesCombinations(
+            features, effective_model->data_spec(), /*flag_1d=*/true,
+            /*flag_2d=*/false,
+            /*flag_2d_categorical_numerical=*/false));
 
     ASSIGN_OR_RETURN(
         *analysis.mutable_pdp_set(),
@@ -776,11 +811,12 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
 
   // Conditional Expectation Plot
   if (options.cep().enabled()) {
-    ASSIGN_OR_RETURN(const auto attribute_idxs,
-                     GenerateAttributesCombinations(
-                         *effective_model, /*flag_1d=*/true,
-                         /*flag_2d=*/false,
-                         /*flag_2d_categorical_numerical=*/false));
+    ASSIGN_OR_RETURN(
+        const auto attribute_idxs,
+        GenerateAttributesCombinations(
+            features, effective_model->data_spec(), /*flag_1d=*/true,
+            /*flag_2d=*/false,
+            /*flag_2d_categorical_numerical=*/false));
 
     ASSIGN_OR_RETURN(
         *analysis.mutable_cep_set(),
@@ -1051,6 +1087,10 @@ absl::StatusOr<proto::FeatureVariationItem> FeatureVariationCategorical(
 absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
     const model::AbstractModel& model, const dataset::proto::Example& example,
     const proto::PredictionAnalysisOptions& options) {
+  ASSIGN_OR_RETURN(const auto features,
+                   GetRequestedFeatures(model.input_features(),
+                                        model.data_spec(), options.features()));
+
   // Set the common fields of the analysis.
   proto::PredictionAnalysisResult analysis;
   *analysis.mutable_data_spec() = model.data_spec();
@@ -1060,7 +1100,7 @@ absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
   model.Predict(example, analysis.mutable_prediction());
 
   // Feature variation
-  for (const auto feature : model.input_features()) {
+  for (const auto feature : features) {
     switch (model.data_spec().columns(feature).type()) {
       case dataset::proto::ColumnType::NUMERICAL: {
         ASSIGN_OR_RETURN(auto var, FeatureVariationNumerical(model, feature,

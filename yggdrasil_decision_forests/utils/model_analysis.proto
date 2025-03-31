@@ -109,6 +109,12 @@ message Options {
 
   // Random seed for randomized tasks.
   optional int32 random_seed = 20 [default = 1234];
+
+  // Features to analyse for the PDP and CEP plots. If not set (i.e., empty),
+  // all the model features are analyzed. If set, `features` defines the order
+  // of the features in the analysis. Does not impact the variable importance
+  // features.
+  repeated string features = 21;
 }
 
 // Results of a model analysis.
@@ -137,6 +143,11 @@ message PredictionAnalysisOptions {
   // Prefix used to generate unique html element ids. If not set, use a random
   // prefix.
   optional string html_id_prefix = 4;
+
+  // Features to analyse. If not set (i.e., empty), all the model features are
+  // analyzed. If set, `features` defines the order of the features in the
+  // analysis.
+  repeated string features = 5;
 }
 
 // Result of a prediction analysis.

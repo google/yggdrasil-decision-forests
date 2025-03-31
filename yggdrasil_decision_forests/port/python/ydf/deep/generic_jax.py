@@ -120,6 +120,7 @@ _PREDICT_BATCH_SIZE = 256
 # debugging.
 _DEBUG_PRINT = False
 
+
 def jax_debug(name: str, x: jax.Array) -> None:
   """Prints the content of a jax array at runtime if debug prints is enabled."""
   if not _DEBUG_PRINT:
@@ -465,6 +466,7 @@ class GenericJAXModel(generic_model.GenericModel):
   def analyze_prediction(
       self,
       single_example: dataset_lib.InputDataset,
+      features: Optional[List[str]] = None,
   ) -> analysis_lib.PredictionAnalysis:
     raise NotImplementedError
 
@@ -478,7 +480,12 @@ class GenericJAXModel(generic_model.GenericModel):
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
+      features: Optional[List[str]] = None,
   ) -> analysis_lib.Analysis:
+    if features is not None:
+      raise ValueError(
+          "`features` argument not implemented for JAX model's analysis"
+      )
     enable_permutation_variable_importances = (
         permutation_variable_importance_rounds > 0
     )

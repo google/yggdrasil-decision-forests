@@ -585,6 +585,7 @@ Use `model.describe()` for more details
   def analyze_prediction(
       self,
       single_example: dataset.InputDataset,
+      features: Optional[List[str]] = None,
   ) -> analysis.PredictionAnalysis:
     """Understands a single prediction of the model.
 
@@ -616,6 +617,8 @@ Use `model.describe()` for more details
         (typed) path, list of (typed) paths, Pandas DataFrame, Xarray Dataset,
         TensorFlow Dataset, PyGrain DataLoader and Dataset (experimental, Linux
         only), dictionary of string to NumPy array or lists.
+      features: If specified, only analyse the following features and display
+        the features in this order.
 
     Returns:
       Prediction explanation.
@@ -633,6 +636,7 @@ Use `model.describe()` for more details
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
+      features: Optional[List[str]] = None,
   ) -> analysis.Analysis:
     """Analyzes a model on a test dataset.
 
@@ -686,6 +690,8 @@ Use `model.describe()` for more details
       num_threads: Number of threads to use to compute the analysis.
       maximum_duration: Maximum duration of the analysis in seconds. Note that
         the analysis can last a little longer than this value.
+      features: If specified, only analyse the following features and display
+        the features in this order for the PDP and CEP plots.
 
     Returns:
       Model analysis.
@@ -1622,6 +1628,7 @@ class GenericCCModel(GenericModel):
   def analyze_prediction(
       self,
       single_example: dataset.InputDataset,
+      features: Optional[List[str]] = None,
   ) -> analysis.PredictionAnalysis:
     with log.cc_log_context():
       ds = dataset.create_vertical_dataset(
@@ -1629,6 +1636,8 @@ class GenericCCModel(GenericModel):
       )
 
       options_proto = model_analysis_pb2.PredictionAnalysisOptions()
+      if features is not None:
+        options_proto.features.extend(features)
       analysis_proto = self._model.AnalyzePrediction(ds._dataset, options_proto)  # pylint: disable=protected-access
       return analysis.PredictionAnalysis(analysis_proto, options_proto)
 
@@ -1642,6 +1651,7 @@ class GenericCCModel(GenericModel):
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
+      features: Optional[List[str]] = None,
   ) -> analysis.Analysis:
     if num_threads is None:
       num_threads = concurrency.determine_optimal_num_threads(training=False)
@@ -1686,6 +1696,8 @@ class GenericCCModel(GenericModel):
           ),
           include_model_structural_variable_importances=True,
       )
+      if features is not None:
+        options_proto.features.extend(features)
 
       analysis_proto = self._model.Analyze(ds._dataset, options_proto)  # pylint: disable=protected-access
       return analysis.Analysis(analysis_proto, options_proto)

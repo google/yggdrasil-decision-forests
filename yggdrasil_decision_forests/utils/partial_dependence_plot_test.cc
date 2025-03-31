@@ -784,12 +784,14 @@ TEST_F(PartialDependencePlotTest, UpdatePDPSetRegression) {
 TEST_F(PartialDependencePlotTest, AppendAttributesCombinations) {
   auto model = CreateSimpleModel(model::proto::Task::CLASSIFICATION);
   std::vector<std::vector<int>> attributes_1d;
-  EXPECT_OK(AppendAttributesCombinations(*model, 1, &attributes_1d));
+  EXPECT_OK(AppendAttributesCombinations(
+      model->input_features(), model->data_spec(), 1, &attributes_1d));
   EXPECT_THAT(attributes_1d,
               ElementsAre(std::vector<int>{0}, std::vector<int>{1}));
 
   std::vector<std::vector<int>> attributes_2d;
-  EXPECT_OK(AppendAttributesCombinations(*model, 2, &attributes_2d));
+  EXPECT_OK(AppendAttributesCombinations(
+      model->input_features(), model->data_spec(), 2, &attributes_2d));
   EXPECT_THAT(attributes_2d, ElementsAre(std::vector<int>{0, 1}));
 }
 
@@ -797,7 +799,8 @@ TEST_F(PartialDependencePlotTest, AppendAttributesCombinations2D) {
   auto model = CreateSimpleModel(model::proto::Task::CLASSIFICATION);
   std::vector<std::vector<int>> attributes_1d;
   EXPECT_OK(AppendAttributesCombinations2D(
-      *model, dataset::proto::ColumnType::NUMERICAL,
+      model->input_features(), model->data_spec(),
+      dataset::proto::ColumnType::NUMERICAL,
       dataset::proto::ColumnType::CATEGORICAL, &attributes_1d));
   EXPECT_THAT(attributes_1d, ElementsAre(std::vector<int>{0, 1}));
 }

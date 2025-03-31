@@ -89,20 +89,23 @@ ComputeConditionalExpectationPlotSet(
 
 // Appends all the "num_dims"-dimensional combinations of input features.
 absl::Status AppendAttributesCombinations(
-    const model::AbstractModel& model, int num_dims,
+    const std::vector<int>& features,
+    const dataset::proto::DataSpecification& dataspec, int num_dims,
     std::vector<std::vector<int>>* attribute_idxs);
 
 // Appends all 2-dimensional combinations of attributes of type {type_1,
 // type_2}.
 absl::Status AppendAttributesCombinations2D(
-    const model::AbstractModel& model, dataset::proto::ColumnType type_1,
-    dataset::proto::ColumnType type_2,
+    const std::vector<int>& features,
+    const dataset::proto::DataSpecification& dataspec,
+    dataset::proto::ColumnType type_1, dataset::proto::ColumnType type_2,
     std::vector<std::vector<int>>* attribute_idxs);
 
 // Creates a list of attribute sets from user set flags.
 absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
-    const model::AbstractModel& model, const bool flag_1d, const bool flag_2d,
-    const bool flag_2d_categorical_numerical);
+    const std::vector<int>& features,
+    const dataset::proto::DataSpecification& dataspec, bool flag_1d,
+    bool flag_2d, bool flag_2d_categorical_numerical);
 
 namespace internal {
 

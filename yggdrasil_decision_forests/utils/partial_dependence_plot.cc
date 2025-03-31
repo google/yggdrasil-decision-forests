@@ -81,10 +81,12 @@ bool SupportedFeatureType(const dataset::proto::ColumnType type) {
 }
 
 // Extracts the input features of a model that are supported for PDP plotting.
-std::vector<int> SupportedInputFeatures(const model::AbstractModel& model) {
+std::vector<int> SupportedInputFeatures(
+    const std::vector<int>& features,
+    const dataset::proto::DataSpecification& dataspec) {
   std::vector<int> supported_input_features;
-  for (const auto col_idx : model.input_features()) {
-    if (SupportedFeatureType(model.data_spec().columns(col_idx).type())) {
+  for (const auto col_idx : features) {
+    if (SupportedFeatureType(dataspec.columns(col_idx).type())) {
       supported_input_features.push_back(col_idx);
     }
   }
@@ -447,9 +449,18 @@ absl::Status UpdateConditionalExpectationPlotSet(
 }
 
 absl::Status AppendAttributesCombinations(
-    const model::AbstractModel& model, const int num_dims,
+    const model::AbstractModel& model, int num_dims,
     std::vector<std::vector<int>>* attribute_idxs) {
-  const auto supported_input_features = SupportedInputFeatures(model);
+  return AppendAttributesCombinations(model.input_features(), model.data_spec(),
+                                      num_dims, attribute_idxs);
+}
+
+absl::Status AppendAttributesCombinations(
+    const std::vector<int>& features,
+    const dataset::proto::DataSpecification& dataspec, const int num_dims,
+    std::vector<std::vector<int>>* attribute_idxs) {
+  const auto supported_input_features =
+      SupportedInputFeatures(features, dataspec);
   if (num_dims == 1) {
     for (const auto col_idx : supported_input_features) {
       attribute_idxs->push_back({col_idx});
@@ -469,16 +480,19 @@ absl::Status AppendAttributesCombinations(
 }
 
 absl::Status AppendAttributesCombinations2D(
-    const model::AbstractModel& model, const dataset::proto::ColumnType type_1,
+    const std::vector<int>& features,
+    const dataset::proto::DataSpecification& dataspec,
+    const dataset::proto::ColumnType type_1,
     const dataset::proto::ColumnType type_2,
     std::vector<std::vector<int>>* attribute_idxs) {
-  const auto supported_input_features = SupportedInputFeatures(model);
+  const auto supported_input_features =
+      SupportedInputFeatures(features, dataspec);
   for (const auto feature_1 : supported_input_features) {
-    if (model.data_spec().columns(feature_1).type() != type_1) {
+    if (dataspec.columns(feature_1).type() != type_1) {
       continue;
     }
     for (const auto feature_2 : supported_input_features) {
-      if (model.data_spec().columns(feature_2).type() != type_2) {
+      if (dataspec.columns(feature_2).type() != type_2) {
         continue;
       }
       if (type_1 == type_2 && feature_1 >= feature_2) {
@@ -580,29 +594,24 @@ ComputeConditionalExpectationPlotSet(
 }
 
 absl::StatusOr<std::vector<std::vector<int>>> GenerateAttributesCombinations(
-    const model::AbstractModel& model, const bool flag_1d, const bool flag_2d,
-    const bool flag_2d_categorical_numerical) {
+    const std::vector<int>& features,
+    const dataset::proto::DataSpecification& dataspec, const bool flag_1d,
+    const bool flag_2d, const bool flag_2d_categorical_numerical) {
   LOG(INFO) << "List plotting attribute combinations";
   std::vector<std::vector<int>> attribute_idxs;
   if (flag_1d) {
-    RETURN_IF_ERROR(
-        utils::AppendAttributesCombinations(model, 1, &attribute_idxs));
+    RETURN_IF_ERROR(utils::AppendAttributesCombinations(features, dataspec, 1,
+                                                        &attribute_idxs));
   }
   if (flag_2d) {
-    RETURN_IF_ERROR(
-        utils::AppendAttributesCombinations(model, 2, &attribute_idxs));
+    RETURN_IF_ERROR(utils::AppendAttributesCombinations(features, dataspec, 2,
+                                                        &attribute_idxs));
   }
   if (flag_2d_categorical_numerical) {
     RETURN_IF_ERROR(utils::AppendAttributesCombinations2D(
-        model, dataset::proto::ColumnType::CATEGORICAL,
+        features, dataspec, dataset::proto::ColumnType::CATEGORICAL,
         dataset::proto::ColumnType::NUMERICAL, &attribute_idxs));
   }
-  // Remove duplicates.
-  std::sort(attribute_idxs.begin(), attribute_idxs.end());
-  attribute_idxs.erase(
-      std::unique(attribute_idxs.begin(), attribute_idxs.end()),
-      attribute_idxs.end());
-
   LOG(INFO) << "Found " << attribute_idxs.size() << " combination(s)";
   return attribute_idxs;
 }

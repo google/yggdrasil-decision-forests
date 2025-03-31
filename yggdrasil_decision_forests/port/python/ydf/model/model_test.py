@@ -301,6 +301,23 @@ class GenericModelTest(parameterized.TestCase):
     self.assertIn("Conditional Expectation Plot", analysis_html)
     self.assertIn("Variable Importance", analysis_html)
 
+  def test_analyze_adult_gbt_sub_features(self):
+    _ = self.adult_binary_class_gbdt.analyze(
+        self.adult_binary_class_gbdt_test_ds,
+        permutation_variable_importance_rounds=5,
+        features=["occupation", "age"],
+    )
+
+  def test_analyze_adult_gbt_sub_features_wrong_feature(self):
+    with self.assertRaisesRegex(
+        ValueError, "Unknown column non_existing_feature"
+    ):
+      _ = self.adult_binary_class_gbdt.analyze(
+          self.adult_binary_class_gbdt_test_ds,
+          permutation_variable_importance_rounds=5,
+          features=["non_existing_feature"],
+      )
+
   def test_analyze_programmatic_data_access_classification(self):
     """Test programmatic access to analysis data."""
     dataset_path = os.path.join(
@@ -378,6 +395,72 @@ class GenericModelTest(parameterized.TestCase):
                     [0.73476332, 0.26523371],
                     [0.72042147, 0.27957545],
                     [0.72042147, 0.27957545],
+                ]),
+            ),
+        ],
+    )
+
+  def test_analyze_programmatic_data_access_classification_sub_features(self):
+    """Test programmatic access to analysis data."""
+    # Large maximum duration reduces test flakiness.
+    analysis = self.adult_binary_class_gbdt.analyze(
+        self.adult_binary_class_gbdt_test_ds,
+        num_bins=4,
+        maximum_duration=60,
+        features=["occupation", "age"],
+    )
+    pdps = analysis.partial_dependence_plots()
+    self.assertLen(pdps, 2)
+    test_utils.assert_almost_equal(
+        pdps,
+        [
+            analysis_lib.PartialDependencePlot(
+                feature_names=["occupation"],
+                feature_values=[
+                    np.array(
+                        [
+                            "<OOD>",
+                            "Prof-specialty",
+                            "Exec-managerial",
+                            "Craft-repair",
+                            "Adm-clerical",
+                            "Sales",
+                            "Other-service",
+                            "Machine-op-inspct",
+                            "Transport-moving",
+                            "Handlers-cleaners",
+                            "Farming-fishing",
+                            "Tech-support",
+                            "Protective-serv",
+                            "Priv-house-serv",
+                        ],
+                    )
+                ],
+                predictions=np.array([
+                    [0.7290186, 0.27097793],
+                    [0.7290186, 0.27097793],
+                    [0.70368701, 0.2963083],
+                    [0.77382477, 0.22617291],
+                    [0.76818352, 0.23181249],
+                    [0.76350558, 0.23649114],
+                    [0.82140092, 0.1785953],
+                    [0.81608086, 0.18391325],
+                    [0.81310829, 0.18688661],
+                    [0.84014485, 0.15985094],
+                    [0.84189474, 0.15810076],
+                    [0.7291793, 0.27081758],
+                    [0.73594471, 0.26405182],
+                    [0.8489624, 0.15103142],
+                ]),
+            ),
+            analysis_lib.PartialDependencePlot(
+                feature_names=["age"],
+                feature_values=[np.array([22.25, 32.5, 43.0, 69.25])],
+                predictions=np.array([
+                    [0.89487603, 0.10512417],
+                    [0.77957238, 0.22042732],
+                    [0.73085017, 0.26914773],
+                    [0.79168959, 0.20831237],
                 ]),
             ),
         ],
@@ -482,8 +565,22 @@ class GenericModelTest(parameterized.TestCase):
     )
 
     analysis_html = analysis._repr_html_()
-    with open("/tmp/analysis.html", "w") as f:
-      f.write(analysis_html)
+    self.assertIn("Feature Variation", analysis_html)
+
+  def test_explain_prediction_adult_gbt_with_sub_features(self):
+    analysis = self.adult_binary_class_gbdt.analyze_prediction(
+        self.adult_binary_class_gbdt_test_ds[:1],
+        features=["occupation", "age"],
+    )
+
+    self.assertEqual(
+        str(analysis),
+        "A prediction analysis. Use a notebook cell to display the analysis."
+        " Alternatively, export the analysis with"
+        ' `analysis.to_file("analysis.html")`.',
+    )
+
+    analysis_html = analysis._repr_html_()
     self.assertIn("Feature Variation", analysis_html)
 
   def test_explain_prediction_adult_gbt_with_wrong_selection(self):
