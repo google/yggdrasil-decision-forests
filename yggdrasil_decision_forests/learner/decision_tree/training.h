@@ -28,13 +28,16 @@
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/gpu.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_scanner.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
@@ -45,6 +48,8 @@
 #include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests::model::decision_tree {
+
+struct InternalTrainConfig;
 
 // A collection of objects used by split-finding methods.
 //
@@ -222,23 +227,75 @@ struct PerThreadCache {
   std::vector<UnsignedExampleIdx> leaf_example_buffer;
 };
 
-// In a concurrent setup, this structure encapsulates all the objects that are
-// needed to communicate with splitter workers.
-struct SplitterConcurrencySetup {
-  // Whether concurrent execution has been enabled.
-  bool concurrent_execution;
-  // The number of threads available in the worker pool.
-  int num_threads;
-
-  // Distributed split finder.
-  std::unique_ptr<SplitterFinderStreamProcessor> split_finder_processor;
-};
-
 // Signature of a function that sets the value (i.e. the prediction) of a leaf
 // from the gradient label statistics.
 typedef std::function<absl::Status(const decision_tree::proto::LabelStatistics&,
                                    decision_tree::proto::Node*)>
     SetLeafValueFromLabelStatsFunctor;
+
+// Training configuration for internal parameters not available to the user
+// directly.
+struct InternalTrainConfig {
+  // How to set the leaf values. Used by all methods except layer-wise learning.
+  CreateSetLeafValueFunctor set_leaf_value_functor = SetLabelDistribution;
+
+  // If true, the split score relies on a hessian: ~gradient^2/hessian (+
+  // regularization). This is only possible for regression. Require
+  // hessian_leaf=true.
+  //
+  // If false, the split score is a classical decision tree score. e.g.,
+  // reduction of variance in the case of regression.
+  bool hessian_score = false;
+
+  // If true, the leaf relies on the hessian. This is only possible for
+  // regression.
+  bool hessian_leaf = false;
+
+  // Index of the hessian column in the dataset. Only used if hessian_leaf=true.
+  int hessian_col_idx = -1;
+
+  // Index of the gradient column in the dataset.  Only used if
+  // hessian_leaf=true.
+  int gradient_col_idx = -1;
+
+  // Regularization terms for hessian_score=true.
+  float hessian_l1 = 0.f;
+  float hessian_l2_numerical = 0.f;
+  float hessian_l2_categorical = 0.f;
+
+  // Number of attributes tested in parallel (using fiber threads).
+  int num_threads = 1;
+
+  // Non owning pointer to pre-processing information.
+  // Depending on the decision tree configuration this field might be required.
+  const Preprocessing* preprocessing = nullptr;
+
+  decision_tree::gpu::VectorSequenceComputer* vector_sequence_computer =
+      nullptr;
+
+  // If true, the list of selected example index ("selected_examples") can
+  // contain duplicated values. If false, all selected examples are expected to
+  // be unique.
+  bool duplicated_selected_examples = true;
+
+  // If set, the training of the tree will stop after this time, leading to an
+  // under-grow but valid decision tree. The growing strategy defines how the
+  // tree is "under-grown".
+  std::optional<absl::Time> timeout;
+
+  // If set, overrides the sorting_strategy.
+  std::optional<proto::DecisionTreeTrainingConfig::Internal::SortingStrategy>
+      override_sorting_strategy;
+
+  // Non-owning pointer to the split finder processor.
+  // If this is not null, the processor will be used for concurrent split
+  // finding.
+  // If this is null, execution will be single-threaded.
+  //
+  // split_finder_processor should be created with
+  // CreateSplitterFinderStreamProcessor.
+  SplitterFinderStreamProcessor* split_finder_processor = nullptr;
+};
 
 // Find the best condition for a leaf node. Return true if a condition better
 // than the one initially in `best_condition` was found. If `best_condition` is
@@ -253,7 +310,6 @@ absl::StatusOr<bool> FindBestCondition(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, PerThreadCache* cache);
@@ -270,7 +326,6 @@ absl::StatusOr<bool> FindBestConditionManager(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats, const NodeConstraints& constraints,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
@@ -297,15 +352,17 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats, const NodeConstraints& constraints,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     PerThreadCache* cache);
 
-// Starts the worker threads needed for "FindBestConditionConcurrentManager".
-absl::Status FindBestConditionStartWorkers(
-    SplitterConcurrencySetup* splitter_concurrency_setup);
+// Creates  and starts the worker threads needed for
+// "FindBestConditionConcurrentManager".
+// If `num_threads` is smaller than 2, returns a nullptr and does not
+// start any threads.
+std::unique_ptr<SplitterFinderStreamProcessor>
+CreateSplitterFinderStreamProcessor(int num_threads);
 
 // A worker that receives splitter work requests and dispatches those to the
 // right specialized splitter function.
@@ -850,7 +907,6 @@ absl::Status GrowTreeBestFirstGlobal(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights,
     const InternalTrainConfig& internal_config, NodeWithChildren* root,
     utils::RandomEngine* random,
@@ -872,7 +928,6 @@ absl::Status DecisionTreeCoreTrain(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights, utils::RandomEngine* random,
     const InternalTrainConfig& internal_config, DecisionTree* dt,
     absl::Span<UnsignedExampleIdx> selected_examples,
@@ -898,7 +953,6 @@ absl::Status NodeTrain(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights, int32_t depth,
     const InternalTrainConfig& internal_config,
     const NodeConstraints& constraints, bool set_leaf_already_set,

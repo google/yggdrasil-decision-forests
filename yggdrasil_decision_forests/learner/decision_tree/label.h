@@ -18,16 +18,13 @@
 
 #include <cstdint>
 #include <functional>
-#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"
-#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/gpu.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
@@ -145,61 +142,6 @@ void UpliftLabelDistToLeaf(const UpliftLabelDistribution& dist,
 // Copies the content on uplift categorical leaf output to a label distribution.
 void UpliftLeafToLabelDist(const decision_tree::proto::NodeUpliftOutput& leaf,
                            UpliftLabelDistribution* dist);
-
-// Training configuration for internal parameters not available to the user
-// directly.
-struct InternalTrainConfig {
-  // How to set the leaf values. Used by all methods except layer-wise learning.
-  CreateSetLeafValueFunctor set_leaf_value_functor = SetLabelDistribution;
-
-  // If true, the split score relies on a hessian: ~gradient^2/hessian (+
-  // regularization). This is only possible for regression. Require
-  // hessian_leaf=true.
-  //
-  // If false, the split score is a classical decision tree score. e.g.,
-  // reduction of variance in the case of regression.
-  bool hessian_score = false;
-
-  // If true, the leaf relies on the hessian. This is only possible for
-  // regression.
-  bool hessian_leaf = false;
-
-  // Index of the hessian column in the dataset. Only used if hessian_leaf=true.
-  int hessian_col_idx = -1;
-
-  // Index of the gradient column in the dataset.  Only used if
-  // hessian_leaf=true.
-  int gradient_col_idx = -1;
-
-  // Regularization terms for hessian_score=true.
-  float hessian_l1 = 0.f;
-  float hessian_l2_numerical = 0.f;
-  float hessian_l2_categorical = 0.f;
-
-  // Number of attributes tested in parallel (using fiber threads).
-  int num_threads = 1;
-
-  // Non owning pointer to pre-processing information.
-  // Depending on the decision tree configuration this field might be required.
-  const Preprocessing* preprocessing = nullptr;
-
-  decision_tree::gpu::VectorSequenceComputer* vector_sequence_computer =
-      nullptr;
-
-  // If true, the list of selected example index ("selected_examples") can
-  // contain duplicated values. If false, all selected examples are expected to
-  // be unique.
-  bool duplicated_selected_examples = true;
-
-  // If set, the training of the tree will stop after this time, leading to an
-  // under-grow but valid decision tree. The growing strategy defines how the
-  // tree is "under-grown".
-  std::optional<absl::Time> timeout;
-
-  // If set, overrides the sorting_strategy.
-  absl::optional<proto::DecisionTreeTrainingConfig::Internal::SortingStrategy>
-      override_sorting_strategy;
-};
 
 }  // namespace yggdrasil_decision_forests::model::decision_tree
 

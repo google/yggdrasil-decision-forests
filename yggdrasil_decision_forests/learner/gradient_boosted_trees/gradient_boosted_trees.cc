@@ -702,7 +702,13 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         typed_path, all_shards.size()));
   }
 
-  // Threadpool.
+  // Create multi-thread processor for splitting features.
+  // TODO: Optimize the number of threads.
+  auto split_finder_processor =
+      decision_tree::CreateSplitterFinderStreamProcessor(
+          deployment_.num_threads());
+
+  // Create Threadpool for the losses.
   std::unique_ptr<utils::concurrency::ThreadPool> thread_pool;
   if (deployment_.num_threads() > 1) {
     LOG(INFO) << "Create thread pool with " << deployment_.num_threads()
@@ -1016,7 +1022,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
       const auto internal_config = internal::BuildWeakLearnerInternalConfig(
           config, deployment().num_threads(), grad_idx,
           current_train_dataset->gradients, current_train_dataset->predictions,
-          begin_training);
+          begin_training, split_finder_processor.get());
 
       RETURN_IF_ERROR(decision_tree::Train(
           current_train_dataset->gradient_dataset, selected_examples,
@@ -1403,11 +1409,16 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   // Sorted deque of the past iterations with snapshots.
   std::deque<int> snapshots_idxs;
 
-  // Threadpool.
+  // Create multi-thread processor for splitting features.
+  // TODO: Optimize the number of threads.
+  auto split_finder_processor =
+      decision_tree::CreateSplitterFinderStreamProcessor(
+          deployment_.num_threads());
+  // Create Threadpool for the losses.
   std::unique_ptr<utils::concurrency::ThreadPool> thread_pool;
   if (deployment_.num_threads() > 1) {
     LOG(INFO) << "Create thread pool with " << deployment_.num_threads()
-              << " threads";
+              << " threads for loss computation";
     thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
         "GBTLossThreadpool", deployment_.num_threads());
     thread_pool->StartWorkers();
@@ -1507,7 +1518,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
 
       auto internal_config = internal::BuildWeakLearnerInternalConfig(
           config, deployment().num_threads(), grad_idx, gradients,
-          sub_train_predictions, begin_training);
+          sub_train_predictions, begin_training, split_finder_processor.get());
       internal_config.preprocessing = &preprocessing;
       if (vector_sequence_computer) {
         internal_config.vector_sequence_computer =
@@ -2550,7 +2561,8 @@ namespace internal {
 decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
     const internal::AllTrainingConfiguration& config, const int num_threads,
     const int grad_idx, const std::vector<GradientData>& gradients,
-    const std::vector<float>& predictions, const absl::Time& begin_training) {
+    const std::vector<float>& predictions, const absl::Time& begin_training,
+    decision_tree::SplitterFinderStreamProcessor* split_finder_processor) {
   // Timeout in the tree training.
   std::optional<absl::Time> timeout;
   if (config.train_config.has_maximum_training_duration_seconds()) {
@@ -2574,6 +2586,7 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
   internal_config.num_threads = num_threads;
   internal_config.duplicated_selected_examples = false;
   internal_config.timeout = timeout;
+  internal_config.split_finder_processor = split_finder_processor;
   return internal_config;
 }
 

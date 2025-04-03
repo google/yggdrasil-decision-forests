@@ -215,7 +215,8 @@ namespace internal {
 decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
     const internal::AllTrainingConfiguration& config, const int num_threads,
     const int grad_idx, const std::vector<GradientData>& gradients,
-    const std::vector<float>& predictions, const absl::Time& begin_training);
+    const std::vector<float>& predictions, const absl::Time& begin_training,
+    decision_tree::SplitterFinderStreamProcessor* split_finder_processor);
 
 // Divide "dataset" into a training and a validation dataset.
 //

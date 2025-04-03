@@ -1463,7 +1463,6 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats, const NodeConstraints& constraints,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
@@ -1497,8 +1496,13 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   // This method guarantees that the jobs/splits are processed in order.
   //
   // Note that next_job_to_process < next_job_to_schedule always holds.
-
-  const int num_threads = splitter_concurrency_setup.num_threads;
+  if (internal_config.split_finder_processor == nullptr) {
+    return absl::InternalError(
+        absl::Substitute("Multi-threaded execution requested but no worker "
+                         "threads created. Expected $0 threads",
+                         internal_config.num_threads));
+  }
+  const int num_threads = internal_config.num_threads;
 
   if (config_link.features().empty()) {
     return false;
@@ -1587,7 +1591,7 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   std::unique_ptr<proto::NodeCondition> best_condition_ptr;
 
   // Get Channel readers and writers.
-  auto& processor = *splitter_concurrency_setup.split_finder_processor;
+  auto& processor = *(internal_config.split_finder_processor);
 
   // Number of jobs currently scheduled.
   int num_in_flight = 0;
@@ -1765,17 +1769,15 @@ absl::StatusOr<bool> FindBestConditionManager(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const LabelStats& label_stats, const NodeConstraints& constraints,
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     PerThreadCache* cache) {
-  if (splitter_concurrency_setup.concurrent_execution) {
-    // Multi-thread.
+  if (internal_config.split_finder_processor != nullptr) {
     return FindBestConditionConcurrentManager(
         train_dataset, selected_examples, weights, config, config_link,
-        dt_config, splitter_concurrency_setup, parent, internal_config,
-        label_stats, constraints, best_condition, random, cache);
+        dt_config, parent, internal_config, label_stats, constraints,
+        best_condition, random, cache);
   }
 
   // Single thread.
@@ -1792,7 +1794,6 @@ absl::StatusOr<bool> FindBestCondition(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const proto::Node& parent, const InternalTrainConfig& internal_config,
     const NodeConstraints& constraints, proto::NodeCondition* best_condition,
     utils::RandomEngine* random, PerThreadCache* cache) {
@@ -1820,10 +1821,10 @@ absl::StatusOr<bool> FindBestCondition(
                          "\" contain out-of-dictionary (=0) values."));
       }
 
-      return FindBestConditionManager(
-          train_dataset, selected_examples, weights, config, config_link,
-          dt_config, splitter_concurrency_setup, parent, internal_config,
-          label_stat, constraints, best_condition, random, cache);
+      return FindBestConditionManager(train_dataset, selected_examples, weights,
+                                      config, config_link, dt_config, parent,
+                                      internal_config, label_stat, constraints,
+                                      best_condition, random, cache);
     } break;
 
     case model::proto::Task::REGRESSION: {
@@ -1851,8 +1852,8 @@ absl::StatusOr<bool> FindBestCondition(
 
         return FindBestConditionManager(
             train_dataset, selected_examples, weights, config, config_link,
-            dt_config, splitter_concurrency_setup, parent, internal_config,
-            label_stat, constraints, best_condition, random, cache);
+            dt_config, parent, internal_config, label_stat, constraints,
+            best_condition, random, cache);
       } else {
         ASSIGN_OR_RETURN(const auto labels,
                          train_dataset.ColumnWithCastWithStatus<
@@ -1865,8 +1866,8 @@ absl::StatusOr<bool> FindBestCondition(
 
         return FindBestConditionManager(
             train_dataset, selected_examples, weights, config, config_link,
-            dt_config, splitter_concurrency_setup, parent, internal_config,
-            label_stat, constraints, best_condition, random, cache);
+            dt_config, parent, internal_config, label_stat, constraints,
+            best_condition, random, cache);
       }
     } break;
 
@@ -1895,10 +1896,10 @@ absl::StatusOr<bool> FindBestCondition(
 
       UpliftLeafToLabelDist(parent.uplift(), &label_stat.label_distribution);
 
-      return FindBestConditionManager(
-          train_dataset, selected_examples, weights, config, config_link,
-          dt_config, splitter_concurrency_setup, parent, internal_config,
-          label_stat, constraints, best_condition, random, cache);
+      return FindBestConditionManager(train_dataset, selected_examples, weights,
+                                      config, config_link, dt_config, parent,
+                                      internal_config, label_stat, constraints,
+                                      best_condition, random, cache);
     } break;
 
     case model::proto::Task::NUMERICAL_UPLIFT: {
@@ -1922,10 +1923,10 @@ absl::StatusOr<bool> FindBestCondition(
 
       UpliftLeafToLabelDist(parent.uplift(), &label_stat.label_distribution);
 
-      return FindBestConditionManager(
-          train_dataset, selected_examples, weights, config, config_link,
-          dt_config, splitter_concurrency_setup, parent, internal_config,
-          label_stat, constraints, best_condition, random, cache);
+      return FindBestConditionManager(train_dataset, selected_examples, weights,
+                                      config, config_link, dt_config, parent,
+                                      internal_config, label_stat, constraints,
+                                      best_condition, random, cache);
     } break;
 
     default:
@@ -4034,7 +4035,6 @@ absl::Status GrowTreeBestFirstGlobal(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights,
     const InternalTrainConfig& internal_config, NodeWithChildren* root,
     utils::RandomEngine* random,
@@ -4110,9 +4110,8 @@ absl::Status GrowTreeBestFirstGlobal(
     ASSIGN_OR_RETURN(
         const auto has_better_condition,
         FindBestCondition(train_dataset, example_idxs.active, weights, config,
-                          config_link, dt_config, splitter_concurrency_setup,
-                          node->node(), internal_config, {}, &condition, random,
-                          &cache));
+                          config_link, dt_config, node->node(), internal_config,
+                          {}, &condition, random, &cache));
     if (!has_better_condition) {
       // No good condition found. Close the branch.
       node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
@@ -4325,28 +4324,19 @@ absl::Status DecisionTreeTrain(
                                      absl::MakeSpan(leaf_examples.value()))
                                : std::nullopt;
 
-  SplitterConcurrencySetup splitter_concurrency_setup;
-  if (internal_config.num_threads <= 1) {
-    splitter_concurrency_setup.concurrent_execution = false;
-    return DecisionTreeCoreTrain(
-        train_dataset, config, config_link, dt_config, deployment,
-        splitter_concurrency_setup, weights, random, internal_config, dt,
-        absl::MakeSpan(working_selected_examples), leaf_example_span);
-  } else {
-    splitter_concurrency_setup.concurrent_execution = true;
-    splitter_concurrency_setup.num_threads = internal_config.num_threads;
-  }
-
-  RETURN_IF_ERROR(FindBestConditionStartWorkers(&splitter_concurrency_setup));
-
-  return DecisionTreeCoreTrain(
-      train_dataset, config, config_link, dt_config, deployment,
-      splitter_concurrency_setup, weights, random, internal_config, dt,
-      absl::MakeSpan(working_selected_examples), leaf_example_span);
+  return DecisionTreeCoreTrain(train_dataset, config, config_link, dt_config,
+                               deployment, weights, random, internal_config, dt,
+                               absl::MakeSpan(working_selected_examples),
+                               leaf_example_span);
 }
 
-absl::Status FindBestConditionStartWorkers(
-    SplitterConcurrencySetup* splitter_concurrency_setup) {
+std::unique_ptr<SplitterFinderStreamProcessor>
+CreateSplitterFinderStreamProcessor(int num_threads) {
+  if (num_threads <= 1) {
+    return nullptr;
+  }
+  LOG(INFO) << "Create processor with " << num_threads
+            << " threads for split computation";
   auto find_condition =
       [](SplitterWorkRequest request) -> absl::StatusOr<SplitterWorkResponse> {
     const auto& common = *(request.common);
@@ -4357,12 +4347,11 @@ absl::Status FindBestConditionStartWorkers(
         common.weights, common.config, common.config_link, common.dt_config,
         common.internal_config, request);
   };
-  splitter_concurrency_setup->split_finder_processor =
-      std::make_unique<SplitterFinderStreamProcessor>(
-          "SplitFinder", splitter_concurrency_setup->num_threads,
-          find_condition);
-  splitter_concurrency_setup->split_finder_processor->StartWorkers();
-  return absl::OkStatus();
+  auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+      "SplitFinder", num_threads, find_condition);
+  split_finder_processor->StartWorkers();
+
+  return split_finder_processor;
 }
 
 absl::Status DecisionTreeCoreTrain(
@@ -4371,7 +4360,6 @@ absl::Status DecisionTreeCoreTrain(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights, utils::RandomEngine* random,
     const InternalTrainConfig& internal_config, DecisionTree* dt,
     absl::Span<UnsignedExampleIdx> selected_examples,
@@ -4391,15 +4379,15 @@ absl::Status DecisionTreeCoreTrain(
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyLocal: {
       const auto constraints = NodeConstraints::CreateNodeConstraints();
       return NodeTrain(train_dataset, config, config_link, dt_config,
-                       deployment, splitter_concurrency_setup, weights, 1,
-                       internal_config, constraints, false, dt->mutable_root(),
-                       random, &cache, selected_examples_rb, leaf_examples_rb);
+                       deployment, weights, 1, internal_config, constraints,
+                       false, dt->mutable_root(), random, &cache,
+                       selected_examples_rb, leaf_examples_rb);
     } break;
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyBestFirstGlobal:
       return GrowTreeBestFirstGlobal(
-          train_dataset, config, config_link, dt_config, deployment,
-          splitter_concurrency_setup, weights, internal_config,
-          dt->mutable_root(), random, selected_examples_rb, leaf_examples_rb);
+          train_dataset, config, config_link, dt_config, deployment, weights,
+          internal_config, dt->mutable_root(), random, selected_examples_rb,
+          leaf_examples_rb);
       break;
     default:
       return absl::InvalidArgumentError("Grow strategy not set");
@@ -4412,7 +4400,6 @@ absl::Status NodeTrain(
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const std::vector<float>& weights, const int32_t depth,
     const InternalTrainConfig& internal_config,
     const NodeConstraints& constraints, bool set_leaf_already_set,
@@ -4492,11 +4479,11 @@ absl::Status NodeTrain(
 
   ASSIGN_OR_RETURN(
       const auto has_better_condition,
-      FindBestCondition(
-          *train_dataset_for_splitter, selected_examples_for_splitter, weights,
-          config, config_link, dt_config, splitter_concurrency_setup,
-          node->node(), internal_config, constraints,
-          node->mutable_node()->mutable_condition(), random, cache));
+      FindBestCondition(*train_dataset_for_splitter,
+                        selected_examples_for_splitter, weights, config,
+                        config_link, dt_config, node->node(), internal_config,
+                        constraints, node->mutable_node()->mutable_condition(),
+                        random, cache));
   if (!has_better_condition) {
     // No good condition found. Close the branch.
     node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
@@ -4564,26 +4551,24 @@ absl::Status NodeTrain(
   }
 
   // Positive child.
-  RETURN_IF_ERROR(
-      NodeTrain(train_dataset, config, config_link, dt_config, deployment,
-                splitter_concurrency_setup, weights, depth + 1, internal_config,
-                pos_constraints, true, node->mutable_pos_child(), random, cache,
-                example_split.positive_examples,
-                node_only_example_split.has_value()
-                    ? std::optional<SelectedExamplesRollingBuffer>(
-                          node_only_example_split->positive_examples)
-                    : std::nullopt));
+  RETURN_IF_ERROR(NodeTrain(
+      train_dataset, config, config_link, dt_config, deployment, weights,
+      depth + 1, internal_config, pos_constraints, true,
+      node->mutable_pos_child(), random, cache, example_split.positive_examples,
+      node_only_example_split.has_value()
+          ? std::optional<SelectedExamplesRollingBuffer>(
+                node_only_example_split->positive_examples)
+          : std::nullopt));
 
   // Negative child.
-  RETURN_IF_ERROR(
-      NodeTrain(train_dataset, config, config_link, dt_config, deployment,
-                splitter_concurrency_setup, weights, depth + 1, internal_config,
-                neg_constraints, true, node->mutable_neg_child(), random, cache,
-                example_split.negative_examples,
-                node_only_example_split.has_value()
-                    ? std::optional<SelectedExamplesRollingBuffer>(
-                          node_only_example_split->negative_examples)
-                    : std::nullopt));
+  RETURN_IF_ERROR(NodeTrain(
+      train_dataset, config, config_link, dt_config, deployment, weights,
+      depth + 1, internal_config, neg_constraints, true,
+      node->mutable_neg_child(), random, cache, example_split.negative_examples,
+      node_only_example_split.has_value()
+          ? std::optional<SelectedExamplesRollingBuffer>(
+                node_only_example_split->negative_examples)
+          : std::nullopt));
   return absl::OkStatus();
 }
 

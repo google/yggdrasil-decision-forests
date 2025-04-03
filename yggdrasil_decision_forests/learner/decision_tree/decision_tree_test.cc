@@ -706,8 +706,8 @@ TEST(DecisionTree, FindBestConditionClassification) {
   proto::NodeCondition condition;
   PerThreadCache cache;
   EXPECT_TRUE(FindBestCondition(dataset, selected_examples, weights, config,
-                                config_link, dt_config, {}, tree.root().node(),
-                                {}, {}, &condition, &random, &cache)
+                                config_link, dt_config, tree.root().node(), {},
+                                {}, &condition, &random, &cache)
                   .value());
 
   // We test that a condition was created on attribute 0 or 1 (non
@@ -2130,12 +2130,11 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
 
   proto::NodeCondition best_condition;
 
-  SplitterConcurrencySetup setup{
-      .num_threads = internal_config.num_threads,
-      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-          "SplitFinder", internal_config.num_threads,
-          FakeFindBestConditionConcurrentConsumerMultiplicative)};
-  setup.split_finder_processor->StartWorkers();
+  auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+      "SplitFinder", internal_config.num_threads,
+      FakeFindBestConditionConcurrentConsumerMultiplicative);
+  split_finder_processor->StartWorkers();
+  internal_config.split_finder_processor = split_finder_processor.get();
 
   // Test case: Features are valid and scores are based on feature id, but
   // current best node has a high score.
@@ -2144,7 +2143,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
 
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats, {},
+                    dt_config, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2170,18 +2169,17 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
 
   proto::NodeCondition best_condition;
 
-  SplitterConcurrencySetup setup{
-      .num_threads = internal_config.num_threads,
-      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-          "SplitFinder", internal_config.num_threads,
-          FakeFindBestConditionConcurrentConsumerAlwaysInvalid)};
-  setup.split_finder_processor->StartWorkers();
+  auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+      "SplitFinder", internal_config.num_threads,
+      FakeFindBestConditionConcurrentConsumerAlwaysInvalid);
+  split_finder_processor->StartWorkers();
+  internal_config.split_finder_processor = split_finder_processor.get();
 
   // Test case: All features are invalid.
   best_condition.set_split_score(0.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats, {},
+                    dt_config, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2210,12 +2208,11 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
 
   proto::NodeCondition best_condition;
 
-  SplitterConcurrencySetup setup{
-      .num_threads = internal_config.num_threads,
-      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-          "SplitFinder", internal_config.num_threads,
-          FakeFindBestConditionConcurrentConsumerMultiplicative)};
-  setup.split_finder_processor->StartWorkers();
+  auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+      "SplitFinder", internal_config.num_threads,
+      FakeFindBestConditionConcurrentConsumerMultiplicative);
+  split_finder_processor->StartWorkers();
+  internal_config.split_finder_processor = split_finder_processor.get();
 
   // Test case: Features are valid and scores are based on feature id, but
   // current best node has a high score.
@@ -2223,7 +2220,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
   best_condition.set_split_score(1000.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats, {},
+                    dt_config, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2234,7 +2231,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
   best_condition.set_split_score(0.f);
   result = FindBestConditionConcurrentManager(
                dataset, selected_examples, weights, config, config_link,
-               dt_config, setup, parent, internal_config, label_stats, {},
+               dt_config, parent, internal_config, label_stats, {},
                &best_condition, &random, &cache)
                .value();
 
@@ -2263,19 +2260,18 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Alternate) {
 
   proto::NodeCondition best_condition;
 
-  SplitterConcurrencySetup setup{
-      .num_threads = internal_config.num_threads,
-      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-          "SplitFinder", internal_config.num_threads,
-          FakeFindBestConditionConcurrentConsumerAlternate)};
-  setup.split_finder_processor->StartWorkers();
+  auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+      "SplitFinder", internal_config.num_threads,
+      FakeFindBestConditionConcurrentConsumerAlternate);
+  split_finder_processor->StartWorkers();
+  internal_config.split_finder_processor = split_finder_processor.get();
 
   // Test case: Features alternate between valid and invalid.
   random.seed(1234);
   best_condition.set_split_score(0.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats, {},
+                    dt_config, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2303,20 +2299,18 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
 
   proto::NodeCondition best_condition;
 
-  SplitterConcurrencySetup setup{
-      .concurrent_execution = true,
-      .num_threads = internal_config.num_threads,
-      .split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-          "SplitFinder", internal_config.num_threads,
-          FakeFindBestConditionConcurrentConsumerAlternate)};
-  setup.split_finder_processor->StartWorkers();
+  auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
+      "SplitFinder", internal_config.num_threads,
+      FakeFindBestConditionConcurrentConsumerAlternate);
+  split_finder_processor->StartWorkers();
+  internal_config.split_finder_processor = split_finder_processor.get();
 
   // Test case: Features alternate between valid and invalid, and processed in
   // reverse order.
   best_condition.set_split_score(1000.f);
   bool result = FindBestConditionConcurrentManager(
                     dataset, selected_examples, weights, config, config_link,
-                    dt_config, setup, parent, internal_config, label_stats, {},
+                    dt_config, parent, internal_config, label_stats, {},
                     &best_condition, &random, &cache)
                     .value();
 
@@ -2328,7 +2322,7 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
   best_condition.set_split_score(0.f);
   result = FindBestConditionConcurrentManager(
                dataset, selected_examples, weights, config, config_link,
-               dt_config, setup, parent, internal_config, label_stats, {},
+               dt_config, parent, internal_config, label_stats, {},
                &best_condition, &random, &cache)
                .value();
   EXPECT_TRUE(result);

@@ -25,6 +25,7 @@ cc_library_ydf(
     ],
     deps = [
         ":decision_tree_cc_proto",
+        ":gpu",
         ":label",
         ":preprocessing",
         ":splitter",
@@ -76,12 +77,11 @@ cc_library_ydf(
     srcs = ["label.cc"],
     hdrs = ["label.h"],
     deps = [
-        ":gpu",
-        ":preprocessing",
         ":splitter",
         ":uplift",
         "//yggdrasil_decision_forests/dataset:types",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/utils:distribution",
@@ -89,7 +89,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
-        "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
     ],
 )
