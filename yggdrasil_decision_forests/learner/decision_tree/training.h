@@ -98,6 +98,11 @@ struct SplitterWorkRequestCommon {
   const proto::Node& parent;
   const LabelStats& label_stats;
   const NodeConstraints& constraints;
+  const std::vector<float>& weights;
+  const model::proto::TrainingConfig& config;
+  const model::proto::TrainingConfigLinking& config_link;
+  const proto::DecisionTreeTrainingConfig& dt_config;
+  const InternalTrainConfig& internal_config;
 };
 
 // Data packed with the work request that can be used by the manager to pass
@@ -300,11 +305,6 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
 
 // Starts the worker threads needed for "FindBestConditionConcurrentManager".
 absl::Status FindBestConditionStartWorkers(
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config,
-    const InternalTrainConfig& internal_config,
-    const std::vector<float>& weights,
     SplitterConcurrencySetup* splitter_concurrency_setup);
 
 // A worker that receives splitter work requests and dispatches those to the
@@ -316,7 +316,6 @@ absl::StatusOr<SplitterWorkResponse> FindBestConditionFromSplitterWorkRequest(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const InternalTrainConfig& internal_config,
     const SplitterWorkRequest& request);
 

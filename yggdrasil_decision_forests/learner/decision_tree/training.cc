@@ -1202,7 +1202,6 @@ absl::StatusOr<SplitterWorkResponse> FindBestConditionFromSplitterWorkRequest(
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
-    const SplitterConcurrencySetup& splitter_concurrency_setup,
     const InternalTrainConfig& internal_config,
     const SplitterWorkRequest& request) {
   SplitterWorkResponse response;
@@ -1512,6 +1511,11 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
       .parent = parent,
       .label_stats = label_stats,
       .constraints = constraints,
+      .weights = weights,
+      .config = config,
+      .config_link = config_link,
+      .dt_config = dt_config,
+      .internal_config = internal_config,
   };
 
   // Computes the number of oblique projections to evaluate and how to group
@@ -4333,9 +4337,7 @@ absl::Status DecisionTreeTrain(
     splitter_concurrency_setup.num_threads = internal_config.num_threads;
   }
 
-  RETURN_IF_ERROR(FindBestConditionStartWorkers(config, config_link, dt_config,
-                                                internal_config, weights,
-                                                &splitter_concurrency_setup));
+  RETURN_IF_ERROR(FindBestConditionStartWorkers(&splitter_concurrency_setup));
 
   return DecisionTreeCoreTrain(
       train_dataset, config, config_link, dt_config, deployment,
@@ -4344,21 +4346,16 @@ absl::Status DecisionTreeTrain(
 }
 
 absl::Status FindBestConditionStartWorkers(
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config,
-    const InternalTrainConfig& internal_config,
-    const std::vector<float>& weights,
     SplitterConcurrencySetup* splitter_concurrency_setup) {
   auto find_condition =
-      [&, splitter_concurrency_setup](
-          SplitterWorkRequest request) -> absl::StatusOr<SplitterWorkResponse> {
-    if (dt_config.internal().generate_fake_error_in_splitter()) {
+      [](SplitterWorkRequest request) -> absl::StatusOr<SplitterWorkResponse> {
+    const auto& common = *(request.common);
+    if (common.dt_config.internal().generate_fake_error_in_splitter()) {
       return absl::InternalError("Fake error");
     }
     return FindBestConditionFromSplitterWorkRequest(
-        weights, config, config_link, dt_config, *splitter_concurrency_setup,
-        internal_config, request);
+        common.weights, common.config, common.config_link, common.dt_config,
+        common.internal_config, request);
   };
   splitter_concurrency_setup->split_finder_processor =
       std::make_unique<SplitterFinderStreamProcessor>(
