@@ -17,8 +17,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <iterator>
 #include <memory>
+#include <regex>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -266,7 +268,6 @@ from $0yggdrasil_decision_forests.dataset import data_spec_pb2
 from $0yggdrasil_decision_forests.learner import abstract_learner_pb2
 from $1dataset import dataset
 from $1dataset import dataspec
-from $1learner import custom_loss
 from $1learner import generic_learner
 from $1learner import hyperparameters
 from $1learner import tuner as tuner_lib
@@ -448,6 +449,8 @@ absl::StatusOr<std::string> GenSingleLearnerWrapper(
       are not exposed as constructor arguments. Parameters in
       extra_training_config have higher priority as the constructor arguments.
 )";
+  RETURN_IF_ERROR(
+      FixDefaultFieldsDocumentation(&fields_documentation, learner_key));
   // Constructor arguments.
   std::string fields_constructor =
       absl::Substitute(R"(
@@ -849,6 +852,38 @@ $8
   }
 
   return wrapper;
+}
+
+absl::Status FixDefaultFieldsDocumentation(std::string* fields_documentation,
+                                           absl::string_view learner_key) {
+  if (learner_key == "DISTRIBUTED_GRADIENT_BOOSTED_TREES") {
+    const std::string start_marker = "    discretize_numerical_columns:";
+    const std::string replacement_string =
+        "    discretize_numerical_columns: For distributed training, use "
+        "`force_numerical_discretization` instead.\n    ";
+
+    size_t start_pos = fields_documentation->find(start_marker);
+    if (start_pos == std::string::npos) {
+      return absl::InvalidArgumentError(
+          "Missing documentation for discretize_numerical_columns");
+    }
+    std::regex end_pattern("\\n {4}[^ \\t\\n\\r\\f\\v]");
+    auto search_start_it =
+        fields_documentation->cbegin() + start_pos + start_marker.length();
+    std::smatch match;
+    size_t end_pos;
+
+    if (std::regex_search(search_start_it, fields_documentation->cend(), match,
+                          end_pattern)) {
+      end_pos = std::distance(fields_documentation->cbegin(), match[0].first);
+      size_t length = end_pos - start_pos;
+      fields_documentation->replace(start_pos, length, replacement_string);
+    } else {
+      return absl::InvalidArgumentError(
+          "End of documentation for discretize_numerical_columns not found.");
+    }
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace internal

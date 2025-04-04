@@ -37,6 +37,7 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -250,7 +251,7 @@ DistributedGradientBoostedTreesLearner::TrainWithStatusImpl(
       proto::distributed_gradient_boosted_trees_config);
   RETURN_IF_ERROR(internal::SetDefaultHyperParameters(config, config_link,
                                                       data_spec, &spe_config));
-  RETURN_IF_ERROR(internal::CheckConfiguration(deployment_));
+  RETURN_IF_ERROR(internal::CheckConfiguration(deployment_, data_spec));
 
   // Working directory.
   auto work_directory = deployment().cache_path();
@@ -334,7 +335,8 @@ absl::Status SetDefaultHyperParameters(
 }
 
 absl::Status CheckConfiguration(
-    const model::proto::DeploymentConfig& deployment) {
+    const model::proto::DeploymentConfig& deployment,
+    const dataset::proto::DataSpecification& data_spec) {
   if (deployment.cache_path().empty()) {
     return absl::InvalidArgumentError(
         "deployment.cache_path is empty. Please provide a cache directory with "
@@ -344,6 +346,25 @@ absl::Status CheckConfiguration(
     return absl::InvalidArgumentError(
         "deployment.distribute.working_directory should be empty. Use "
         "deployment.cache_path to specify the cache directory.");
+  }
+  // Catch columns of type DISCRETIZED_NUMERICAL.
+  std::vector<std::string> discretized_numerical_columns;
+  for (const auto& column : data_spec.columns()) {
+    if (column.type() == dataset::proto::DISCRETIZED_NUMERICAL) {
+      discretized_numerical_columns.push_back(column.name());
+    }
+  }
+  if (!discretized_numerical_columns.empty()) {
+    const auto columns_str = absl::StrJoin(discretized_numerical_columns, ", ");
+    return absl::InvalidArgumentError(absl::Substitute(
+        "The semantic of columns $0 is DISCRETIZED_NUMERICAL semantic (In "
+        "Python, this might be done thought the `features=` or "
+        "`discretize_numerical_columns=` constructor argument).\nThe "
+        "Distributed Gradient Boosted Trees learner does not support "
+        "DISCRETIZED_NUMERICAL features. Make the feature NUMERICAL.\nTo train "
+        "a model with numerical discretization (this is often much faster),  "
+        "set the hyper-parameter `force_numerical_discretization=true`.",
+        columns_str));
   }
   return absl::OkStatus();
 }

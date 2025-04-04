@@ -48,6 +48,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -242,9 +243,10 @@ absl::Status SetDefaultHyperParameters(
     proto::DistributedGradientBoostedTreesTrainingConfig* spe_config);
 
 absl::Status CheckConfiguration(
-    const model::proto::DeploymentConfig& deployment);
+    const model::proto::DeploymentConfig& deployment,
+    const dataset::proto::DataSpecification& data_spec);
 
-// Create the dataset cache (i.e. indexed dataset values) from a generic datast
+// Create the dataset cache (i.e. indexed dataset values) from a generic dataset
 // path.
 absl::Status CreateDatasetCache(
     const model::proto::DeploymentConfig& deployment,

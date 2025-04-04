@@ -24,11 +24,14 @@
 #include "gtest/gtest.h"
 #include "absl/debugging/leak_check.h"
 #include "absl/log/log.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -45,6 +48,10 @@ namespace distributed_gradient_boosted_trees {
 namespace {
 
 using test::EqualsProto;
+using ::testing::AllOf;
+using ::testing::HasSubstr;
+using ::testing::Not;
+using ::testing::status::StatusIs;
 
 class DatasetAdult : public utils::TrainAndTestTester {
  public:
@@ -604,6 +611,40 @@ class DatasetSyntheticRanking : public utils::TrainAndTestTester {
 TEST_F(DatasetSyntheticRanking, Base) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7018, 0.0258, 0.7058);
+}
+
+TEST(CheckConfiguration, SuccessIfNoDiscretization) {
+  dataset::proto::DataSpecification data_spec;
+  data_spec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "num" }
+    columns { type: CATEGORICAL name: "cat" }
+    columns { type: HASH name: "hash" }
+    columns { type: CATEGORICAL_SET name: "catset" }
+  )pb");
+  model::proto::DeploymentConfig deployment_config;
+  deployment_config.set_cache_path(
+      file::JoinPath(test::TmpDirectory(), "working_directory"));
+  EXPECT_OK(internal::CheckConfiguration(deployment_config, data_spec));
+}
+
+TEST(CheckConfiguration, FailsIfDiscretization) {
+  dataset::proto::DataSpecification data_spec;
+  data_spec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "classic_numerical" }
+    columns { type: DISCRETIZED_NUMERICAL name: "discnum1" }
+    columns { type: DISCRETIZED_NUMERICAL name: "discnum2" }
+    columns { type: CATEGORICAL name: "categorical" }
+  )pb");
+  model::proto::DeploymentConfig deployment_config;
+  deployment_config.set_cache_path(
+      file::JoinPath(test::TmpDirectory(), "working_directory"));
+  const auto check_configuration_result =
+      internal::CheckConfiguration(deployment_config, data_spec);
+  EXPECT_THAT(check_configuration_result,
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       AllOf(HasSubstr("discnum1"), HasSubstr("discnum2"),
+                             Not(HasSubstr("classic_numerical")),
+                             Not(HasSubstr("categorical")))));
 }
 
 }  // namespace

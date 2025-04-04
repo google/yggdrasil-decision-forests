@@ -189,7 +189,6 @@ py_library(
     srcs = ["specialized_learners_pre_generated.py"],
     deps = [
         ":abstract_feature_selector",
-        ":custom_loss_py",
         ":generic_learner",
         ":hyperparameters",
         ":tuner",

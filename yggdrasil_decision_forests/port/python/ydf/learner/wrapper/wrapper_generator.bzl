@@ -72,7 +72,6 @@ def py_wrap_yggdrasil_learners(
             "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
             "//ydf/dataset:dataset",
             "//ydf/dataset:dataspec",
-            "//ydf/learner:custom_loss_py",
             "//ydf/learner:generic_learner",
             "//ydf/learner:hyperparameters",
             "//ydf/learner:tuner",

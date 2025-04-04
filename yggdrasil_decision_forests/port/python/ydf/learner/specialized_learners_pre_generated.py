@@ -39,7 +39,6 @@ from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
-from ydf.learner import custom_loss
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
@@ -152,14 +151,14 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       not exposed as constructor arguments. Parameters in extra_training_config
       have higher priority as the constructor arguments.
     adapt_bootstrap_size_ratio_for_maximum_training_duration: Control how the
-      maximum training duration (if set) is applied. If false, the training stop
-      when the time is used. If true, adapts the size of the sampled dataset
-      used to train each tree such that `num_trees` will train within
+      maximum training duration (if set) is applied. If false, the training
+      stops when the time is used. If true, adapts the size of the sampled
+      dataset used to train each tree such that `num_trees` will train within
       `maximum_training_duration`. Has no effect if there is no maximum training
       duration specified. Default: False.
     allow_na_conditions: If true, the tree training evaluates conditions of the
       type `X is NA` i.e. `X is missing`. Default: False.
-    bootstrap_size_ratio: Number of examples used to train each trees; expressed
+    bootstrap_size_ratio: Number of examples used to train each tree; expressed
       as a ratio of the training dataset size. Default: 1.0.
     bootstrap_training_dataset: If true (default), each tree is trained on a
       separate dataset sampled with replacement from the original dataset. If
@@ -176,14 +175,14 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       dictionary), the "random" algorithm is a good alternative. - `ONE_HOT`:
       One-hot encoding. Find the optimal categorical split of the form
       "attribute == param". This method is similar (but more efficient) than
-      converting converting each possible categorical value into a boolean
-      feature. This method is available for comparison purpose and generally
-      performs worse than other alternatives. - `RANDOM`: Best splits among a
-      set of random candidate. Find the a categorical split of the form "value
-      \\in mask" using a random search. This solution can be seen as an
-      approximation of the CART algorithm. This method is a strong alternative
-      to CART. This algorithm is inspired from section "5.1 Categorical
-      Variables" of "Random Forest", 2001.
+      converting each possible categorical value into a boolean feature. This
+      method is available for comparison purpose and generally performs worse
+      than other alternatives. - `RANDOM`: Best splits among a set of random
+      candidate. Find the a categorical split of the form "value \\in mask"
+      using a random search. This solution can be seen as an approximation of
+      the CART algorithm. This method is a strong alternative to CART. This
+      algorithm is inspired from section "5.1 Categorical Variables" of "Random
+      Forest", 2001.
         Default: "CART".
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
@@ -343,7 +342,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       for choosing a split, where p is the number of numerical features.
       Increasing "max_num_projections" increases the training time but not the
       inference time. In late stage model development, if every bit of accuracy
-      if important, increase this value. The paper "Sparse Projection Oblique
+      is important, increase this value. The paper "Sparse Projection Oblique
       Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
       Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
@@ -356,8 +355,8 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
     sparse_oblique_num_projections_exponent: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
       to test at each node. Increasing this value very likely improves the
-      quality of the model, drastically increases the training time, and doe not
-      impact the inference time. Oblique splits try out
+      quality of the model, drastically increases the training time, and does
+      not impact the inference time. Oblique splits try out
       max(p^num_projections_exponent, max_num_projections) random projections
       for choosing a split, where p is the number of numerical features.
       Therefore, increasing this `num_projections_exponent` and possibly
@@ -412,7 +411,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
       `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
       "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
-      et al., 2029 Default: "AXIS_ALIGNED".
+      et al., 2019 Default: "AXIS_ALIGNED".
     uplift_min_examples_in_treatment: For uplift models only. Minimum number of
       examples per treatment in a node. Default: 5.
     uplift_split_score: For uplift models only. Splitter score i.e. score
@@ -1242,8 +1241,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       not exposed as constructor arguments. Parameters in extra_training_config
       have higher priority as the constructor arguments.
     adapt_subsample_for_maximum_training_duration: Control how the maximum
-      training duration (if set) is applied. If false, the training stop when
-      the time is used. If true, the size of the sampled datasets used train
+      training duration (if set) is applied. If false, the training stops when
+      the time is used. If true, the size of the sampled datasets used to train
       individual trees are adapted dynamically so that all the trees are trained
       in time. Default: False.
     allow_na_conditions: If true, the tree training evaluates conditions of the
@@ -1251,7 +1250,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     apply_link_function: If true, applies the link function (a.k.a. activation
       function), if any, before returning the model prediction. If false,
       returns the pre-link function model output. For example, in the case of
-      binary classification, the pre-link function output is a logic while the
+      binary classification, the pre-link function output is a logit while the
       post-link function is a probability. Default: True.
     categorical_algorithm: How to learn splits on categorical attributes. -
       `CART`: CART algorithm. Find categorical splits of the form "value \\in
@@ -1261,14 +1260,14 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       dictionary), the "random" algorithm is a good alternative. - `ONE_HOT`:
       One-hot encoding. Find the optimal categorical split of the form
       "attribute == param". This method is similar (but more efficient) than
-      converting converting each possible categorical value into a boolean
-      feature. This method is available for comparison purpose and generally
-      performs worse than other alternatives. - `RANDOM`: Best splits among a
-      set of random candidate. Find the a categorical split of the form "value
-      \\in mask" using a random search. This solution can be seen as an
-      approximation of the CART algorithm. This method is a strong alternative
-      to CART. This algorithm is inspired from section "5.1 Categorical
-      Variables" of "Random Forest", 2001.
+      converting each possible categorical value into a boolean feature. This
+      method is available for comparison purpose and generally performs worse
+      than other alternatives. - `RANDOM`: Best splits among a set of random
+      candidate. Find the a categorical split of the form "value \\in mask"
+      using a random search. This solution can be seen as an approximation of
+      the CART algorithm. This method is a strong alternative to CART. This
+      algorithm is inspired from section "5.1 Categorical Variables" of "Random
+      Forest", 2001.
         Default: "CART".
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
@@ -1294,7 +1293,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     dart_dropout: Dropout rate applied when using the DART i.e. when
       forest_extraction=DART. Default: None.
     early_stopping: Early stopping detects the overfitting of the model and
-      halts it training using the validation dataset. If not provided directly,
+      halts its training using the validation dataset. If not provided directly,
       the validation dataset is extracted from the training dataset (see
       "validation_ratio" parameter): - `NONE`: No early stopping. All the
       num_trees are trained and kept. - `MIN_LOSS_FINAL`: All the num_trees are
@@ -1364,9 +1363,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       model interpretation as well as hyper parameter tuning. This can take lots
       of space, sometimes accounting for half of the model size. Default: True.
     l1_regularization: L1 regularization applied to the training loss. Impact
-      the tree structures and lead values. Default: 0.0.
+      the tree structures and leaf values. Default: 0.0.
     l2_categorical_regularization: L2 regularization applied to the training
-      loss for categorical features. Impact the tree structures and lead values.
+      loss for categorical features. Impact the tree structures and leaf values.
       Default: 1.0.
     l2_regularization: L2 regularization applied to the training loss for all
       features except the categorical ones. Default: 0.0.
@@ -1449,7 +1448,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       values are between ]0, and 1] as well as -1. If not set or equal to -1,
       the `num_candidate_attributes` is used. Default: None.
     num_trees: Maximum number of decision trees. The effective number of trained
-      tree can be smaller if early stopping is enabled. Default: 300.
+      tree can be smaller if early stopping is enabled. For multi-class
+      classification problems, the number of decision trees is at most this
+      parameter times the number of classes. Default: 300.
     numerical_vector_sequence_num_examples: For datasets with
       NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
       vectors). Maximum number of examples to use to find splits. A larger value
@@ -1506,7 +1507,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       for choosing a split, where p is the number of numerical features.
       Increasing "max_num_projections" increases the training time but not the
       inference time. In late stage model development, if every bit of accuracy
-      if important, increase this value. The paper "Sparse Projection Oblique
+      is important, increase this value. The paper "Sparse Projection Oblique
       Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
       Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
@@ -1519,8 +1520,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     sparse_oblique_num_projections_exponent: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
       to test at each node. Increasing this value very likely improves the
-      quality of the model, drastically increases the training time, and doe not
-      impact the inference time. Oblique splits try out
+      quality of the model, drastically increases the training time, and does
+      not impact the inference time. Oblique splits try out
       max(p^num_projections_exponent, max_num_projections) random projections
       for choosing a split, where p is the number of numerical features.
       Therefore, increasing this `num_projections_exponent` and possibly
@@ -1575,7 +1576,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
       `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
       "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
-      et al., 2029 Default: "AXIS_ALIGNED".
+      et al., 2019 Default: "AXIS_ALIGNED".
     subsample: Ratio of the dataset (sampling without replacement) used to train
       individual trees for the random sampling method. If \\"subsample\\" is set
       and if \\"sampling_method\\" is NOT set or set to \\"NONE\\", then
@@ -1592,7 +1593,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       `KL`: - p log (p/q) - `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2 -
       `CHI_SQUARED` or `CS`: (p-q)^2/q
         Default: "KULLBACK_LEIBLER".
-    use_hessian_gain: Use true, uses a formulation of split gain with a hessian
+    use_hessian_gain: If true, uses a formulation of split gain with a hessian
       term i.e. optimizes the splits to minimize the variance of "gradient /
       hessian. Available for all losses except regression. Default: False.
     validation_interval_in_trees: Evaluate the model on the validation set every
@@ -2056,12 +2057,8 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     min_vocab_frequency: Minimum number of occurrence of a value for CATEGORICAL
       and CATEGORICAL_SET columns. Value observed less than
       `min_vocab_frequency` are considered as out-of-vocabulary.
-    discretize_numerical_columns: If true, discretize all the numerical columns
-      before training. Discretized numerical columns are faster to train with,
-      but they can have a negative impact on the model quality. Using
-      `discretize_numerical_columns=True` is equivalent as setting the column
-      semantic DISCRETIZED_NUMERICAL in the `column` argument. See the
-      definition of DISCRETIZED_NUMERICAL for more details.
+    discretize_numerical_columns: For distributed training, use
+      `force_numerical_discretization` instead.
     num_discretized_numerical_bins: Number of bins used when disretizing
       numerical columns.
     max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
@@ -2090,7 +2087,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     apply_link_function: If true, applies the link function (a.k.a. activation
       function), if any, before returning the model prediction. If false,
       returns the pre-link function model output. For example, in the case of
-      binary classification, the pre-link function output is a logic while the
+      binary classification, the pre-link function output is a logit while the
       post-link function is a probability. Default: True.
     focal_loss_alpha: EXPERIMENTAL, default 0.5. Weighting parameter for focal
       loss, positive samples weighted by alpha, negative samples by (1-alpha).
@@ -2158,7 +2155,9 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       values are between ]0, and 1] as well as -1. If not set or equal to -1,
       the `num_candidate_attributes` is used. Default: None.
     num_trees: Maximum number of decision trees. The effective number of trained
-      tree can be smaller if early stopping is enabled. Default: 300.
+      tree can be smaller if early stopping is enabled. For multi-class
+      classification problems, the number of decision trees is at most this
+      parameter times the number of classes. Default: 300.
     pure_serving_model: Clear the model from any information that is not
       required for model serving. This includes debugging, model interpretation
       and other meta-data. The size of the serialized model can be reduced
@@ -2171,7 +2170,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       tends to give more accurate results (assuming enough trees are trained),
       but results in larger models. Analogous to neural network learning rate.
       Fixed to 1.0 for DART models. Default: 0.1.
-    use_hessian_gain: Use true, uses a formulation of split gain with a hessian
+    use_hessian_gain: If true, uses a formulation of split gain with a hessian
       term i.e. optimizes the splits to minimize the variance of "gradient /
       hessian. Available for all losses except regression. Default: False.
     worker_logs: If true, workers will print training logs. Default: True.
@@ -2506,14 +2505,14 @@ class CartLearner(generic_learner.GenericCCLearner):
       dictionary), the "random" algorithm is a good alternative. - `ONE_HOT`:
       One-hot encoding. Find the optimal categorical split of the form
       "attribute == param". This method is similar (but more efficient) than
-      converting converting each possible categorical value into a boolean
-      feature. This method is available for comparison purpose and generally
-      performs worse than other alternatives. - `RANDOM`: Best splits among a
-      set of random candidate. Find the a categorical split of the form "value
-      \\in mask" using a random search. This solution can be seen as an
-      approximation of the CART algorithm. This method is a strong alternative
-      to CART. This algorithm is inspired from section "5.1 Categorical
-      Variables" of "Random Forest", 2001.
+      converting each possible categorical value into a boolean feature. This
+      method is available for comparison purpose and generally performs worse
+      than other alternatives. - `RANDOM`: Best splits among a set of random
+      candidate. Find the a categorical split of the form "value \\in mask"
+      using a random search. This solution can be seen as an approximation of
+      the CART algorithm. This method is a strong alternative to CART. This
+      algorithm is inspired from section "5.1 Categorical Variables" of "Random
+      Forest", 2001.
         Default: "CART".
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
@@ -2653,7 +2652,7 @@ class CartLearner(generic_learner.GenericCCLearner):
       for choosing a split, where p is the number of numerical features.
       Increasing "max_num_projections" increases the training time but not the
       inference time. In late stage model development, if every bit of accuracy
-      if important, increase this value. The paper "Sparse Projection Oblique
+      is important, increase this value. The paper "Sparse Projection Oblique
       Random Forests" (Tomita et al, 2020) does not define this hyperparameter.
       Default: None.
     sparse_oblique_normalization: For sparse oblique splits i.e.
@@ -2666,8 +2665,8 @@ class CartLearner(generic_learner.GenericCCLearner):
     sparse_oblique_num_projections_exponent: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections
       to test at each node. Increasing this value very likely improves the
-      quality of the model, drastically increases the training time, and doe not
-      impact the inference time. Oblique splits try out
+      quality of the model, drastically increases the training time, and does
+      not impact the inference time. Oblique splits try out
       max(p^num_projections_exponent, max_num_projections) random projections
       for choosing a split, where p is the number of numerical features.
       Therefore, increasing this `num_projections_exponent` and possibly
@@ -2722,7 +2721,7 @@ class CartLearner(generic_learner.GenericCCLearner):
       from "Sparse Projection Oblique Random Forests", Tomita et al., 2020. -
       `MHLD_OBLIQUE`: Multi-class Hellinger Linear Discriminant splits from
       "Classification Based on Multivariate Contrast Patterns", Canete-Sifuentes
-      et al., 2029 Default: "AXIS_ALIGNED".
+      et al., 2019 Default: "AXIS_ALIGNED".
     uplift_min_examples_in_treatment: For uplift models only. Minimum number of
       examples per treatment in a node. Default: 5.
     uplift_split_score: For uplift models only. Splitter score i.e. score

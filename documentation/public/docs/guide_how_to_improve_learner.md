@@ -9,7 +9,13 @@ By default, use learning with **exact splits**. The alternative to exact splits
 is **approximated splits**, which are much faster (2x to 5x speed-up depending
 on the dataset) to learn but can sometimes lead to a drop in quality.
 
-Enable approximated splits with `force_numerical_discretization=True`. The
+For non-distributed training, enable approximated splits with
+`discretize_numerical_columns=True`. The `num_discretized_numerical_bins`
+parameter (default to 255) controls the number of bins used for discretizing
+numerical columns.
+
+For distributed training, enable approximated splits with
+`force_numerical_discretization=True`. The
 `max_unique_values_for_discretized_numerical` (default to 16000) parameter
 controls the accuracy of the approximate spits. A smaller value will make the
 algorithm faster, but it may also result in a less accurate spit.
@@ -21,7 +27,7 @@ other hyperparameters can result in both faster training and improved accuracy.
 
 In XGBoost, approximated splits can be enabled with `tree_method="hist"`.
 
-LightGBM always use approximated splits.
+LightGBM always uses approximated splits.
 
 ## Distributed training
 

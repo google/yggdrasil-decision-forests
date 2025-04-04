@@ -713,6 +713,12 @@ absl::Status InitializeMetadata(
         dst->mutable_hash();
         break;
 
+      case dataset::proto::ColumnType::DISCRETIZED_NUMERICAL:
+        // This should have been caught earlier in the pipeline.
+        return absl::InvalidArgumentError(absl::Substitute(
+            "Column $0 has invalid semantic DISCRETIZED_NUMERICAL, use "
+            "hyperparameter `force_numerical_discretization` instead.",
+            src.name()));
       default:
         return absl::InvalidArgumentError(absl::StrCat(
             "Non supported type ", dataset::proto::ColumnType_Name(src.type()),

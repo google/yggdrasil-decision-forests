@@ -75,6 +75,10 @@ std::string FormatDocumentation(absl::string_view raw,
 
 // Gets the number of leading spaces of a string.
 int NumLeadingSpaces(absl::string_view text);
+
+// Apply learner-specific adjustments to the documentation of default fields.
+absl::Status FixDefaultFieldsDocumentation(std::string* fields_documentation,
+                                           absl::string_view learner_key);
 }  // namespace internal
 
 // Creates the Python code source that contains wrapping classes for all linked
