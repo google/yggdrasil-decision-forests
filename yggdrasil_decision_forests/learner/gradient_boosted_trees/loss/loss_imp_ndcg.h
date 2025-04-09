@@ -38,9 +38,13 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-// Normalized Discounted Cumulative Gain loss.
-// Suited for ranking.
-// See "AbstractLoss" for the method documentation.
+// Normalized Discounted Cumulative Gain loss for Ranking problems.
+// The implementation follows the paper "From RankNet to LambdaRank to
+// LambdaMART: An Overview" by Christopher J.C. Burges (2010)
+// https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/MSR-TR-2010-82.pdf
+//
+// Note that weights for NDCG losses are per group. Only the weight of the first
+// example of a group is considered and applied to the entire group.
 class NDCGLoss : public AbstractLoss {
  public:
   // For unit testing.

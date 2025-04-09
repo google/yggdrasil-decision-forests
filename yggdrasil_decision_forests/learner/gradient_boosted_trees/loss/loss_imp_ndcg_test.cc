@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 
+#include <cmath>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -56,18 +57,24 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   dataset::VerticalDataset dataset;
   // TODO Replace by a modern function when possible.
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
-    columns { type: NUMERICAL name: "a" }
+    columns { type: NUMERICAL name: "LABEL" }
     columns {
       type: CATEGORICAL
-      name: "b"
+      name: "GROUP"
       categorical { number_of_unique_values: 3 is_already_integerized: true }
     }
   )pb");
   RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "1"}, {"b", "1"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "2"}, {"b", "2"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"LABEL", "3"}, {"GROUP", "1"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"LABEL", "1"}, {"GROUP", "1"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"LABEL", "0"}, {"GROUP", "2"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"LABEL", "2"}, {"GROUP", "2"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"LABEL", "4"}, {"GROUP", "2"}}));
   return dataset;
 }
 
@@ -81,15 +88,17 @@ TEST(NDCGLossTest, RankingIndexInitialization) {
   EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_THAT(index.groups(), SizeIs(2));
   ASSERT_THAT(index.groups()[0].items, SizeIs(2));
-  ASSERT_THAT(index.groups()[1].items, SizeIs(2));
-  EXPECT_EQ(index.groups()[0].items[0].example_idx, 2);
+  ASSERT_THAT(index.groups()[1].items, SizeIs(3));
+  EXPECT_EQ(index.groups()[0].items[0].example_idx, 0);
   EXPECT_EQ(index.groups()[0].items[0].relevance, 3);
-  EXPECT_EQ(index.groups()[0].items[1].example_idx, 0);
+  EXPECT_EQ(index.groups()[0].items[1].example_idx, 1);
   EXPECT_EQ(index.groups()[0].items[1].relevance, 1);
-  EXPECT_EQ(index.groups()[1].items[0].example_idx, 3);
+  EXPECT_EQ(index.groups()[1].items[0].example_idx, 4);
   EXPECT_EQ(index.groups()[1].items[0].relevance, 4);
-  EXPECT_EQ(index.groups()[1].items[1].example_idx, 1);
+  EXPECT_EQ(index.groups()[1].items[1].example_idx, 3);
   EXPECT_EQ(index.groups()[1].items[1].relevance, 2);
+  EXPECT_EQ(index.groups()[1].items[2].example_idx, 2);
+  EXPECT_EQ(index.groups()[1].items[2].relevance, 0);
 }
 
 TEST_P(NDCGLossTest, InitialPredictions) {
@@ -97,7 +106,7 @@ TEST_P(NDCGLossTest, InitialPredictions) {
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
-    weights = {2.f, 4.f, 2.f, 4.f};
+    weights = {1.f, 2.f, 3.f, 4.f, 5.f};
   }
 
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
@@ -112,11 +121,11 @@ TEST_P(NDCGLossTest, InitialPredictions) {
 TEST_P(NDCGLossTest, UpdateGradients) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  std::vector<float> weights;
   const bool threaded = std::get<1>(GetParam());
 
   RankingGroupsIndices index;
-  EXPECT_OK(index.Initialize(dataset, 0, 1));
+  EXPECT_OK(
+      index.Initialize(dataset, /*label_col_idx=*/0, /*group_col_idx=*/1));
   EXPECT_THAT(index.groups(), SizeIs(2));
 
   dataset::VerticalDataset gradient_dataset;
@@ -125,15 +134,11 @@ TEST_P(NDCGLossTest, UpdateGradients) {
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
+                                            /* label_col_idx=*/0,
                                             /*hessian_splits=*/false, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
-  ASSERT_OK_AND_ASSIGN(
-      const std::vector<float> initial_predictions,
-      loss_imp.InitialPredictions(dataset, /* label_col_idx =*/0, weights));
-  internal::SetInitialPredictions(initial_predictions, dataset.nrow(),
-                                  &predictions);
+  predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
 
   utils::RandomEngine random(1234);
   if (threaded) {
@@ -149,16 +154,13 @@ TEST_P(NDCGLossTest, UpdateGradients) {
                                        /* label_col_idx= */ 0, predictions,
                                        &index, &gradients, &random));
   }
-
   ASSERT_THAT(gradients, Not(IsEmpty()));
   const std::vector<float>& gradient = gradients.front().gradient;
-  // Explanation:
-  // - Element 0 is pushed down by element 2 (and in reverse).
-  // - Element 1 is pushed down by element 3 (and in reverse).
-  EXPECT_THAT(gradient, ElementsAre(FloatNear(-0.14509f, kTestPrecision),
-                                    FloatNear(-0.13109f, kTestPrecision),
-                                    FloatNear(0.14509, kTestPrecision),
-                                    FloatNear(0.13109, kTestPrecision)));
+  EXPECT_THAT(gradient, ElementsAre(FloatNear(0.212146f, kTestPrecision),
+                                    FloatNear(-0.212146f, kTestPrecision),
+                                    FloatNear(-0.365370f, kTestPrecision),
+                                    FloatNear(-0.017095f, kTestPrecision),
+                                    FloatNear(0.382466f, kTestPrecision)));
 }
 
 TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
@@ -180,12 +182,7 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
                                             /*hessian_splits=*/false, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
-
-  ASSERT_OK_AND_ASSIGN(
-      const std::vector<float> initial_predictions,
-      loss_imp.InitialPredictions(dataset, /* label_col_idx =*/0, weights));
-  internal::SetInitialPredictions(initial_predictions, dataset.nrow(),
-                                  &predictions);
+  predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
 
   utils::RandomEngine random(1234);
   ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
@@ -194,13 +191,11 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   const std::vector<float>& gradient = gradients.front().gradient;
-  // Explanation:
-  // - Element 0 is pushed down by element 2 (and in reverse).
-  // - Element 1 is pushed down by element 3 (and in reverse).
-  EXPECT_THAT(gradient, ElementsAre(FloatNear(-0.33864f, kTestPrecision),
-                                    FloatNear(-0.32854f, kTestPrecision),
-                                    FloatNear(0.33864f, kTestPrecision),
-                                    FloatNear(0.32854f, kTestPrecision)));
+  EXPECT_THAT(gradient, ElementsAre(FloatNear(0.569704592, kTestPrecision),
+                                    FloatNear(-0.56970495, kTestPrecision),
+                                    FloatNear(-0.377651036, kTestPrecision),
+                                    FloatNear(-0.111444674, kTestPrecision),
+                                    FloatNear(0.489095628, kTestPrecision)));
 }
 
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
@@ -209,34 +204,33 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
-    weights = {1.f, 3.f, 1.f, 3.f};
+    weights = {1.f, 1.f, 3.f, 3.f, 3.f};
   }
 
   // Perfectly wrong predictions.
-  std::vector<float> predictions = {2., 2., 1., 1.};
+  std::vector<float> predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   RankingGroupsIndices index;
-  EXPECT_OK(index.Initialize(dataset, 0, 1));
+  EXPECT_OK(
+      index.Initialize(dataset, /*label_col_idx=*/0, /*group_col_idx=*/1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 0, predictions, weights, &index));
+                    /* label_col_idx=*/0, predictions, weights, &index));
+  double expected_ndcg;
   if (weighted) {
-    // R> 0.7238181 = (sum((2^c(1,3)-1)/log2(seq(2)+1)) /
-    // sum((2^c(3,1)-1)/log2(seq(2)+1)) +  3(sum((2^c(2,4)-1)/log2(seq(2)+1)) /
-    // sum((2^c(4,2)-1)/log2(seq(2)+1))) )/4
-    EXPECT_NEAR(loss_results.loss, -0.730822, kTestPrecision);
-    EXPECT_THAT(loss_results.secondary_metrics,
-                ElementsAre(FloatNear(0.730822, kTestPrecision)));
+    expected_ndcg = ((1. + 7 / log2(3)) / (7. + 1. / log2(3)) +
+                     3. * (3. / log2(3) + 15. / 2.) / (15 + 3. / log2(3))) /
+                    4.;
   } else {
-    // R> 0.7238181 = (sum((2^c(1,3)-1)/log2(seq(2)+1)) /
-    // sum((2^c(3,1)-1)/log2(seq(2)+1)) +  sum((2^c(2,4)-1)/log2(seq(2)+1)) /
-    // sum((2^c(4,2)-1)/log2(seq(2)+1)) )/2
-    EXPECT_NEAR(loss_results.loss, -0.723818, kTestPrecision);
-    EXPECT_THAT(loss_results.secondary_metrics,
-                ElementsAre(FloatNear(0.723818, kTestPrecision)));
+    expected_ndcg = ((1. + 7 / log2(3)) / (7. + 1. / log2(3)) +
+                     (3. / log2(3) + 15. / 2.) / (15 + 3. / log2(3))) /
+                    2.;
   }
+  EXPECT_NEAR(loss_results.loss, -expected_ndcg, kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(expected_ndcg, kTestPrecision)));
 }
 
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
@@ -245,11 +239,11 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
-    weights = {1.f, 3.f, 1.f, 3.f};
+    weights = {1.f, 1.f, 3.f, 3.f, 3.f};
   }
 
   // Perfectly wrong predictions.
-  std::vector<float> predictions = {2., 2., 1., 1.};
+  std::vector<float> predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(1);
   const NDCGLoss loss_imp(gbt_config, model::proto::Task::RANKING,
@@ -260,23 +254,15 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
       LossResults loss_results,
       loss_imp.Loss(dataset,
                     /* label_col_idx= */ 0, predictions, weights, &index));
+  double expected_ndcg;
   if (weighted) {
-    // R> 0.7238181 = (sum((2^c(1,3)-1)/log2(seq(2)+1)) /
-    // sum((2^c(3,1)-1)/log2(seq(2)+1)) +  3(sum((2^c(2,4)-1)/log2(seq(2)+1)) /
-    // sum((2^c(4,2)-1)/log2(seq(2)+1))) )/4
-    EXPECT_NEAR(loss_results.loss, -(1. / 7. + 9. / 15.) / 4., kTestPrecision);
-    EXPECT_THAT(
-        loss_results.secondary_metrics,
-        ElementsAre(FloatNear((1. / 7. + 9. / 15.) / 4., kTestPrecision)));
+    expected_ndcg = (1. / 7.) / 4.;
   } else {
-    // R> 0.7238181 = (sum((2^c(1,3)-1)/log2(seq(2)+1)) /
-    // sum((2^c(3,1)-1)/log2(seq(2)+1)) +  sum((2^c(2,4)-1)/log2(seq(2)+1)) /
-    // sum((2^c(4,2)-1)/log2(seq(2)+1)) )/2
-    EXPECT_NEAR(loss_results.loss, -(1. / 7. + 3. / 15.) / 2., kTestPrecision);
-    EXPECT_THAT(
-        loss_results.secondary_metrics,
-        ElementsAre(FloatNear((1. / 7. + 3. / 15.) / 2., kTestPrecision)));
+    expected_ndcg = (1. / 7.) / 2.;
   }
+  EXPECT_NEAR(loss_results.loss, -expected_ndcg, kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(expected_ndcg, kTestPrecision)));
 }
 
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
@@ -285,11 +271,11 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
-    weights = {1.f, 3.f, 1.f, 3.f};
+    weights = {1.f, 1.f, 3.f, 3.f, 3.f};
   }
 
   // Perfect predictions.
-  std::vector<float> predictions = {10.f, 11.f, 12.f, 13.f};
+  std::vector<float> predictions = {1.f, 0.f, 0.f, 0.5f, 1.f};
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   RankingGroupsIndices index;
@@ -309,11 +295,11 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectGroupedPredictions) {
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
-    weights = {1.f, 3.f, 1.f, 3.f};
+    weights = {1.f, 1.f, 3.f, 3.f, 3.f};
   }
 
   // Perfect predictions again (the ranking across groups has no effect).
-  std::vector<float> predictions = {10.f, 4.f, 12.f, 6.f};
+  std::vector<float> predictions = {0.6f, 0.4f, 0.f, 0.5f, 1.f};
   const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
                           dataset.data_spec().columns(0));
   RankingGroupsIndices index;

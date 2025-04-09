@@ -38,6 +38,8 @@ message WeightDefinition {
   }
 
   // The weight is directly the numerical value.
+  // Note that for Ranking problems, the ranking is per group and all weights of
+  // the same group should be identical.
   message NumericalWeight {}
 
   // Solve the following mapping to get the weight.
