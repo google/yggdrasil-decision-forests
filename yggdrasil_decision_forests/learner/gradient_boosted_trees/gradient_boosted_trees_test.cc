@@ -84,6 +84,7 @@ namespace {
 
 using test::EqualsProto;
 using ::testing::ElementsAre;
+using ::testing::IsEmpty;
 using ::testing::SizeIs;
 using ::testing::UnorderedElementsAre;
 using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
@@ -2375,6 +2376,9 @@ class GradientBoostedTreesOnSyntheticRanking
     auto* hash_column = guide_.add_column_guides();
     hash_column->set_column_name_pattern("^GROUP$");
     hash_column->set_type(dataset::proto::ColumnType::HASH);
+    auto* label_column = guide_.add_column_guides();
+    label_column->set_column_name_pattern("^LABEL$");
+    label_column->set_type(dataset::proto::ColumnType::NUMERICAL);
 
     train_config_.set_learner(GradientBoostedTreesLearner::kRegisteredName);
     train_config_.set_task(model::proto::Task::RANKING);
@@ -2394,6 +2398,31 @@ class GradientBoostedTreesOnSyntheticRanking
 TEST_F(GradientBoostedTreesOnSyntheticRanking, Base) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7151, 0.025, 0.7255);
+}
+
+TEST_F(GradientBoostedTreesOnSyntheticRanking,
+       IndicatorLabelsEqualArbitraryLabels) {
+  dataset_filename_ = "synthetic_ranking_indicator_train.csv";
+  dataset_test_filename_ = "synthetic_ranking_indicator_test.csv";
+  PrepareDataset();
+  TrainModel();
+  auto indicator_labels_optimized_model = std::move(model_);
+
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_internal()->set_enable_ndcg_indicator_labels_optimization(
+      false);
+  TrainModel();
+
+  ASSERT_THAT(model_->DebugCompare(*indicator_labels_optimized_model),
+              IsEmpty());
+}
+
+TEST_F(GradientBoostedTreesOnSyntheticRanking, IndicatorLabelsQuality) {
+  dataset_filename_ = "synthetic_ranking_indicator_train.csv";
+  dataset_test_filename_ = "synthetic_ranking_indicator_test.csv";
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.5337, 0.0725, 0.5204);
 }
 
 }  // namespace

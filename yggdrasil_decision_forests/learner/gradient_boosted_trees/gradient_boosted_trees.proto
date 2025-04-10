@@ -346,6 +346,17 @@ message GradientBoostedTreesTrainingConfig {
   // increase the training time significantly.
   optional bool compute_permutation_variable_importance = 35 [default = false];
 
+  message Internal {
+    // If true, the optimization for binary labels with a single 1 per query
+    // for NDCG gradient computation used. This will not impact the model but
+    // increase training time. Exposed for testing only.
+    optional bool enable_ndcg_indicator_labels_optimization = 1
+        [default = true];
+  }
+
+  // Internal knobs of the algorithm that don't impact the final model.
+  optional Internal internal = 39;
+
   reserved 38;
 }
 

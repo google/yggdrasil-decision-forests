@@ -62,6 +62,10 @@ class NDCGCalculator {
     return gain * inv_log_rank_[rank];
   }
 
+  inline double InvLogRank(const int rank) const { return inv_log_rank_[rank]; }
+
+  int truncation() const { return truncation_; }
+
  private:
   int truncation_;
 

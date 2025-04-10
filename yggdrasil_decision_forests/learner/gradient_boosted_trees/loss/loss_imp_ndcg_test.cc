@@ -22,6 +22,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -49,11 +50,13 @@ using ::testing::Combine;
 constexpr float kTestPrecision = 0.00001f;
 
 using ::testing::ElementsAre;
-using testing::FloatNear;
+using ::testing::FloatNear;
 using ::testing::IsEmpty;
-using testing::SizeIs;
+using ::testing::Pointwise;
+using ::testing::SizeIs;
 
-absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
+absl::StatusOr<dataset::VerticalDataset> CreateToyDataset(
+    bool indicator_labels) {
   dataset::VerticalDataset dataset;
   // TODO Replace by a modern function when possible.
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
@@ -65,16 +68,29 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
     }
   )pb");
   RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
-  RETURN_IF_ERROR(
-      dataset.AppendExampleWithStatus({{"LABEL", "3"}, {"GROUP", "1"}}));
-  RETURN_IF_ERROR(
-      dataset.AppendExampleWithStatus({{"LABEL", "1"}, {"GROUP", "1"}}));
-  RETURN_IF_ERROR(
-      dataset.AppendExampleWithStatus({{"LABEL", "0"}, {"GROUP", "2"}}));
-  RETURN_IF_ERROR(
-      dataset.AppendExampleWithStatus({{"LABEL", "2"}, {"GROUP", "2"}}));
-  RETURN_IF_ERROR(
-      dataset.AppendExampleWithStatus({{"LABEL", "4"}, {"GROUP", "2"}}));
+  if (indicator_labels) {
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "1"}, {"GROUP", "1"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "0"}, {"GROUP", "1"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "0"}, {"GROUP", "2"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "0"}, {"GROUP", "2"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "1"}, {"GROUP", "2"}}));
+  } else {
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "3"}, {"GROUP", "1"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "1"}, {"GROUP", "1"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "0"}, {"GROUP", "2"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "2"}, {"GROUP", "2"}}));
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"LABEL", "4"}, {"GROUP", "2"}}));
+  }
   return dataset;
 }
 
@@ -82,7 +98,7 @@ class NDCGLossTest : public testing::TestWithParam<std::tuple<bool, bool>> {};
 
 TEST(NDCGLossTest, RankingIndexInitialization) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
+                       CreateToyDataset(false));
 
   RankingGroupsIndices index;
   EXPECT_OK(index.Initialize(dataset, 0, 1));
@@ -102,7 +118,7 @@ TEST(NDCGLossTest, RankingIndexInitialization) {
 }
 
 TEST_P(NDCGLossTest, InitialPredictions) {
-  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
@@ -118,9 +134,9 @@ TEST_P(NDCGLossTest, InitialPredictions) {
   EXPECT_THAT(init_pred, ElementsAre(0.f));
 }
 
-TEST_P(NDCGLossTest, UpdateGradients) {
+TEST_P(NDCGLossTest, UpdateGradientsArbitraryLabels) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
+                       CreateToyDataset(false));
   const bool threaded = std::get<1>(GetParam());
 
   RankingGroupsIndices index;
@@ -163,9 +179,65 @@ TEST_P(NDCGLossTest, UpdateGradients) {
                                     FloatNear(0.382466f, kTestPrecision)));
 }
 
+TEST(NDCGLossTest, UpdateGradientsIndicatorLabels) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset(true));
+  RankingGroupsIndices index;
+  EXPECT_OK(
+      index.Initialize(dataset, /*label_col_idx=*/0, /*group_col_idx=*/1));
+  EXPECT_THAT(index.groups(), SizeIs(2));
+
+  const NDCGLoss loss_imp_indicator({}, model::proto::Task::RANKING,
+                                    dataset.data_spec().columns(0));
+  proto::GradientBoostedTreesTrainingConfig gbt_config_no_indicator;
+  gbt_config_no_indicator.mutable_internal()
+      ->set_enable_ndcg_indicator_labels_optimization(false);
+  const NDCGLoss loss_imp_no_indicator(gbt_config_no_indicator,
+                                       model::proto::Task::RANKING,
+                                       dataset.data_spec().columns(0));
+  dataset::VerticalDataset gradient_dataset_indicator;
+  dataset::VerticalDataset gradient_dataset_no_indicator;
+  std::vector<GradientData> gradients_indicator;
+  std::vector<GradientData> gradients_no_indicator;
+
+  {
+    std::vector<float> predictions = {1.f, 0.f, 1.f, 0.5f, 0.f};
+    ASSERT_OK(internal::CreateGradientDataset(
+        dataset,
+        /* label_col_idx=*/0,
+        /*hessian_splits=*/false, loss_imp_indicator,
+        &gradient_dataset_indicator, &gradients_indicator, &predictions));
+    utils::RandomEngine random(1234);
+    CHECK_OK(loss_imp_indicator.UpdateGradients(gradient_dataset_indicator,
+                                                /* label_col_idx=*/0,
+                                                predictions, &index,
+                                                &gradients_indicator, &random));
+  }
+  {
+    std::vector<float> predictions = {1.f, 0.f, 1.f, 0.5f, 0.f};
+    ASSERT_OK(internal::CreateGradientDataset(
+        dataset,
+        /* label_col_idx=*/0,
+        /*hessian_splits=*/false, loss_imp_no_indicator,
+        &gradient_dataset_no_indicator, &gradients_no_indicator, &predictions));
+    utils::RandomEngine random(1234);
+    CHECK_OK(loss_imp_no_indicator.UpdateGradients(
+        gradient_dataset_no_indicator,
+        /* label_col_idx=*/0, predictions, &index, &gradients_no_indicator,
+        &random));
+  }
+
+  ASSERT_THAT(gradients_indicator, Not(IsEmpty()));
+  ASSERT_THAT(gradients_no_indicator, Not(IsEmpty()));
+  ASSERT_THAT(gradients_no_indicator[0].gradient, SizeIs(5));
+  EXPECT_THAT(gradients_indicator.front().gradient,
+              Pointwise(FloatNear(kTestPrecision),
+                        gradients_no_indicator.front().gradient));
+}
+
 TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
+                       CreateToyDataset(false));
   std::vector<float> weights;
 
   RankingGroupsIndices index;
@@ -200,7 +272,7 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
 
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
+                       CreateToyDataset(false));
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
@@ -235,7 +307,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
 
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
+                       CreateToyDataset(false));
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
@@ -267,7 +339,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
 
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
+                       CreateToyDataset(false));
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
@@ -291,7 +363,7 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
 
 TEST_P(NDCGLossTest, ComputeRankingLossPerfectGroupedPredictions) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
+                       CreateToyDataset(false));
   const bool weighted = std::get<0>(GetParam());
   std::vector<float> weights;
   if (weighted) {
@@ -314,14 +386,14 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectGroupedPredictions) {
 }
 
 TEST(NDCGLossTest, SecondaryMetricName) {
-  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
   const auto loss_imp =
       NDCGLoss({}, model::proto::Task::RANKING, dataset.data_spec().columns(0));
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("NDCG@5"));
 }
 
 TEST(NDCGLossTest, SecondaryMetricNameTrucation10) {
-  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(10);
   const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
@@ -330,7 +402,7 @@ TEST(NDCGLossTest, SecondaryMetricNameTrucation10) {
 }
 
 TEST(NDCGLossTest, InvalidTruncation) {
-  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(0);
   const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
