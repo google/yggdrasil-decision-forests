@@ -258,7 +258,7 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
     const std::vector<float>& labels, const double initial_variance,
     std::vector<UnsignedExampleIdx>* running_attr_bank_idx,
     std::vector<bool>* candidate_attributes_bitmap) {
-  if (weighted) {
+  if constexpr (weighted) {
     DCHECK_EQ(weights.size(), labels.size());
   } else {
     DCHECK(weights.empty());
@@ -279,7 +279,8 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
     // "candidate_attr_value".
     utils::BinaryToNormalDistributionDouble candidate_split_label_distribution =
         split_label_distribution;
-    int64_t num_absent_in_negative_set = 0;
+    bool has_neg = false;
+    bool has_pos = false;
     for (size_t select_idx = 0; select_idx < selected_examples.size();
          select_idx++) {
       const auto example_idx = selected_examples[select_idx];
@@ -326,14 +327,14 @@ std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
           candidate_split_label_distribution.mutable_neg()->Sub(
               labels[example_idx]);
         }
+        has_pos = true;
       } else {
-        num_absent_in_negative_set++;
+        has_neg = true;
       }
     }
     // Remove the attribute from the candidate set if the attribute is pure
     // for the current negative set.
-    if (num_absent_in_negative_set == 0 ||
-        num_absent_in_negative_set == selected_examples.size()) {
+    if (!has_neg || !has_pos) {
       (*candidate_attributes_bitmap)[candidate_attr_value] = false;
       continue;
     }
