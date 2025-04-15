@@ -12,6 +12,7 @@ py_library(
     name = "util",
     srcs = ["util.py"],
     deps = [
+        "//ydf/util:log_book",
         "//ydf/util:tf_example",
         "//ydf/util:vertex_ai",
     ],

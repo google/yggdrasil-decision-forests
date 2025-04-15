@@ -22,3 +22,5 @@ from ydf.util.vertex_ai import VertexAIClusterSpec
 
 from ydf.util.tf_example import read_tf_record
 from ydf.util.tf_example import write_tf_record
+
+from ydf.util.log_book import LogBook

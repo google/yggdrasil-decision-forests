@@ -50,6 +50,14 @@ py_library(
     deps = [],
 )
 
+py_library(
+    name = "log_book",
+    srcs = ["log_book.py"],
+    deps = [
+        # pandas dep,
+    ],
+)
+
 # Tests
 # =====
 
@@ -76,5 +84,16 @@ py_test(
     deps = [
         ":vertex_ai",
         # absl/testing:absltest dep,
+    ],
+)
+
+py_test(
+    name = "log_book_test",
+    srcs = ["log_book_test.py"],
+    deps = [
+        ":log_book",
+        # absl/logging dep,
+        # absl/testing:absltest dep,
+        # pandas dep,
     ],
 )
