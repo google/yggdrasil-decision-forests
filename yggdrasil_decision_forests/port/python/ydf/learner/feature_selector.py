@@ -241,6 +241,7 @@ class BackwardSelectionFeatureSelector(
       local_learner._data_spec_args.columns = (  # pylint: disable=protected-access
           dataspec_lib.normalize_column_defs(current_input_features)
       )
+      local_learner._data_spec_args.include_all_columns = False  # pylint: disable=protected-access
       # TODO: Add support for cross-validation.
       model = local_learner.train(
           ds=ds,
