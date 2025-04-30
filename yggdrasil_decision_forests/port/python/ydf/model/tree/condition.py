@@ -174,6 +174,7 @@ class NumericalSparseObliqueCondition(AbstractCondition):
   attributes: Sequence[int]
   weights: Sequence[float]
   threshold: float
+  na_replacements: Sequence[float]
 
   def pretty(self, dataspec: data_spec_pb2.DataSpecification) -> str:
     text = " + ".join(
@@ -303,6 +304,7 @@ def to_condition(
         attributes=condition_type.oblique_condition.attributes,
         weights=condition_type.oblique_condition.weights,
         threshold=condition_type.oblique_condition.threshold,
+        na_replacements=condition_type.oblique_condition.na_replacements,
         **base_kwargs,
     )
 
@@ -446,6 +448,7 @@ def _to_json_numerical_sparse_oblique(
       "attributes": [dataspec.columns[f].name for f in condition.attributes],
       "weights": list(condition.weights),
       "threshold": condition.threshold,
+      "na_replacements": list(condition.na_replacements),
   }
 
 
@@ -620,6 +623,7 @@ def _to_proto_condition_oblique(
               attributes=condition.attributes,
               weights=condition.weights,
               threshold=condition.threshold,
+              na_replacements=condition.na_replacements,
           ),
       ),
   )

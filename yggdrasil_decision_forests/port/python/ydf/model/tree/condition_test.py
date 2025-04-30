@@ -473,6 +473,7 @@ class ConditionTest(parameterized.TestCase):
         score=2,
         weights=[1, 2],
         threshold=3,
+        na_replacements=[-1, -2],
     )
     dataspec = data_spec_pb2.DataSpecification(
         columns=[data_spec_pb2.Column(name="f"), data_spec_pb2.Column(name="g")]
@@ -486,6 +487,7 @@ class ConditionTest(parameterized.TestCase):
                 attributes=[0, 1],
                 weights=[1, 2],
                 threshold=3,
+                na_replacements=[-1, -2],
             ),
         ),
     )
@@ -504,6 +506,7 @@ class ConditionTest(parameterized.TestCase):
         score=2,
         weights=[],
         threshold=3,
+        na_replacements=[],
     )
     dataspec = data_spec_pb2.DataSpecification(columns=[data_spec_pb2.Column()])
     proto_condition = decision_tree_pb2.NodeCondition(
@@ -515,6 +518,7 @@ class ConditionTest(parameterized.TestCase):
                 attributes=[],
                 weights=[],
                 threshold=3,
+                na_replacements=[],
             ),
         ),
     )
