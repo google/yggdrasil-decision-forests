@@ -90,11 +90,11 @@ a value less than "num_trees".
 By default, trees are "orthogonal" or "axis aligned", that is, each
 split/condition tests a single feature. By opposition, conditions in oblique
 trees can use multiple features. Oblique splits generally improve performances
-by are slower to train.
+but are slower to train.
 
-Oblique trees are more expensive to train. The `num_projections_exponent`
-parameter plays an important role in the training time and final model quality
-(1 is cheap, 2 is better but more expensive). See `SparseObliqueSplit` in the
+The `num_projections_exponent` parameter plays an important role in the training
+time and final model quality (1 is cheap, 2 is better but more expensive). See
+`SparseObliqueSplit` in the
 [DecisionTreeTrainingConfig](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto#L152)
 for more details.
 
@@ -243,8 +243,8 @@ The `winner_take_all_inference` parameter of the Random Forest learner is set to
 True by default. This ensures that by default, the YDF Random Forest is
 equivalent to the original random forest by Breiman.
 
-However, in many cases `winner_take_all=False` can reduce the size and
-improve the quality of a Random Forest model.
+However, in many cases `winner_take_all=False` can reduce the size and improve
+the quality of a Random Forest model.
 
 ```python
 learner = ydf.RandomForestLearner(winner_take_all=False, ...)
