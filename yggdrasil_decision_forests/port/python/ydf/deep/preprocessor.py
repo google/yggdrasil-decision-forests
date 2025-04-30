@@ -115,7 +115,7 @@ class Preprocessor:
       abstract_model: abstract_model_pb2.AbstractModel,
       dataspec: data_spec_pb2.DataSpecification,
   ) -> "Preprocessor":
-    return cls(
+    return cls(  # pytype: disable=wrong-arg-types
         dataspec=dataspec,
         input_features_col_idxs=list(abstract_model.input_features),
         numerical_zscore=preprocessor.numerical_zscore
