@@ -431,6 +431,24 @@ TEST(Distribution, BinaryToNormalDistributionDouble) {
   EXPECT_NEAR(conf.FinalVariance(), 0.625, 0.0001);
 }
 
+TEST(Distribution, BinaryToNormalDistributionDoubleAdd) {
+  BinaryToNormalDistributionDouble conf;
+  BinaryToNormalDistributionDouble other_conf;
+
+  conf.Add(false, 1);
+  conf.Add(true, 1);
+  other_conf.Add(false, 2);
+  other_conf.Add(true, 3);
+
+  conf.Add(other_conf);
+
+  EXPECT_NEAR(conf.NumObservations(), 4, 0.0001);
+
+  // var(c(1,2)) / 2 +  var(c(1,3)) / 2 = 0.625
+  // with var the variance.
+  EXPECT_NEAR(conf.FinalVariance(), 0.625, 0.0001);
+}
+
 TEST(BinaryDistributionEntropy, Base) {
   const double epsilon = 0.0001;
 

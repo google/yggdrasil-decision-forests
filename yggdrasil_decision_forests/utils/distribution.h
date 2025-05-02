@@ -146,6 +146,11 @@ class BinaryToNormalDistributionDouble {
     split_[bool_dim].Add(num_dim, weight);
   }
 
+  void Add(const BinaryToNormalDistributionDouble& other) {
+    split_[0].Add(other.neg());
+    split_[1].Add(other.pos());
+  }
+
   // Variance i.e. weighted sum of the variance of the normal distributions.
   double FinalVariance() const {
     const double frac_pos = pos().NumObservations() /
