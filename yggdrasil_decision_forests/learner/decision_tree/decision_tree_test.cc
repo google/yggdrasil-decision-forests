@@ -2124,14 +2124,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
   proto::DecisionTreeTrainingConfig dt_config;
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerMultiplicative);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2163,14 +2163,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
   proto::DecisionTreeTrainingConfig dt_config;
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerAlwaysInvalid);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2202,14 +2202,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
   dt_config.set_num_candidate_attributes(-1);
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerMultiplicative);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2254,14 +2254,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Alternate) {
   dt_config.set_num_candidate_attributes(-1);
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerAlternate);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2293,14 +2293,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
   dt_config.set_num_candidate_attributes(-1);
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 10;
+  const int num_threads = 10;
   FakeLabelStats label_stats{};
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerAlternate);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();

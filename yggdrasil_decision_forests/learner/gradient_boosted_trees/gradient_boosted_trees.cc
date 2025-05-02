@@ -2583,7 +2583,6 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
   internal_config.hessian_l2_numerical = config.gbt_config->l2_regularization();
   internal_config.hessian_l2_categorical =
       config.gbt_config->l2_regularization_categorical();
-  internal_config.num_threads = num_threads;
   internal_config.duplicated_selected_examples = false;
   internal_config.timeout = timeout;
   internal_config.split_finder_processor = split_finder_processor;

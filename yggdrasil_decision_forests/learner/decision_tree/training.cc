@@ -1499,11 +1499,10 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   // Note that next_job_to_process < next_job_to_schedule always holds.
   if (internal_config.split_finder_processor == nullptr) {
     return absl::InternalError(
-        absl::Substitute("Multi-threaded execution requested but no worker "
-                         "threads created. Expected $0 threads",
-                         internal_config.num_threads));
+        "Multi-threaded execution requested but no worker threads created.");
   }
-  const int num_threads = internal_config.num_threads;
+  const int num_threads = internal_config.split_finder_processor->num_threads();
+  DCHECK_GT(num_threads, 0);
 
   if (config_link.features().empty()) {
     return false;
