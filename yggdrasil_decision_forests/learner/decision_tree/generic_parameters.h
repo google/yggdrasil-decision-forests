@@ -50,6 +50,8 @@ constexpr char kHParamCategoricalSetSplitMaxNumItems[] =
     "categorical_set_split_max_num_items";
 constexpr char kHParamCategoricalSetSplitMinItemFrequency[] =
     "categorical_set_split_min_item_frequency";
+constexpr char kHParamCategoricalSetSplitGreedyMaximumMaskSize[] =
+    "categorical_set_split_greedy_maximum_mask_size";
 
 // Categorical splitter
 constexpr char kHParamCategoricalAlgorithm[] = "categorical_algorithm";

@@ -187,6 +187,19 @@ absl::Status GetGenericHyperParameterSpecification(
   }
 
   {
+    ASSIGN_OR_RETURN(
+        auto param,
+        get_params(kHParamCategoricalSetSplitGreedyMaximumMaskSize));
+    param->mutable_integer()->set_default_value(
+        config.categorical_set_greedy_forward().max_selected_items());
+    param->mutable_integer()->set_minimum(-1);
+    param->mutable_documentation()->set_proto_field(
+        "categorical_set_greedy_forward");
+    param->mutable_documentation()->set_description(
+        R"(For categorical set splits e.g. texts. Maximum number of attribute values on the positive side of the split mask. Smaller values might improve training speed but lead to worse models. Setting this parameter to 1 is equal to one-hot encoding the attribute values. Set to -1 for no maximum (default).)");
+  }
+
+  {
     ASSIGN_OR_RETURN(auto param,
                      get_params(kHParamCategoricalSetSplitMaxNumItems));
     param->mutable_integer()->set_default_value(
@@ -698,6 +711,15 @@ absl::Status SetHyperParameters(
     if (hparam.has_value()) {
       dt_config->mutable_categorical_set_greedy_forward()->set_sampling(
           hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamCategoricalSetSplitGreedyMaximumMaskSize);
+    if (hparam.has_value()) {
+      dt_config->mutable_categorical_set_greedy_forward()
+          ->set_max_selected_items(hparam.value().value().integer());
     }
   }
 

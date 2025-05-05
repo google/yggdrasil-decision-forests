@@ -184,6 +184,11 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       algorithm is inspired from section "5.1 Categorical Variables" of "Random
       Forest", 2001.
         Default: "CART".
+    categorical_set_split_greedy_maximum_mask_size: For categorical set splits
+      e.g. texts. Maximum number of attribute values on the positive side of the
+      split mask. Smaller values might increase training speed but lead to worse
+      models. Setting this parameter to 1 is equal to one-hot encoding the
+      attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
       positive set. The sampling is applied once per node (i.e. not at every
@@ -476,6 +481,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       bootstrap_size_ratio: float = 1.0,
       bootstrap_training_dataset: bool = True,
       categorical_algorithm: str = "CART",
+      categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
@@ -536,6 +542,9 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         "bootstrap_size_ratio": bootstrap_size_ratio,
         "bootstrap_training_dataset": bootstrap_training_dataset,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_set_split_greedy_maximum_mask_size": (
+            categorical_set_split_greedy_maximum_mask_size
+        ),
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
         ),
@@ -1269,6 +1278,11 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       algorithm is inspired from section "5.1 Categorical Variables" of "Random
       Forest", 2001.
         Default: "CART".
+    categorical_set_split_greedy_maximum_mask_size: For categorical set splits
+      e.g. texts. Maximum number of attribute values on the positive side of the
+      split mask. Smaller values might increase training speed but lead to worse
+      models. Setting this parameter to 1 is equal to one-hot encoding the
+      attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
       positive set. The sampling is applied once per node (i.e. not at every
@@ -1670,6 +1684,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       allow_na_conditions: bool = False,
       apply_link_function: bool = True,
       categorical_algorithm: str = "CART",
+      categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
@@ -1751,6 +1766,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "allow_na_conditions": allow_na_conditions,
         "apply_link_function": apply_link_function,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_set_split_greedy_maximum_mask_size": (
+            categorical_set_split_greedy_maximum_mask_size
+        ),
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
         ),
@@ -2514,6 +2532,11 @@ class CartLearner(generic_learner.GenericCCLearner):
       algorithm is inspired from section "5.1 Categorical Variables" of "Random
       Forest", 2001.
         Default: "CART".
+    categorical_set_split_greedy_maximum_mask_size: For categorical set splits
+      e.g. texts. Maximum number of attribute values on the positive side of the
+      split mask. Smaller values might increase training speed but lead to worse
+      models. Setting this parameter to 1 is equal to one-hot encoding the
+      attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
       positive set. The sampling is applied once per node (i.e. not at every
@@ -2782,6 +2805,7 @@ class CartLearner(generic_learner.GenericCCLearner):
       ] = None,
       allow_na_conditions: bool = False,
       categorical_algorithm: str = "CART",
+      categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
@@ -2832,6 +2856,9 @@ class CartLearner(generic_learner.GenericCCLearner):
     hyper_parameters = {
         "allow_na_conditions": allow_na_conditions,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_set_split_greedy_maximum_mask_size": (
+            categorical_set_split_greedy_maximum_mask_size
+        ),
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
         ),

@@ -796,6 +796,7 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamCategoricalSetSplitGreedySampling,
       decision_tree::kHParamCategoricalSetSplitMaxNumItems,
       decision_tree::kHParamCategoricalSetSplitMinItemFrequency,
+      decision_tree::kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent,
       decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections,
       decision_tree::kHParamSplitAxisMhldObliqueMaxNumAttributes,
