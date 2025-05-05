@@ -262,6 +262,7 @@ absl::Status FinalizeModelWithValidationDataset(
     const dataset::VerticalDataset& validation_dataset, const int num_threads,
     GradientBoostedTreesModel* mdl) {
   std::vector<float> final_secondary_metrics;
+  std::string log_snippet;
   if (config.gbt_config->early_stopping() ==
           proto::GradientBoostedTreesTrainingConfig::
               MIN_VALIDATION_LOSS_ON_FULL_MODEL ||
@@ -315,17 +316,21 @@ absl::Status FinalizeModelWithValidationDataset(
                "stopping completely with 'early_stopping=NONE'.";
       }
     }
+
+    // Final snippet
+    absl::StrAppendFormat(
+        &log_snippet, "Final model num-trees:%d valid-loss:%f",
+        early_stopping.best_num_trees() / mdl->num_trees_per_iter(),
+        mdl->validation_loss());
   } else {
     mdl->set_validation_loss(early_stopping.last_loss());
     final_secondary_metrics = early_stopping.last_metrics();
-  }
 
-  // Final snippet
-  std::string snippet;
-  absl::StrAppendFormat(
-      &snippet, "Final model num-trees:%d valid-loss:%f",
-      early_stopping.best_num_trees() / mdl->num_trees_per_iter(),
-      mdl->validation_loss());
+    // Final snippet
+    absl::StrAppendFormat(
+        &log_snippet, "Final model num-trees:%d valid-loss:%f",
+        mdl->NumTrees() / mdl->num_trees_per_iter(), mdl->validation_loss());
+  }
 
   if (!final_secondary_metrics.empty()) {
     for (int secondary_metric_idx = 0;
@@ -333,12 +338,12 @@ absl::Status FinalizeModelWithValidationDataset(
          mdl->training_logs().secondary_metric_names().size();
          secondary_metric_idx++) {
       absl::StrAppendFormat(
-          &snippet, " valid-%s:%f",
+          &log_snippet, " valid-%s:%f",
           mdl->training_logs().secondary_metric_names(secondary_metric_idx),
           final_secondary_metrics[secondary_metric_idx]);
     }
   }
-  LOG(INFO) << snippet;
+  LOG(INFO) << log_snippet;
 
   if (config.gbt_config->compute_permutation_variable_importance()) {
     LOG(INFO) << "Compute permutation variable importances";
