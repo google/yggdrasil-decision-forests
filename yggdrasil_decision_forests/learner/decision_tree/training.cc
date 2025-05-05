@@ -3311,6 +3311,9 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
   } else {
     DCHECK(weights.empty());
   }
+
+  const int max_iterations =
+      dt_config.categorical_set_greedy_forward().max_selected_items();
   // Bitmap of available attribute values. During the course of the algorithm,
   // an attribute value is available if:
   //  - It is selected by the initial random sampling of candidate attribute
@@ -3451,6 +3454,13 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
       split_label_distribution_no_weights.mutable_pos()->Add(label);
       split_label_distribution_no_weights.mutable_neg()->Sub(label);
       candidate_attributes_bitmap[best_attr_value] = false;
+
+      // If the number of iterations is what we want, just stop the loop
+      if (max_iterations > 0 &&
+          positive_attributes_vector.size() >= max_iterations) {
+        break;
+      }
+
       const auto attr_bank_begin =
           attribute_bank.begin() + attribute_values[example_idx].first;
       const auto attr_bank_end =

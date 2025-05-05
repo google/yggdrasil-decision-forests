@@ -2014,6 +2014,68 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
   }
 }
 
+TEST(FindBestSplitTest,
+     FindBestCategoricalSetSplitCartForRegressionMaxIterations) {
+  std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
+  // The global optimal split separates the first 4 examples from the remaining
+  // ones.
+  std::vector<float> labels = {1, 3, 4, 2, 13, 12, 11, 14};
+
+  // The attribute values. The greedy forward algorithm first adds attribute
+  // values 0, then 1 and finally 2. This test stops after adding attribute
+  // value 1 since max_iterations=2.
+  dataset::VerticalDataset::CategoricalSetColumn attributes;
+
+  // Will end up in the positive set.
+  attributes.AddVector({0});
+  attributes.AddVector({1, 3});
+  attributes.AddVector({2, 4});
+  attributes.AddVector({0, 1, 4});
+  // Will end up in the negative set.
+  attributes.AddVector({3});
+  attributes.AddVector({4});
+  attributes.AddVector({3, 5});
+  attributes.AddVector({4, 5});
+
+  int num_attribute_classes = 6;
+  int min_num_obs = 1;
+
+  // Compute the label distribution.
+  utils::NormalDistributionDouble label_distribution;
+  for (const auto example_idx : selected) {
+    label_distribution.Add(labels[example_idx]);
+  }
+
+  utils::RandomEngine rnd(1234);
+  proto::NodeCondition best_condition;
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
+  dt_config.mutable_categorical_set_greedy_forward()->set_max_selected_items(2);
+
+  EXPECT_EQ(
+      FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<false>(
+          selected, {}, attributes, labels, num_attribute_classes, min_num_obs,
+          dt_config, label_distribution, -1, &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.condition().type_case(),
+            proto::Condition::kContainsBitmapConditionFieldNumber);
+  // The expected element map is "000011".
+  EXPECT_EQ(
+      best_condition.condition().contains_bitmap_condition().elements_bitmap(),
+      "\x03");
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 3);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 3);
+  EXPECT_EQ(best_condition.na_value(), false);
+  // R>   var(c(1,2,3,4,11,12,13,14)) - (var(c(1,2,3)) * (3/8) +
+  // var(c(4,11,12,13,14)) * (5/8)) = 18.15
+  // With "var" the variance (not the sampling variance).
+  EXPECT_NEAR(best_condition.split_score(), 18.15, 0.0001);
+}
+
 TEST(DecisionTree, MaskItemsForCategoricalForSetGreedySelection) {
   utils::RandomEngine random;
 
