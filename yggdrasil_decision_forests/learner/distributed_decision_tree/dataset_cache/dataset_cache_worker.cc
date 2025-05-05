@@ -881,6 +881,16 @@ absl::Status CreateDatasetCacheWorker::Setup(Blob serialized_welcome) {
 
 absl::StatusOr<Blob> CreateDatasetCacheWorker::RunRequest(
     Blob serialized_request) {
+  auto status_or = RunRequestImpl(serialized_request);
+  if (!status_or.ok()) {
+    LOG(WARNING) << "Worker #" << WorkerIdx()
+                 << " failed to run request: " << status_or.status().message();
+  }
+  return status_or;
+}
+
+absl::StatusOr<Blob> CreateDatasetCacheWorker::RunRequestImpl(
+    Blob serialized_request) {
   ASSIGN_OR_RETURN(auto request, utils::ParseBinaryProto<proto::WorkerRequest>(
                                      serialized_request));
   proto::WorkerResult result;

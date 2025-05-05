@@ -202,6 +202,10 @@ DistributedGradientBoostedTreesWorker::RunRequest(
   }
 
   auto status_or = RunRequestImp(std::move(serialized_request));
+  if (!status_or.ok()) {
+    LOG(WARNING) << "Worker #" << WorkerIdx()
+                 << " failed to run request: " << status_or.status().message();
+  }
 
   {
     utils::concurrency::MutexLock l(&mutex_num_running_requests_);

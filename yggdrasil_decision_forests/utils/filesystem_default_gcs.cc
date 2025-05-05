@@ -14,6 +14,8 @@
  */
 
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include <initializer_list>
 #include <memory>
 #include <regex>  // NOLINT
@@ -88,13 +90,15 @@ absl::Status FileInputByteStream::Open(absl::string_view path) {
   ASSIGN_OR_RETURN(const auto cloud_path, GetGCSPath(path));
   gcs_stream_ = GetGCSClient().ReadObject(cloud_path.bucket, cloud_path.object);
   if (!gcs_stream_.status().ok()) {
-    return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path, " with error ",
-                                     gcs_stream_.status().message()));
+    return absl::Status(
+        absl::StatusCode::kUnknown,
+        absl::StrCat("Failed to gcs read open ", path, " with error ",
+                     gcs_stream_.status().message()));
   }
   if (gcs_stream_.bad()) {
     return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path));
+                        absl::StrCat("Failed to read open ", path,
+                                     " with error:", std::strerror(errno)));
   }
   return absl::OkStatus();
 }
@@ -130,13 +134,15 @@ absl::Status FileOutputByteStream::Open(absl::string_view path) {
   gcs_stream_ =
       GetGCSClient().WriteObject(cloud_path.bucket, cloud_path.object);
   if (!gcs_stream_.last_status().ok()) {
-    return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path, " with error ",
-                                     gcs_stream_.last_status().message()));
+    return absl::Status(
+        absl::StatusCode::kUnknown,
+        absl::StrCat("Failed to gcs write open ", path, " with error ",
+                     gcs_stream_.last_status().message()));
   }
   if (gcs_stream_.bad()) {
     return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path));
+                        absl::StrCat("Failed to write open ", path,
+                                     " with error:", std::strerror(errno)));
   }
   return absl::OkStatus();
 }

@@ -16,6 +16,8 @@
 #include "yggdrasil_decision_forests/utils/filesystem_default.h"
 
 #include <algorithm>
+#include <cerrno>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <initializer_list>
@@ -93,7 +95,8 @@ absl::Status STLFileInputByteStream::Open(absl::string_view path) {
   file_stream_.open(std::string(path), std::ios::binary);
   if (!file_stream_.is_open()) {
     return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path));
+                        absl::StrCat("Failed to read open ", path,
+                                     " with error:", std::strerror(errno)));
   }
   return absl::OkStatus();
 }
@@ -120,7 +123,7 @@ absl::StatusOr<bool> STLFileInputByteStream::ReadExactly(char* buffer,
 absl::Status STLFileInputByteStream::Close() {
   file_stream_.close();
   if (file_stream_.bad()) {
-    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to close file");
   }
   return absl::OkStatus();
 }
@@ -129,7 +132,8 @@ absl::Status STLFileOutputByteStream::Open(absl::string_view path) {
   file_stream_.open(std::string(path), std::ios::binary);
   if (!file_stream_.is_open()) {
     return absl::Status(absl::StatusCode::kUnknown,
-                        absl::StrCat("Failed to open ", path));
+                        absl::StrCat("Failed to write open ", path,
+                                     " with error:", std::strerror(errno)));
   }
   return absl::OkStatus();
 }
@@ -145,7 +149,7 @@ absl::Status STLFileOutputByteStream::Write(absl::string_view chunk) {
 absl::Status STLFileOutputByteStream::Close() {
   file_stream_.close();
   if (file_stream_.bad()) {
-    return absl::Status(absl::StatusCode::kUnknown, "Failed to clsoe file");
+    return absl::Status(absl::StatusCode::kUnknown, "Failed to close file");
   }
   return absl::OkStatus();
 }
