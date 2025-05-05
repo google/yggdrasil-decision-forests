@@ -40,7 +40,7 @@
 namespace yggdrasil_decision_forests::utils {
 
 absl::StatusOr<std::unique_ptr<GZipInputByteStream>>
-GZipInputByteStream::Create(absl::Nonnull<utils::InputByteStream*> stream,
+GZipInputByteStream::Create(utils::InputByteStream* stream,
                             size_t buffer_size) {
   auto gz_stream = std::make_unique<GZipInputByteStream>(stream, buffer_size);
   std::memset(&gz_stream->deflate_stream_, 0,
@@ -146,7 +146,7 @@ absl::Status GZipInputByteStream::CloseDeflateStream() {
 }
 
 absl::StatusOr<std::unique_ptr<GZipOutputByteStream>>
-GZipOutputByteStream::Create(absl::Nonnull<utils::OutputByteStream*> stream,
+GZipOutputByteStream::Create(utils::OutputByteStream* stream,
                              int compression_level, size_t buffer_size,
                              bool raw_deflate) {
   if (compression_level != Z_DEFAULT_COMPRESSION) {

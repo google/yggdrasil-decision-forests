@@ -35,8 +35,7 @@ namespace yggdrasil_decision_forests::utils {
 class GZipInputByteStream : public utils::InputByteStream {
  public:
   static absl::StatusOr<std::unique_ptr<GZipInputByteStream>> Create(
-      absl::Nonnull<utils::InputByteStream*> stream,
-      size_t buffer_size = 1024 * 1024);
+      utils::InputByteStream* stream, size_t buffer_size = 1024 * 1024);
 
   GZipInputByteStream(utils::InputByteStream* stream, size_t buffer_size);
   ~GZipInputByteStream() override;
@@ -76,7 +75,7 @@ class GZipOutputByteStream : public utils::OutputByteStream {
   //     compressed data, but 1MB should work in most cases.
   //   raw_deflate: If true, uses the raw deflate algorithm (!= zlib or gzip).
   static absl::StatusOr<std::unique_ptr<GZipOutputByteStream>> Create(
-      absl::Nonnull<utils::OutputByteStream*> stream,
+      utils::OutputByteStream* stream,
       int compression_level = Z_DEFAULT_COMPRESSION,
       size_t buffer_size = 1024 * 1024, bool raw_deflate = false);
 

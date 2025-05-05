@@ -204,8 +204,8 @@ std::ostream& operator<<(std::ostream& os, const FeatureDef& feature);
 // "spec_feature_idx" value. The pointer is tied to "defs" and only valid until
 // "defs" is destroyed or modified.
 template <typename T>
-absl::StatusOr<absl::Nonnull<const T*>> FindFeatureDef(
-    const std::vector<T>& defs, int spec_feature_idx) {
+absl::StatusOr<const T*> FindFeatureDef(const std::vector<T>& defs,
+                                        int spec_feature_idx) {
   static_assert(std::is_base_of_v<FeatureDef, T>,
                 "T must be derived from FeatureDef");
   for (const auto& def : defs) {
