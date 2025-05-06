@@ -217,6 +217,12 @@ class LogBook:
     return pd.DataFrame.from_records(records)
 
   def _augment_key(self, key: ExperimentKey) -> ExperimentKey:
+
+    if not isinstance(key, dict):
+      raise ValueError(
+          f"The key should be a dictionary. Instead, got {type(key)}."
+      )
+
     new_key = key.copy()
     for k, v in self._default_keys.items():
       if k not in new_key:
