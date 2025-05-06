@@ -130,4 +130,4 @@ from ydf.api import internal
 from ydf.api import experimental
 
 
-# pylint: enable=g-importing-member,g-import-not-at-top,g-bad-import-order,reimported
+# pylint: enable=g-importing-member,g-bad-import-order,reimported
