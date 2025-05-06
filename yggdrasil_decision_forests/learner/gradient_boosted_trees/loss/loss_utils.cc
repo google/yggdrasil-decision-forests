@@ -15,9 +15,9 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <vector>
-#include <algorithm>
 
 #include "absl/status/status.h"
 #include "absl/types/span.h"
@@ -29,11 +29,21 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
+
+namespace {
+// Returns true if the given loss returns logits.
+bool IsLogitLoss(proto::Loss loss) {
+  return loss == proto::BINOMIAL_LOG_LIKELIHOOD ||
+         loss == proto::MULTINOMIAL_LOG_LIKELIHOOD ||
+         loss == proto::BINARY_FOCAL_LOSS;
+}
+}  // namespace
 
 // Set the value of a leaf node.
 template <bool weighted>
@@ -112,7 +122,8 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
       sum_weighted_hessian + gbt_config.l2_regularization();
   float value = gbt_config.shrinkage() * numerator / denominator;
   // TODO - b/311636358: Move this information to the AbstractLoss class.
-  if (gbt_config.loss() != proto::SQUARED_ERROR) {
+  const auto& loss = gbt_config.loss();
+  if (IsLogitLoss(loss)) {
     value = std::clamp(value, -gbt_config.clamp_leaf_logit(),
                        gbt_config.clamp_leaf_logit());
   }
@@ -154,7 +165,7 @@ SetLeafValueWithNewtonRaphsonStepFunctor(
 }
 
 absl::Status SetLeafValueWithNewtonRaphsonStep(
-    const proto::GradientBoostedTreesTrainingConfig& gbt_config_,
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
     const decision_tree::proto::LabelStatistics& label_statistics,
     decision_tree::proto::Node* node) {
   node->set_num_pos_training_examples_without_weight(
@@ -178,17 +189,18 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
   }
 
   const double numerator = decision_tree::l1_threshold(
-      sum_gradients, gbt_config_.l1_regularization());
-  const double denominator = sum_hessians + gbt_config_.l2_regularization();
-  float value = gbt_config_.shrinkage() * numerator / denominator;
-  if (gbt_config_.loss() != proto::SQUARED_ERROR) {
-    value = std::clamp(value, -gbt_config_.clamp_leaf_logit(),
-                       gbt_config_.clamp_leaf_logit());
+      sum_gradients, gbt_config.l1_regularization());
+  const double denominator = sum_hessians + gbt_config.l2_regularization();
+  float value = gbt_config.shrinkage() * numerator / denominator;
+  const auto& loss = gbt_config.loss();
+  if (IsLogitLoss(loss)) {
+    value = std::clamp(value, -gbt_config.clamp_leaf_logit(),
+                       gbt_config.clamp_leaf_logit());
   }
   auto* reg = node->mutable_regressor();
   reg->set_top_value(value);
 
-  if (gbt_config_.use_hessian_gain()) {
+  if (gbt_config.use_hessian_gain()) {
     reg->set_sum_gradients(sum_gradients);
     reg->set_sum_hessians(sum_hessians);
   } else {
