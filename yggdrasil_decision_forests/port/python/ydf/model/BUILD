@@ -196,6 +196,7 @@ py_library(
     name = "model_metadata",
     srcs = ["model_metadata.py"],
     deps = [
+        "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )

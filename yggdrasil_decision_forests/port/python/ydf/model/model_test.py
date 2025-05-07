@@ -716,6 +716,7 @@ Use `model.describe()` for more details
         created_date=31415,
         uid=271828,
         framework="TestFramework",
+        custom_fields={"string": "bar", "bytes": b"Caf\351"},
     )
     self.adult_binary_class_gbdt.set_metadata(metadata)
     self.assertEqual(metadata, self.adult_binary_class_gbdt.metadata())

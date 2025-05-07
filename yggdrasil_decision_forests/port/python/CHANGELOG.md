@@ -5,6 +5,7 @@
 ### Feature
 
 -   Support Python 3.13.
+-   Allow custom fields in model metadata.
 
 ## 0.11.0 - 2025-03-12
 

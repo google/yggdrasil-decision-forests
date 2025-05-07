@@ -16,8 +16,10 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_MODEL_METADATA_H_
 #define YGGDRASIL_DECISION_FORESTS_MODEL_METADATA_H_
 
+#include <cstdint>
 #include <string>
 
+#include "absl/container/flat_hash_map.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 
 namespace yggdrasil_decision_forests {
@@ -29,14 +31,22 @@ class MetaData {
   const std::string& owner() const { return owner_; }
   void set_owner(const std::string& value) { owner_ = value; }
 
-  const uint64_t created_date() const { return created_date_; }
+  uint64_t created_date() const { return created_date_; }
   void set_created_date(const uint64_t value) { created_date_ = value; }
 
-  const uint64_t uid() const { return uid_; }
+  uint64_t uid() const { return uid_; }
   void set_uid(const uint64_t value) { uid_ = value; }
 
   const std::string& framework() const { return framework_; }
   void set_framework(const std::string& value) { framework_ = value; }
+
+  const absl::flat_hash_map<std::string, std::string>& custom_fields() const {
+    return custom_fields_;
+  }
+  void set_custom_fields(
+      const absl::flat_hash_map<std::string, std::string>& value) {
+    custom_fields_ = value;
+  }
 
   void Export(model::proto::Metadata* dst) const;
   void Import(const model::proto::Metadata& src);
@@ -46,6 +56,7 @@ class MetaData {
   int64_t created_date_ = 0;
   uint64_t uid_ = 0;
   std::string framework_;
+  absl::flat_hash_map<std::string, std::string> custom_fields_;
 };
 
 }  // namespace model

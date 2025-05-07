@@ -110,6 +110,12 @@ message Metadata {
 
   // Framework used to create the model.
   optional string framework = 4;
+
+  message CustomField {
+    optional string key = 1;
+    optional bytes value = 2;
+  }
+  repeated CustomField custom_fields = 5;
 }
 
 // Description of the importance of a given attribute. The semantic of
