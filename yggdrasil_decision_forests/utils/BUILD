@@ -955,6 +955,19 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "shap",
+    srcs = ["shap.cc"],
+    hdrs = ["shap.h"],
+    deps = [
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/random_forest",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)
+
 # Bzl Libraries
 # =============
 
@@ -1447,6 +1460,23 @@ cc_test(
     deps = [
         ":time",
         "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "shap_test",
+    srcs = ["shap_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":shap",
+        "//yggdrasil_decision_forests/dataset:csv_example_reader",
+        "//yggdrasil_decision_forests/dataset:csv_example_writer",
+        "//yggdrasil_decision_forests/learner/cart",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/learner/isolation_forest",
+        "//yggdrasil_decision_forests/learner/random_forest",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "@com_google_googletest//:gtest_main",
     ],
 )

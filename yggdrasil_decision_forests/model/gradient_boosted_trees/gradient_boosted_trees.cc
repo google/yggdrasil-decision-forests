@@ -445,7 +445,7 @@ void GradientBoostedTreesModel::Predict(
                      [&accumulator](const decision_tree::proto::Node& node) {
                        accumulator += node.regressor().top_value();
                      });
-      const float proba_true = 1.f / (1.f + std::exp(-accumulator));
+      const float proba_true = 1. / (1. + std::exp(-accumulator));
       prediction->mutable_classification()->set_value(proba_true > 0.5f ? 2
                                                                         : 1);
       auto* dist = prediction->mutable_classification()->mutable_distribution();
