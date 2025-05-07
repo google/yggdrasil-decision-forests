@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <vector>
@@ -303,8 +304,18 @@ using IntegerDistributionFloat = IntegerDistribution<float>;
 template <typename T>
 class BinaryToIntegerConfusionMatrix {
  public:
+  BinaryToIntegerConfusionMatrix() {}
+
+  BinaryToIntegerConfusionMatrix(IntegerDistribution<T> neg,
+                                 IntegerDistribution<T> pos)
+      : split_{neg, pos} {}
   // Add an entry.
   void Add(bool bool_dim, int int_dim, const T weight = 1.);
+
+  void Add(const BinaryToIntegerConfusionMatrix& other) {
+    split_[0].Add(other.neg());
+    split_[1].Add(other.pos());
+  }
 
   // Entropy metrics.
   double InformationGain() const;
