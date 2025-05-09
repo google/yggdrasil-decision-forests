@@ -71,13 +71,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace distributed_gradient_boosted_trees {
 
-constexpr char DistributedGradientBoostedTreesLearner::kRegisteredName[];
-constexpr char DistributedGradientBoostedTreesLearner::kHParamWorkerLogs[];
-constexpr char DistributedGradientBoostedTreesLearner::
-    kHParamMaxUniqueValuesForDiscretizedNumerical[];
-constexpr char DistributedGradientBoostedTreesLearner::
-    kHParamForceNumericalDiscretization[];
-
 model::proto::LearnerCapabilities
 DistributedGradientBoostedTreesLearner::Capabilities() const {
   model::proto::LearnerCapabilities capabilities;

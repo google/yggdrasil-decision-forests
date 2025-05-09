@@ -56,8 +56,6 @@ namespace distributed_gradient_boosted_trees {
 
 using ::yggdrasil_decision_forests::model::gradient_boosted_trees::LossResults;
 
-constexpr char DistributedGradientBoostedTreesWorker::kWorkerKey[];
-
 DistributedGradientBoostedTreesWorker::
     ~DistributedGradientBoostedTreesWorker() {
   if (worker_logs_) {

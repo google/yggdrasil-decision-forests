@@ -77,18 +77,6 @@ namespace model {
 namespace random_forest {
 
 constexpr double kAdaptativeWarmUpSeconds = 5.0;
-constexpr char RandomForestLearner::kRegisteredName[];
-constexpr char RandomForestLearner::kHParamNumTrees[];
-constexpr char RandomForestLearner::kHParamWinnerTakeAll[];
-constexpr char RandomForestLearner::
-    kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration[];
-constexpr char RandomForestLearner::kHParamComputeOOBPerformances[];
-constexpr char RandomForestLearner::kHParamComputeOOBVariableImportance[];
-constexpr char RandomForestLearner::kHParamBootstrapTrainingDataset[];
-constexpr char RandomForestLearner::kHParamBootstrapSizeRatio[];
-constexpr char
-    RandomForestLearner::kHParamNumOOBVariableImportancePermutations[];
-constexpr char RandomForestLearner::kHParamSamplingWithReplacement[];
 
 RandomForestLearner::RandomForestLearner(
     const model::proto::TrainingConfig& training_config)

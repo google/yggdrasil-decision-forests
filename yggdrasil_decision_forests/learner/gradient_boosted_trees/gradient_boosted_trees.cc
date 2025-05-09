@@ -89,54 +89,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-constexpr char GradientBoostedTreesLearner::kRegisteredName[];
-
-// Generic hyper parameter names.
-constexpr char GradientBoostedTreesLearner::kHParamNumTrees[];
-constexpr char GradientBoostedTreesLearner::kHParamShrinkage[];
-constexpr char GradientBoostedTreesLearner::kHParamL1Regularization[];
-constexpr char GradientBoostedTreesLearner::kHParamL2Regularization[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamL2CategoricalRegularization[];
-constexpr char GradientBoostedTreesLearner::kHParamLambdaLoss[];
-constexpr char GradientBoostedTreesLearner::kHParamDartDropOut[];
-constexpr char GradientBoostedTreesLearner::
-    kHParamAdaptSubsampleForMaximumTrainingDuration[];
-constexpr char GradientBoostedTreesLearner::kHParamUseHessianGain[];
-constexpr char GradientBoostedTreesLearner::kHParamSamplingMethod[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodNone[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodRandom[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodGOSS[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodSelGB[];
-constexpr char GradientBoostedTreesLearner::kHParamGossAlpha[];
-constexpr char GradientBoostedTreesLearner::kHParamGossBeta[];
-constexpr char GradientBoostedTreesLearner::kHParamSelGBRatio[];
-constexpr char GradientBoostedTreesLearner::kHParamSubsample[];
-
-constexpr char GradientBoostedTreesLearner::kHParamForestExtraction[];
-constexpr char GradientBoostedTreesLearner::kHParamForestExtractionMart[];
-constexpr char GradientBoostedTreesLearner::kHParamForestExtractionDart[];
-
-constexpr char GradientBoostedTreesLearner::kHParamValidationSetRatio[];
-constexpr char GradientBoostedTreesLearner::kHParamEarlyStopping[];
-constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingNone[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamEarlyStoppingMinLossFullModel[];
-constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingLossIncrease[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamEarlyStoppingInitialIteration[];
-constexpr char GradientBoostedTreesLearner::kHParamApplyLinkFunction[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamComputePermutationVariableImportance[];
-constexpr char GradientBoostedTreesLearner::kHParamValidationIntervalInTrees[];
-constexpr char GradientBoostedTreesLearner::kHParamLoss[];
-constexpr char GradientBoostedTreesLearner::kHParamFocalLossGamma[];
-constexpr char GradientBoostedTreesLearner::kHParamFocalLossAlpha[];
-constexpr char GradientBoostedTreesLearner::kHParamNDCGTruncation[];
-constexpr char GradientBoostedTreesLearner::kHParamXENDCGTruncation[];
-
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
 using EarlyStopping = ::yggdrasil_decision_forests::learner::
