@@ -135,6 +135,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamNDCGTruncation[] = "ndcg_truncation";
   static constexpr char kHParamXENDCGTruncation[] =
       "cross_entropy_ndcg_truncation";
+  static constexpr char kHParamTotalMaxNumNodes[] = "total_max_num_nodes";
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,

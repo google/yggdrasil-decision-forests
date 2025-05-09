@@ -2062,6 +2062,13 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamTotalMaxNumNodes);
+    if (hparam.has_value()) {
+      gbt_config->set_total_max_num_nodes(hparam.value().value().integer());
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -2572,6 +2579,17 @@ For example, in the case of binary classification, the pre-link function output 
         kHParamFocalLossAlpha);
     param.mutable_mutual_exclusive()->add_other_parameters(
         kHParamFocalLossGamma);
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamTotalMaxNumNodes);
+    param.mutable_integer()->set_minimum(-1);
+    param.mutable_integer()->set_default_value(
+        gbt_config.total_max_num_nodes());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Limit the total number of nodes in the model over all trees. This limit is an upper bound that may not be reached exactly. If the value is smaller than the number of nodes of a single tree according to other hyperparameter, the learner may return an empty model. This hyperparameter is useful for hyperparameter tuning models with very few nodes for small model size and fast inference. For training individual models, prefer adapting max_num_nodes / max_depth and num_trees. Set to -1 (default) for no limit.)");
   }
 
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(

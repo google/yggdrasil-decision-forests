@@ -145,6 +145,50 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
 
     self._check_adult_model(learner=learner, minimum_accuracy=0.869)
 
+  def test_adult_total_max_num_nodes(self):
+    def count_nodes(node):
+      if node.is_leaf:
+        return 1
+      return 1 + count_nodes(node.neg_child) + count_nodes(node.pos_child)
+
+    def count_total_nodes(model):
+      total = 0
+      for i in range(model.num_trees()):
+        t = model.get_tree(i)
+        cur = count_nodes(t.root)
+        total += cur
+      return total
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="income", total_max_num_nodes=300
+    ).train(self.adult.train)
+
+    self.assertLessEqual(count_total_nodes(model), 300)
+    self.assertGreaterEqual(count_total_nodes(model), 200)
+
+  def test_adult_multiclass_total_max_num_nodes(self):
+    def count_nodes(node):
+      if node.is_leaf:
+        return 1
+      return 1 + count_nodes(node.neg_child) + count_nodes(node.pos_child)
+
+    def count_total_nodes(model):
+      total = 0
+      for i in range(model.num_trees()):
+        t = model.get_tree(i)
+        cur = count_nodes(t.root)
+        total += cur
+      return total
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="race", total_max_num_nodes=300
+    ).train(self.adult.train)
+
+    self.assertLessEqual(count_total_nodes(model), 300)
+    self.assertGreaterEqual(count_total_nodes(model), 200)
+    # One iteration of training with 5 trees per iteration.
+    self.assertEqual(model.num_trees(), 5)
+
   def test_model_type_ranking(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="col_float",

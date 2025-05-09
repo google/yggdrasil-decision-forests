@@ -186,7 +186,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         Default: "CART".
     categorical_set_split_greedy_maximum_mask_size: For categorical set splits
       e.g. texts. Maximum number of attribute values on the positive side of the
-      split mask. Smaller values might increase training speed but lead to worse
+      split mask. Smaller values might improve training speed but lead to worse
       models. Setting this parameter to 1 is equal to one-hot encoding the
       attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
@@ -1280,7 +1280,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         Default: "CART".
     categorical_set_split_greedy_maximum_mask_size: For categorical set splits
       e.g. texts. Maximum number of attribute values on the positive side of the
-      split mask. Smaller values might increase training speed but lead to worse
+      split mask. Smaller values might improve training speed but lead to worse
       models. Setting this parameter to 1 is equal to one-hot encoding the
       attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
@@ -1597,6 +1597,14 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       \\"sampling_method\\" is implicitly set to \\"RANDOM\\". In other words,
       to enable random subsampling, you only need to set "\\"subsample\\".
       Default: 1.0.
+    total_max_num_nodes: Limit the total number of nodes in the model over all
+      trees. This limit is an upper bound that may not be reached exactly. If
+      the value is smaller than the number of nodes of a single tree according
+      to other hyperparameter, the learner may return an empty model. This
+      hyperparameter is useful for hyperparameter tuning models with very few
+      nodes for small model size and fast inference. For training individual
+      models, prefer adapting max_num_nodes / max_depth and num_trees. Set to -1
+      (default) for no limit. Default: -1.
     uplift_min_examples_in_treatment: For uplift models only. Minimum number of
       examples per treatment in a node. Default: 5.
     uplift_split_score: For uplift models only. Splitter score i.e. score
@@ -1742,6 +1750,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       sparse_oblique_weights_power_of_two_min_exponent: Optional[int] = None,
       split_axis: str = "AXIS_ALIGNED",
       subsample: float = 1.0,
+      total_max_num_nodes: int = -1,
       uplift_min_examples_in_treatment: int = 5,
       uplift_split_score: str = "KULLBACK_LEIBLER",
       use_hessian_gain: bool = False,
@@ -1856,6 +1865,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         ),
         "split_axis": split_axis,
         "subsample": subsample,
+        "total_max_num_nodes": total_max_num_nodes,
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
         "uplift_split_score": uplift_split_score,
         "use_hessian_gain": use_hessian_gain,
@@ -2534,7 +2544,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         Default: "CART".
     categorical_set_split_greedy_maximum_mask_size: For categorical set splits
       e.g. texts. Maximum number of attribute values on the positive side of the
-      split mask. Smaller values might increase training speed but lead to worse
+      split mask. Smaller values might improve training speed but lead to worse
       models. Setting this parameter to 1 is equal to one-hot encoding the
       attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
