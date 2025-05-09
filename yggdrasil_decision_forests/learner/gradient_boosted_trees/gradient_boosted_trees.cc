@@ -1399,6 +1399,13 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
             vector_sequence_columns, /*use_gpu=*/deployment_.use_gpu()));
   }
 
+  std::optional<size_t> total_num_nodes;
+  size_t current_num_nodes = 0;
+  if (config.gbt_config->has_total_max_num_nodes() &&
+      config.gbt_config->total_max_num_nodes() >= 0) {
+    total_num_nodes = config.gbt_config->total_max_num_nodes();
+  }
+
   // Time of the next snapshot if training resume is enabled.
   auto next_snapshot =
       absl::Now() +
@@ -1577,6 +1584,17 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
                                           gradient_validation_dataset,
                                           &validation_predictions,
                                           /*mean_abs_prediction=*/nullptr));
+      }
+    }
+
+    if (total_num_nodes.has_value()) {
+      for (auto& tree : new_trees) {
+        current_num_nodes += tree->NumNodes();
+      }
+      if (current_num_nodes > *total_num_nodes) {
+        LOG(INFO) << "Model has reached the maximum number of nodes, stopping "
+                     "training.";
+        break;
       }
     }
 

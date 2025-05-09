@@ -1590,6 +1590,24 @@ TEST_F(GradientBoostedTreesOnAdult, PoissonLoss) {
   TrainAndEvaluateModel();
 }
 
+TEST_F(GradientBoostedTreesOnAdult, TotalMaxNumNodes) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_total_max_num_nodes(1000);
+  TrainAndEvaluateModel();
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8575, 0.0115, 0.855);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3242, 0.0113, 0.3298);
+  auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  EXPECT_GE(gbt_model->NumTrees(), 18);
+  EXPECT_LE(gbt_model->NumTrees(), 22);
+  int64_t total_num_nodes = 0;
+  for (const auto& t : gbt_model->decision_trees()) {
+    total_num_nodes += t->NumNodes();
+  }
+  EXPECT_LE(total_num_nodes, 1000);
+}
+
 // Helper for the training and testing on two non-overlapping samples from the
 // Abalone dataset.
 class GradientBoostedTreesOnAbalone : public utils::TrainAndTestTester {
