@@ -7,6 +7,7 @@
 -   Support Python 3.13.
 -   Allow custom fields in model metadata.
 -   Compute SHAP value variable importances with `model.analyze`.
+-   Compute model's SHAP values with `model.predict_shap(dataset)`.
 
 ## 0.11.0 - 2025-03-12
 

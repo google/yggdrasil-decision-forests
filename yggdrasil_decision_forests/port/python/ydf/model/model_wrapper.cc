@@ -17,16 +17,19 @@
 
 #include <pybind11/numpy.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -47,6 +50,7 @@
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/shap.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
@@ -72,6 +76,109 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::Predict(
   } else {
     return PredictWithFastEngine(dataset, num_threads);
   }
+}
+
+absl::StatusOr<std::pair<std::unordered_map<std::string, py::array_t<float>>,
+                         py::array_t<float>>>
+GenericCCModel::PredictShap(const dataset::VerticalDataset& dataset,
+                            int num_threads) {
+  const size_t num_examples = dataset.nrow();
+
+  // Result numpy values
+  py::array_t<float, py::array::c_style | py::array::forcecast> initial_values;
+  py::array_t<float, py::array::c_style | py::array::forcecast> shap_values;
+  static_assert(initial_values.itemsize() == sizeof(float),
+                "A C++ float should have the same size as a numpy float");
+  static_assert(shap_values.itemsize() == sizeof(float),
+                "A C++ float should have the same size as a numpy float");
+
+  ASSIGN_OR_RETURN(const auto expected_shape, utils::shap::GetShape(*model_));
+  initial_values.resize({expected_shape.num_outputs});
+  shap_values.resize({num_examples, expected_shape.num_attributes,
+                      expected_shape.num_outputs});
+
+  // Fast accessors
+  auto unchecked_initial_values = initial_values.mutable_unchecked();
+  auto unchecked_shap_values = shap_values.mutable_unchecked();
+
+  {
+    py::gil_scoped_release release;
+
+    struct Cache {
+      dataset::proto::Example example;
+      utils::shap::ExampleShapValues example_shapes;
+    };
+
+    const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                  size_t block_size) -> Cache {
+      Cache cache;
+      return cache;
+    };
+
+    const auto run = [&unchecked_shap_values, &unchecked_initial_values,
+                      &dataset, this](size_t block_idx, size_t begin_item_idx,
+                                      size_t end_item_idx,
+                                      Cache* cache) -> absl::Status {
+      for (auto example_idx = begin_item_idx; example_idx < end_item_idx;
+           example_idx++) {
+        // Compute shape on example
+        dataset.ExtractExample(example_idx, &cache->example);
+        RETURN_IF_ERROR(utils::shap::tree_shap(
+            *model_, cache->example, &cache->example_shapes,
+            /*compute_bias=*/block_idx == 0));
+
+        // Save values in numpy array
+        const auto& raw_values = cache->example_shapes.values();
+        std::transform(raw_values.begin(), raw_values.end(),
+                       unchecked_shap_values.mutable_data(example_idx, 0, 0),
+                       [](double v) { return static_cast<float>(v); });
+
+        if (block_idx == 0) {
+          // Save the initial values
+          const auto& raw_values = cache->example_shapes.bias();
+          std::transform(raw_values.begin(), raw_values.end(),
+                         unchecked_initial_values.mutable_data(),
+                         [](double v) { return static_cast<float>(v); });
+        }
+      }
+      return absl::OkStatus();
+    };
+
+    RETURN_IF_ERROR(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+        /*num_items=*/num_examples,
+        /*max_num_threads=*/num_threads,
+        /*min_block_size=*/100,   // At least 100 examples in a batch
+        /*max_block_size=*/2000,  // No more than 2k examples in a batch
+        create_cache, run));
+  }
+
+  // Remove the output dimension if there is only one output.
+  if (expected_shape.num_outputs == 1) {
+    initial_values = initial_values.reshape({});
+  }
+
+  // Slice the SHAP value of each attribute.
+  std::unordered_map<std::string, py::array_t<float>> map_shaps;
+  const auto& input_features = model_->input_features();
+  const absl::flat_hash_set<int> input_features_set(input_features.begin(),
+                                                    input_features.end());
+  for (size_t attribute_idx = 0; attribute_idx < expected_shape.num_attributes;
+       attribute_idx++) {
+    if (!input_features_set.contains(attribute_idx)) {
+      continue;
+    }
+    py::tuple slice_index(3);
+    slice_index[0] = py::slice(0, num_examples, 1);
+    slice_index[1] = attribute_idx;
+    if (expected_shape.num_outputs == 1) {
+      slice_index[2] = 0;
+    } else {
+      slice_index[2] = py::slice(0, expected_shape.num_outputs, 1);
+    }
+    py::array slice = shap_values[slice_index];
+    map_shaps[model_->data_spec().columns(attribute_idx).name()] = slice;
+  }
+  return std::make_pair(std::move(map_shaps), std::move(initial_values));
 }
 
 absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithFastEngine(

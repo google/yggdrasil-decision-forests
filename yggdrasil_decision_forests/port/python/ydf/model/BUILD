@@ -29,6 +29,7 @@ pybind_library(
     deps = [
         ":pydf_models",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -37,6 +38,7 @@ pybind_library(
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:types",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/dataset:weight",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
@@ -53,6 +55,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:random",
+        "@ydf_cc//yggdrasil_decision_forests/utils:shap",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
         "@ydf_cc//yggdrasil_decision_forests/utils:synchronization_primitives",
         "@ydf_cc//yggdrasil_decision_forests/utils:uid",

@@ -20,11 +20,14 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_SHAP_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_SHAP_H_
 
+#include <stddef.h>
+
 #include <string>
 #include <vector>
 
 #include "absl/functional/function_ref.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
@@ -81,6 +84,13 @@ absl::Status tree_shap(const model::AbstractModel& model,
                        dataset::proto::Example& example,
                        ExampleShapValues* shap_values,
                        bool compute_bias = true);
+
+// Computes the shape of the SHAP values computed by "tree_shap".
+struct Shape {
+  size_t num_attributes;
+  size_t num_outputs;
+};
+absl::StatusOr<Shape> GetShape(const model::AbstractModel& model);
 
 namespace internal {
 

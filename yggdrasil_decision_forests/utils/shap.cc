@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/shap.h"
 
+#include <stddef.h>
+
 #include <cmath>
 #include <optional>
 #include <string>
@@ -415,6 +417,14 @@ std::string ExampleShapValues::ToString(
   }
   absl::StrAppend(&rep, "Bias:\n\t", absl::StrJoin(bias_, ", "), "\n");
   return rep;
+}
+
+absl::StatusOr<Shape> GetShape(const model::AbstractModel& model) {
+  ASSIGN_OR_RETURN(const auto accessor, internal::GetModelAccessor(model));
+  return Shape{
+      .num_attributes = static_cast<size_t>(model.data_spec().columns_size()),
+      .num_outputs = static_cast<size_t>(accessor.num_outputs),
+  };
 }
 
 absl::Status tree_shap(const model::AbstractModel& model,

@@ -24,20 +24,19 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
@@ -112,6 +111,10 @@ class GenericCCModel {
   absl::StatusOr<py::array_t<float>> Predict(
       const dataset::VerticalDataset& dataset, bool use_slow_engine,
       int num_threads);
+
+  absl::StatusOr<std::pair<std::unordered_map<std::string, py::array_t<float>>,
+                           py::array_t<float>>>
+  PredictShap(const dataset::VerticalDataset& dataset, int num_threads);
 
   // Predict using one of the fast engines. This function is used in the vast
   // majority of cases.

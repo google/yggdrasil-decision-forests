@@ -39,6 +39,16 @@ ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 Column = dataspec.Column
 
 
+def sigmoid(x: np.ndarray) -> np.ndarray:
+  return 1 / (1 + np.exp(-x))
+
+
+def softmax(x: np.ndarray) -> np.ndarray:
+  x_max = np.max(x, axis=1, keepdims=True)
+  e_x = np.exp(x - x_max)
+  return e_x / np.sum(e_x, axis=1, keepdims=True)
+
+
 class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
 
   def test_adult(self):
@@ -465,6 +475,49 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
       _ = specialized_learners.GradientBoostedTreesLearner(
           label="l", task=generic_learner.Task.REGRESSION
       ).train(pd.DataFrame({"l": ["A", "B"], "f": [0, 1]}))
+
+  def test_shap_adult(self):
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="income", num_trees=20
+    ).train(self.adult.train_pd)
+
+    shape_values, initial_values = model.predict_shap(self.adult.test_pd)
+
+    # Expected items
+    self.assertSameElements(model.input_feature_names(), shape_values.keys())
+    for _, v in shape_values.items():
+      self.assertEqual(v.shape, (self.adult.test_pd.shape[0],))
+    self.assertEqual(initial_values.shape, ())
+
+    # Predictions match
+    predictions = model.predict(self.adult.test_pd)
+    predictions_from_shap = sigmoid(
+        initial_values + np.sum([v for v in shape_values.values()], axis=0)
+    )
+    npt.assert_almost_equal(predictions, predictions_from_shap, decimal=5)
+
+  def test_shap_iris(self):
+    dataset = pd.read_csv(
+        os.path.join(test_utils.ydf_test_data_path(), "dataset", "iris.csv")
+    )
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="class", num_trees=20
+    ).train(dataset)
+
+    shape_values, initial_values = model.predict_shap(dataset)
+
+    # Expected items
+    self.assertSameElements(model.input_feature_names(), shape_values.keys())
+    for _, v in shape_values.items():
+      self.assertEqual(v.shape, (dataset.shape[0], 3))
+    self.assertEqual(initial_values.shape, (3,))
+
+    # Predictions match
+    predictions = model.predict(dataset)
+    predictions_from_shap = softmax(
+        initial_values + np.sum([v for v in shape_values.values()], axis=0)
+    )
+    npt.assert_almost_equal(predictions, predictions_from_shap, decimal=5)
 
 
 if __name__ == "__main__":

@@ -134,6 +134,11 @@ class GenericCCModel:
       use_slow_engine: bool,
       num_threads: int,
   ) -> npt.NDArray[np.float32]: ...
+  def PredictShap(
+      self,
+      dataset: VerticalDataset,
+      num_threads: int,
+  ) -> Tuple[Dict[str, npt.NDArray[np.float32]], npt.NDArray[np.float32]]: ...
   def Evaluate(
       self,
       dataset: VerticalDataset,
@@ -236,7 +241,6 @@ class RandomForestCCModel(DecisionForestCCModel):
 
 class IsolationForestCCModel(DecisionForestCCModel):
   def set_num_examples_per_tree(self, num_examples: int): ...
-
   @property
   def kRegisteredName(self): ...
   def num_examples_per_tree(self) -> int: ...

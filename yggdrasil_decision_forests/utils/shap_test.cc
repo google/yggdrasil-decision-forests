@@ -34,6 +34,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests::utils::shap {
 namespace {
@@ -172,6 +173,8 @@ TEST(Shape, ShapOnRegressiveCART2DL) {
   ExampleShapValues shap_values;
   model::proto::Prediction prediction;
 
+  ASSERT_OK_AND_ASSIGN(const auto expected_shape, GetShape(*test_data.model));
+
   test_data.dataset.ExtractExample(0, &example);
   test_data.model->Predict(example, &prediction);
   CHECK_OK(tree_shap(*test_data.model, example, &shap_values));
@@ -181,6 +184,8 @@ TEST(Shape, ShapOnRegressiveCART2DL) {
   EXPECT_THAT(shap_values.values(),
               ElementsAre(DoubleNear(0., kMargin), DoubleNear(-0.125, kMargin),
                           DoubleNear(0.375, kMargin)));
+  EXPECT_EQ(shap_values.num_outputs(), expected_shape.num_outputs);
+  EXPECT_EQ(shap_values.num_columns(), expected_shape.num_attributes);
 
   test_data.dataset.ExtractExample(1, &example);
   test_data.model->Predict(example, &prediction);
@@ -496,9 +501,13 @@ TEST(Shape, ShapOnGBTMultiClassClassificationIris) {
   ExampleShapValues shap_values;
   model::proto::Prediction prediction;
 
+  ASSERT_OK_AND_ASSIGN(const auto expected_shape, GetShape(*test_data.model));
+
   test_data.dataset.ExtractExample(0, &example);
   test_data.model->Predict(example, &prediction);
   CHECK_OK(tree_shap(*test_data.model, example, &shap_values));
+  EXPECT_EQ(shap_values.num_outputs(), expected_shape.num_outputs);
+  EXPECT_EQ(shap_values.num_columns(), expected_shape.num_attributes);
 
   std::vector<double> exp_sum_shaps(shap_values.num_outputs(), 0);
   double sum_exp_sum_shaps = 0;
