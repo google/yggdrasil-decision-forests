@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the following paper."
+authors:
+  - family-names: Guillame-Bert
+    given-names: Mathieu
+  - family-names: Bruch
+    given-names: Sebastian
+  - family-names: Stotz
+    given-names: Richard
+  - family-names: Pfeifer
+    given-names: Jan
+title: "Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library"
+conference: "Proceedings of the 29th ACM SIGKDD Conference on Knowledge Discovery and Data Mining (KDD 2023)"
+date-released: 2023-08-06
+pages: 4068-4077
+doi: 10.1145/3580305.3599933
+url: https://doi.org/10.1145/3580305.3599933
