@@ -60,6 +60,17 @@ message Options {
     optional int32 num_rounds = 2 [default = 1];
   }
 
+  optional ShapVariableImportance shap_variable_importance = 22;
+
+  message ShapVariableImportance {
+    // Enable the computation of Shap value variable importances.
+    optional bool enabled = 1 [default = true];
+
+    // Ratio of examples used to compute the shap value variable importances.
+    // Reduce this value to speed-up the computation.
+    optional float example_sampling = 2 [default = 1.];
+  }
+
   optional bool include_model_structural_variable_importances = 17
       [default = false];
 

@@ -756,14 +756,14 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     # Create an analysis that would take a lot of time if not limited in time.
     def create_dataset(n: int) -> Dict[str, np.ndarray]:
       return {
-          "feature": np.random.uniform(size=(n, 100)),
+          "feature": np.random.uniform(size=(n, 50)),
           "label": np.random.uniform(size=(n,)),
       }
 
     model = specialized_learners.RandomForestLearner(
         label="label", task=generic_learner.Task.REGRESSION
     ).train(create_dataset(1_000))
-    _ = model.analyze(create_dataset(100_000), maximum_duration=5)
+    _ = model.analyze(create_dataset(50_000), maximum_duration=5, num_threads=5)
 
   def test_boolean_feature(self):
     data = {

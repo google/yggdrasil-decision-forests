@@ -803,12 +803,16 @@ proto::Column* AddColumn(const absl::string_view name,
 
 proto::Column* AddNumericalColumn(const absl::string_view name,
                                   proto::DataSpecification* data_spec) {
-  return AddColumn(name, proto::ColumnType::NUMERICAL, data_spec);
+  auto col = AddColumn(name, proto::ColumnType::NUMERICAL, data_spec);
+  col->mutable_numerical();
+  return col;
 }
 
 proto::Column* AddBooleanColumn(const absl::string_view name,
                                 proto::DataSpecification* data_spec) {
-  return AddColumn(name, proto::ColumnType::BOOLEAN, data_spec);
+  auto col = AddColumn(name, proto::ColumnType::BOOLEAN, data_spec);
+  col->mutable_boolean();
+  return col;
 }
 
 proto::Column* AddCategoricalColumn(const absl::string_view name,

@@ -294,10 +294,13 @@ class BackwardSelectionFeatureSelector(
       if use_self_evaluation:
         variable_importances = model.variable_importances()
       else:
+        # TODO: Add support for sampling / max duration.
         variable_importances = model.analyze(
             valid,
             partial_dependence_plot=False,
             conditional_expectation_plot=False,
+            # TODO: Allow shap variable importances.
+            shap_values=False,
             maximum_duration=None,
         ).variable_importances()
 

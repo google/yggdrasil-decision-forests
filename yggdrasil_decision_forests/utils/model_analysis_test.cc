@@ -28,8 +28,10 @@
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -61,7 +63,10 @@ std::string ModelDir() {
       "yggdrasil_decision_forests/test_data/model");
 }
 
-TEST(ModelAnalysis, Classification) {
+// Note: The old golden models don't contain the necessary meta-data (the number
+// of training examples per nodes) to compute SHAP values. For this reason,
+// tests like "ClassificationGodenModel" don't show SHAP variable importances.
+TEST(ModelAnalysis, ClassificationGodenModel) {
   const std::string dataset_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_test.csv"));
   const std::string model_path =
@@ -83,6 +88,44 @@ TEST(ModelAnalysis, Classification) {
   options.set_num_threads(1);
   options.set_html_id_prefix("my_report");
   options.mutable_report_header()->set_enabled(false);
+  const auto report_path = file::JoinPath(test::TmpDirectory(), "analysis");
+
+  ASSERT_OK_AND_ASSIGN(const auto analysis,
+                       Analyse(*model.get(), dataset, options));
+  ASSERT_OK_AND_ASSIGN(const auto report,
+                       CreateHtmlReport(*model.get(), dataset, "MODEL_PATH",
+                                        "DATASET_PATH", analysis, options));
+}
+
+// Train a model and compute the full analysis. This test includes SHAP variable
+// importances.
+TEST(ModelAnalysis, ClassificationWithTraining) {
+  LOG(INFO) << "Load dataset";
+  const std::string dataset_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_test.csv"));
+  const auto dataspec = dataset::CreateDataSpec(dataset_path).value();
+  dataset::VerticalDataset dataset;
+  CHECK_OK(dataset::LoadVerticalDataset(dataset_path, dataspec, &dataset));
+
+  LOG(INFO) << "Train model";
+  auto model = model::GetLearner(PARSE_TEST_PROTO(R"pb(
+                 task: CLASSIFICATION
+                 label: "income"
+                 learner: "GRADIENT_BOOSTED_TREES"
+                 [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
+                      .gradient_boosted_trees_config] { num_trees: 20 }
+               )pb"))
+                   .value()
+                   ->TrainWithStatus(dataset)
+                   .value();
+
+  proto::Options options;
+  options.mutable_pdp()->set_example_sampling(0.01f);
+  options.mutable_cep()->set_example_sampling(0.1f);
+  options.set_num_threads(1);
+  options.set_html_id_prefix("my_report");
+  options.mutable_report_header()->set_enabled(false);
+  options.mutable_shap_variable_importance()->set_example_sampling(0.1);
   const auto report_path = file::JoinPath(test::TmpDirectory(), "analysis");
 
   ASSERT_OK_AND_ASSIGN(const auto analysis,
@@ -264,6 +307,112 @@ TEST(ModelAnalysis, PDPPlot) {
   EXPECT_EQ(c1->ys.size(), 50);
 
   // TODO: Add a more extensive unit test with a golden report.
+}
+
+TEST(ModelAnalysis, ShapValuesOnRegression) {
+  // Build a dataset
+  dataset::VerticalDataset dataset;
+  dataset::AddNumericalColumn("f1", dataset.mutable_data_spec());
+  dataset::AddNumericalColumn("f2", dataset.mutable_data_spec());
+  dataset::AddNumericalColumn("l", dataset.mutable_data_spec());
+  CHECK_OK(dataset.CreateColumnsFromDataspec());
+  // The dataset is large to show that sampling / max time is applied.
+  for (int i = 0; i < 1'000'000; i++) {
+    const float f1 = static_cast<float>(i % 1000) / 1000;
+    const float f2 = static_cast<float>((i * 793) % 1000) / 1000;
+    const float l = f1 - 0.5 * f2;
+    CHECK_OK(dataset.AppendExampleWithStatus({
+        {"l", absl::StrCat(l)},
+        {"f1", absl::StrCat(f1)},
+        {"f2", absl::StrCat(f2)},
+    }));
+  }
+
+  auto model = model::GetLearner(PARSE_TEST_PROTO(R"pb(
+                 task: REGRESSION
+                 label: "l"
+                 learner: "GRADIENT_BOOSTED_TREES"
+                 [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
+                      .gradient_boosted_trees_config] {
+                   num_trees: 20
+                   subsample: 0.001
+                   validation_set_ratio: 0.001
+                 }
+               )pb"))
+                   .value()
+                   ->TrainWithStatus(dataset)
+                   .value();
+
+  proto::Options options;
+  options.mutable_pdp()->set_enabled(false);
+  options.mutable_cep()->set_enabled(false);
+  options.mutable_permuted_variable_importance()->set_enabled(false);
+  options.mutable_shap_variable_importance()->set_example_sampling(0.5);
+  options.set_maximum_duration_seconds(5);
+  auto analysis = Analyse(*model, dataset, options).value();
+
+  // The model output predict := f1 - 0.5 x f2, so the VI of f1 (attribute 0) is
+  // twice the VI of f2 (attribute 1).
+  const auto& vas = analysis.variable_importances().find("SHAP_VALUE")->second;
+  ASSERT_EQ(vas.variable_importances_size(), 2);
+  EXPECT_EQ(vas.variable_importances(0).attribute_idx(), 0);
+  EXPECT_NEAR(vas.variable_importances(0).importance(), 0.2, 0.03);
+  EXPECT_EQ(vas.variable_importances(1).attribute_idx(), 1);
+  EXPECT_NEAR(vas.variable_importances(1).importance(), 0.1, 0.03);
+}
+
+TEST(ModelAnalysis, ShapValuesOnMultiClassClassification) {
+  // Build a dataset
+  dataset::VerticalDataset dataset;
+  dataset::AddNumericalColumn("f1", dataset.mutable_data_spec());
+  dataset::AddNumericalColumn("f2", dataset.mutable_data_spec());
+  dataset::AddCategoricalColumn("l", {"X", "Y", "Z"},
+                                dataset.mutable_data_spec());
+  CHECK_OK(dataset.CreateColumnsFromDataspec());
+  // The dataset is large to show that sampling / max time is applied.
+  for (int i = 0; i < 2000; i++) {
+    const float f1 = static_cast<float>(i % 1000) / 1000;
+    const float f2 = static_cast<float>((i * 793) % 1000) / 1000;
+    std::string label;
+    if (f2 >= 0.5f) {
+      label = "X";
+    } else if (f1 >= 0.5f) {
+      label = "Y";
+    } else {
+      label = "Z";
+    }
+    CHECK_OK(dataset.AppendExampleWithStatus({
+        {"l", label},
+        {"f1", absl::StrCat(f1)},
+        {"f2", absl::StrCat(f2)},
+    }));
+  }
+
+  auto model = model::GetLearner(PARSE_TEST_PROTO(R"pb(
+                 task: CLASSIFICATION
+                 label: "l"
+                 learner: "GRADIENT_BOOSTED_TREES"
+                 [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
+                      .gradient_boosted_trees_config] { num_trees: 20 }
+               )pb"))
+                   .value()
+                   ->TrainWithStatus(dataset)
+                   .value();
+
+  proto::Options options;
+  options.mutable_pdp()->set_enabled(false);
+  options.mutable_cep()->set_enabled(false);
+  options.mutable_permuted_variable_importance()->set_enabled(false);
+  options.set_maximum_duration_seconds(5);
+  auto analysis = Analyse(*model, dataset, options).value();
+
+  // Make sure that both features are important.
+  const auto& vas = analysis.variable_importances().find("SHAP_VALUE")->second;
+  ASSERT_EQ(vas.variable_importances_size(), 2);
+  EXPECT_EQ(vas.variable_importances(0).attribute_idx(), 1);
+  EXPECT_NEAR(vas.variable_importances(0).importance(), 4.937, 0.03);
+  EXPECT_EQ(vas.variable_importances(1).attribute_idx(), 0);
+  EXPECT_NEAR(vas.variable_importances(1).importance(), 2.483, 0.03);
 }
 
 TEST(PredictionAnalysis, Classification) {

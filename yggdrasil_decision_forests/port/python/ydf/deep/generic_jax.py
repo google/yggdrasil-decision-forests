@@ -477,6 +477,8 @@ class GenericJAXModel(generic_model.GenericModel):
       num_bins: int = 50,
       partial_dependence_plot: bool = True,
       conditional_expectation_plot: bool = True,
+      permutation_variable_importance: bool = True,
+      shap_values: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,

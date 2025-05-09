@@ -633,6 +633,8 @@ Use `model.describe()` for more details
       num_bins: int = 50,
       partial_dependence_plot: bool = True,
       conditional_expectation_plot: bool = True,
+      permutation_variable_importance: bool = True,
+      shap_values: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
@@ -681,6 +683,7 @@ Use `model.describe()` for more details
         Expensive to compute.
       conditional_expectation_plot: Compute the conditional expectation plots
         a.k.a. CEP. Cheap to compute.
+      shap_values: Compute SHAP values based metrics.
       permutation_variable_importance_rounds: If >1, computes permutation
         variable importances using "permutation_variable_importance_rounds"
         rounds. The most rounds the more accurate the results. Using a single
@@ -1648,6 +1651,8 @@ class GenericCCModel(GenericModel):
       num_bins: int = 50,
       partial_dependence_plot: bool = True,
       conditional_expectation_plot: bool = True,
+      permutation_variable_importance: bool = True,
+      shap_values: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
@@ -1658,7 +1663,7 @@ class GenericCCModel(GenericModel):
 
     enable_permutation_variable_importances = (
         permutation_variable_importance_rounds > 0
-    )
+    ) and permutation_variable_importance
     if (
         enable_permutation_variable_importances
         and self.task() == Task.ANOMALY_DETECTION
@@ -1694,8 +1699,13 @@ class GenericCCModel(GenericModel):
               enabled=enable_permutation_variable_importances,
               num_rounds=permutation_variable_importance_rounds,
           ),
+          shap_variable_importance=model_analysis_pb2.Options.ShapVariableImportance(
+              enabled=shap_values,
+              example_sampling=sampling,
+          ),
           include_model_structural_variable_importances=True,
       )
+      # TODO: Use "shap_values" to enable other SHAP based analyses.
       if features is not None:
         options_proto.features.extend(features)
 

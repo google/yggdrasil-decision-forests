@@ -48,6 +48,10 @@ double GetNumNodeExamples(const model::decision_tree::NodeWithChildren& node) {
   return node.node().num_pos_training_examples_without_weight();
 }
 
+bool HasNumNodeExamples(const model::decision_tree::NodeWithChildren& node) {
+  return node.node().has_num_pos_training_examples_without_weight();
+}
+
 double GetRegressionNodeValue(
     const model::decision_tree::NodeWithChildren& node, const int output_idx) {
   DCHECK_EQ(output_idx, 0);
@@ -332,6 +336,11 @@ absl::Status GetModelBias(const ModelAccessor& accessor,
     const auto& tree = accessor.decision_forest->decision_trees()[tree_idx];
     const int output_idx_per_tree = tree_idx % accessor.num_outputs;
 
+    if (!HasNumNodeExamples(tree->root())) {
+      return absl::InvalidArgumentError(
+          "The model does not have number of examples per nodes meta-data");
+    }
+
     tree->IterateOnNodes([&accessor, &bias, &num_examples, output_idx_per_tree](
                              const model::decision_tree::NodeWithChildren& node,
                              const int depth) {
@@ -431,6 +440,12 @@ absl::Status tree_shap(const model::AbstractModel& model,
   const int num_trees = accessor.decision_forest->decision_trees().size();
   for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
     const auto& tree = accessor.decision_forest->decision_trees()[tree_idx];
+
+    if (!HasNumNodeExamples(tree->root())) {
+      return absl::InvalidArgumentError(
+          "The model does not have number of examples per nodes meta-data");
+    }
+
     path.clear();
     // Note: Unlike the paper, we use the magic value of -1 instead of 0 for
     // "attribute_idx".

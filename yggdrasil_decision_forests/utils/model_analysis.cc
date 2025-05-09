@@ -833,6 +833,14 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
          options.permuted_variable_importance().num_rounds()}));
   }
 
+  if (options.shap_variable_importance().enabled()) {
+    RETURN_IF_ERROR(ComputeShapFeatureImportance(
+        dataset, &model, analysis.mutable_variable_importances(),
+        {.num_threads = options.num_threads(),
+         .max_duration_seconds = maximum_duration_seconds,
+         .sampling = options.shap_variable_importance().example_sampling()}));
+  }
+
   if (options.include_model_structural_variable_importances()) {
     auto& dst_map = *analysis.mutable_variable_importances();
     for (const auto& key : model.AvailableVariableImportances()) {
