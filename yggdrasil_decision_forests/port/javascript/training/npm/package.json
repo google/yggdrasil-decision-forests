@@ -21,7 +21,7 @@
     "decision-tree",
     "tensorflow-decision-forest"
   ],
-  "author": "Google Decision Forests <decision-forests-contact@google.com> (https://https://github.com/google/yggdrasil-decision-forests/)",
+  "author": "Google Decision Forests <decision-forests-contact@google.com> (https://github.com/google/yggdrasil-decision-forests/)",
   "contributors": ["Mathieu Guillame-Bert", "Richard Stotz"],
   "license": "Apache-2.0",
   "bugs": {
