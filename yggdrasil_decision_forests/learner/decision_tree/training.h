@@ -773,6 +773,7 @@ FindSplitLabelHessianRegressionFeatureCategorical(
 //    return positive_set
 //
 // `weights` may be empty and this is equivalent to unit weights.
+template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     absl::Span<const UnsignedExampleIdx> selected_examples,
