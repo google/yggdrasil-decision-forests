@@ -94,18 +94,21 @@ absl::Status AnalyseAndCreateHtmlReport(const model::AbstractModel& model,
 
 namespace internal {
 
+// Returns a string representation of a "bar" showing a signed shap value
+// between -range and range.
+std::string ShapRepr(float range, float value, int bar_len = 16);
+
 absl::StatusOr<utils::plot::MultiPlot> PlotConditionalExpectationPlotSet(
     const dataset::proto::DataSpecification& data_spec,
-    const ConditionalExpectationPlotSet& cond_set,
-    const model::proto::Task task, const int label_col_idx,
-    const proto::Options& options, int* recommended_width_px,
+    const ConditionalExpectationPlotSet& cond_set, model::proto::Task task,
+    int label_col_idx, const proto::Options& options, int* recommended_width_px,
     int* recommended_height_px);
 
 absl::StatusOr<utils::plot::MultiPlot> PlotPartialDependencePlotSet(
     const dataset::proto::DataSpecification& data_spec,
-    const PartialDependencePlotSet& pdp_set, const model::proto::Task task,
-    const int label_col_idx, const proto::Options& options,
-    int* recommended_width_px, int* recommended_height_px);
+    const PartialDependencePlotSet& pdp_set, model::proto::Task task,
+    int label_col_idx, const proto::Options& options, int* recommended_width_px,
+    int* recommended_height_px);
 
 }  // namespace internal
 }  // namespace model_analysis

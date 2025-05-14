@@ -737,6 +737,7 @@ Use `model.describe()` for more details
         Expensive to compute.
       conditional_expectation_plot: Compute the conditional expectation plots
         a.k.a. CEP. Cheap to compute.
+      permutation_variable_importance: Compute permutation variable importances.
       shap_values: Compute SHAP values based metrics.
       permutation_variable_importance_rounds: If >1, computes permutation
         variable importances using "permutation_variable_importance_rounds"

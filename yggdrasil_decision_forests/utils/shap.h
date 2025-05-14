@@ -81,7 +81,7 @@ class ExampleShapValues {
 // in "shap_values". The biases (e.g. "shap_values.bias()") is only computed
 // if "compute_bias = true".
 absl::Status tree_shap(const model::AbstractModel& model,
-                       dataset::proto::Example& example,
+                       const dataset::proto::Example& example,
                        ExampleShapValues* shap_values,
                        bool compute_bias = true);
 

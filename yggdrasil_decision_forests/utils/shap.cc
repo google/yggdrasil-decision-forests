@@ -428,7 +428,7 @@ absl::StatusOr<Shape> GetShape(const model::AbstractModel& model) {
 }
 
 absl::Status tree_shap(const model::AbstractModel& model,
-                       dataset::proto::Example& example,
+                       const dataset::proto::Example& example,
                        ExampleShapValues* shap_values, bool compute_bias) {
   if (model.weights().has_value()) {
     return absl::InvalidArgumentError(

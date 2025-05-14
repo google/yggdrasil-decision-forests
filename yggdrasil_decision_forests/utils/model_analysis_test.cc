@@ -25,6 +25,7 @@
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -440,6 +441,70 @@ TEST(PredictionAnalysis, Classification) {
   ASSERT_OK_AND_ASSIGN(const auto report, CreateHtmlReport(analysis, options));
 }
 
+TEST(PredictionAnalysis, ClassificationWithTraining) {
+  LOG(INFO) << "Load dataset";
+  const std::string dataset_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_train.csv"));
+  const auto dataspec = dataset::CreateDataSpec(dataset_path).value();
+  dataset::VerticalDataset dataset;
+  CHECK_OK(dataset::LoadVerticalDataset(dataset_path, dataspec, &dataset));
+
+  LOG(INFO) << "Train model";
+  auto model = model::GetLearner(PARSE_TEST_PROTO(R"pb(
+                 task: CLASSIFICATION
+                 label: "income"
+                 learner: "GRADIENT_BOOSTED_TREES"
+                 [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
+                      .gradient_boosted_trees_config] { num_trees: 20 }
+               )pb"))
+                   .value()
+                   ->TrainWithStatus(dataset)
+                   .value();
+
+  proto::PredictionAnalysisOptions options;
+  options.set_html_id_prefix("my_prefix");
+  dataset::proto::Example example;
+  dataset.ExtractExample(0, &example);
+  ASSERT_OK_AND_ASSIGN(const auto analysis,
+                       AnalyzePrediction(*model, example, options));
+  ASSERT_OK_AND_ASSIGN(const auto report, CreateHtmlReport(analysis, options));
+
+  EXPECT_TRUE(absl::StrContains(report, "SHAP values"));
+  EXPECT_TRUE(absl::StrContains(report, "      |+++++"));
+}
+
+TEST(PredictionAnalysis, ClassificationMultiClassWithTraining) {
+  LOG(INFO) << "Load dataset";
+  const std::string dataset_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "iris.csv"));
+  const auto dataspec = dataset::CreateDataSpec(dataset_path).value();
+  dataset::VerticalDataset dataset;
+  CHECK_OK(dataset::LoadVerticalDataset(dataset_path, dataspec, &dataset));
+
+  LOG(INFO) << "Train model";
+  auto model = model::GetLearner(PARSE_TEST_PROTO(R"pb(
+                 task: CLASSIFICATION
+                 label: "class"
+                 learner: "GRADIENT_BOOSTED_TREES"
+                 [yggdrasil_decision_forests.model.gradient_boosted_trees.proto
+                      .gradient_boosted_trees_config] { num_trees: 20 }
+               )pb"))
+                   .value()
+                   ->TrainWithStatus(dataset)
+                   .value();
+
+  proto::PredictionAnalysisOptions options;
+  options.set_html_id_prefix("my_prefix");
+  dataset::proto::Example example;
+  dataset.ExtractExample(0, &example);
+  ASSERT_OK_AND_ASSIGN(const auto analysis,
+                       AnalyzePrediction(*model, example, options));
+  ASSERT_OK_AND_ASSIGN(const auto report, CreateHtmlReport(analysis, options));
+
+  EXPECT_TRUE(absl::StrContains(report, "SHAP values"));
+  EXPECT_TRUE(absl::StrContains(report, "      |+++++"));
+}
+
 TEST(PredictionAnalysis, AnomalyDetection) {
   const std::string dataset_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "gaussians_test.csv"));
@@ -565,6 +630,15 @@ TEST(PredictionAnalysis, ToyModel) {
                   )pb")));
 
   ASSERT_OK_AND_ASSIGN(const auto report, CreateHtmlReport(analysis, options));
+}
+
+TEST(PredictionAnalysis, ShapRepr) {
+  EXPECT_EQ(internal::ShapRepr(4, 0, 4), "    |    ");
+  EXPECT_EQ(internal::ShapRepr(4, 4, 4), "    |++++");
+  EXPECT_EQ(internal::ShapRepr(4, 2, 4), "    |++  ");
+  EXPECT_EQ(internal::ShapRepr(4, -2, 4), "  --|    ");
+  EXPECT_EQ(internal::ShapRepr(4, -4, 4), "----|    ");
+  EXPECT_EQ(internal::ShapRepr(0, 0, 4), "    |    ");
 }
 
 }  // namespace
