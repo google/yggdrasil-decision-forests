@@ -37,6 +37,7 @@
 #include "absl/container/btree_set.h"
 #include "absl/container/fixed_array.h"
 #include "absl/log/log.h"
+#include "absl/log/scoped_mock_log.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -83,7 +84,10 @@ namespace gradient_boosted_trees {
 namespace {
 
 using test::EqualsProto;
+using ::testing::_;
+using ::testing::AnyNumber;
 using ::testing::ElementsAre;
+using ::testing::HasSubstr;
 using ::testing::IsEmpty;
 using ::testing::SizeIs;
 using ::testing::UnorderedElementsAre;
@@ -2213,6 +2217,36 @@ TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingInitialIteration) {
   const GradientBoostedTreesModel* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model.get());
   EXPECT_EQ(gbt_model->NumTrees(), 1);
+}
+
+TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingTooEarlyStopWarning) {
+  absl::ScopedMockLog log;
+  EXPECT_CALL(log, Log).Times(AnyNumber());
+  EXPECT_CALL(
+      log,
+      Log(absl::LogSeverity::kWarning, _,
+          HasSubstr(
+              "The best validation loss was obtained during iteration 3")));
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  // Configure model training.
+  model::proto::DeploymentConfig deployment_config;
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::CLASSIFICATION);
+  train_config.set_label("b");
+  train_config.add_features("a");
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  auto* gbt_config = train_config.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_early_stopping_num_trees_look_ahead(1);
+  gbt_config->set_early_stopping_initial_iteration(3);
+  gbt_config->set_validation_set_ratio(0.3f);
+  ASSERT_OK(model::GetLearner(train_config, &learner, deployment_config));
+
+  log.StartCapturingLogs();
+  ASSERT_OK(learner->TrainWithStatus(dataset));
 }
 
 TEST_F(GradientBoostedTreesOnIris, InterruptAndResumeTraining) {
