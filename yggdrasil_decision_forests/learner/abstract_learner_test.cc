@@ -161,6 +161,50 @@ TEST(AbstractModel, LinkTrainingConfigAnomalyDetectionWithLabel) {
   EXPECT_THAT(config_link.features(), ElementsAre(1, 2));
 }
 
+TEST(AbstractModel, LinkTrainingConfigSurvivalAnalysisWithoutEntryAge) {
+  proto::TrainingConfig training_config;
+  training_config.set_task(proto::Task::SURVIVAL_ANALYSIS);
+  training_config.set_label("A");
+  training_config.set_label_event_observed("B");
+
+  dataset::proto::DataSpecification data_spec;
+  data_spec.add_columns()->set_name("A");
+  data_spec.add_columns()->set_name("B");
+  data_spec.add_columns()->set_name("C");
+  data_spec.add_columns()->set_name("D");
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_EQ(config_link.label(), 0);
+  EXPECT_EQ(config_link.label_event_observed(), 1);
+  EXPECT_THAT(config_link.features(), ElementsAre(2, 3));
+}
+
+TEST(AbstractModel, LinkTrainingConfigSurvivalAnalysisWithEntryAge) {
+  proto::TrainingConfig training_config;
+  training_config.set_task(proto::Task::SURVIVAL_ANALYSIS);
+  training_config.set_label("A");
+  training_config.set_label_event_observed("B");
+  training_config.set_label_entry_age("C");
+
+  dataset::proto::DataSpecification data_spec;
+  data_spec.add_columns()->set_name("A");
+  data_spec.add_columns()->set_name("B");
+  data_spec.add_columns()->set_name("C");
+  data_spec.add_columns()->set_name("D");
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_EQ(config_link.label(), 0);
+  EXPECT_EQ(config_link.label_event_observed(), 1);
+  EXPECT_EQ(config_link.label_entry_age(), 2);
+  EXPECT_THAT(config_link.features(), ElementsAre(3));
+}
+
 TEST(AbstractLearner, GenericHyperParameters) {
   const model::proto::GenericHyperParameterSpecification hparam_spec =
       PARSE_TEST_PROTO(R"pb(

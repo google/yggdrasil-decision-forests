@@ -130,6 +130,13 @@ message TrainingConfig {
   // number of observations = 0 and maximum numbers of items = -1 => infinity).
   optional string ranking_group = 8;
 
+  // NUMERICAL column identifying the optional entry age (a.k.a. left censoring)
+  // column in SURVIVAL_ANALYSIS task.
+  optional string label_entry_age = 16;
+
+  // BOOLEAN column indicating observed events in a SURVIVAL_ANALYSIS task.
+  optional string label_event_observed = 17;
+
   // Maximum training duration of the training expressed in seconds. If the
   // learner does not support constrained the training time, the training will
   // fails immediately. Each learning algorithm is free to use this parameter as
@@ -199,6 +206,13 @@ message TrainingConfigLinking {
 
   // Index of the column matching "cv_group" in the "TrainingConfig".
   optional int32 cv_group = 4;
+
+  // Index of the column matching "label_entry_age" in the "TrainingConfig".
+  optional int32 label_entry_age = 14 [default = -1];
+
+  // Index of the column matching "label_event_observed" in the
+  // "TrainingConfig".
+  optional int32 label_event_observed = 15 [default = -1];
 
   optional dataset.proto.LinkedWeightDefinition weight_definition = 7;
 

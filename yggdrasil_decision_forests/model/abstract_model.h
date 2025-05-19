@@ -182,6 +182,18 @@ class AbstractModel {
     return data_spec().columns(label_col_idx());
   }
 
+  // Get/set survival analysis labels
+  void set_label_entry_age_col_idx(int col_idx) {
+    label_entry_age_col_idx_ = col_idx;
+  }
+  int label_entry_age_col_idx() const { return label_entry_age_col_idx_; }
+  void set_label_event_observed_col_idx(int col_idx) {
+    label_event_observed_col_idx_ = col_idx;
+  }
+  int label_event_observed_col_idx() const {
+    return label_event_observed_col_idx_;
+  }
+
   // Get the weights used during training..
   std::optional<dataset::proto::LinkedWeightDefinition> weights() const {
     return weights_;
@@ -530,6 +542,10 @@ class AbstractModel {
   // Column index of uplift treatment.
   int uplift_treatment_col_idx_ = -1;
 
+  // Column indexes of survival analysis task.
+  int label_entry_age_col_idx_ = -1;
+  int label_event_observed_col_idx_ = -1;
+
   // Example weight used during training. If not specified, all the examples
   // have the same weight.
   std::optional<dataset::proto::LinkedWeightDefinition> weights_;
@@ -591,13 +607,18 @@ struct GroundTruthColumnIndices {
   const int label_col_idx;
   const int group_col_idx;
   const int uplift_treatment_col_idx;
+  const int entry_age_col_idx;
+  const int event_observed_col_idx;
 
   GroundTruthColumnIndices(
       const int label_col_idx, const int group_col_idx = kNoRankingGroup,
-      const int uplift_treatment_col_idx = kNoUpliftTreatmentGroup)
+      const int uplift_treatment_col_idx = kNoUpliftTreatmentGroup,
+      const int entry_age_col_idx = -1, const int event_observed_col_idx = -1)
       : label_col_idx(label_col_idx),
         group_col_idx(group_col_idx),
-        uplift_treatment_col_idx(uplift_treatment_col_idx) {}
+        uplift_treatment_col_idx(uplift_treatment_col_idx),
+        entry_age_col_idx(entry_age_col_idx),
+        event_observed_col_idx(event_observed_col_idx) {}
 };
 
 // Note: The "task" defines how the label are interpreted and how the

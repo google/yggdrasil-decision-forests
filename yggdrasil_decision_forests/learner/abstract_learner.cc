@@ -128,6 +128,36 @@ absl::Status AbstractLearner::LinkTrainingConfig(
   }
   config_link->set_uplift_treatment(uplift_treatment);
 
+  // Survival analysis
+  int32_t entry_age = -1;
+  int32_t event_observed = -1;
+  if (training_config.task() == proto::SURVIVAL_ANALYSIS) {
+    if (!training_config.has_label_event_observed())
+      return absl::InvalidArgumentError(
+          "\"event_observed\" should be specified for the SURVIVAL_ANALYSIS "
+          "task.");
+    // Note: The "label_entry_age" column is optional.
+    RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+        training_config.label_event_observed(), data_spec, &event_observed,
+        "Retrieving event_observed column failed. "));
+    if (training_config.has_label_entry_age()) {
+      RETURN_IF_ERROR(dataset::GetSingleColumnIdxFromName(
+          training_config.label_entry_age(), data_spec, &entry_age,
+          "Retrieving entry_age column failed. "));
+    }
+  } else {
+    if (training_config.has_label_entry_age())
+      return absl::InvalidArgumentError(
+          "\"label_entry_age\" can only be used for the SURVIVAL_ANALYSIS "
+          "task");
+    if (training_config.has_label_event_observed())
+      return absl::InvalidArgumentError(
+          "\"label_event_observed\" can only be used for the SURVIVAL_ANALYSIS "
+          "task");
+  }
+  config_link->set_label_entry_age(entry_age);
+  config_link->set_label_event_observed(event_observed);
+
   // Weights.
   if (training_config.has_weight_definition()) {
     RETURN_IF_ERROR(dataset::GetLinkedWeightDefinition(
@@ -188,6 +218,27 @@ absl::Status AbstractLearner::LinkTrainingConfig(
       LOG(INFO) << "The cv_group \"" << training_config.cv_group()
                 << "\" was removed from the input feature set.";
       feature_idxs.erase(it_cv_group_result);
+    }
+  }
+
+  // Remove secondary survival labels.
+  if (entry_age != -1) {
+    auto it_feature =
+        std::find(feature_idxs.begin(), feature_idxs.end(), entry_age);
+    if (it_feature != feature_idxs.end()) {
+      LOG(INFO) << "The entry_age \"" << training_config.label_entry_age()
+                << "\" was removed from the input feature set.";
+      feature_idxs.erase(it_feature);
+    }
+  }
+  if (event_observed != -1) {
+    auto it_feature =
+        std::find(feature_idxs.begin(), feature_idxs.end(), event_observed);
+    if (it_feature != feature_idxs.end()) {
+      LOG(INFO) << "The event_observed \""
+                << training_config.label_event_observed()
+                << "\" was removed from the input feature set.";
+      feature_idxs.erase(it_feature);
     }
   }
 
@@ -623,6 +674,38 @@ absl::Status AbstractLearner::CheckConfiguration(
     } break;
     case model::proto::Task::ANOMALY_DETECTION:
       return absl::InternalError("ANOMALY_DETECTION has no labels");
+
+    case model::proto::Task::SURVIVAL_ANALYSIS: {
+      if (label_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("The label column \"", config.label(),
+                         "\" should be NUMERICAL for a SURVIVAL_ANALYSIS "
+                         "Task."));
+      }
+      if (!config_link.has_label_event_observed() ||
+          config_link.label_event_observed() < 0) {
+        return absl::InvalidArgumentError(
+            "The \"event_observed\" is not defined but required for an "
+            "SURVIVAL_ANALYSIS task.");
+      }
+      const auto& event_observed_col_spec =
+          data_spec.columns(config_link.label_event_observed());
+      if (event_observed_col_spec.type() !=
+          dataset::proto::ColumnType::BOOLEAN) {
+        return absl::InvalidArgumentError(
+            "The \"event_observed\" column must be BOOLEAN.");
+      }
+      if (config_link.has_label_entry_age() &&
+          config_link.label_entry_age() >= 0) {
+        const auto& entry_age_col_spec =
+            data_spec.columns(config_link.label_entry_age());
+        if (entry_age_col_spec.type() !=
+            dataset::proto::ColumnType::NUMERICAL) {
+          return absl::InvalidArgumentError(
+              "The \"entry_age\" column must be NUMERICAL.");
+        }
+      }
+    } break;
   }
   // Check the label don't contains NaN.
   if (label_col_spec.count_nas() != 0) {
@@ -861,6 +944,15 @@ void InitializeModelWithAbstractTrainingConfig(
     model->set_uplift_treatment_col(training_config_linking.uplift_treatment());
   }
 
+  if (training_config.task() == proto::Task::SURVIVAL_ANALYSIS) {
+    model->set_label_event_observed_col_idx(
+        training_config_linking.label_event_observed());
+    if (training_config_linking.has_label_entry_age()) {
+      model->set_label_entry_age_col_idx(
+          training_config_linking.label_entry_age());
+    }
+  }
+
   model->set_task(training_config.task());
   model->mutable_input_features()->assign(
       training_config_linking.features().begin(),
@@ -974,6 +1066,28 @@ absl::Status CopyProblemDefinition(const proto::TrainingConfig& src,
     }
   }
 
+  if (src.has_label_entry_age()) {
+    if (dst->has_label_entry_age() &&
+        dst->label_entry_age() != src.label_entry_age()) {
+      return absl::InvalidArgumentError(
+          absl::Substitute("Invalid label_entry_age. $0 != $1",
+                           src.label_entry_age(), dst->label_entry_age()));
+    } else {
+      dst->set_label_entry_age(src.label_entry_age());
+    }
+  }
+
+  if (src.has_label_event_observed()) {
+    if (dst->has_label_event_observed() &&
+        dst->label_event_observed() != src.label_event_observed()) {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "Invalid label_event_observed. $0 != $1", src.label_event_observed(),
+          dst->label_event_observed()));
+    } else {
+      dst->set_label_event_observed(src.label_event_observed());
+    }
+  }
+
   if (src.has_weight_definition()) {
     if (dst->has_weight_definition() &&
         dst->weight_definition().DebugString() !=
@@ -1009,7 +1123,13 @@ dataset::LoadConfig OptimalDatasetLoadingConfig(
       link_config.uplift_treatment() >= 0) {
     load_config.load_columns->push_back(link_config.uplift_treatment());
   }
-
+  if (link_config.has_label_entry_age() && link_config.label_entry_age() >= 0) {
+    load_config.load_columns->push_back(link_config.label_entry_age());
+  }
+  if (link_config.has_label_event_observed() &&
+      link_config.label_event_observed() >= 0) {
+    load_config.load_columns->push_back(link_config.label_event_observed());
+  }
   if (link_config.has_weight_definition()) {
     load_config.load_columns->push_back(
         link_config.weight_definition().attribute_idx());
