@@ -85,15 +85,13 @@ function test_package() {
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*.manylinux2014_${ARCHITECTURE}.whl"
   fi
   ${PIP} install ${PACKAGEPATH} --force-reinstall
-
+  ${PIP} install pandas
   ${PIP} list
   ${PIP} show ydf -f
 
   # Run a small example (in different folder to avoid clashes)
   local current_folder=$(basename "$PWD")
   pushd ..
-  ${PIP} install -r $current_folder/dev_requirements.txt
-  ${PIP} install -r $current_folder/requirements.txt
   python $current_folder/examples/minimal.py
   popd
 
@@ -101,24 +99,25 @@ function test_package() {
     rm -r previous_package
   fi
   mkdir previous_package
-  python -m pip download --no-deps -d previous_package ydf
-  local old_file_size=`du -k "previous_package" | cut -f1`
-  local new_file_size=`du -k $PACKAGEPATH | cut -f1`
-  local scaled_old_file_size=$(($old_file_size * 12))
-  local scaled_new_file_size=$(($new_file_size * 10))
-  if [ "$scaled_new_file_size" -gt "$scaled_old_file_size" ]; then
-    echo "New package is 20% larger than the previous one."
-    echo "This may indicate an issue with the wheel, aborting."
-    exit 1
-  fi
-  scaled_old_file_size=$(($old_file_size * 8))
-  if [ "$scaled_new_file_size" -lt "$scaled_old_file_size" ]; then
-    echo "New package is 20% smaller than the previous one."
-    echo "This may indicate an issue with the wheel, aborting."
-    exit 1
+  if python -m pip download --no-deps -d previous_package ydf; then
+    local old_file_size=`du -k "previous_package" | cut -f1`
+    local new_file_size=`du -k $PACKAGEPATH | cut -f1`
+    local scaled_old_file_size=$(($old_file_size * 12))
+    local scaled_new_file_size=$(($new_file_size * 10))
+    if [ "$scaled_new_file_size" -gt "$scaled_old_file_size" ]; then
+      echo "New package is 20% larger than the previous one."
+      echo "This may indicate an issue with the wheel, aborting."
+      exit 1
+    fi
+    scaled_old_file_size=$(($old_file_size * 8))
+    if [ "$scaled_new_file_size" -lt "$scaled_old_file_size" ]; then
+      echo "New package is 20% smaller than the previous one."
+      echo "This may indicate an issue with the wheel, aborting."
+      exit 1
+    fi
   fi
   rm -r previous_package
-  echo "Testing $PACKAGEPATH successful"
+  echo "Tested $PACKAGEPATH successful"
 }
 
 # Builds and tests a pip package in a given version of python

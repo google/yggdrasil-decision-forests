@@ -2,12 +2,37 @@
 
 ## HEAD
 
+## 0.12.0 - 2025-05-20
+
 ### Feature
 
--   Support Python 3.13.
--   Allow custom fields in model metadata.
--   Compute SHAP value variable importances with `model.analyze`.
--   Compute model's SHAP values with `model.predict_shap(dataset)`.
+-   Enable support for Python 3.13.
+-   Add custom fields to model metadata.
+-   Add SHAP value variable importances with `model.analyze()`.
+-   Add SHAP values for a dataset with `model.predict_shap()`.
+-   Speed-up (up to 20x) training of models with CATEGORICAL_SET features.
+-   Add hyper-parameter to limit the mask size for CATEGORICAL_SET features.
+-   Add hyper-parameter `total_max_num_nodes` to limit the total number of nodes in a model.
+-   Add support for na_replacements in python tree editor API.
+-   Add support for include_all_columns in FeatureSelector.
+-   Add the `ydf.utils.LogBook` to manage and track experiments.
+-   Speed-up training of NDCG ranking model when a single example per group
+    is non-zero.
+-   Speed-up training on datasets with few columns on a computer with a
+    large amount of cores.
+-   Speed-up loss computation multi-threading code.
+-   Improve distributed training error messages.
+-   Remove need for label columns for deep learning models.
+
+### Fix
+
+-   Log message if early stopping is not used.
+-   Fix force_numerical_discretization errors and documentation.
+-   Fix handling of empty list columns in the dataset.
+
+### Release music
+
+Kindersinfonie (Berchtoldsgaden Musick). Unknown
 
 ## 0.11.0 - 2025-03-12
 
