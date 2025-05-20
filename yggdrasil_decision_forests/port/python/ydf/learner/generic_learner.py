@@ -625,6 +625,10 @@ class GenericCCLearner(GenericLearner):
     if "loss" in self._hyperparameters and isinstance(
         self._hyperparameters["loss"], custom_loss.AbstractCustomLoss
     ):
+      if self._tuner:
+        raise ValueError(
+            "Custom losses are not supported for hyperparameter tuning."
+        )
       log.info(
           "Using a custom loss. Note when using custom losses, hyperparameter"
           " `apply_link_function` is ignored. Use the losses' activation"

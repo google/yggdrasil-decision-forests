@@ -30,6 +30,7 @@ from ydf.dataset import dataspec
 from ydf.learner import custom_loss
 from ydf.learner import generic_learner
 from ydf.learner import specialized_learners
+from ydf.learner import tuner as tuner_lib
 from ydf.model import generic_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from ydf.utils import test_utils
@@ -772,6 +773,31 @@ class CustomLossTest(parameterized.TestCase):
         self.two_center_regression.train
     )
     self.assertAlmostEqual(cross_validation.rmse, 190.43, delta=3.0)
+
+  def test_tuner(self):
+    tuner = tuner_lib.RandomSearchTuner(num_trials=10)
+    tuner.choice("shrinkage", [0.2, 0.1])
+
+    toy_custom_loss = custom_loss.RegressionLoss(
+        initial_predictions=lambda x, y: np.float32(0),
+        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
+        loss=lambda x, y, z: np.float32(0),
+        activation=custom_loss.Activation.IDENTITY,
+    )
+    learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="target",
+        loss=toy_custom_loss,
+        task=generic_learner.Task.REGRESSION,
+        num_trees=30,
+        early_stopping="NONE",
+        validation_ratio=0.0,
+        tuner=tuner,
+    )
+
+    with self.assertRaisesWithLiteralMatch(
+        ValueError, "Custom losses are not supported for hyperparameter tuning."
+    ):
+      _ = learner_custom_loss.train(self.two_center_regression.train)
 
 
 if __name__ == "__main__":

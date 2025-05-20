@@ -379,6 +379,7 @@ py_test(
         ":custom_loss_py",
         ":generic_learner",
         ":specialized_learners",
+        ":tuner",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
