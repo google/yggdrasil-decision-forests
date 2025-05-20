@@ -42,6 +42,7 @@ cc_library_ydf(
     hdrs = [
         "model_compiler.h",
     ],
+    visibility = ["//yggdrasil_decision_forests/cli:__pkg__"],
     deps = [
         ":decision_forest",
         "//yggdrasil_decision_forests/model:abstract_model",

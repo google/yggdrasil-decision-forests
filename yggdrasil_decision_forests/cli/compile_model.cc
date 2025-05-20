@@ -28,8 +28,10 @@
 // - Ranking GBT with numerical only splits
 
 #include <iostream>
+#include <string>
 
 #include "absl/flags/flag.h"
+#include "absl/log/log.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/model_compiler.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -49,6 +51,9 @@ absl::StatusOr<std::string> CompileModel() {
   // Check required flags.
   STATUS_CHECK(!absl::GetFlag(FLAGS_model).empty());
   STATUS_CHECK(!absl::GetFlag(FLAGS_namespace).empty());
+
+  LOG(WARNING) << "The YDF model compiler is deprecated. Contact the YDF team "
+                  "for alternatives.";
 
   return serving::decision_forest::CompileRankingNumericalOnly(
       absl::GetFlag(FLAGS_model), absl::GetFlag(FLAGS_namespace));
