@@ -29,6 +29,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
@@ -47,13 +48,21 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
   using AbstractLoss::Loss;
   using AbstractLoss::UpdateGradients;
 
-  CrossEntropyNDCGLoss(
-      const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-      model::proto::Task task, const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column),
-        ndcg_truncation_(gbt_config.xe_ndcg().ndcg_truncation()) {}
+  typedef NDCGLoss::Cache Cache;
 
-  absl::Status Status() const override;
+  absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateLossCache(
+      const dataset::VerticalDataset& dataset) const override;
+
+  absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateRankingLossCache(
+      absl::Span<const float> labels,
+      absl::Span<const uint64_t> groups) const override;
+
+  CrossEntropyNDCGLoss(const ConstructorArgs& args)
+      : AbstractLoss(args),
+        ndcg_truncation_(args.gbt_config.xe_ndcg().ndcg_truncation()) {}
+
+  static absl::StatusOr<std::unique_ptr<AbstractLoss>> RegistrationCreate(
+      const ConstructorArgs& args);
 
   bool RequireGroupingAttribute() const override { return true; }
 
@@ -71,9 +80,8 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
 
   absl::Status UpdateGradients(
       const absl::Span<const float> labels,
-      const absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-      utils::RandomEngine* random,
+      const absl::Span<const float> predictions, const AbstractLossCache* cache,
+      GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
@@ -81,8 +89,7 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,
       const absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:

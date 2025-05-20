@@ -31,6 +31,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_ndcg.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -42,18 +43,19 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-absl::Status CrossEntropyNDCGLoss::Status() const {
-  if (task_ != model::proto::Task::RANKING) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+CrossEntropyNDCGLoss::RegistrationCreate(const ConstructorArgs& args) {
+  if (args.task != model::proto::Task::RANKING) {
     return absl::InvalidArgumentError(
         "Cross Entropy NDCG loss is only compatible with a ranking task.");
   }
-  if (ndcg_truncation_ < 1) {
+  if (args.gbt_config.xe_ndcg().ndcg_truncation() < 1) {
     return absl::InvalidArgumentError(
         absl::StrCat("The NDCG truncation must be set to a positive integer, "
                      "currently found: ",
-                     ndcg_truncation_));
+                     args.gbt_config.xe_ndcg().ndcg_truncation()));
   }
-  return absl::OkStatus();
+  return absl::make_unique<CrossEntropyNDCGLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>> CrossEntropyNDCGLoss::InitialPredictions(
@@ -69,10 +71,12 @@ absl::StatusOr<std::vector<float>> CrossEntropyNDCGLoss::InitialPredictions(
 
 absl::Status CrossEntropyNDCGLoss::UpdateGradients(
     const absl::Span<const float> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
+  STATUS_CHECK(cache);
+  auto& ranking_index = static_cast<const Cache*>(cache)->ranking_index;
+
   // TODO: Implement thread_pool.
 
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
@@ -91,7 +95,7 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
   // distribution and compute the loss.
   std::vector<float> params;
 
-  for (const auto& group : ranking_index->groups()) {
+  for (const auto& group : ranking_index.groups()) {
     const size_t group_size = group.items.size();
 
     // Skip groups with too few items.
@@ -183,15 +187,30 @@ std::vector<std::string> CrossEntropyNDCGLoss::SecondaryMetricNames() const {
 absl::StatusOr<LossResults> CrossEntropyNDCGLoss::Loss(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
-  if (ranking_index == nullptr) {
-    return absl::InternalError("Missing ranking index");
-  }
+  STATUS_CHECK(cache);
+  auto& ranking_index = static_cast<const Cache*>(cache)->ranking_index;
   float loss_value =
-      -ranking_index->NDCG(predictions, weights, ndcg_truncation_);
+      -ranking_index.NDCG(predictions, weights, ndcg_truncation_);
   return LossResults{/*.loss =*/loss_value, /*.secondary_metrics =*/{}};
+}
+
+absl::StatusOr<std::unique_ptr<AbstractLossCache>>
+CrossEntropyNDCGLoss::CreateLossCache(
+    const dataset::VerticalDataset& dataset) const {
+  auto cache = absl::make_unique<CrossEntropyNDCGLoss::Cache>();
+  RETURN_IF_ERROR(cache->ranking_index.Initialize(
+      dataset, train_config_link_.label(), train_config_link_.ranking_group()));
+  return cache;
+}
+
+absl::StatusOr<std::unique_ptr<AbstractLossCache>>
+CrossEntropyNDCGLoss::CreateRankingLossCache(
+    absl::Span<const float> labels, absl::Span<const uint64_t> groups) const {
+  auto cache = absl::make_unique<CrossEntropyNDCGLoss::Cache>();
+  RETURN_IF_ERROR(cache->ranking_index.Initialize(labels, groups));
+  return cache;
 }
 
 }  // namespace gradient_boosted_trees

@@ -279,7 +279,7 @@ class DistributedGradientBoostedTreesWorker
     absl::Status status;
 
     // Ranking index for the validation dataset.
-    std::unique_ptr<gradient_boosted_trees::RankingGroupsIndices> ranking_index;
+    std::unique_ptr<gradient_boosted_trees::AbstractLossCache> loss_cache;
   } validation_;
 
   // Accessor to the pseudo response. Initialized with the
@@ -314,8 +314,7 @@ class DistributedGradientBoostedTreesWorker
   bool worker_logs_ = true;
 
   // Ranking index for the training dataset.
-  std::unique_ptr<gradient_boosted_trees::RankingGroupsIndices>
-      train_ranking_index_;
+  std::unique_ptr<gradient_boosted_trees::AbstractLossCache> train_loss_cache_;
 };
 
 // Extract the requested features in a FindSplits request.

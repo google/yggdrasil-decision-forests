@@ -435,7 +435,7 @@ TrainWithCache(
   ASSIGN_OR_RETURN(const auto loss, gradient_boosted_trees::CreateLoss(
                                         spe_config.gbt().loss(), config.task(),
                                         data_spec.columns(config_link.label()),
-                                        spe_config.gbt()));
+                                        spe_config.gbt(), config_link));
 
   // Allocate each feature to a worker.
   ASSIGN_OR_RETURN(

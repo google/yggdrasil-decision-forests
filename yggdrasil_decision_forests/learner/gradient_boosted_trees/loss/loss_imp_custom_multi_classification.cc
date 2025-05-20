@@ -41,17 +41,23 @@ LossShape CustomMultiClassificationLoss::Shape() const {
   return LossShape{.gradient_dim = dimension_, .prediction_dim = dimension_};
 };
 
-absl::Status CustomMultiClassificationLoss::Status() const {
-  if (task_ != model::proto::Task::CLASSIFICATION) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+CustomMultiClassificationLoss::RegistrationCreate(
+    const ConstructorArgs& args,
+    const CustomMultiClassificationLossFunctions& custom_loss_functions) {
+  if (args.task != model::proto::Task::CLASSIFICATION) {
     return absl::InvalidArgumentError(
         "This custom loss is only compatible with a classification task.");
   }
-  if (dimension_ == 2) {
+  const int dimension =
+      args.label_column.categorical().number_of_unique_values() - 1;
+  if (dimension == 2) {
     return absl::InvalidArgumentError(
         "The dataset is a binary classification dataset. Please use a binary "
         "classification loss.");
   }
-  return absl::OkStatus();
+  return absl::make_unique<CustomMultiClassificationLoss>(
+      args, dimension, custom_loss_functions);
 }
 
 absl::StatusOr<std::vector<float>>
@@ -83,9 +89,8 @@ CustomMultiClassificationLoss::InitialPredictions(
 
 absl::Status CustomMultiClassificationLoss::UpdateGradients(
     const absl::Span<const int32_t> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   auto labels_span = absl::MakeConstSpan(labels);
   auto predictions_span = absl::MakeConstSpan(predictions);
@@ -110,8 +115,7 @@ std::vector<std::string> CustomMultiClassificationLoss::SecondaryMetricNames()
 absl::StatusOr<LossResults> CustomMultiClassificationLoss::Loss(
     const absl::Span<const int32_t> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   DCHECK_EQ(weights.size(), labels.size());
   DCHECK_EQ(weights.size() * dimension_, predictions.size());

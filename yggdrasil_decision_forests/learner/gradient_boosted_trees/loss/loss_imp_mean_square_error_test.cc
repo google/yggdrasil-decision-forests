@@ -71,8 +71,8 @@ TEST_P(MeanSquareErrorLossTest, InitialPredictions) {
     weights = {2.f, 4.f, 6.f, 8.f};
   }
 
-  const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
+  const MeanSquaredErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
@@ -97,8 +97,8 @@ TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
+  const MeanSquaredErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
                                             /* label_col_idx= */ 0,
                                             /*hessian_splits=*/false, loss_imp,
@@ -138,8 +138,8 @@ TEST_P(MeanSquareErrorLossTest, ComputeRegressionLoss) {
   }
 
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
-  const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
+  const MeanSquaredErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   LossResults loss_results;
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
@@ -179,10 +179,12 @@ TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
   }
 
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
-  const MeanSquaredErrorLoss loss_imp({}, model::proto::Task::RANKING,
-                                      dataset.data_spec().columns(0));
-  RankingGroupsIndices index;
-  EXPECT_OK(index.Initialize(dataset, 0, 1));
+  const MeanSquaredErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)});
+  MeanSquaredErrorLoss::Cache cache;
+  cache.ranking_index = std::make_unique<RankingGroupsIndices>();
+  auto* index = cache.ranking_index.get();
+  EXPECT_OK(index->Initialize(dataset, 0, 1));
   LossResults loss_results;
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
@@ -191,12 +193,12 @@ TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp.Loss(dataset,
                                        /* label_col_idx= */ 0, predictions,
-                                       weights, &index, &thread_pool));
+                                       weights, &cache, &thread_pool));
   } else {
     ASSERT_OK_AND_ASSIGN(
         loss_results,
         loss_imp.Loss(dataset,
-                      /* label_col_idx= */ 0, predictions, weights, &index));
+                      /* label_col_idx= */ 0, predictions, weights, &cache));
   }
   if (weighted) {
     EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
@@ -219,15 +221,15 @@ TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRegression) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   const MeanSquaredErrorLoss loss_imp_regression(
-      {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1));
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp_regression.SecondaryMetricNames(), ElementsAre("rmse"));
 }
 
 TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRanking) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const MeanSquaredErrorLoss loss_imp_ranking({}, model::proto::Task::RANKING,
-                                              dataset.data_spec().columns(1));
+  const MeanSquaredErrorLoss loss_imp_ranking(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp_ranking.SecondaryMetricNames(),
               ElementsAre("rmse", "NDCG@5"));
 }

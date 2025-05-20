@@ -65,12 +65,13 @@ void UpdateGradientsSingleThread(const absl::Span<const float> labels,
 
 }  // namespace
 
-absl::Status MeanAverageErrorLoss::Status() const {
-  if (task_ != model::proto::Task::REGRESSION) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+MeanAverageErrorLoss::RegistrationCreate(const ConstructorArgs& args) {
+  if (args.task != model::proto::Task::REGRESSION) {
     return absl::InvalidArgumentError(
         "Mean average error loss is only compatible with regression");
   }
-  return absl::OkStatus();
+  return absl::make_unique<MeanAverageErrorLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
@@ -130,9 +131,8 @@ absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
 
 absl::Status MeanAverageErrorLoss::UpdateGradients(
     const absl::Span<const float> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   STATUS_CHECK_EQ(gradients->size(), 1);
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
@@ -171,8 +171,7 @@ std::vector<std::string> MeanAverageErrorLoss::SecondaryMetricNames() const {
 absl::StatusOr<LossResults> MeanAverageErrorLoss::Loss(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   ASSIGN_OR_RETURN(float mae,
                    metric::MAE(labels, predictions, weights, thread_pool));

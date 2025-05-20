@@ -43,13 +43,14 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-absl::Status MultinomialLogLikelihoodLoss::Status() const {
-  if (task_ != model::proto::Task::CLASSIFICATION) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+MultinomialLogLikelihoodLoss::RegistrationCreate(const ConstructorArgs& args) {
+  if (args.task != model::proto::Task::CLASSIFICATION) {
     return absl::InvalidArgumentError(
         "Multinomial log-likelihood loss is only compatible with a "
         "classification task");
   }
-  return absl::OkStatus();
+  return absl::make_unique<MultinomialLogLikelihoodLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>>
@@ -73,7 +74,7 @@ MultinomialLogLikelihoodLoss::InitialPredictions(
 template <typename T>
 absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
     const absl::Span<T> labels, const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    const AbstractLossCache* cache, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   static_assert(std::is_integral<T>::value, "Integral required.");
@@ -122,22 +123,20 @@ absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
 
 absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
     const absl::Span<const int32_t> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
-                                  random, thread_pool);
+  return TemplatedUpdateGradients(labels, predictions, cache, gradients, random,
+                                  thread_pool);
 }
 
 absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
     const absl::Span<const int16_t> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
-                                  random, thread_pool);
+  return TemplatedUpdateGradients(labels, predictions, cache, gradients, random,
+                                  thread_pool);
 }
 
 std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
@@ -206,8 +205,7 @@ void MultinomialLogLikelihoodLoss::TemplatedLossImp(
 template <typename T>
 absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
     const absl::Span<T> labels, const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
   utils::IntegersConfusionMatrixDouble confusion_matrix;
@@ -277,21 +275,17 @@ absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::TemplatedLoss(
 absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::Loss(
     const absl::Span<const int32_t> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedLoss(labels, predictions, weights, ranking_index,
-                       thread_pool);
+  return TemplatedLoss(labels, predictions, weights, cache, thread_pool);
 }
 
 absl::StatusOr<LossResults> MultinomialLogLikelihoodLoss::Loss(
     const absl::Span<const int16_t> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedLoss(labels, predictions, weights, ranking_index,
-                       thread_pool);
+  return TemplatedLoss(labels, predictions, weights, cache, thread_pool);
 }
 
 }  // namespace gradient_boosted_trees

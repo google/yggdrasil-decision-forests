@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -51,12 +52,30 @@ class NDCGLoss : public AbstractLoss {
   using AbstractLoss::Loss;
   using AbstractLoss::UpdateGradients;
 
-  NDCGLoss(const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-           model::proto::Task task, const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column),
-        ndcg_truncation_(gbt_config.lambda_mart_ndcg().ndcg_truncation()) {}
+  static absl::StatusOr<std::unique_ptr<AbstractLoss>> RegistrationCreate(
+      const ConstructorArgs& args);
 
-  absl::Status Status() const override;
+  NDCGLoss(const ConstructorArgs& args, int ndcg_truncation)
+      : AbstractLoss(args), ndcg_truncation_(ndcg_truncation) {}
+
+  class Cache : public AbstractLossCache {
+   public:
+    RankingGroupsIndices ranking_index;
+
+    virtual ~Cache() {}
+
+    virtual absl::StatusOr<const RankingGroupsIndices*> ranking_indices()
+        const override {
+      return &ranking_index;
+    }
+  };
+
+  absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateLossCache(
+      const dataset::VerticalDataset& dataset) const override;
+
+  absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateRankingLossCache(
+      absl::Span<const float> labels,
+      absl::Span<const uint64_t> groups) const override;
 
   bool RequireGroupingAttribute() const override { return true; }
 
@@ -74,9 +93,8 @@ class NDCGLoss : public AbstractLoss {
 
   absl::Status UpdateGradients(
       const absl::Span<const float> labels,
-      const absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-      utils::RandomEngine* random,
+      const absl::Span<const float> predictions, const AbstractLossCache* cache,
+      GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
@@ -84,15 +102,14 @@ class NDCGLoss : public AbstractLoss {
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,
       const absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
   const int ndcg_truncation_;
 };
 
-// LAMBDA_MART_NDCG5 also creates this loss.
+// LAMBDA_MART_NDCG5 also RegistrationCreates this loss.
 REGISTER_AbstractGradientBoostedTreeLoss(NDCGLoss, "LAMBDA_MART_NDCG");
 
 }  // namespace gradient_boosted_trees

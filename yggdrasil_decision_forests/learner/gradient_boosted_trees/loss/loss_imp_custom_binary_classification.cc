@@ -37,12 +37,16 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-absl::Status CustomBinaryClassificationLoss::Status() const {
-  if (task_ != model::proto::Task::CLASSIFICATION) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+CustomBinaryClassificationLoss::RegistrationCreate(
+    const ConstructorArgs& args,
+    const CustomBinaryClassificationLossFunctions& custom_loss_functions) {
+  if (args.task != model::proto::Task::CLASSIFICATION) {
     return absl::InvalidArgumentError(
         "This custom loss is only compatible with a classification task.");
   }
-  return absl::OkStatus();
+  return absl::make_unique<CustomBinaryClassificationLoss>(
+      args, custom_loss_functions);
 }
 
 absl::StatusOr<std::vector<float>>
@@ -75,9 +79,8 @@ CustomBinaryClassificationLoss::InitialPredictions(
 
 absl::Status CustomBinaryClassificationLoss::UpdateGradients(
     const absl::Span<const int32_t> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   auto labels_span = absl::MakeConstSpan(labels);
   auto predictions_span = absl::MakeConstSpan(predictions);
@@ -98,8 +101,7 @@ std::vector<std::string> CustomBinaryClassificationLoss::SecondaryMetricNames()
 absl::StatusOr<LossResults> CustomBinaryClassificationLoss::Loss(
     const absl::Span<const int32_t> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   DCHECK_EQ(weights.size(), labels.size());
   DCHECK_EQ(weights.size(), predictions.size());

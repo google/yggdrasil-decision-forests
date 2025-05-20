@@ -87,19 +87,19 @@ absl::StatusOr<std::vector<float>> PoissonLoss::InitialPredictions(
       static_cast<float>(std::log(stats.sum() / stats.count()))};
 }
 
-absl::Status PoissonLoss::Status() const {
-  if (task_ != model::proto::Task::REGRESSION) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>> PoissonLoss::RegistrationCreate(
+    const ConstructorArgs &args) {
+  if (args.task != model::proto::Task::REGRESSION) {
     return absl::InvalidArgumentError(
         "Poisson loss is only compatible with a regression task");
   }
-  return absl::OkStatus();
+  return absl::make_unique<PoissonLoss>(args);
 }
 
 absl::Status PoissonLoss::UpdateGradients(
     const absl::Span<const float> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices *ranking_index, GradientDataRef *gradients,
-    utils::RandomEngine *random,
+    const absl::Span<const float> predictions, const AbstractLossCache *cache,
+    GradientDataRef *gradients, utils::RandomEngine *random,
     utils::concurrency::ThreadPool *thread_pool) const {
   if (gradients->size() != 1) {
     return absl::InternalError("Wrong gradient shape");
@@ -152,8 +152,7 @@ std::vector<std::string> PoissonLoss::SecondaryMetricNames() const {
 absl::StatusOr<LossResults> PoissonLoss::Loss(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices *ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache *cache,
     utils::concurrency::ThreadPool *thread_pool) const {
   double sum_loss = 0;
   double total_example_weight = 0;

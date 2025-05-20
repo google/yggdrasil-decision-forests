@@ -17,6 +17,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_binary_classification.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_regression.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -29,6 +30,7 @@ namespace gradient_boosted_trees {
 namespace {
 
 TEST(LossLibrary, CanonicalLosses) {
+  model::proto::TrainingConfigLinking link_config;
   proto::GradientBoostedTreesTrainingConfig config;
   dataset::proto::Column binary_categorical_label_column =
       PARSE_TEST_PROTO(R"pb(
@@ -47,37 +49,39 @@ TEST(LossLibrary, CanonicalLosses) {
 
   EXPECT_OK(CreateLoss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
                        model::proto::Task::CLASSIFICATION,
-                       binary_categorical_label_column, config));
+                       binary_categorical_label_column, config, link_config));
 
   EXPECT_OK(CreateLoss(proto::Loss::SQUARED_ERROR,
                        model::proto::Task::REGRESSION, numerical_label_column,
-                       config));
+                       config, link_config));
 
   EXPECT_OK(CreateLoss(proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD,
                        model::proto::Task::CLASSIFICATION,
-                       multiclass_categorical_label_column, config));
+                       multiclass_categorical_label_column, config,
+                       link_config));
 
   EXPECT_OK(CreateLoss(proto::Loss::LAMBDA_MART_NDCG5,
                        model::proto::Task::RANKING, numerical_label_column,
-                       config));
+                       config, link_config));
 
   EXPECT_OK(CreateLoss(proto::Loss::LAMBDA_MART_NDCG,
                        model::proto::Task::RANKING, numerical_label_column,
-                       config));
+                       config, link_config));
 
   EXPECT_OK(CreateLoss(proto::Loss::XE_NDCG_MART, model::proto::Task::RANKING,
-                       numerical_label_column, config));
+                       numerical_label_column, config, link_config));
 
   EXPECT_OK(CreateLoss(proto::Loss::BINARY_FOCAL_LOSS,
                        model::proto::Task::CLASSIFICATION,
-                       binary_categorical_label_column, config));
+                       binary_categorical_label_column, config, link_config));
 
   EXPECT_OK(CreateLoss(proto::Loss::POISSON, model::proto::Task::REGRESSION,
-                       numerical_label_column, config));
+                       numerical_label_column, config, link_config));
 }
 
 TEST(LossLibrary, CustomLosses) {
   proto::GradientBoostedTreesTrainingConfig config;
+  model::proto::TrainingConfigLinking link_config;
   dataset::proto::Column binary_categorical_label_column =
       PARSE_TEST_PROTO(R"pb(
         type: CATEGORICAL
@@ -95,62 +99,65 @@ TEST(LossLibrary, CustomLosses) {
 
   EXPECT_OK(CreateLoss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
                        model::proto::Task::CLASSIFICATION,
-                       binary_categorical_label_column, config,
+                       binary_categorical_label_column, config, link_config,
                        CustomBinaryClassificationLossFunctions{}));
 
   EXPECT_OK(CreateLoss(proto::Loss::BINARY_FOCAL_LOSS,
                        model::proto::Task::CLASSIFICATION,
-                       binary_categorical_label_column, config,
+                       binary_categorical_label_column, config, link_config,
                        CustomBinaryClassificationLossFunctions{}));
 
   EXPECT_OK(CreateLoss(proto::Loss::SQUARED_ERROR,
                        model::proto::Task::REGRESSION, numerical_label_column,
-                       config, CustomRegressionLossFunctions{}));
+                       config, link_config, CustomRegressionLossFunctions{}));
 
   EXPECT_OK(CreateLoss(proto::Loss::POISSON, model::proto::Task::REGRESSION,
-                       numerical_label_column, config,
+                       numerical_label_column, config, link_config,
                        CustomRegressionLossFunctions{}));
 
   EXPECT_FALSE(CreateLoss(proto::Loss::SQUARED_ERROR,
                           model::proto::Task::REGRESSION,
-                          numerical_label_column, config,
+                          numerical_label_column, config, link_config,
                           CustomBinaryClassificationLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
                           model::proto::Task::CLASSIFICATION,
-                          numerical_label_column, config,
+                          numerical_label_column, config, link_config,
                           CustomRegressionLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG,
                           model::proto::Task::RANKING, numerical_label_column,
-                          config, CustomBinaryClassificationLossFunctions{})
+                          config, link_config,
+                          CustomBinaryClassificationLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG5,
                           model::proto::Task::RANKING, numerical_label_column,
-                          config, CustomBinaryClassificationLossFunctions{})
+                          config, link_config,
+                          CustomBinaryClassificationLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::XE_NDCG_MART,
                           model::proto::Task::RANKING, numerical_label_column,
-                          config, CustomBinaryClassificationLossFunctions{})
+                          config, link_config,
+                          CustomBinaryClassificationLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG,
                           model::proto::Task::RANKING, numerical_label_column,
-                          config, CustomRegressionLossFunctions{})
+                          config, link_config, CustomRegressionLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::LAMBDA_MART_NDCG5,
                           model::proto::Task::RANKING, numerical_label_column,
-                          config, CustomRegressionLossFunctions{})
+                          config, link_config, CustomRegressionLossFunctions{})
                    .ok());
 
   EXPECT_FALSE(CreateLoss(proto::Loss::XE_NDCG_MART,
                           model::proto::Task::RANKING, numerical_label_column,
-                          config, CustomRegressionLossFunctions{})
+                          config, link_config, CustomRegressionLossFunctions{})
                    .ok());
 }
 

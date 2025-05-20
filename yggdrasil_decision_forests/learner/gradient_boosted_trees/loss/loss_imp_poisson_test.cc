@@ -78,25 +78,28 @@ class PoissonLossTest : public testing::TestWithParam<std::tuple<bool, bool>> {
 TEST(PoissonLossTest, LossStatusRegression) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
-                             dataset.data_spec().columns(0));
-  EXPECT_OK(loss_imp.Status());
+  const auto loss_imp = PoissonLoss::RegistrationCreate(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
+  EXPECT_OK(loss_imp.status());
 }
 
 TEST(PoissonLossTest, LossStatusClassification) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const PoissonLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                             dataset.data_spec().columns(0));
-  EXPECT_FALSE(loss_imp.Status().ok());
+  const auto loss_imp =
+      PoissonLoss::RegistrationCreate({{},
+                                       {},
+                                       model::proto::Task::CLASSIFICATION,
+                                       dataset.data_spec().columns(0)});
+  EXPECT_FALSE(loss_imp.ok());
 }
 
 TEST(PoissonLossTest, LossStatusRanking) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const PoissonLoss loss_imp({}, model::proto::Task::RANKING,
-                             dataset.data_spec().columns(0));
-  EXPECT_FALSE(loss_imp.Status().ok());
+  const auto loss_imp = PoissonLoss::RegistrationCreate(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)});
+  EXPECT_FALSE(loss_imp.ok());
 }
 
 TEST_P(PoissonLossTest, InitialPredictionsClassic) {
@@ -108,11 +111,16 @@ TEST_P(PoissonLossTest, InitialPredictionsClassic) {
     weights = {2.f, 4.f, 6.f, 8.f};
   }
 
-  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
-                             dataset.data_spec().columns(0));
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss_imp,
+      PoissonLoss::RegistrationCreate({{},
+                                       {},
+                                       model::proto::Task::REGRESSION,
+                                       dataset.data_spec().columns(0)}));
+
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
-      loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
+      loss_imp->InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
   if (weighted) {
     float log_mean = std::log((2. + 8. + 18. + 32.) / 20.);
     EXPECT_THAT(init_pred, ElementsAre(FloatNear(log_mean, kTestPrecision)));
@@ -133,9 +141,14 @@ TEST(PoissonLossTest, InitialPredictionsLabelStatistics) {
     type: NUMERICAL
     name: "a"
   )pb");
-  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION, column_spec);
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss_imp,
+      PoissonLoss::RegistrationCreate(
+          {{}, {}, model::proto::Task::REGRESSION, column_spec}));
+
   ASSERT_OK_AND_ASSIGN(const std::vector<float> init_pred,
-                       loss_imp.InitialPredictions(label_statistics));
+                       loss_imp->InitialPredictions(label_statistics));
 
   float log_mean = std::log((1.f + 2.f + 3.f + 4.f) / 4.f);
   EXPECT_THAT(init_pred, ElementsAre(FloatNear(log_mean, kTestPrecision)));
@@ -153,18 +166,24 @@ TEST_P(PoissonLossTest, UpdateGradientsLabelColIdx) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
-                             dataset.data_spec().columns(0));
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss_imp,
+      PoissonLoss::RegistrationCreate({{},
+                                       {},
+                                       model::proto::Task::REGRESSION,
+                                       dataset.data_spec().columns(0)}));
+
   ASSERT_OK(internal::CreateGradientDataset(dataset,
                                             /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /*hessian_splits=*/false, *loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
 
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> loss_initial_predictions,
-      loss_imp.InitialPredictions(dataset,
-                                  /* label_col_idx =*/0, weights));
+      loss_imp->InitialPredictions(dataset,
+                                   /* label_col_idx =*/0, weights));
   internal::SetInitialPredictions(loss_initial_predictions, dataset.nrow(),
                                   &predictions);
 
@@ -172,10 +191,10 @@ TEST_P(PoissonLossTest, UpdateGradientsLabelColIdx) {
 
   utils::RandomEngine random(1234);
 
-  ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
-                                     /* label_col_idx= */ 0, predictions,
-                                     /*ranking_index=*/nullptr, &gradients,
-                                     &random));
+  ASSERT_OK(loss_imp->UpdateGradients(gradient_dataset,
+                                      /* label_col_idx= */ 0, predictions,
+                                      /*ranking_index=*/nullptr, &gradients,
+                                      &random));
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   if (weighted) {
@@ -200,12 +219,16 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
-                             dataset.data_spec().columns(0));
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss_imp,
+      PoissonLoss::RegistrationCreate({{},
+                                       {},
+                                       model::proto::Task::REGRESSION,
+                                       dataset.data_spec().columns(0)}));
   std::vector<float> labels = {1.f, 2.f, 3.f, 4.f};
   ASSERT_OK(internal::CreateGradientDataset(dataset,
                                             /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /*hessian_splits=*/false, *loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   GradientDataRef compact_gradient(gradients.size());
@@ -216,8 +239,8 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
   // Initial predictions are log(2.5) (unweighted) and log(3) (weighted).
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> loss_initial_predictions,
-      loss_imp.InitialPredictions(dataset,
-                                  /* label_col_idx =*/0, weights));
+      loss_imp->InitialPredictions(dataset,
+                                   /* label_col_idx =*/0, weights));
   internal::SetInitialPredictions(loss_initial_predictions, dataset.nrow(),
                                   &predictions);
 
@@ -229,14 +252,14 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
-    ASSERT_OK(loss_imp.UpdateGradients(
+    ASSERT_OK(loss_imp->UpdateGradients(
         labels, predictions,
         /*ranking_index=*/nullptr, &compact_gradient, &random, &thread_pool));
   } else {
-    ASSERT_OK(loss_imp.UpdateGradients(labels, predictions,
-                                       /*ranking_index=*/nullptr,
-                                       &compact_gradient, &random,
-                                       /*thread_pool=*/nullptr));
+    ASSERT_OK(loss_imp->UpdateGradients(labels, predictions,
+                                        /*ranking_index=*/nullptr,
+                                        &compact_gradient, &random,
+                                        /*thread_pool=*/nullptr));
   }
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
@@ -260,22 +283,26 @@ TEST_P(PoissonLossTest, ComputeLoss) {
   }
 
   std::vector<float> predictions = {1.f, 1.f, 2.f, 2.f};
-  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
-                             dataset.data_spec().columns(0));
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss_imp,
+      PoissonLoss::RegistrationCreate({{},
+                                       {},
+                                       model::proto::Task::REGRESSION,
+                                       dataset.data_spec().columns(0)}));
   LossResults loss_results;
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
     thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
-                         loss_imp.Loss(dataset,
-                                       /* label_col_idx= */ 0, predictions,
-                                       weights, nullptr, &thread_pool));
+                         loss_imp->Loss(dataset,
+                                        /* label_col_idx= */ 0, predictions,
+                                        weights, nullptr, &thread_pool));
   } else {
     ASSERT_OK_AND_ASSIGN(
         loss_results,
-        loss_imp.Loss(dataset,
-                      /* label_col_idx= */ 0, predictions, weights, nullptr));
+        loss_imp->Loss(dataset,
+                       /* label_col_idx= */ 0, predictions, weights, nullptr));
   }
   if (weighted) {
     const float expected_loss =
@@ -304,13 +331,17 @@ TEST_P(PoissonLossTest, ComputeLoss) {
   }
 }
 
-
 TEST(PoissonLossTest, SecondaryMetricNames) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const PoissonLoss loss_imp({}, model::proto::Task::REGRESSION,
-                             dataset.data_spec().columns(1));
-  EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("RMSE"));
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss_imp,
+      PoissonLoss::RegistrationCreate({{},
+                                       {},
+                                       model::proto::Task::REGRESSION,
+                                       dataset.data_spec().columns(1)}));
+  EXPECT_THAT(loss_imp->SecondaryMetricNames(), ElementsAre("RMSE"));
 }
 
 INSTANTIATE_TEST_SUITE_P(PoissonLossTestWithWeights, PoissonLossTest,

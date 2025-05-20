@@ -35,12 +35,15 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-absl::Status CustomRegressionLoss::Status() const {
-  if (task_ != model::proto::Task::REGRESSION) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+CustomRegressionLoss::RegistrationCreate(
+    const ConstructorArgs& args,
+    const CustomRegressionLossFunctions& custom_loss_functions) {
+  if (args.task != model::proto::Task::REGRESSION) {
     return absl::InvalidArgumentError(
         "This custom loss is only compatible with a regression task.");
   }
-  return absl::OkStatus();
+  return absl::make_unique<CustomRegressionLoss>(args, custom_loss_functions);
 }
 
 absl::StatusOr<std::vector<float>> CustomRegressionLoss::InitialPredictions(
@@ -70,9 +73,8 @@ absl::StatusOr<std::vector<float>> CustomRegressionLoss::InitialPredictions(
 
 absl::Status CustomRegressionLoss::UpdateGradients(
     const absl::Span<const float> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   if (gradients->size() != 1) {
     return absl::InternalError("Wrong gradient shape");
@@ -95,8 +97,7 @@ std::vector<std::string> CustomRegressionLoss::SecondaryMetricNames() const {
 absl::StatusOr<LossResults> CustomRegressionLoss::Loss(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   DCHECK_EQ(weights.size(), labels.size());
   DCHECK_EQ(weights.size(), predictions.size());

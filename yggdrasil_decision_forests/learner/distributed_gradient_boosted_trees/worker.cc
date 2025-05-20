@@ -104,6 +104,14 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     LOG(INFO) << "Initializing DistributedGradientBoostedTreesWorker";
   }
 
+  // Training loss.
+  ASSIGN_OR_RETURN(
+      loss_,
+      gradient_boosted_trees::CreateLoss(
+          spe_config.gbt().loss(), welcome_.train_config().task(),
+          welcome_.dataspec().columns(welcome_.train_config_linking().label()),
+          spe_config.gbt(), welcome_.train_config_linking()));
+
   if (GetWorkerType() == WorkerType::kTRAINER) {
     // Load the dataset.
     const auto& worker_features =
@@ -123,10 +131,10 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
       if (worker_logs_) {
         LOG(INFO) << "Compute ranking groups";
       }
-      train_ranking_index_ =
-          std::make_unique<gradient_boosted_trees::RankingGroupsIndices>();
-      RETURN_IF_ERROR(train_ranking_index_->Initialize(
-          dataset_->ranking_labels(), dataset_->ranking_groups()));
+      ASSIGN_OR_RETURN(train_loss_cache_, loss_->CreateRankingLossCache(
+                                              dataset_->ranking_labels(),
+                                              dataset_->ranking_groups()));
+
       RETURN_IF_ERROR(dataset_->release_ranking_groups());
     }
 
@@ -163,21 +171,10 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     }
 
     if (welcome_.train_config().task() == model::proto::Task::RANKING) {
-      validation_.ranking_index =
-          std::make_unique<gradient_boosted_trees::RankingGroupsIndices>();
-      RETURN_IF_ERROR(validation_.ranking_index->Initialize(
-          *validation_.dataset, welcome_.train_config_linking().label(),
-          welcome_.train_config_linking().ranking_group()));
+      ASSIGN_OR_RETURN(validation_.loss_cache,
+                       loss_->CreateLossCache(*validation_.dataset));
     }
   }
-
-  // Training loss.
-  ASSIGN_OR_RETURN(
-      loss_,
-      gradient_boosted_trees::CreateLoss(
-          spe_config.gbt().loss(), welcome_.train_config().task(),
-          welcome_.dataspec().columns(welcome_.train_config_linking().label()),
-          spe_config.gbt()));
 
   // Threadpool.
   if (worker_logs_) {
@@ -569,9 +566,9 @@ absl::Status DistributedGradientBoostedTreesWorker::StartNewIter(
           &random_, thread_pool_.get()));
       break;
     case model::proto::Task::RANKING:
-      DCHECK(train_ranking_index_);
+      STATUS_CHECK(train_loss_cache_);
       RETURN_IF_ERROR(loss_->UpdateGradients(
-          dataset_->ranking_labels(), predictions_, train_ranking_index_.get(),
+          dataset_->ranking_labels(), predictions_, train_loss_cache_.get(),
           &gradient_ref_, &random_, thread_pool_.get()));
       break;
     default:
@@ -1203,7 +1200,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
       const LossResults loss_results,
       loss_->Loss(*validation_.dataset, welcome_.train_config_linking().label(),
                   validation_.predictions, validation_.weights,
-                  /*ranking_index=*/validation_.ranking_index.get(),
+                  /*ranking_index=*/validation_.loss_cache.get(),
                   /*thread_pool=*/thread_pool_.get()));
 
   validation_.evaluation.set_loss(loss_results.loss);
@@ -1320,9 +1317,9 @@ absl::StatusOr<LossResults> DistributedGradientBoostedTreesWorker::Loss(
       break;
     }
     case model::proto::Task::RANKING: {
-      DCHECK(train_ranking_index_);
+      STATUS_CHECK(train_loss_cache_);
       return loss_->Loss(dataset->ranking_labels(), predictions,
-                         dataset->weights(), train_ranking_index_.get(),
+                         dataset->weights(), train_loss_cache_.get(),
                          thread_pool_.get());
       break;
     }

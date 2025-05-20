@@ -540,7 +540,8 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
       CreateLoss(all_config->gbt_config->loss(),
                  all_config->train_config.task(),
                  data_spec.columns(all_config->train_config_link.label()),
-                 *all_config->gbt_config, custom_loss_functions_));
+                 *all_config->gbt_config, all_config->train_config_link,
+                 custom_loss_functions_));
 
   if (all_config->loss->RequireGroupingAttribute()) {
     if (!all_config->gbt_config->validation_set_group_feature().empty()) {
@@ -1307,19 +1308,13 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     }
   }
 
-  std::unique_ptr<RankingGroupsIndices> train_ranking_index;
-  std::unique_ptr<RankingGroupsIndices> valid_ranking_index;
-  if (mdl->task() == model::proto::Task::RANKING) {
-    train_ranking_index = std::make_unique<RankingGroupsIndices>();
-    RETURN_IF_ERROR(train_ranking_index->Initialize(
-        sub_train_dataset, config.train_config_link.label(),
-        config.train_config_link.ranking_group()));
-    if (has_validation_dataset) {
-      valid_ranking_index = std::make_unique<RankingGroupsIndices>();
-      RETURN_IF_ERROR(valid_ranking_index->Initialize(
-          validation_dataset, config.train_config_link.label(),
-          config.train_config_link.ranking_group()));
-    }
+  std::unique_ptr<AbstractLossCache> train_loss_cache;
+  std::unique_ptr<AbstractLossCache> valid_loss_cache;
+  ASSIGN_OR_RETURN(train_loss_cache,
+                   config.loss->CreateLossCache(sub_train_dataset));
+  if (has_validation_dataset) {
+    ASSIGN_OR_RETURN(valid_loss_cache,
+                     config.loss->CreateLossCache(validation_dataset));
   }
 
   proto::TrainingLogs& training_logs = mdl->training_logs_;
@@ -1431,7 +1426,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     // Compute the gradient of the residual relative to the examples.
     RETURN_IF_ERROR(config.loss->UpdateGradients(
         gradient_sub_train_dataset, config.train_config_link.label(),
-        sub_train_predictions, train_ranking_index.get(), &gradients, &random,
+        sub_train_predictions, train_loss_cache.get(), &gradients, &random,
         thread_pool.get()));
 
     float subsample_factor = 1.f;
@@ -1455,13 +1450,15 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
             &random, &selected_examples, &goss_weights);
         break;
       case proto::GradientBoostedTreesTrainingConfig::
-          kSelectiveGradientBoosting:
+          kSelectiveGradientBoosting: {
+        ASSIGN_OR_RETURN(const RankingGroupsIndices* ranking_index,
+                         train_loss_cache->ranking_indices());
         RETURN_IF_ERROR(internal::SampleTrainingExamplesWithSelGB(
-            mdl->task(), gradient_sub_train_dataset.nrow(),
-            train_ranking_index.get(), sub_train_predictions,
+            mdl->task(), gradient_sub_train_dataset.nrow(), ranking_index,
+            sub_train_predictions,
             config.gbt_config->selective_gradient_boosting().ratio(),
             &selected_examples));
-        break;
+      } break;
       case proto::GradientBoostedTreesTrainingConfig::
           kStochasticGradientBoosting:
       case proto::GradientBoostedTreesTrainingConfig::SAMPLING_METHODS_NOT_SET:
@@ -1562,7 +1559,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           config.loss->Loss(gradient_sub_train_dataset,
                             config.train_config_link.label(),
                             sub_train_predictions, weights,
-                            train_ranking_index.get(), thread_pool.get()));
+                            train_loss_cache.get(), thread_pool.get()));
 
       auto* log_entry = training_logs.mutable_entries()->Add();
       log_entry->set_number_of_trees(iter_idx + 1);
@@ -1596,7 +1593,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
             config.loss->Loss(gradient_validation_dataset,
                               config.train_config_link.label(),
                               validation_predictions, validation_weights,
-                              valid_ranking_index.get(), thread_pool.get()));
+                              valid_loss_cache.get(), thread_pool.get()));
         log_entry->set_validation_loss(validation_loss_result.loss);
         *log_entry->mutable_validation_secondary_metrics() = {
             validation_loss_result.secondary_metrics.begin(),

@@ -41,22 +41,22 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-BinaryFocalLoss::BinaryFocalLoss(
-    const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-    const model::proto::Task task, const dataset::proto::Column& label_column)
-    : BinomialLogLikelihoodLoss(gbt_config, task, label_column),
-      gamma_(gbt_config.binary_focal_loss_options().misprediction_exponent()),
-      alpha_(gbt_config.binary_focal_loss_options()
+BinaryFocalLoss::BinaryFocalLoss(const ConstructorArgs& args)
+    : BinomialLogLikelihoodLoss(args),
+      gamma_(
+          args.gbt_config.binary_focal_loss_options().misprediction_exponent()),
+      alpha_(args.gbt_config.binary_focal_loss_options()
                  .positive_sample_coefficient()) {}
 
-absl::Status BinaryFocalLoss::Status() const {
-  if (task_ != model::proto::Task::CLASSIFICATION)
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+BinaryFocalLoss::RegistrationCreate(const ConstructorArgs& args) {
+  if (args.task != model::proto::Task::CLASSIFICATION)
     return absl::InvalidArgumentError(
         "Focal loss is only compatible with a binary classification task");
-  if (label_column_.categorical().number_of_unique_values() != 3)
+  if (args.label_column.categorical().number_of_unique_values() != 3)
     return absl::InvalidArgumentError(
         "Focal loss is only compatible with a BINARY classification task");
-  return absl::OkStatus();
+  return absl::make_unique<BinaryFocalLoss>(args);
 }
 
 // Calculate log(pt) for formula (5) from page 3 and other reusable stuff from
@@ -137,7 +137,7 @@ float CalculateFocalLossHessian(FocalLossGradientData gradient_data,
 template <typename T>
 absl::Status BinaryFocalLoss::TemplatedUpdateGradients(
     const absl::Span<T> labels, const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+    const AbstractLossCache* cache, GradientDataRef* gradients,
     utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   static_assert(std::is_integral<T>::value, "Integral required.");
@@ -173,22 +173,20 @@ absl::Status BinaryFocalLoss::TemplatedUpdateGradients(
 
 absl::Status BinaryFocalLoss::UpdateGradients(
     const absl::Span<const int32_t> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
-                                  random, thread_pool);
+  return TemplatedUpdateGradients(labels, predictions, cache, gradients, random,
+                                  thread_pool);
 }
 
 absl::Status BinaryFocalLoss::UpdateGradients(
     const absl::Span<const int16_t> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedUpdateGradients(labels, predictions, ranking_index, gradients,
-                                  random, thread_pool);
+  return TemplatedUpdateGradients(labels, predictions, cache, gradients, random,
+                                  thread_pool);
 }
 
 template <typename T>
@@ -263,8 +261,7 @@ void BinaryFocalLoss::TemplatedLossImp(
 template <typename T>
 absl::StatusOr<LossResults> BinaryFocalLoss::TemplatedLoss(
     const absl::Span<T> labels, const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   double sum_loss = 0;
   double count_correct_predictions = 0;
@@ -333,21 +330,17 @@ absl::StatusOr<LossResults> BinaryFocalLoss::TemplatedLoss(
 absl::StatusOr<LossResults> BinaryFocalLoss::Loss(
     const absl::Span<const int32_t> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedLoss(labels, predictions, weights, ranking_index,
-                       thread_pool);
+  return TemplatedLoss(labels, predictions, weights, cache, thread_pool);
 }
 
 absl::StatusOr<LossResults> BinaryFocalLoss::Loss(
     const absl::Span<const int16_t> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
-  return TemplatedLoss(labels, predictions, weights, ranking_index,
-                       thread_pool);
+  return TemplatedLoss(labels, predictions, weights, cache, thread_pool);
 }
 
 }  // namespace gradient_boosted_trees

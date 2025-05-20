@@ -117,7 +117,10 @@ TEST_P(MultinomialLogLikelihoodLossTest, InitialPredictions) {
   }
 
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+      {{},
+       {},
+       model::proto::Task::CLASSIFICATION,
+       dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 1, weights));
@@ -132,7 +135,10 @@ TEST(MultinomialLogLikelihoodLossTest, UpdateGradients) {
   std::vector<GradientData> gradients;
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+      {{},
+       {},
+       model::proto::Task::CLASSIFICATION,
+       dataset.data_spec().columns(1)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
                                             /* label_col_idx= */ 1,
                                             /*hessian_splits=*/false, loss_imp,
@@ -154,11 +160,13 @@ TEST(MultinomialLogLikelihoodLossTest, UpdateGradients) {
                                     FloatNear(-1.f / 3.f, kTestPrecision)));
 }
 
-
 TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+      {{},
+       {},
+       model::proto::Task::CLASSIFICATION,
+       dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
 }
 
@@ -176,7 +184,7 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLoss) {
           (label_column.categorical().number_of_unique_values() - 1),
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, label_column);
+      {{}, {}, model::proto::Task::CLASSIFICATION, label_column});
   LossResults loss_results;
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
@@ -224,7 +232,7 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
           (label_column.categorical().number_of_unique_values() - 1),
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, label_column);
+      {{}, {}, model::proto::Task::CLASSIFICATION, label_column});
   LossResults loss_results;
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(

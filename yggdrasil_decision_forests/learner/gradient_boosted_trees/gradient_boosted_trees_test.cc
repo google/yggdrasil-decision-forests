@@ -434,7 +434,7 @@ TEST(GradientBoostedTrees, CreateGradientDataset) {
 
   const auto loss_imp = CreateLoss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
                                    model::proto::Task::CLASSIFICATION,
-                                   dataset.data_spec().columns(1), {})
+                                   dataset.data_spec().columns(1), {}, {})
                             .value();
   CHECK_OK(internal::CreateGradientDataset(dataset,
                                            /* label_col_idx= */ 1,
@@ -1966,7 +1966,7 @@ TEST(DartPredictionAccumulator, Base) {
   std::vector<float> predictions;
   const auto loss_imp =
       CreateLoss(proto::Loss::SQUARED_ERROR, model::proto::Task::REGRESSION,
-                 dataset.data_spec().columns(0), {})
+                 dataset.data_spec().columns(0), {}, {})
           .value();
   CHECK_OK(internal::CreateGradientDataset(dataset,
                                            /* label_col_idx= */ 0,

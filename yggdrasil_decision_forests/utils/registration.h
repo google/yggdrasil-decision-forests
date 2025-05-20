@@ -33,11 +33,19 @@
 //   #include "interface.h"
 //   BaseClassRegisterer::Create("C1", "Toto").value() ...
 //
+// If the interface class defines the symbol "REQUIRED_REGISTRATION_CREATE",
+// implementation class should defines a static "RegistrationCreate" method,with
+// the following signature. This method will be called instead of the
+// constructor. This mechanism allows to handle failure in the implementation
+// class constructor.
+//   static absl::StatusOr<std::unique_ptr<BaseClass>> RegistrationCreate();
+//
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_REGISTRATION_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_REGISTRATION_H_
 
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -97,18 +105,32 @@ class AbstractCreator {
   virtual ~AbstractCreator() = default;
   AbstractCreator(absl::string_view name) : name_(name) {}
   const std::string& name() const { return name_; }
-  virtual std::unique_ptr<Interface> Create(Args... args) = 0;
+  virtual absl::StatusOr<std::unique_ptr<Interface>> Create(Args... args) = 0;
 
  private:
   std::string name_;
+};
+
+// Check if the interface class defines a "REQUIRED_REGISTRATION_CREATE" global
+// variable.
+template <typename T, typename = void>
+struct use_registration_create_value : std::false_type {};
+
+template <typename T>
+struct use_registration_create_value<
+    T, std::void_t<typename T::REQUIRED_REGISTRATION_CREATE>> : std::true_type {
 };
 
 template <class Interface, class Implementation, class... Args>
 class Creator final : public AbstractCreator<Interface, Args...> {
  public:
   Creator(absl::string_view name) : AbstractCreator<Interface, Args...>(name) {}
-  std::unique_ptr<Interface> Create(Args... args) override {
-    return std::make_unique<Implementation>(args...);
+  absl::StatusOr<std::unique_ptr<Interface>> Create(Args... args) override {
+    if constexpr (use_registration_create_value<Interface>::value) {
+      return Implementation::RegistrationCreate(args...);
+    } else {
+      return std::make_unique<Implementation>(args...);
+    }
   };
 };
 

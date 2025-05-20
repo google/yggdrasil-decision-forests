@@ -42,14 +42,15 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-absl::Status MeanSquaredErrorLoss::Status() const {
-  if (task_ != model::proto::Task::REGRESSION &&
-      task_ != model::proto::Task::RANKING) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>>
+MeanSquaredErrorLoss::RegistrationCreate(const ConstructorArgs& args) {
+  if (args.task != model::proto::Task::REGRESSION &&
+      args.task != model::proto::Task::RANKING) {
     return absl::InvalidArgumentError(
         "Mean squared error loss is only compatible with a "
         "regression or ranking task");
   }
-  return absl::OkStatus();
+  return absl::make_unique<MeanSquaredErrorLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
@@ -94,9 +95,8 @@ absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
 
 absl::Status MeanSquaredErrorLoss::UpdateGradients(
     const absl::Span<const float> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   // TODO: Implement thread_pool.
 
@@ -130,8 +130,7 @@ std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
 absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   constexpr int kNDCG5Truncation = 5;
   float loss_value;
@@ -140,11 +139,40 @@ absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
 
   std::vector<float> secondary_metrics = {loss_value};
   if (task_ == model::proto::Task::RANKING) {
+    STATUS_CHECK(cache);
+    auto* ranking_index = static_cast<const Cache*>(cache)->ranking_index.get();
     secondary_metrics.push_back(
         ranking_index->NDCG(predictions, weights, kNDCG5Truncation));
   }
   return LossResults{/*.loss =*/loss_value,
                      /*.secondary_metrics =*/std::move(secondary_metrics)};
+}
+
+absl::StatusOr<std::unique_ptr<AbstractLossCache>>
+MeanSquaredErrorLoss::CreateLossCache(
+    const dataset::VerticalDataset& dataset) const {
+  if (task_ != model::proto::Task::RANKING) {
+    return std::unique_ptr<AbstractLossCache>();
+  }
+  // Only create a ranking index if the model is a ranker.
+  auto cache = absl::make_unique<MeanSquaredErrorLoss::Cache>();
+  cache->ranking_index = absl::make_unique<RankingGroupsIndices>();
+  RETURN_IF_ERROR(cache->ranking_index->Initialize(
+      dataset, train_config_link_.label(), train_config_link_.ranking_group()));
+  return cache;
+}
+
+absl::StatusOr<std::unique_ptr<AbstractLossCache>>
+MeanSquaredErrorLoss::CreateRankingLossCache(
+    absl::Span<const float> labels, absl::Span<const uint64_t> groups) const {
+  if (task_ != model::proto::Task::RANKING) {
+    return std::unique_ptr<AbstractLossCache>();
+  }
+  // Only create a ranking index if the model is a ranker.
+  auto cache = absl::make_unique<MeanSquaredErrorLoss::Cache>();
+  cache->ranking_index = absl::make_unique<RankingGroupsIndices>();
+  RETURN_IF_ERROR(cache->ranking_index->Initialize(labels, groups));
+  return cache;
 }
 
 }  // namespace gradient_boosted_trees

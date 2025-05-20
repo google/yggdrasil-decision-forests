@@ -69,6 +69,34 @@ class SubClassB1 : public BaseClassB {
 REGISTRATION_CREATE_POOL(BaseClassB);
 REGISTRATION_REGISTER_CLASS(SubClassB1, "B1", BaseClassB);
 
+class BaseClassC {
+ public:
+  using REQUIRED_REGISTRATION_CREATE = std::true_type;
+
+  virtual ~BaseClassC() = default;
+  virtual std::string Result() = 0;
+};
+
+class SubClassC1 : public BaseClassC {
+ public:
+  // A constructor with some complex args that we don't provide to the
+  // registration.
+  SubClassC1(int p1, int p2) {}
+
+  static absl::StatusOr<std::unique_ptr<BaseClassC>> RegistrationCreate() {
+    return absl::make_unique<SubClassC1>(1, 2);
+  }
+
+  std::string Result() override { return "SubClassC1"; }
+};
+
+REGISTRATION_CREATE_POOL(BaseClassC);
+REGISTRATION_REGISTER_CLASS(SubClassC1, "C1", BaseClassC);
+
+TEST(Registration, WithStatus) {
+  EXPECT_EQ(BaseClassCRegisterer::Create("C1").value()->Result(), "SubClassC1");
+}
+
 TEST(Registration, WithConstructorArguments) {
   EXPECT_EQ(absl::StrJoin(BaseClassARegisterer::GetNames(), ","), "A1,A2");
 
