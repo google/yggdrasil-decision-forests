@@ -44,6 +44,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
@@ -204,6 +205,16 @@ class GenericCCLearner {
       const utils::proto::FoldGenerator& fold_generator,
       const metric::proto::EvaluationOptions& evaluation_options,
       const model::proto::DeploymentConfig& deployment_evaluation) const {
+    if (deployment_evaluation.num_threads() > 1) {
+      auto* gbt_learner = dynamic_cast<
+          model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+          learner_.get());
+      if (gbt_learner != nullptr && gbt_learner->HasCustomLossFunctions()) {
+        return absl::InvalidArgumentError(
+            "When using custom losses, learner evaluation cannot be "
+            "use parallel evaluations. Set parallel_evaluations=1.");
+      }
+    }
     EnableUserInterruption();
     ASSIGN_OR_RETURN(auto evaluation,
                      model::EvaluateLearnerOrStatus(

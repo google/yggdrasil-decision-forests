@@ -708,6 +708,71 @@ class CustomLossTest(parameterized.TestCase):
         atol=1e-6,
     )
 
+  def test_cross_validation_no_parallel_evaluations(self):
+    toy_custom_loss = custom_loss.RegressionLoss(
+        initial_predictions=lambda x, y: np.float32(0),
+        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
+        loss=lambda x, y, z: np.float32(0),
+        activation=custom_loss.Activation.IDENTITY,
+    )
+
+    learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="target",
+        loss=toy_custom_loss,
+        task=generic_learner.Task.REGRESSION,
+        num_trees=30,
+        early_stopping="NONE",
+        validation_ratio=0.0,
+    )
+    with self.assertRaisesRegex(
+        ValueError,
+        "When using custom losses, learner evaluation cannot be use parallel"
+        " evaluations.",
+    ):
+      _ = learner_custom_loss.cross_validation(
+          self.two_center_regression.train, parallel_evaluations=2
+      )
+
+  def test_cross_validation_mse(self):
+    def mse_initial_predictions(
+        labels: npty.NDArray[np.float32], weights: npty.NDArray[np.float32]
+    ) -> np.float32:
+      return np.average(labels, weights=weights)
+
+    def mse_gradient(
+        labels: npty.NDArray[np.float32], predictions: npty.NDArray[np.float32]
+    ) -> Tuple[npty.NDArray[np.float32], npty.NDArray[np.float32]]:
+      return (predictions - labels, -np.ones(labels.shape))
+
+    def mse_loss(
+        labels: npty.NDArray[np.float32],
+        predictions: npty.NDArray[np.float32],
+        weights: npty.NDArray[np.float32],
+    ) -> np.float32:
+      numerator = np.sum(np.multiply(weights, np.square(labels - predictions)))
+      denominator = np.sum(weights)
+      return np.sqrt(numerator / denominator)
+
+    mse_custom_loss = custom_loss.RegressionLoss(
+        initial_predictions=mse_initial_predictions,
+        gradient_and_hessian=mse_gradient,
+        loss=mse_loss,
+        activation=custom_loss.Activation.IDENTITY,
+    )
+
+    learner_custom_loss = specialized_learners.GradientBoostedTreesLearner(
+        label="target",
+        loss=mse_custom_loss,
+        task=generic_learner.Task.REGRESSION,
+        num_trees=30,
+        early_stopping="NONE",
+        validation_ratio=0.0,
+    )
+    cross_validation = learner_custom_loss.cross_validation(
+        self.two_center_regression.train
+    )
+    self.assertAlmostEqual(cross_validation.rmse, 190.43, delta=3.0)
+
 
 if __name__ == "__main__":
   absltest.main()

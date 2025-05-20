@@ -909,7 +909,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
   utils::RandomEngine rnd;
   RETURN_IF_ERROR(metric::InitializeEvaluation(
       evaluation_options, label_col_spec, &aggregated_evaluation));
-  {
+  if (deployment_evaluation.num_threads() > 1) {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         deployment_evaluation.num_threads(),
         {.name_prefix = std::string("Evaluator")});
@@ -919,6 +919,10 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
         utils::RandomEngine rnd(seed);
         train_and_evaluate(fold_idx, &rnd);
       });
+    }
+  } else {
+    for (int fold_idx = 0; fold_idx < num_folds; fold_idx++) {
+      train_and_evaluate(fold_idx, &rnd);
     }
   }
 

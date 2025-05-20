@@ -47,6 +47,7 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -189,6 +190,10 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   void SetCustomLossFunctions(
       const CustomLossFunctions& custom_loss_functions) {
     custom_loss_functions_ = custom_loss_functions;
+  }
+
+  bool HasCustomLossFunctions() const {
+    return custom_loss_functions_.index() > 0;
   }
 
  private:
