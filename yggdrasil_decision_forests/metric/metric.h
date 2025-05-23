@@ -136,6 +136,9 @@ float NDCG(const proto::EvaluationResults& eval);
 // Mean Reciprocal Rank.
 float MRR(const proto::EvaluationResults& eval);
 
+// Mean Average Precision.
+float MAP(const proto::EvaluationResults& eval);
+
 // Equivalent to the fraction of examples were the highest predicted example is
 // also the example with the highest relevance value.
 float PrecisionAt1(const proto::EvaluationResults& eval);

@@ -2,6 +2,11 @@
 
 ## HEAD
 
+### Feature
+
+
+-   Expose Mean Average Precision for Ranking tasks.
+
 ## 0.12.0 - 2025-05-20
 
 ### Feature

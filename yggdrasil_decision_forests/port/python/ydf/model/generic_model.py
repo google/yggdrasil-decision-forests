@@ -548,6 +548,7 @@ Use `model.describe()` for more details
       bootstrapping: Union[bool, int] = False,
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
+      map_truncation: int = 5,
       evaluation_task: Optional[Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
@@ -620,6 +621,8 @@ Use `model.describe()` for more details
       ndcg_truncation: Controls at which ranking position the NDCG metric should
         be truncated. Default to 5. Ignored for non-ranking models.
       mrr_truncation: Controls at which ranking position the MRR metric loss
+        should be truncated. Default to 5. Ignored for non-ranking models.
+      map_truncation: Controls at which ranking position the MAP metric loss
         should be truncated. Default to 5. Ignored for non-ranking models.
       evaluation_task: Deprecated. Use `task` instead.
       use_slow_engine: If true, uses the slow engine for making predictions. The
@@ -1610,6 +1613,7 @@ class GenericCCModel(GenericModel):
       bootstrapping: Union[bool, int] = False,
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
+      map_truncation: int = 5,
       evaluation_task: Optional[Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
@@ -1686,7 +1690,9 @@ class GenericCCModel(GenericModel):
           bootstrapping_samples=bootstrapping_samples,
           task=task._to_proto_type(),  # pylint: disable=protected-access
           ranking=metric_pb2.EvaluationOptions.Ranking(
-              ndcg_truncation=ndcg_truncation, mrr_truncation=mrr_truncation
+              ndcg_truncation=ndcg_truncation,
+              mrr_truncation=mrr_truncation,
+              map_truncation=map_truncation,
           )
           if task == Task.RANKING
           else None,

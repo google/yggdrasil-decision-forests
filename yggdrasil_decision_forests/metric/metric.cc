@@ -46,6 +46,7 @@
 #include "boost/math/distributions/students_t.hpp"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/metric/labels.h"
+#include "yggdrasil_decision_forests/metric/ranking_ap.h"
 #include "yggdrasil_decision_forests/metric/ranking_mrr.h"
 #include "yggdrasil_decision_forests/metric/ranking_ndcg.h"
 #include "yggdrasil_decision_forests/metric/uplift.h"
@@ -284,6 +285,7 @@ absl::Status FinalizeRankingMetricsFromSampledPredictions(
 
   NDCGCalculator ndcg_computer(option.ranking().ndcg_truncation());
   MRRCalculator mrr_computer(option.ranking().mrr_truncation());
+  APCalculator ap_computer(option.ranking().map_truncation());
 
   double sum_weighted_ndcg = 0;
   double sum_weights = 0;
@@ -292,11 +294,15 @@ absl::Status FinalizeRankingMetricsFromSampledPredictions(
   double sum_weighted_mrr = 0;
   double sum_weighted_precision_at_1 = 0;
 
+  double sum_weighted_ap = 0;
+
   // NDCGs and weights of each group. Used for the computation of confidence
   // intervals using bootstrapping.
-  std::vector<std::pair<float, float>> individual_ndcgs, individual_mrrs;
+  std::vector<std::pair<float, float>> individual_ndcgs, individual_mrrs,
+      individual_aps;
   individual_ndcgs.reserve(grouped_examples.size());
   individual_mrrs.reserve(grouped_examples.size());
+  individual_aps.reserve(grouped_examples.size());
 
   size_t min_num_items_in_group = std::numeric_limits<size_t>::max();
   size_t max_num_items_in_group = std::numeric_limits<size_t>::min();
@@ -326,8 +332,14 @@ absl::Status FinalizeRankingMetricsFromSampledPredictions(
         group.second.weight *
         mrr_computer.MRR(group.second.pred_and_label_relevance);
     individual_mrrs.emplace_back(weighted_mrr, group.second.weight);
-
     sum_weighted_mrr += weighted_mrr;
+
+    // MAP
+    const auto weighted_ap =
+        group.second.weight *
+        ap_computer.AP(group.second.pred_and_label_relevance);
+    individual_aps.emplace_back(weighted_ap, group.second.weight);
+    sum_weighted_ap += weighted_ap;
 
     // Precision @ 1
     const auto precision_at_1 =
@@ -346,6 +358,9 @@ absl::Status FinalizeRankingMetricsFromSampledPredictions(
 
   ranking.mutable_mrr()->set_value(sum_weighted_mrr / sum_weights);
   ranking.set_mrr_truncation(option.ranking().mrr_truncation());
+
+  ranking.mutable_map()->set_value(sum_weighted_ap / sum_weights);
+  ranking.set_map_truncation(option.ranking().map_truncation());
 
   ranking.mutable_precision_at_1()->set_value(sum_weighted_precision_at_1 /
                                               sum_weights);
@@ -1147,6 +1162,10 @@ float NDCG(const proto::EvaluationResults& eval) {
 
 float MRR(const proto::EvaluationResults& eval) {
   return eval.ranking().mrr().value();
+}
+
+float MAP(const proto::EvaluationResults& eval) {
+  return eval.ranking().map().value();
 }
 
 float PrecisionAt1(const proto::EvaluationResults& eval) {

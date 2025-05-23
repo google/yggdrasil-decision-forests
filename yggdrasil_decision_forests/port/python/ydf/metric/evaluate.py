@@ -31,6 +31,7 @@ def _build_evaluation_options(
     bootstrapping: Union[bool, int],
     ndcg_truncation: int,
     mrr_truncation: int,
+    map_truncation: int,
     num_threads: Optional[int],
 ) -> metric_pb2.EvaluationOptions:
   """Builds evaluation options for the given task."""
@@ -47,7 +48,9 @@ def _build_evaluation_options(
   ranking = None
   if task == generic_model.Task.RANKING:
     ranking = metric_pb2.EvaluationOptions.Ranking(
-        ndcg_truncation=ndcg_truncation, mrr_truncation=mrr_truncation
+        ndcg_truncation=ndcg_truncation,
+        mrr_truncation=mrr_truncation,
+        map_truncation=map_truncation,
     )
   options = metric_pb2.EvaluationOptions(
       bootstrapping_samples=bootstrapping_samples,
@@ -255,6 +258,7 @@ def evaluate_predictions(
     bootstrapping: Union[bool, int] = False,
     ndcg_truncation: int = 5,
     mrr_truncation: int = 5,
+    map_truncation: int = 5,
     random_seed: int = 1234,
     num_threads: Optional[int] = None,
 ) -> metric.Evaluation:
@@ -351,6 +355,8 @@ def evaluate_predictions(
       be truncated. Default to 5. Ignored for non-ranking models.
     mrr_truncation: Controls at which ranking position the MRR metric loss
       should be truncated. Default to 5. Ignored for non-ranking models.
+    map_truncation: Controls at which ranking position the MAP metric loss
+      should be truncated. Default to 5. Ignored for non-ranking models.
     random_seed: Random seed for sampling.
     num_threads: Number of threads used to run the model.
 
@@ -367,6 +373,7 @@ def evaluate_predictions(
       bootstrapping,
       ndcg_truncation,
       mrr_truncation,
+      map_truncation,
       num_threads,
   )
 

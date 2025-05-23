@@ -1275,6 +1275,29 @@ Use `model.describe()` for more details
     )
     self.assertAlmostEqual(evaluation.mrr, expected_mrr)
 
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "map@5",
+          "truncation": 5,
+          "expected_map": 0.793028052,
+      },
+      {
+          "testcase_name": "map@2",
+          "truncation": 2,
+          "expected_map": 0.792079209,
+      },
+      {
+          "testcase_name": "map@10",
+          "truncation": 10,
+          "expected_map": 0.7601983518,
+      },
+  )
+  def test_evaluate_ranking_map_truncation(self, truncation, expected_map):
+    evaluation = self.synthetic_ranking_gbdt.evaluate(
+        self.synthetic_ranking_gbdt_test_ds, map_truncation=truncation
+    )
+    self.assertAlmostEqual(evaluation.map, expected_map, places=3)
+
   def test_model_save_pure_serving(self):
     model_path = os.path.join(
         test_utils.ydf_test_data_path(),

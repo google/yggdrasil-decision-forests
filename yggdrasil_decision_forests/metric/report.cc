@@ -554,6 +554,16 @@ absl::Status AppendTextReportRanking(const proto::EvaluationResults& eval,
   }
   absl::StrAppend(report, "\n");
 
+  absl::StrAppend(report, "MAP@", eval.ranking().map_truncation(), ": ",
+                  MAP(eval));
+  if (eval.ranking().map().has_bootstrap_based_95p()) {
+    absl::SubstituteAndAppend(
+        report, " CI95[B][$0 $1]",
+        eval.ranking().map().bootstrap_based_95p().lower(),
+        eval.ranking().map().bootstrap_based_95p().upper());
+  }
+  absl::StrAppend(report, "\n");
+
   absl::StrAppend(report, "Precision@1: ", PrecisionAt1(eval));
   if (eval.ranking().precision_at_1().has_bootstrap_based_95p()) {
     absl::SubstituteAndAppend(

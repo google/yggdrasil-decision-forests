@@ -1127,6 +1127,8 @@ TEST(Metric, EvaluationOfRanking) {
 
   // R=1
   EXPECT_NEAR(MRR(eval), 1.0, 0.01);
+  // R=1
+  EXPECT_NEAR(MAP(eval), 19. / 20., 0.01);
 
   // TODO: Fix.
   // EXPECT_NEAR(PrecisionAt1(eval), 1.0, 0.01);

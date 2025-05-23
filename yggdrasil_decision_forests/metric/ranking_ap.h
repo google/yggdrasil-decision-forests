@@ -13,30 +13,35 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/metric/ranking_mrr.h"
+// Compute the Average Precision ranking metric.
+//
+// The relevance values are expected to be binary with 0 indicating non-relevant
+// and >0.5 indicating relevant examples.
+//
+// AP currently break score ties according to the training examples' order.
+//
+#ifndef YGGDRASIL_DECISION_FORESTS_METRIC_RANKING_AP_H_
+#define YGGDRASIL_DECISION_FORESTS_METRIC_RANKING_AP_H_
 
-#include <algorithm>
 #include <vector>
 
 #include "yggdrasil_decision_forests/metric/ranking_utils.h"
+
 namespace yggdrasil_decision_forests {
 namespace metric {
 
-MRRCalculator::MRRCalculator(const int truncation) : truncation_(truncation) {}
+class APCalculator {
+ public:
+  explicit APCalculator(int truncation);
 
-double MRRCalculator::MRR(
-    const std::vector<RankingLabelAndPrediction>& group) const {
-  auto mutable_group = group;
-  std::sort(mutable_group.begin(), mutable_group.end(),
-            OrderDecreasingPrediction);
-  const int max_rank = std::min(truncation_, static_cast<int>(group.size()));
-  for (int rank = 0; rank < max_rank; rank++) {
-    if (mutable_group[rank].label > 0.5) {
-      return 1.0 / (rank + 1.0);
-    }
-  }
-  return 0.0;
-}
+  // Computes the AP@truncation of a set of examples.
+  double AP(const std::vector<RankingLabelAndPrediction>& group) const;
+
+ private:
+  int truncation_;
+};
 
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests
+
+#endif  // YGGDRASIL_DECISION_FORESTS_METRIC_RANKING_AP_H_

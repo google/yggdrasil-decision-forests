@@ -401,6 +401,7 @@ class GenericJAXModel(generic_model.GenericModel):
       bootstrapping: Union[bool, int] = False,
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
+      map_truncation: int = 5,
       evaluation_task: Optional[generic_model.Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
@@ -460,6 +461,7 @@ class GenericJAXModel(generic_model.GenericModel):
         bootstrapping=bootstrapping,
         ndcg_truncation=ndcg_truncation,
         mrr_truncation=mrr_truncation,
+        map_truncation=map_truncation,
         num_threads=num_threads,
     )
 

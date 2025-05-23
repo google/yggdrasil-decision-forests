@@ -64,6 +64,8 @@ message EvaluationOptions {
     // If false (default) and if all the predictions (items) are in the same
     // group (i.e. there is only one group), raises an error.
     optional bool allow_only_one_group = 3 [default = false];
+    // Rank cut-off at which Mean Average Precision is computed.
+    optional int32 map_truncation = 4 [default = 5];
   }
 
   message Uplift {}
@@ -170,13 +172,16 @@ message EvaluationResults {
     optional MetricEstimate mrr = 8;
     optional int32 mrr_truncation = 9;
 
+    optional MetricEstimate map = 14;
+    optional int32 map_truncation = 15;
+
     reserved 6, 7;
 
     // Fraction of examples were the highest predicted example is also the
     // example with the highest relevance value.
     optional MetricEstimate precision_at_1 = 13;
 
-    // Next ID: 14
+    // Next ID: 16
     reserved 1;
   }
 
@@ -334,9 +339,11 @@ message MetricAccessor {
     oneof Type {
       NDCG ndcg = 1;
       MRR mrr = 2;
+      MAP map = 3;
     }
     message NDCG {}
     message MRR {}
+    message MAP {}
   }
 
   message Uplift {

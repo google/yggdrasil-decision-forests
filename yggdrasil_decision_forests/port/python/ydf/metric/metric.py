@@ -281,6 +281,7 @@ class Evaluation:
       bootstrapping. Only available for regression task.
     ndcg: Normalized Discounted Cumulative Gain. Used for ranking tasks.
     mrr: Mean Reciprocal Rank. Used for ranking tasks.
+    map: Mean Average Precision. Used for ranking tasks.
     qini: For uplifting.
     auuc: For uplifting.
     custom_metrics: User custom metrics dictionary.
@@ -475,6 +476,13 @@ class Evaluation:
         return rank.mrr.value
 
   @property
+  def map(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("ranking"):
+      rank = self._evaluation_proto.ranking
+      if rank.HasField("map"):
+        return rank.map.value
+
+  @property
   def qini(self) -> Optional[float]:
     if self._evaluation_proto.HasField("uplift"):
       uplift = self._evaluation_proto.uplift
@@ -514,6 +522,7 @@ class Evaluation:
     add_item("rmse_ci95_bootstrap", self.rmse_ci95_bootstrap)
     add_item("ndcg", self.ndcg)
     add_item("mrr", self.mrr)
+    add_item("map", self.map)
     add_item("qini", self.qini)
     add_item("auuc", self.auuc)
     return output

@@ -59,10 +59,12 @@ cc_library_ydf(
 cc_library_ydf(
     name = "ranking",
     srcs = [
+        "ranking_ap.cc",
         "ranking_mrr.cc",
         "ranking_ndcg.cc",
     ],
     hdrs = [
+        "ranking_ap.h",
         "ranking_mrr.h",
         "ranking_ndcg.h",
     ],
