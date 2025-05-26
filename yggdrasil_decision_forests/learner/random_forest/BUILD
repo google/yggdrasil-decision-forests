@@ -31,7 +31,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:generic_parameters",
         "//yggdrasil_decision_forests/learner/decision_tree:gpu",
-        "//yggdrasil_decision_forests/learner/decision_tree:label",
         "//yggdrasil_decision_forests/learner/decision_tree:preprocessing",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/metric",

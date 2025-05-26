@@ -15,6 +15,9 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <string>
@@ -34,7 +37,11 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/label_accessor.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/splitter.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
@@ -43,11 +50,17 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {

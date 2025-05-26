@@ -16,9 +16,13 @@
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.h"
 
 #include <cmath>
+#include <functional>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
+#include <tuple>
+#include <utility>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/log.h"
@@ -29,15 +33,21 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
+#include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/distribute.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/utils/hyper_parameters.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {

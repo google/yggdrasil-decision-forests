@@ -17,6 +17,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "gmock/gmock.h"
@@ -31,6 +34,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/random.h"

@@ -49,7 +49,6 @@ namespace yggdrasil_decision_forests {
 namespace dataset {
 
 using proto::ColumnType;
-using proto::DatasetFormat;
 using proto::Tokenizer;
 using yggdrasil_decision_forests::utils::AccurateSum;
 

@@ -15,12 +15,22 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_square_error.h"
 
+#include <cmath>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -35,7 +45,6 @@ using ::testing::ElementsAre;
 using ::testing::FloatNear;
 using ::testing::IsEmpty;
 using ::testing::Not;
-using ::testing::SizeIs;
 
 // Margin of error for numerical tests.
 constexpr float kTestPrecision = 0.000001f;

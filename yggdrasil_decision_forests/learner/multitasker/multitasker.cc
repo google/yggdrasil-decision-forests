@@ -15,8 +15,15 @@
 
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -26,6 +33,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"

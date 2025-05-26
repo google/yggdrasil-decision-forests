@@ -15,7 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/concurrency_default.h"
 
-#include <iostream>
+#include <functional>
+#include <utility>
 
 namespace yggdrasil_decision_forests {
 namespace utils {
