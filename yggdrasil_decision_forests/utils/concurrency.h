@@ -25,8 +25,8 @@
 //
 //   # ThreadPool
 //   {
+//   // The threadpool starts workers upon construction.
 //   ThreadPool pool("name", /*num_threads=*/10);
-//   pool.StartWorkers();
 //   pool.Schedule([](){...});
 //   }
 //

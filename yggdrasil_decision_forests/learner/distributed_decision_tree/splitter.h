@@ -1083,7 +1083,6 @@ TemplatedFindBestSplitsWithDiscretizedNumericalFeatureMultiThreading(
 
   {
     utils::concurrency::ThreadPool thread_pool("splitter", num_threads);
-    thread_pool.StartWorkers();
 
     RETURN_IF_ERROR(InitializeCategoricalFeatureBuckets<>(
         common, is_target_node, /*num_feature_values=*/num_discretized_values,

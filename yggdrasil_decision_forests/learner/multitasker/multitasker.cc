@@ -262,7 +262,6 @@ MultitaskerLearner::TrainWithStatusImpl(
       utils::concurrency::ThreadPool pool(
           deployment().num_threads(),
           {.name_prefix = std::string("multitasker")});
-      pool.StartWorkers();
       for (const auto subtask_idx : secondary_task_idxs) {
         pool.Schedule([train_subtask_nostatus, subtask_idx]() {
           train_subtask_nostatus(subtask_idx, /*primary=*/false);
@@ -293,7 +292,6 @@ MultitaskerLearner::TrainWithStatusImpl(
     utils::concurrency::ThreadPool pool(
         deployment().num_threads(),
         {.name_prefix = std::string("multitasker")});
-    pool.StartWorkers();
     for (const auto subtask_idx : primary_task_idxs) {
       pool.Schedule([train_subtask_nostatus, subtask_idx]() {
         train_subtask_nostatus(subtask_idx, /*primary=*/true);

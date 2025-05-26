@@ -54,9 +54,6 @@ class ThreadPool {
   // Ensure all the jobs are done and all the threads have been joined.
   ~ThreadPool();
 
-  // Starts the threads.
-  void StartWorkers();
-
   // Schedules a new job. Returns immediately i.e. does not wait for the job to
   // be executed.
   // If "num_threads==0", execute "callback" synchronously.

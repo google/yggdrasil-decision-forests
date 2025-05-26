@@ -218,7 +218,6 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
           utils::concurrency::ThreadPool pool(
               std::min<int>(non_blocking_.load_features.size(), num_threads),
               {.name_prefix = std::string("LoadFeatures")});
-          pool.StartWorkers();
           for (const int column_idx : non_blocking_.load_features) {
             pool.Schedule([&, column_idx]() {
               {
@@ -317,7 +316,6 @@ absl::Status DatasetCacheReader::LoadingAndUnloadingFeatures(
         utils::concurrency::ThreadPool pool(
             std::min<int>(load_features.size(), 20),
             {.name_prefix = std::string("LoadFeatures")});
-        pool.StartWorkers();
 
         for (const int column_idx : load_features) {
           pool.Schedule([&, column_idx]() {
@@ -608,7 +606,6 @@ absl::Status DatasetCacheReader::InitializeAndLoadInMemoryCache() {
     utils::concurrency::Mutex mutex_worker_status;
     utils::concurrency::ThreadPool pool(
         20, {.name_prefix = std::string("LoadFeatures")});
-    pool.StartWorkers();
     for (const int column_idx : features_) {
       pool.Schedule([&, column_idx]() {
         {
@@ -1066,7 +1063,6 @@ absl::Status PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
   {
     utils::concurrency::ThreadPool thread_pool(
         /*num_threads=*/20, {.name_prefix = std::string("InferDataspec")});
-    thread_pool.StartWorkers();
     for (int col_idx = 0; col_idx < data_spec->columns_size(); col_idx++) {
       for (int shard_idx = 0; shard_idx < partial_meta_data.num_shards();
            shard_idx++) {

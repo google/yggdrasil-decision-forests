@@ -694,7 +694,6 @@ absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path) {
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         50, {.name_prefix = std::string("CountNumberOfExamples")});
-    pool.StartWorkers();
     for (const auto& path : paths) {
       pool.Schedule([&, path]() {
         number_of_examples += creator->CountExamples(path).value();

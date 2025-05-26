@@ -189,7 +189,6 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLoss) {
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp.Loss(dataset,
                                        /* label_col_idx= */ 1, predictions,
@@ -237,7 +236,6 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(
         loss_results,
         loss_imp.Loss(dataset,

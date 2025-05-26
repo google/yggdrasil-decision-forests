@@ -183,7 +183,6 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
   }
   thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>(
       "generic", welcome_.deployment_config().num_threads());
-  thread_pool_->StartWorkers();
 
   return absl::OkStatus();
 }

@@ -67,7 +67,6 @@ void MoveFilenamesNoFailures(const std::string_view src_dir,
                              const std::vector<std::string>& filenames) {
   utils::concurrency::ThreadPool thread_pool(
       kNumThreads, {.name_prefix = std::string("MoveFilenamesNoFailures")});
-  thread_pool.StartWorkers();
   for (const auto& filename : filenames) {
     thread_pool.Schedule([filename, src_dir, dst_dir]() {
       const auto src_file = file::JoinPath(src_dir, filename);
@@ -293,7 +292,6 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
   {
     utils::concurrency::ThreadPool thread_pool(
         kNumThreads, {.name_prefix = std::string("ExportColumns")});
-    thread_pool.StartWorkers();
     for (const auto column_idx : request.columns()) {
       thread_pool.Schedule([&, column_idx]() {
         {

@@ -251,7 +251,6 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK(loss_imp->UpdateGradients(
         labels, predictions,
         /*ranking_index=*/nullptr, &compact_gradient, &random, &thread_pool));
@@ -293,7 +292,6 @@ TEST_P(PoissonLossTest, ComputeLoss) {
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp->Loss(dataset,
                                         /* label_col_idx= */ 0, predictions,

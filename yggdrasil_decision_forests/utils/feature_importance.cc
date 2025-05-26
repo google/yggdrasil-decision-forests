@@ -211,7 +211,6 @@ absl::Status ComputePermutationFeatureImportance(
     utils::concurrency::ThreadPool pool(
         options.num_threads,
         {.name_prefix = std::string("variable_importance")});
-    pool.StartWorkers();
     LOG(INFO) << "Running " << model->data_spec().columns_size()
               << " features on " << options.num_threads << " threads with "
               << options.num_rounds << " rounds";

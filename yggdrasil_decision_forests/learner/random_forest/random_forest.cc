@@ -595,7 +595,6 @@ RandomForestLearner::TrainWithStatusImpl(
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         deployment().num_threads(), {.name_prefix = std::string("TrainRF")});
 
-    pool.StartWorkers();
     for (int tree_idx = 0; tree_idx < rf_config.num_trees(); tree_idx++) {
       pool.Schedule([&, tree_idx]() {
         // The user interrupted the training.

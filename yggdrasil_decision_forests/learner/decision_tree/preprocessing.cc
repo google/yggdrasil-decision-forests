@@ -83,7 +83,6 @@ absl::Status PresortNumericalFeatures(
   utils::concurrency::ThreadPool pool(
       std::min(num_threads, config_link.features().size()),
       {.name_prefix = std::string("presort_numerical_features")});
-  pool.StartWorkers();
 
   // For all the input features in the model.
   for (const auto feature_idx : config_link.features()) {

@@ -161,7 +161,6 @@ TEST_P(NDCGLossTest, UpdateGradientsArbitraryLabels) {
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         6, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
                                        /* label_col_idx= */ 0, predictions,
                                        &cache, &gradients, &random,

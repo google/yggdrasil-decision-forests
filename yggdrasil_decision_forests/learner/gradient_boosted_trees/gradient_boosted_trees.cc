@@ -673,7 +673,6 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
               << " threads";
     thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
         "GBTLossThreadpool", deployment_.num_threads());
-    thread_pool->StartWorkers();
   }
 
   // Split the shards between train and validation.
@@ -1380,7 +1379,6 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
               << " threads for loss computation";
     thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
         "GBTLossThreadpool", deployment_.num_threads());
-    thread_pool->StartWorkers();
   }
 
   // Try to resume training.

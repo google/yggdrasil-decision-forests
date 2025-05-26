@@ -1491,7 +1491,6 @@ TEST(Metric, RMSE) {
 TEST(Metric, RMSEThreaded) {
   utils::concurrency::ThreadPool thread_pool(4,
                                              {.name_prefix = std::string("")});
-  thread_pool.StartWorkers();
   // R> sqrt(mean((c(1,2,3)-c(1,3,4))^2))
   // 0.8164966
   EXPECT_NEAR(RMSE(/*labels=*/std::vector<float>{1, 2, 3},
@@ -1523,9 +1522,6 @@ TEST_P(MAETest, MAE) {
 
   utils::concurrency::ThreadPool thread_pool(4,
                                              {.name_prefix = std::string("")});
-  if (threaded) {
-    thread_pool.StartWorkers();
-  }
   auto* effective_threadpool = threaded ? &thread_pool : nullptr;
 
   {
