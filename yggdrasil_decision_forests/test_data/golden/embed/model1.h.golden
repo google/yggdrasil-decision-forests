@@ -1,0 +1,6 @@
+#ifndef MODEL_my_model_H_
+#define MODEL_my_model_H_
+namespace my_model {
+inline void f() {}
+}  // namespace my_model
+#endif

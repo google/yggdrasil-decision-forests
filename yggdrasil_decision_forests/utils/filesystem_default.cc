@@ -440,6 +440,16 @@ std::string GetBasename(absl::string_view path) {
   }
 }
 
+std::string GetDirname(absl::string_view path) {
+  try {
+    auto filename = fs::path(std::string(path)).parent_path().string();
+    return filename;
+  } catch (const std::exception& e) {
+    LOG(ERROR) << "Error parsing dirname of " << path << ": " << e.what();
+    return "";
+  }
+}
+
 absl::Status SetImmutable(absl::string_view path) { return absl::OkStatus(); }
 
 }  // namespace file

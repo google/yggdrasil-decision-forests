@@ -254,6 +254,11 @@ class FileSystemImplementation : public FileSystemInterface {
     return "";
   }
 
+  std::string GetDirname(absl::string_view path) override {
+    LOG(FATAL) << "Not implemented";
+    return "";
+  }
+
   virtual std::unique_ptr<
       yggdrasil_decision_forests::utils::FileInputByteStream>
   CreateInputByteStream() override {

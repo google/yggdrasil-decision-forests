@@ -296,6 +296,10 @@ class FileSystemImplementation : public FileSystemInterface {
     return std::string(tensorflow::io::Basename(path));
   }
 
+  std::string GetDirname(absl::string_view path) override {
+    return std::string(tensorflow::io::Dirname(path));
+  }
+
   virtual std::unique_ptr<
       yggdrasil_decision_forests::utils::FileInputByteStream>
   CreateInputByteStream() override {
