@@ -17,9 +17,19 @@
 
 #include "yggdrasil_decision_forests/serving/embed/embed.h"
 
+#include <memory>
 #include <string>
+#include <utility>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/decision_tree/builder.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -33,6 +43,55 @@ std::string TestDataDir() {
                         "yggdrasil_decision_forests/test_data");
 }
 
+struct TestData {
+  std::unique_ptr<model::AbstractModel> model;
+};
+
+TestData BuildToyTestData() {
+  auto model = std::make_unique<
+      model::gradient_boosted_trees::GradientBoostedTreesModel>();
+
+  dataset::AddNumericalColumn("l", model->mutable_data_spec());
+  dataset::AddNumericalColumn("f1", model->mutable_data_spec());
+  dataset::AddCategoricalColumn("f2", {"x", "y", "z"},
+                                model->mutable_data_spec());
+
+  model->set_task(model::proto::Task::CLASSIFICATION);
+  model->set_label_col_idx(0);
+  model->mutable_input_features()->push_back(1);
+  model->mutable_input_features()->push_back(2);
+  model->set_initial_predictions({1.f});
+  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR,
+                  {});
+  model->set_num_trees_per_iter(1);
+
+  {
+    auto tree = std::make_unique<model::decision_tree::DecisionTree>();
+    model::decision_tree::TreeBuilder root(tree.get());
+    auto [nl1, l1] = root.ConditionIsGreater(1, 1);
+    auto [l2, nl2] = nl1.ConditionIsGreater(1, 2);
+    auto [l3, l4] = nl2.ConditionContains(2, {1, 3});
+    l1.LeafRegression(2);
+    l2.LeafRegression(4);
+    l3.LeafRegression(5);
+    l4.LeafRegression(6);
+    tree->SetLeafIndices();
+    model->AddTree(std::move(tree));
+  }
+
+  {
+    auto tree = std::make_unique<model::decision_tree::DecisionTree>();
+    model::decision_tree::TreeBuilder root(tree.get());
+    auto [l2, l1] = root.ConditionIsGreater(1, 2);
+    l1.LeafRegression(2);
+    l2.LeafRegression(4);
+    tree->SetLeafIndices();
+    model->AddTree(std::move(tree));
+  }
+
+  return TestData{.model = std::move(model)};
+};
+
 TEST(Embed, SimpleModel) {
   ASSERT_OK_AND_ASSIGN(const auto model,
                        model::LoadModel(file::JoinPath(
@@ -43,6 +102,91 @@ TEST(Embed, SimpleModel) {
   test::ExpectEqualGolden(embed.at("my_model.h"),
                           "yggdrasil_decision_forests/test_data/"
                           "golden/embed/model1.h.golden");
+}
+
+TEST(ComputeStatistics, ManualBinaryGBT) {
+  const auto test_data = BuildToyTestData();
+
+  const auto* df = dynamic_cast<const model::DecisionForestInterface*>(
+      test_data.model.get());
+  ASSERT_TRUE(df);
+  ASSERT_OK_AND_ASSIGN(const auto stats,
+                       internal::ComputeStatistics(*test_data.model, *df));
+
+  EXPECT_EQ(stats.num_features, 2);
+  EXPECT_EQ(stats.num_trees, 2);
+  EXPECT_EQ(stats.num_leaves, 6);
+  EXPECT_EQ(stats.max_num_leaves_per_tree, 4);
+  EXPECT_EQ(stats.max_depth, 3);
+  EXPECT_EQ(stats.internal_output_dim, 1);
+  EXPECT_EQ(stats.multi_dim_tree, false);
+}
+
+TEST(ComputeStatistics, RealBinaryGBT) {
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
+                                             TestDataDir(), "model",
+                                             "adult_binary_class_gbdt_v2")));
+  const auto* df =
+      dynamic_cast<const model::DecisionForestInterface*>(model.get());
+  ASSERT_TRUE(df);
+  ASSERT_OK_AND_ASSIGN(const auto stats,
+                       internal::ComputeStatistics(*model, *df));
+
+  EXPECT_EQ(stats.num_features, 14);
+  EXPECT_EQ(stats.num_trees, 163);
+  EXPECT_EQ(stats.num_leaves, 4476);
+  EXPECT_EQ(stats.max_num_leaves_per_tree, 32);
+  EXPECT_EQ(stats.max_depth, 5);
+  EXPECT_EQ(stats.internal_output_dim, 1);
+  EXPECT_EQ(stats.multi_dim_tree, false);
+}
+
+TEST(ComputeStatistics, RealMultiClassGBT) {
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
+                                             TestDataDir(), "model",
+                                             "iris_multi_class_gbdt_v2")));
+  const auto* df =
+      dynamic_cast<const model::DecisionForestInterface*>(model.get());
+  ASSERT_TRUE(df);
+  ASSERT_OK_AND_ASSIGN(const auto stats,
+                       internal::ComputeStatistics(*model, *df));
+
+  EXPECT_EQ(stats.num_features, 4);
+  EXPECT_EQ(stats.num_trees, 54);
+  EXPECT_EQ(stats.num_leaves, 611);
+  EXPECT_EQ(stats.max_num_leaves_per_tree, 17);
+  EXPECT_EQ(stats.max_depth, 5);
+  EXPECT_EQ(stats.internal_output_dim, 3);
+  EXPECT_EQ(stats.multi_dim_tree, false);
+}
+
+TEST(Embed, CheckModelName) {
+  EXPECT_OK(internal::CheckModelName("my_model_123"));
+  EXPECT_THAT(internal::CheckModelName("my-model"),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(internal::CheckModelName("my model"),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(Embed, StringToUpperCaseVariable) {
+  EXPECT_EQ(internal::StringToConstantSymbol("A nice-and-cold_day 123!"),
+            "A_NICE_AND_COLD_DAY_123");
+  EXPECT_EQ(internal::StringToConstantSymbol("123AAA!"), "V123AAA");
+  EXPECT_EQ(internal::StringToConstantSymbol(""), "");
+}
+
+TEST(Embed, StringToLowerCaseVariable) {
+  EXPECT_EQ(internal::StringToVariableSymbol("A nice-and-cold_day 123!"),
+            "a_nice_and_cold_day_123");
+  EXPECT_EQ(internal::StringToVariableSymbol("123AAA!"), "v123aaa");
+  EXPECT_EQ(internal::StringToVariableSymbol(""), "");
+}
+
+TEST(Embed, StringToStructSymbol) {
+  EXPECT_EQ(internal::StringToStructSymbol("A nice-and-cold_day 123!"),
+            "ANiceAndColdDay123");
+  EXPECT_EQ(internal::StringToStructSymbol("123AAA!"), "V123AAA");
+  EXPECT_EQ(internal::StringToStructSymbol(""), "");
 }
 
 }  // namespace
