@@ -514,6 +514,7 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
         label="income",
         tuner=tuner,
         num_trees=10,
+        num_threads=30,
     )
 
     model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.85)

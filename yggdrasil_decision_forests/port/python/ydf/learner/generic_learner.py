@@ -124,6 +124,7 @@ class GenericLearner(abc.ABC):
       )
     if tuner:
       tuner.set_base_learner(learner_name)
+      tuner.set_base_learner_num_threads(self._deployment_config.num_threads)
 
     self._post_init()
 

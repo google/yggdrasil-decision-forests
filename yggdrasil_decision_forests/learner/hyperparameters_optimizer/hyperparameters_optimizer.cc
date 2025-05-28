@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -73,11 +74,32 @@ absl::Status SetTrainConfigDefaultValues(
     sub_learner.set_maximum_training_duration_seconds(
         effective_config->maximum_training_duration_seconds());
   }
-  // Cross-validation training must use retraining.
-  if (hparam_opt_config->evaluation().has_cross_validation() &&
-      !hparam_opt_config->retrain_final_model()) {
-    LOG(INFO) << "Setting retrain_final_model=true for cross-validation.";
-    hparam_opt_config->set_retrain_final_model(true);
+  if (hparam_opt_config->evaluation().has_cross_validation()) {
+    // Cross-validation training must use retraining.
+    if (!hparam_opt_config->retrain_final_model()) {
+      LOG(INFO) << "Setting retrain_final_model=true for cross-validation.";
+      hparam_opt_config->set_retrain_final_model(true);
+    }
+    // Prefer threads for the outer cross-validation loop.
+    const int total_num_threads =
+        std::max(1, hparam_opt_config->base_learner_deployment().num_threads());
+    const int num_folds = hparam_opt_config->evaluation()
+                              .cross_validation()
+                              .fold_generator()
+                              .num_folds();
+    const int cv_num_threads =
+        std::max(1, std::min(num_folds, total_num_threads));
+    const int per_learner_num_threads =
+        (total_num_threads + cv_num_threads - 1) / cv_num_threads;
+    hparam_opt_config->mutable_evaluation()
+        ->mutable_cross_validation()
+        ->set_num_threads(cv_num_threads);
+    hparam_opt_config->mutable_base_learner_deployment()->set_num_threads(
+        per_learner_num_threads);
+    LOG(INFO) << "Cross-validation with " << cv_num_threads
+              << " thread(s) for the cross-validation and "
+              << per_learner_num_threads
+              << " thread(s) for each model training.";
   }
 
   RETURN_IF_ERROR(CopyProblemDefinition(*effective_config, &sub_learner));
@@ -819,10 +841,9 @@ absl::StatusOr<double> HyperParameterOptimizerLearner::EvaluateCandidateLocally(
         evaluation_options.mutable_regression()->set_enable_regression_plots(
             false);
       }
-      // TODO: If no custom loss is used, "split" the num of threads
-      // specified by the user between the cross-validation and
-      // model learning.
-      evaluation_options.set_num_threads(1);
+      evaluation_options.set_num_threads(
+          spe_config.evaluation().cross_validation().num_threads());
+
       evaluation_options.set_task(spe_config.base_learner().task());
       ASSIGN_OR_RETURN(evaluation, model::EvaluateLearnerOrStatus(
                                        *base_learner, train_dataset,

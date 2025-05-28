@@ -92,6 +92,8 @@ message Evaluation {
 
   message CrossValidation {
     optional utils.proto.FoldGenerator.CrossValidation fold_generator = 1;
+
+    optional int32 num_threads = 2 [default = 10];
   }
 }
 
