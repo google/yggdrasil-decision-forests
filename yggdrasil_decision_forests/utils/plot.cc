@@ -15,12 +15,20 @@
 
 #include "yggdrasil_decision_forests/utils/plot.h"
 
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/utils/histogram.h"
 #include "yggdrasil_decision_forests/utils/html.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -47,6 +55,15 @@ std::string VectorToJsVector(const std::vector<double>& values) {
   }
   absl::StrAppend(&js, "]");
   return js;
+}
+
+// Converts a vector into a stringified Javascript array.
+std::string VectorToJsVector(const std::vector<std::string>& values) {
+  auto quote_formatter = [](std::string* out, const std::string& s) {
+    absl::StrAppend(out, "\"", html::Escape(s), "\"");
+  };
+  std::string joined_elements = absl::StrJoin(values, ", ", quote_formatter);
+  return absl::StrCat("[", joined_elements, "]");
 }
 
 }  // namespace
@@ -218,6 +235,11 @@ absl::Status ExportCurveToHtml(const Curve& curve, const int item_idx,
   if (!curve.xs.empty()) {
     absl::SubstituteAndAppend(&export_acc->data, "x: $0,\n",
                               VectorToJsVector(curve.xs));
+  }
+
+  if (!curve.point_labels.empty()) {
+    absl::SubstituteAndAppend(&export_acc->data, "text: $0,\n",
+                              VectorToJsVector(curve.point_labels));
   }
 
   std::string line_style;
