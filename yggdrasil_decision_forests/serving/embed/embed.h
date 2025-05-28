@@ -23,6 +23,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
@@ -58,6 +59,30 @@ struct ModelStatistics {
   bool multi_dim_tree = false;
 };
 
+// Specific options for the generation of the model.
+// The internal options contains all the precise internal decision aspect of the
+// model compilation e.g. how many bits to use to encode numerical features. The
+// internal options are computed using the user provided options (simply called
+// "options" in the code) and the model.
+struct InternalOptions {
+  // Number of bits to encode a fixed-size feature.
+  // Note: Currently, all the fixed-size features are encoded with the same
+  // precision (e.g. all the numerical and categorical values are encoded with
+  // the same number of bits). Can be 1, 2, or 4.
+  int feature_value_bytes = 0;
+
+  // If the numerical features are encoded as float. In this case
+  // feature_value_bits=4 (currently). If false, numerical features are encoded
+  // as ints, and "feature_value_bytes" specify the precision.
+  bool numerical_feature_is_float = false;
+};
+
+// Computes the internal options of the model.
+absl::StatusOr<InternalOptions> ComputeInternalOptions(
+    const model::AbstractModel& model,
+    const model::DecisionForestInterface& df_interface,
+    const ModelStatistics& stats, const proto::Options& options);
+
 // Computes the statistics of the model.
 absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::AbstractModel& model,
@@ -75,6 +100,21 @@ std::string StringToVariableSymbol(absl::string_view input);
 
 // Converts any string into a c++ struct name e.g. "HelloWorld1".
 std::string StringToStructSymbol(absl::string_view input);
+
+// Computes the number of bytes to encode the unsigned value. Can return 1, 2,
+// or 4. For example, "MaxUnsignedValueToNumBytes" returns 2 for value=600
+// (since using a single byte cannot encode a value greater than 255).
+int MaxUnsignedValueToNumBytes(uint32_t value);
+
+struct FeatureDef {
+  std::string type;  // Type to encode a feature e.g. "float".
+  absl::optional<std::string> default_value = {};  // Optional default value.
+};
+
+// Generates the definition of a feature in an instance struct.
+absl::StatusOr<FeatureDef> GenFeatureDef(
+    const dataset::proto::Column& col,
+    const internal::InternalOptions& internal_options);
 
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed

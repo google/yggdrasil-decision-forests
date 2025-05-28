@@ -24,7 +24,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
@@ -51,8 +53,10 @@ TestData BuildToyTestData() {
   auto model = std::make_unique<
       model::gradient_boosted_trees::GradientBoostedTreesModel>();
 
-  dataset::AddNumericalColumn("l", model->mutable_data_spec());
-  dataset::AddNumericalColumn("f1", model->mutable_data_spec());
+  dataset::AddNumericalColumn("l", model->mutable_data_spec())
+      ->set_dtype(dataset::proto::DTYPE_INT8);
+  dataset::AddNumericalColumn("f1", model->mutable_data_spec())
+      ->set_dtype(dataset::proto::DTYPE_INT16);
   dataset::AddCategoricalColumn("f2", {"x", "y", "z"},
                                 model->mutable_data_spec());
 
@@ -93,9 +97,9 @@ TestData BuildToyTestData() {
 };
 
 TEST(Embed, SimpleModel) {
-  ASSERT_OK_AND_ASSIGN(const auto model,
-                       model::LoadModel(file::JoinPath(
-                           TestDataDir(), "model", "adult_binary_class_gbdt")));
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
+                                             TestDataDir(), "model",
+                                             "adult_binary_class_gbdt_v2")));
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model));
   EXPECT_EQ(embed.size(), 1);
   EXPECT_TRUE(embed.contains("my_model.h"));
@@ -120,6 +124,12 @@ TEST(ComputeStatistics, ManualBinaryGBT) {
   EXPECT_EQ(stats.max_depth, 3);
   EXPECT_EQ(stats.internal_output_dim, 1);
   EXPECT_EQ(stats.multi_dim_tree, false);
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto internal_options,
+      internal::ComputeInternalOptions(*test_data.model, *df, stats, {}));
+  EXPECT_EQ(internal_options.feature_value_bytes, 2);
+  EXPECT_EQ(internal_options.numerical_feature_is_float, false);
 }
 
 TEST(ComputeStatistics, RealBinaryGBT) {
@@ -139,6 +149,12 @@ TEST(ComputeStatistics, RealBinaryGBT) {
   EXPECT_EQ(stats.max_depth, 5);
   EXPECT_EQ(stats.internal_output_dim, 1);
   EXPECT_EQ(stats.multi_dim_tree, false);
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto internal_options,
+      internal::ComputeInternalOptions(*model, *df, stats, {}));
+  EXPECT_EQ(internal_options.feature_value_bytes, 4);
+  EXPECT_EQ(internal_options.numerical_feature_is_float, false);
 }
 
 TEST(ComputeStatistics, RealMultiClassGBT) {
@@ -158,6 +174,12 @@ TEST(ComputeStatistics, RealMultiClassGBT) {
   EXPECT_EQ(stats.max_depth, 5);
   EXPECT_EQ(stats.internal_output_dim, 3);
   EXPECT_EQ(stats.multi_dim_tree, false);
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto internal_options,
+      internal::ComputeInternalOptions(*model, *df, stats, {}));
+  EXPECT_EQ(internal_options.feature_value_bytes, 4);
+  EXPECT_EQ(internal_options.numerical_feature_is_float, true);
 }
 
 TEST(Embed, CheckModelName) {
@@ -187,6 +209,73 @@ TEST(Embed, StringToStructSymbol) {
             "ANiceAndColdDay123");
   EXPECT_EQ(internal::StringToStructSymbol("123AAA!"), "V123AAA");
   EXPECT_EQ(internal::StringToStructSymbol(""), "");
+}
+
+TEST(Embed, MaxUnsignedValueToNumBytes) {
+  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(0), 1);
+  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(255), 1);
+  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(256), 2);
+  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(65535), 2);
+  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(65536), 4);
+  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(4294967295), 4);
+}
+
+struct GenFeatureDefCase {
+  dataset::proto::Column col_spec;
+  internal::InternalOptions internal_options;
+  std::string expected_type;
+  absl::optional<std::string> expected_default_value;
+};
+
+SIMPLE_PARAMETERIZED_TEST(
+    GenFeatureDef, GenFeatureDefCase,
+    {
+        {PARSE_TEST_PROTO("type: NUMERICAL"),
+         {.feature_value_bytes = 4, .numerical_feature_is_float = true},
+         "float",
+         {}},
+
+        {PARSE_TEST_PROTO("type: NUMERICAL"),
+         {.feature_value_bytes = 4, .numerical_feature_is_float = false},
+         "int32_t",
+         {}},
+
+        {PARSE_TEST_PROTO("type: NUMERICAL"),
+         {.feature_value_bytes = 2, .numerical_feature_is_float = false},
+         "int16_t",
+         {}},
+
+        {PARSE_TEST_PROTO("type: NUMERICAL"),
+         {.feature_value_bytes = 1, .numerical_feature_is_float = false},
+         "int8_t",
+         {}},
+
+        {PARSE_TEST_PROTO("type: CATEGORICAL"),
+         {.feature_value_bytes = 4},
+         "int32_t",
+         {}},
+
+        {PARSE_TEST_PROTO("type: CATEGORICAL"),
+         {.feature_value_bytes = 2},
+         "int16_t",
+         {}},
+
+        {PARSE_TEST_PROTO("type: CATEGORICAL"),
+         {.feature_value_bytes = 1},
+         "int8_t",
+         {}},
+
+        {PARSE_TEST_PROTO("type: BOOLEAN"),
+         {.feature_value_bytes = 2},
+         "int16_t",
+         {}},
+    }) {
+  const auto& test_case = GetParam();
+  ASSERT_OK_AND_ASSIGN(
+      const auto value,
+      internal::GenFeatureDef(test_case.col_spec, test_case.internal_options));
+  EXPECT_EQ(value.type, test_case.expected_type);
+  EXPECT_EQ(value.default_value, test_case.expected_default_value);
 }
 
 }  // namespace

@@ -1,6 +1,30 @@
-#ifndef MODEL_my_model_H_
-#define MODEL_my_model_H_
+#ifndef YDF_MODEL_MY_MODEL_H_
+#define YDF_MODEL_MY_MODEL_H_
+
+#include <stdint.h>
+
 namespace my_model {
+
+constexpr const int kNumFeatures = 14;
+
+struct Instance {
+  int32_t age;
+  int32_t workclass;
+  int32_t fnlwgt;
+  int32_t education;
+  int32_t education_num;
+  int32_t marital_status;
+  int32_t occupation;
+  int32_t relationship;
+  int32_t race;
+  int32_t sex;
+  int32_t capital_gain;
+  int32_t capital_loss;
+  int32_t hours_per_week;
+  int32_t native_country;
+};
+
 inline void f() {}
+
 }  // namespace my_model
 #endif

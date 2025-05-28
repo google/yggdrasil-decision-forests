@@ -26,6 +26,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -81,23 +82,96 @@ std::string StringToSnakeCaseSymbol(const std::string_view input,
   return result;
 }
 
+// Generates the struct for a single instance (i.e., an example without a
+// label).
+absl::StatusOr<std::string> GenInstanceStruct(
+    const model::AbstractModel& model, const proto::Options& options,
+    const internal::InternalOptions& internal_options) {
+  std::string content;
+
+  // Start
+  absl::SubstituteAndAppend(&content, R"(
+constexpr const int kNumFeatures = $0;
+
+struct Instance {
+)",
+                            model.input_features().size());
+
+  for (const auto input_feature : model.input_features()) {
+    const auto& col = model.data_spec().columns(input_feature);
+    const std::string variable_name =
+        internal::StringToVariableSymbol(col.name());
+    ASSIGN_OR_RETURN(const auto feature_def,
+                     internal::GenFeatureDef(col, internal_options));
+    absl::StrAppend(&content, "  ", feature_def.type, " ", variable_name);
+
+    if (!feature_def.default_value.has_value()) {
+      absl::StrAppend(&content, ";\n");
+    } else {
+      absl::StrAppend(&content, " = ", *feature_def.default_value, ";\n");
+    }
+  }
+
+  // End
+  absl::StrAppend(&content, R"(};
+)");
+
+  return content;
+}
+
 }  // namespace
 
 absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
     const model::AbstractModel& model, const proto::Options& options) {
+  const auto* df_interface =
+      dynamic_cast<const model::DecisionForestInterface*>(&model);
+  if (!df_interface) {
+    return absl::InvalidArgumentError(
+        "The model is not a decision forest model.");
+  }
+
   RETURN_IF_ERROR(internal::CheckModelName(options.name()));
+
+  ASSIGN_OR_RETURN(const internal::ModelStatistics stats,
+                   internal::ComputeStatistics(model, *df_interface));
+
+  ASSIGN_OR_RETURN(
+      const internal::InternalOptions internal_options,
+      internal::ComputeInternalOptions(model, *df_interface, stats, options));
 
   absl::node_hash_map<Filename, Content> result;
 
-  result[absl::StrCat(options.name(), ".h")] =
-      absl::Substitute(R"(#ifndef MODEL_$0_H_
-#define MODEL_$0_H_
-namespace $0 {
+  std::string header;
+
+  // Open define and namespace.
+  absl::SubstituteAndAppend(&header, R"(#ifndef YDF_MODEL_$0_H_
+#define YDF_MODEL_$0_H_
+
+#include <stdint.h>
+
+namespace $1 {
+)",
+                            internal::StringToConstantSymbol(options.name()),
+                            internal::StringToVariableSymbol(options.name()));
+
+  // Instance struct.
+  ASSIGN_OR_RETURN(const auto instance_struct,
+                   GenInstanceStruct(model, options, internal_options));
+  absl::StrAppend(&header, instance_struct);
+
+  // Predict method
+  absl::StrAppend(&header, R"(
 inline void f() {}
+)");
+
+  // Close define and namespace.
+  absl::SubstituteAndAppend(&header, R"(
 }  // namespace $0
 #endif
 )",
-                       options.name());
+                            internal::StringToVariableSymbol(options.name()));
+
+  result[absl::StrCat(options.name(), ".h")] = header;
   return result;
 }
 
@@ -161,6 +235,66 @@ absl::Status CheckModelName(absl::string_view value) {
   return absl::OkStatus();
 }
 
+absl::StatusOr<InternalOptions> ComputeInternalOptions(
+    const model::AbstractModel& model,
+    const model::DecisionForestInterface& df_interface,
+    const ModelStatistics& stats, const proto::Options& options) {
+  InternalOptions internal_options{.feature_value_bytes = 1,
+                                   .numerical_feature_is_float = false};
+
+  // Feature encoding.
+  for (const auto input_feature : model.input_features()) {
+    const auto& col_spec = model.data_spec().columns(input_feature);
+    switch (col_spec.type()) {
+      case dataset::proto::ColumnType::NUMERICAL: {
+        switch (col_spec.dtype()) {
+          case dataset::proto::DTYPE_INVALID:  // Default
+          case dataset::proto::DTYPE_FLOAT32:
+          // Note: float64 are always converted to float32 during training.
+          case dataset::proto::DTYPE_FLOAT64:
+            internal_options.numerical_feature_is_float = true;
+            internal_options.feature_value_bytes =
+                std::max(internal_options.feature_value_bytes, 4);
+            break;
+          case dataset::proto::DTYPE_INT16:
+            internal_options.feature_value_bytes =
+                std::max(internal_options.feature_value_bytes, 2);
+            break;
+          case dataset::proto::DTYPE_INT32:
+          // Note: int64 are always converted to int32 during training.
+          case dataset::proto::DTYPE_INT64:
+            internal_options.feature_value_bytes =
+                std::max(internal_options.feature_value_bytes, 4);
+            break;
+          case dataset::proto::DTYPE_INT8:
+          case dataset::proto::DTYPE_BOOL:
+            // Nothing to do.
+            break;
+          default:
+            return absl::InvalidArgumentError(
+                absl::StrCat("Non supported numerical feature type: ",
+                             dataset::proto::DType_Name(col_spec.dtype())));
+        }
+      } break;
+      case dataset::proto::ColumnType::CATEGORICAL: {
+        const int feature_bytes = MaxUnsignedValueToNumBytes(
+            col_spec.categorical().number_of_unique_values());
+        internal_options.feature_value_bytes =
+            std::max(internal_options.feature_value_bytes, feature_bytes);
+      } break;
+      case dataset::proto::ColumnType::BOOLEAN:
+        // Nothing to do.
+        break;
+      default:
+        return absl::InvalidArgumentError(
+            absl::StrCat("Non supported feature type: ",
+                         dataset::proto::ColumnType_Name(col_spec.type())));
+    }
+  }
+
+  return internal_options;
+}
+
 std::string StringToConstantSymbol(const absl::string_view input) {
   return StringToSnakeCaseSymbol(input, true, 'V');
 }
@@ -210,6 +344,49 @@ std::string StringToStructSymbol(const absl::string_view input) {
     result.pop_back();
   }
   return result;
+}
+
+int MaxUnsignedValueToNumBytes(uint32_t value) {
+  if (value <= 0xff) {
+    return 1;
+  } else if (value <= 0xffff) {
+    return 2;
+  } else {
+    return 4;
+  }
+}
+
+absl::StatusOr<FeatureDef> GenFeatureDef(
+    const dataset::proto::Column& col,
+    const internal::InternalOptions& internal_options) {
+  // TODO: Add support for default values.
+  // TODO: Add support for string categorical features.
+  // TODO: For integer numericals, use the min/max to possibly reduce the
+  // required precision.
+  switch (col.type()) {
+    case dataset::proto::ColumnType::NUMERICAL: {
+      if (internal_options.numerical_feature_is_float) {
+        DCHECK_EQ(internal_options.feature_value_bytes, 4);
+        return FeatureDef{.type = "float", .default_value = {}};
+      } else {
+        return FeatureDef{
+            .type = absl::StrCat(
+                "int", internal_options.feature_value_bytes * 8, "_t"),
+            .default_value = {}};
+      }
+    } break;
+    case dataset::proto::ColumnType::BOOLEAN:
+    case dataset::proto::ColumnType::CATEGORICAL:
+      return FeatureDef{
+          .type = absl::StrCat("int", internal_options.feature_value_bytes * 8,
+                               "_t"),
+          .default_value = {}};
+      break;
+    default:
+      return absl::InvalidArgumentError(
+          absl::StrCat("Non supported feature type: ",
+                       dataset::proto::ColumnType_Name(col.type())));
+  }
 }
 
 }  // namespace internal
