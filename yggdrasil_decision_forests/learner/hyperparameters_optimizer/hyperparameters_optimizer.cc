@@ -41,6 +41,7 @@
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
@@ -71,6 +72,12 @@ absl::Status SetTrainConfigDefaultValues(
       !sub_learner.has_maximum_training_duration_seconds()) {
     sub_learner.set_maximum_training_duration_seconds(
         effective_config->maximum_training_duration_seconds());
+  }
+  // Cross-validation training must use retraining.
+  if (hparam_opt_config->evaluation().has_cross_validation() &&
+      !hparam_opt_config->retrain_final_model()) {
+    LOG(INFO) << "Setting retrain_final_model=true for cross-validation.";
+    hparam_opt_config->set_retrain_final_model(true);
   }
 
   RETURN_IF_ERROR(CopyProblemDefinition(*effective_config, &sub_learner));
@@ -792,13 +799,36 @@ absl::StatusOr<double> HyperParameterOptimizerLearner::EvaluateCandidateLocally(
   metric::proto::EvaluationResults evaluation;
   switch (spe_config.evaluation().source_case()) {
     case proto::Evaluation::SourceCase::SOURCE_NOT_SET:
-    case proto::Evaluation::SourceCase::kSelfModelEvaluation:
-
+    case proto::Evaluation::SourceCase::kSelfModelEvaluation: {
       // Simple training + get the model self evaluation.
       ASSIGN_OR_RETURN(
           *model, base_learner->TrainWithStatus(train_dataset, valid_dataset));
       evaluation = (*model)->ValidationEvaluation();
       break;
+    }
+    case proto::Evaluation::SourceCase::kCrossValidation: {
+      utils::proto::FoldGenerator fold_generator;
+      fold_generator.mutable_cross_validation()->CopyFrom(
+          spe_config.evaluation().cross_validation().fold_generator());
+      metric::proto::EvaluationOptions evaluation_options;
+      evaluation_options.set_bootstrapping_samples(0);
+      if (spe_config.base_learner().task() == model::proto::CLASSIFICATION) {
+        evaluation_options.mutable_classification()->set_roc_enable(false);
+      }
+      if (spe_config.base_learner().task() == model::proto::REGRESSION) {
+        evaluation_options.mutable_regression()->set_enable_regression_plots(
+            false);
+      }
+      // TODO: If no custom loss is used, "split" the num of threads
+      // specified by the user between the cross-validation and
+      // model learning.
+      evaluation_options.set_num_threads(1);
+      evaluation_options.set_task(spe_config.base_learner().task());
+      ASSIGN_OR_RETURN(evaluation, model::EvaluateLearnerOrStatus(
+                                       *base_learner, train_dataset,
+                                       fold_generator, evaluation_options,
+                                       spe_config.base_learner_deployment()));
+    }
   }
 
   ASSIGN_OR_RETURN(const auto score, EvaluationToScore(spe_config, evaluation));

@@ -463,6 +463,7 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
         "//ydf/utils:test_utils",
+        "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
     ],
 )
 

@@ -35,6 +35,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -73,6 +74,7 @@ all_proto_library(
         "//yggdrasil_decision_forests/learner:abstract_learner_proto",
         "//yggdrasil_decision_forests/metric:metric_proto",
         "//yggdrasil_decision_forests/model:hyperparameter_proto",
+        "//yggdrasil_decision_forests/utils:fold_generator_proto",
     ],
 )
 

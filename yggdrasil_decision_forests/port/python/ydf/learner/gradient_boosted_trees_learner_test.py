@@ -502,6 +502,26 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     self.assertIsNotNone(logs)
     self.assertLen(logs.trials, 5)
 
+  def test_tuner_cross_validation(self):
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=5,
+        automatic_search_space=True,
+        parallel_trials=2,
+        cross_validation=True,
+        cross_validation_num_folds=3,  # Reduce num_folds because cv is slow.
+    )
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        tuner=tuner,
+        num_trees=10,
+    )
+
+    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.85)
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.trials, 5)
+    self.assertGreater(logs.trials[0].score, 0)
+
   def test_label_type_error_message(self):
     with self.assertRaisesRegex(
         ValueError,
