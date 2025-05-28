@@ -89,7 +89,7 @@ Variable Importance: SUM_SCORE:
 Loss: BINOMIAL_LOG_LIKELIHOOD
 Validation loss value: 0.576143
 Number of trees per iteration: 1
-Node format: NOT_SET
+Node format: BLOB_SEQUENCE_GZIP
 Number of trees: 163
 Total number of nodes: 8789
 

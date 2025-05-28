@@ -55,7 +55,7 @@ Variable Importance: SUM_SCORE:
 Loss: SQUARED_ERROR
 Validation loss value: 2.10527
 Number of trees per iteration: 1
-Node format: NOT_SET
+Node format: BLOB_SEQUENCE_GZIP
 Number of trees: 45
 Total number of nodes: 2373
 
