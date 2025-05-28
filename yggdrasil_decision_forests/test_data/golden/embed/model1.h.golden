@@ -9,22 +9,24 @@ constexpr const int kNumFeatures = 14;
 
 struct Instance {
   int32_t age;
-  int32_t workclass;
+  uint32_t workclass;
   int32_t fnlwgt;
-  int32_t education;
+  uint32_t education;
   int32_t education_num;
-  int32_t marital_status;
-  int32_t occupation;
-  int32_t relationship;
-  int32_t race;
-  int32_t sex;
+  uint32_t marital_status;
+  uint32_t occupation;
+  uint32_t relationship;
+  uint32_t race;
+  uint32_t sex;
   int32_t capital_gain;
   int32_t capital_loss;
   int32_t hours_per_week;
-  int32_t native_country;
+  uint32_t native_country;
 };
 
-inline void f() {}
+inline bool Predict(const Instance& instance) {
+  return {};
+}
 
 }  // namespace my_model
 #endif

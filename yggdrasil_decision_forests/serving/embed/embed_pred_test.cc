@@ -23,8 +23,11 @@ namespace yggdrasil_decision_forests::serving::embed {
 namespace {
 
 TEST(Embed, Example) {
-  test_model1::f();
-  test_model2::f();
+  const float pred1 = test_model1::Predict(test_model1::Instance{});
+  const float pred2 = test_model2::Predict(test_model2::Instance{});
+
+  (void)pred1;
+  (void)pred2;
 }
 
 }  // namespace

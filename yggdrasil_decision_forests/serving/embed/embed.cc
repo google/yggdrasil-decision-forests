@@ -38,6 +38,14 @@ namespace yggdrasil_decision_forests::serving::embed {
 
 namespace {
 
+// Integer type.
+std::string UnsignedInteger(int bytes) {
+  return absl::StrCat("uint", bytes * 8, "_t");
+}
+std::string SignedInteger(int bytes) {
+  return absl::StrCat("int", bytes * 8, "_t");
+}
+
 // Converts any string into a snake case symbol.
 std::string StringToSnakeCaseSymbol(const std::string_view input,
                                     const bool to_upper,
@@ -148,10 +156,16 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
 #define YDF_MODEL_$0_H_
 
 #include <stdint.h>
-
-namespace $1 {
 )",
-                            internal::StringToConstantSymbol(options.name()),
+                            internal::StringToConstantSymbol(options.name()));
+
+  if (internal_options.include_array) {
+    absl::StrAppend(&header, "#include <array>\n");
+  }
+
+  absl::SubstituteAndAppend(&header, R"(
+namespace $0 {
+)",
                             internal::StringToVariableSymbol(options.name()));
 
   // Instance struct.
@@ -160,9 +174,12 @@ namespace $1 {
   absl::StrAppend(&header, instance_struct);
 
   // Predict method
-  absl::StrAppend(&header, R"(
-inline void f() {}
-)");
+  absl::SubstituteAndAppend(&header, R"(
+inline $0 Predict(const Instance& instance) {
+  return {};
+}
+)",
+                            internal_options.output_type);
 
   // Close define and namespace.
   absl::SubstituteAndAppend(&header, R"(
@@ -185,23 +202,34 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
       .num_features = static_cast<int>(model.input_features().size()),
   };
 
+  const bool is_classification =
+      model.task() == model::proto::Task::CLASSIFICATION;
+  const int num_classification_classes =
+      model.LabelColumnSpec().categorical().number_of_unique_values() - 1;
+  const bool is_binary_classification =
+      is_classification && num_classification_classes == 2;
+
   // Model specific statistics.
   const auto model_gbt = dynamic_cast<
       const model::gradient_boosted_trees::GradientBoostedTreesModel*>(&model);
   const auto model_rf =
       dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
+
   if (model_gbt) {
-    stats.multi_dim_tree = false;
+    stats.multi_dim_tree = false;  // GBT trees are single dimensional.
   } else if (model_rf) {
-    stats.multi_dim_tree = true;
+    stats.multi_dim_tree = true;  // RF trees are multidimensional.
   } else {
     return absl::InvalidArgumentError("The model type is not supported.");
   }
 
-  if (model.task() == model::proto::Task::CLASSIFICATION &&
-      model.LabelColumnSpec().categorical().number_of_unique_values() > 3) {
-    stats.internal_output_dim =
-        model.LabelColumnSpec().categorical().number_of_unique_values() - 1;
+  if (is_classification) {
+    DCHECK_GE(num_classification_classes, 2);
+    if (is_binary_classification) {
+      stats.internal_output_dim = 1;
+    } else {
+      stats.internal_output_dim = num_classification_classes;
+    }
   } else {
     stats.internal_output_dim = 1;
   }
@@ -239,8 +267,19 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats, const proto::Options& options) {
-  InternalOptions internal_options{.feature_value_bytes = 1,
-                                   .numerical_feature_is_float = false};
+  InternalOptions internal_options;
+  RETURN_IF_ERROR(
+      ComputeInternalOptionsFeature(model, options, &internal_options));
+  RETURN_IF_ERROR(
+      ComputeInternalOptionsOutput(model, stats, options, &internal_options));
+  return internal_options;
+}
+
+absl::Status ComputeInternalOptionsFeature(const model::AbstractModel& model,
+                                           const proto::Options& options,
+                                           InternalOptions* out) {
+  out->feature_value_bytes = 1;
+  out->numerical_feature_is_float = false;
 
   // Feature encoding.
   for (const auto input_feature : model.input_features()) {
@@ -248,23 +287,21 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
     switch (col_spec.type()) {
       case dataset::proto::ColumnType::NUMERICAL: {
         switch (col_spec.dtype()) {
+          // TODO: Add support for unsigned features.
           case dataset::proto::DTYPE_INVALID:  // Default
           case dataset::proto::DTYPE_FLOAT32:
           // Note: float64 are always converted to float32 during training.
           case dataset::proto::DTYPE_FLOAT64:
-            internal_options.numerical_feature_is_float = true;
-            internal_options.feature_value_bytes =
-                std::max(internal_options.feature_value_bytes, 4);
+            out->numerical_feature_is_float = true;
+            out->feature_value_bytes = std::max(out->feature_value_bytes, 4);
             break;
           case dataset::proto::DTYPE_INT16:
-            internal_options.feature_value_bytes =
-                std::max(internal_options.feature_value_bytes, 2);
+            out->feature_value_bytes = std::max(out->feature_value_bytes, 2);
             break;
           case dataset::proto::DTYPE_INT32:
           // Note: int64 are always converted to int32 during training.
           case dataset::proto::DTYPE_INT64:
-            internal_options.feature_value_bytes =
-                std::max(internal_options.feature_value_bytes, 4);
+            out->feature_value_bytes = std::max(out->feature_value_bytes, 4);
             break;
           case dataset::proto::DTYPE_INT8:
           case dataset::proto::DTYPE_BOOL:
@@ -279,8 +316,8 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
       case dataset::proto::ColumnType::CATEGORICAL: {
         const int feature_bytes = MaxUnsignedValueToNumBytes(
             col_spec.categorical().number_of_unique_values());
-        internal_options.feature_value_bytes =
-            std::max(internal_options.feature_value_bytes, feature_bytes);
+        out->feature_value_bytes =
+            std::max(out->feature_value_bytes, feature_bytes);
       } break;
       case dataset::proto::ColumnType::BOOLEAN:
         // Nothing to do.
@@ -291,8 +328,70 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
                          dataset::proto::ColumnType_Name(col_spec.type())));
     }
   }
+  return absl::OkStatus();
+}
 
-  return internal_options;
+absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
+                                          const ModelStatistics& stats,
+                                          const proto::Options& options,
+                                          InternalOptions* out) {
+  switch (model.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      const int num_classes =
+          model.LabelColumnSpec().categorical().number_of_unique_values() - 1;
+      switch (options.classification_output()) {
+        case proto::ClassificationOutput::CLASS:
+          if (num_classes == 2) {
+            out->output_type = "bool";
+          } else {
+            out->output_type =
+                UnsignedInteger(MaxUnsignedValueToNumBytes(num_classes));
+          }
+          break;
+        case proto::ClassificationOutput::SCORE: {
+          std::string base_output_type;
+          if (options.integerize_output()) {
+            if (stats.leaf_output_is_signed) {
+              base_output_type =
+                  SignedInteger(options.accumulator_precision_bytes());
+            } else {
+              base_output_type =
+                  UnsignedInteger(options.accumulator_precision_bytes());
+            }
+          } else {
+            base_output_type = "float";
+          }
+          if (num_classes == 2) {
+            out->output_type = base_output_type;
+          } else {
+            out->include_array = true;
+            out->output_type = absl::StrCat("std::array<", base_output_type,
+                                            ", ", num_classes, ">");
+          }
+        } break;
+        case proto::ClassificationOutput::PROBABILITY:
+          if (num_classes == 2) {
+            out->output_type = "float";
+          } else {
+            out->include_array = true;
+            out->output_type =
+                absl::StrCat("std::array<float, ", num_classes, ">");
+          }
+          break;
+      }
+    } break;
+    case model::proto::Task::REGRESSION:
+      if (options.integerize_output()) {
+        out->output_type = SignedInteger(options.accumulator_precision_bytes());
+      } else {
+        out->output_type = "float";
+      }
+      break;
+    default:
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Non supported task: ", model::proto::Task_Name(model.task())));
+  }
+  return absl::OkStatus();
 }
 
 std::string StringToConstantSymbol(const absl::string_view input) {
@@ -356,6 +455,29 @@ int MaxUnsignedValueToNumBytes(uint32_t value) {
   }
 }
 
+int MaxSignedValueToNumBytes(int32_t value) {
+  if (value <= 0x7f && value >= -0x80) {
+    return 1;
+  } else if (value <= 0x7fff && value >= -0x8000) {
+    return 2;
+  } else {
+    return 4;
+  }
+}
+
+std::string DTypeToCCType(const proto::DType::Enum value) {
+  switch (value) {
+    case proto::DType::INT8:
+      return "int8_t";
+    case proto::DType::INT16:
+      return "int16_t";
+    case proto::DType::INT32:
+      return "int32_t";
+    case proto::DType::FLOAT32:
+      return "float";
+  }
+}
+
 absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
     const internal::InternalOptions& internal_options) {
@@ -370,16 +492,14 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
         return FeatureDef{.type = "float", .default_value = {}};
       } else {
         return FeatureDef{
-            .type = absl::StrCat(
-                "int", internal_options.feature_value_bytes * 8, "_t"),
+            .type = SignedInteger(internal_options.feature_value_bytes),
             .default_value = {}};
       }
     } break;
     case dataset::proto::ColumnType::BOOLEAN:
     case dataset::proto::ColumnType::CATEGORICAL:
       return FeatureDef{
-          .type = absl::StrCat("int", internal_options.feature_value_bytes * 8,
-                               "_t"),
+          .type = UnsignedInteger(internal_options.feature_value_bytes),
           .default_value = {}};
       break;
     default:

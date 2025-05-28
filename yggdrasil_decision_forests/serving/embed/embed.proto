@@ -21,4 +21,55 @@ package yggdrasil_decision_forests.serving.embed.proto;
 message Options {
   // Name filename and namespace of the generated library.
   optional string name = 1 [default = "my_model"];
+
+  // What is the Predict function is returning in case of a classification
+  // model.
+  optional ClassificationOutput.Enum classification_output = 2
+      [default = CLASS];
+
+  // If true, integerize the output computation. The model will be smaller and
+  // faster, but the predictions will be less accurate.
+  optional bool integerize_output = 3 [default = false];
+
+  // Precision of the accumulator when integerize_output=true;
+  optional int32 accumulator_precision_bytes = 4 [default = 2];
+}
+
+// Output of a classification model.
+message ClassificationOutput {
+  enum Enum {
+    // The model returns an integer representing the predicted class.
+    //
+    // This option is fast and simple to use.
+    CLASS = 0;
+
+    // For a binary classification model, the prediction output is an
+    // accumulator of type "accumulator_precision" where the sign (positive or
+    // negative) indicates the predicted label value. For a multi-class
+    // classification model, the predicted output is an array of accumulators
+    // where the largest value defines the predicted label.
+    //
+    // This option is fast but hard to use.
+    SCORE = 1;
+
+    // For a binary classification model, the prediction output is the
+    // probability of the positive class. For a multi-class classification
+    // model, the predicted output is an array of probabilities for all the
+    // classes.
+    //
+    // Note: This probability might be not calibrated if the model is not
+    // calibrated.
+    //
+    // This option is easy to use but slow.
+    PROBABILITY = 2;
+  }
+}
+
+message DType {
+  enum Enum {
+    INT8 = 0;
+    INT16 = 1;
+    INT32 = 2;
+    FLOAT32 = 3;
+  }
 }

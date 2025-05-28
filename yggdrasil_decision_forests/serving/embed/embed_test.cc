@@ -53,7 +53,7 @@ TestData BuildToyTestData() {
   auto model = std::make_unique<
       model::gradient_boosted_trees::GradientBoostedTreesModel>();
 
-  dataset::AddNumericalColumn("l", model->mutable_data_spec())
+  dataset::AddCategoricalColumn("l", {"a", "b"}, model->mutable_data_spec())
       ->set_dtype(dataset::proto::DTYPE_INT8);
   dataset::AddNumericalColumn("f1", model->mutable_data_spec())
       ->set_dtype(dataset::proto::DTYPE_INT16);
@@ -108,7 +108,7 @@ TEST(Embed, SimpleModel) {
                           "golden/embed/model1.h.golden");
 }
 
-TEST(ComputeStatistics, ManualBinaryGBT) {
+TEST(Process, ManualBinaryGBT) {
   const auto test_data = BuildToyTestData();
 
   const auto* df = dynamic_cast<const model::DecisionForestInterface*>(
@@ -124,6 +124,7 @@ TEST(ComputeStatistics, ManualBinaryGBT) {
   EXPECT_EQ(stats.max_depth, 3);
   EXPECT_EQ(stats.internal_output_dim, 1);
   EXPECT_EQ(stats.multi_dim_tree, false);
+  EXPECT_EQ(stats.leaf_output_is_signed, true);
 
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
@@ -132,7 +133,7 @@ TEST(ComputeStatistics, ManualBinaryGBT) {
   EXPECT_EQ(internal_options.numerical_feature_is_float, false);
 }
 
-TEST(ComputeStatistics, RealBinaryGBT) {
+TEST(Process, RealBinaryGBT) {
   ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
                                              TestDataDir(), "model",
                                              "adult_binary_class_gbdt_v2")));
@@ -149,6 +150,7 @@ TEST(ComputeStatistics, RealBinaryGBT) {
   EXPECT_EQ(stats.max_depth, 5);
   EXPECT_EQ(stats.internal_output_dim, 1);
   EXPECT_EQ(stats.multi_dim_tree, false);
+  EXPECT_EQ(stats.leaf_output_is_signed, true);
 
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
@@ -157,7 +159,7 @@ TEST(ComputeStatistics, RealBinaryGBT) {
   EXPECT_EQ(internal_options.numerical_feature_is_float, false);
 }
 
-TEST(ComputeStatistics, RealMultiClassGBT) {
+TEST(Process, RealMultiClassGBT) {
   ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
                                              TestDataDir(), "model",
                                              "iris_multi_class_gbdt_v2")));
@@ -174,12 +176,101 @@ TEST(ComputeStatistics, RealMultiClassGBT) {
   EXPECT_EQ(stats.max_depth, 5);
   EXPECT_EQ(stats.internal_output_dim, 3);
   EXPECT_EQ(stats.multi_dim_tree, false);
+  EXPECT_EQ(stats.leaf_output_is_signed, true);
 
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
       internal::ComputeInternalOptions(*model, *df, stats, {}));
   EXPECT_EQ(internal_options.feature_value_bytes, 4);
   EXPECT_EQ(internal_options.numerical_feature_is_float, true);
+}
+
+struct ComputeInternalOptionsOutputCase {
+  model::proto::Task task;
+  dataset::proto::Column label_column;
+  proto::Options options;
+  std::string expected_output_type;
+  internal::ModelStatistics stats;
+};
+
+SIMPLE_PARAMETERIZED_TEST(
+    ComputeInternalOptionsOutput, ComputeInternalOptionsOutputCase,
+    {
+        // Classification + class
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 3 })pb"),
+         {},
+         "bool"},
+
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 5 })pb"),
+         {},
+         "uint8_t"},
+
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(
+             R"pb(type: CATEGORICAL
+                  categorical { number_of_unique_values: 300 })pb"),
+         {},
+         "uint16_t"},
+
+        // Classification + score
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 3 })pb"),
+         PARSE_TEST_PROTO("classification_output: SCORE"), "float"},
+
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 5 })pb"),
+         PARSE_TEST_PROTO("classification_output: SCORE"),
+         "std::array<float, 4>"},
+
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 3 })pb"),
+         PARSE_TEST_PROTO("classification_output:SCORE integerize_output:true"),
+         "int16_t"},
+
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 5 })pb"),
+         PARSE_TEST_PROTO("classification_output:SCORE integerize_output:true"),
+         "std::array<int16_t, 4>"},
+
+        // Classification + probability
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 3 })pb"),
+         PARSE_TEST_PROTO("classification_output:PROBABILITY"), "float"},
+
+        {model::proto::Task::CLASSIFICATION,
+         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
+                               categorical { number_of_unique_values: 5 })pb"),
+         PARSE_TEST_PROTO("classification_output:PROBABILITY"),
+         "std::array<float, 4>"},
+
+        // Regression
+        {model::proto::Task::REGRESSION,
+         PARSE_TEST_PROTO(R"pb(type: NUMERICAL)pb"),
+         {},
+         "float"},
+
+        {model::proto::Task::REGRESSION,
+         PARSE_TEST_PROTO(R"pb(type: NUMERICAL)pb"),
+         PARSE_TEST_PROTO("integerize_output:true"), "int16_t"},
+    }) {
+  const auto& test_case = GetParam();
+  auto model = BuildToyTestData().model;
+  model->set_task(test_case.task);
+  *model->mutable_data_spec()->mutable_columns(model->label_col_idx()) =
+      test_case.label_column;
+  internal::InternalOptions internal_options;
+  ASSERT_OK(internal::ComputeInternalOptionsOutput(
+      *model, test_case.stats, test_case.options, &internal_options));
+  EXPECT_EQ(internal_options.output_type, test_case.expected_output_type);
 }
 
 TEST(Embed, CheckModelName) {
@@ -220,6 +311,20 @@ TEST(Embed, MaxUnsignedValueToNumBytes) {
   EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(4294967295), 4);
 }
 
+TEST(Embed, MaxSignedValueToNumBytes) {
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(0), 1);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(127), 1);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-128), 1);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(128), 2);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-129), 2);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(32767), 2);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-32768), 2);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(32768), 4);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-32769), 4);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(2147483647), 4);
+  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-2147483648), 4);
+}
+
 struct GenFeatureDefCase {
   dataset::proto::Column col_spec;
   internal::InternalOptions internal_options;
@@ -252,22 +357,22 @@ SIMPLE_PARAMETERIZED_TEST(
 
         {PARSE_TEST_PROTO("type: CATEGORICAL"),
          {.feature_value_bytes = 4},
-         "int32_t",
+         "uint32_t",
          {}},
 
         {PARSE_TEST_PROTO("type: CATEGORICAL"),
          {.feature_value_bytes = 2},
-         "int16_t",
+         "uint16_t",
          {}},
 
         {PARSE_TEST_PROTO("type: CATEGORICAL"),
          {.feature_value_bytes = 1},
-         "int8_t",
+         "uint8_t",
          {}},
 
         {PARSE_TEST_PROTO("type: BOOLEAN"),
          {.feature_value_bytes = 2},
-         "int16_t",
+         "uint16_t",
          {}},
     }) {
   const auto& test_case = GetParam();
@@ -276,6 +381,13 @@ SIMPLE_PARAMETERIZED_TEST(
       internal::GenFeatureDef(test_case.col_spec, test_case.internal_options));
   EXPECT_EQ(value.type, test_case.expected_type);
   EXPECT_EQ(value.default_value, test_case.expected_default_value);
+}
+
+TEST(Embed, DTypeToCCType) {
+  EXPECT_EQ(internal::DTypeToCCType(proto::DType::INT8), "int8_t");
+  EXPECT_EQ(internal::DTypeToCCType(proto::DType::INT16), "int16_t");
+  EXPECT_EQ(internal::DTypeToCCType(proto::DType::INT32), "int32_t");
+  EXPECT_EQ(internal::DTypeToCCType(proto::DType::FLOAT32), "float");
 }
 
 }  // namespace

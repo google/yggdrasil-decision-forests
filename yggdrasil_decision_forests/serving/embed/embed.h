@@ -57,6 +57,9 @@ struct ModelStatistics {
   int internal_output_dim = 0;
   // Are individual trees returning multidimensional outputs.
   bool multi_dim_tree = false;
+
+  // If the individual trees can output a negative value.
+  bool leaf_output_is_signed = true;
 };
 
 // Specific options for the generation of the model.
@@ -75,6 +78,18 @@ struct InternalOptions {
   // feature_value_bits=4 (currently). If false, numerical features are encoded
   // as ints, and "feature_value_bytes" specify the precision.
   bool numerical_feature_is_float = false;
+
+  // The type returned by the prediction function.
+  std::string output_type;
+
+  // Type of the accumulator to accumulate the leaf values.
+  std::string accumulator_type;
+
+  // Type of the leaf values.
+  std::string leaf_value_type;
+
+  // If true, the model requires the <array> include.
+  bool include_array = false;
 };
 
 // Computes the internal options of the model.
@@ -82,6 +97,17 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats, const proto::Options& options);
+
+// Populates the feature parts of the internal option.
+absl::Status ComputeInternalOptionsFeature(const model::AbstractModel& model,
+                                           const proto::Options& options,
+                                           InternalOptions* out);
+
+// Populates the output parts of the internal option.
+absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
+                                          const ModelStatistics& stats,
+                                          const proto::Options& options,
+                                          InternalOptions* out);
 
 // Computes the statistics of the model.
 absl::StatusOr<ModelStatistics> ComputeStatistics(
@@ -101,10 +127,13 @@ std::string StringToVariableSymbol(absl::string_view input);
 // Converts any string into a c++ struct name e.g. "HelloWorld1".
 std::string StringToStructSymbol(absl::string_view input);
 
-// Computes the number of bytes to encode the unsigned value. Can return 1, 2,
+// Computes the number of bytes to encode an unsigned value. Can return 1, 2,
 // or 4. For example, "MaxUnsignedValueToNumBytes" returns 2 for value=600
 // (since using a single byte cannot encode a value greater than 255).
 int MaxUnsignedValueToNumBytes(uint32_t value);
+
+// Same as MaxUnsignedValueToNumBytes, but for signed values.
+int MaxSignedValueToNumBytes(int32_t value);
 
 struct FeatureDef {
   std::string type;  // Type to encode a feature e.g. "float".
@@ -115,6 +144,9 @@ struct FeatureDef {
 absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
     const internal::InternalOptions& internal_options);
+
+// Convert a proto dtype to the corresponding c++ class.
+std::string DTypeToCCType(proto::DType::Enum value);
 
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed
