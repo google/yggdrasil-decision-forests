@@ -406,6 +406,9 @@ INSTANTIATE_TEST_SUITE_P(
         },
         {"synthetic_ranking_gbdt", "synthetic_ranking_test.csv",
          AllGBTEngines()},
+        {"synthetic_ranking_gbdt_xe_ndcg",
+         "synthetic_ranking_test.csv",
+         {gradient_boosted_trees::kGeneric}},
     }),
     [](const testing::TestParamInfo<AllCompatibleEnginesTest::ParamType>&
            info) {

@@ -202,6 +202,19 @@ TEST(GradientBoostedTrees, NDCGTruncationLegacyModel) {
   EXPECT_THAT(description, testing::HasSubstr("LAMBDA_MART_NDCG5@5"));
 }
 
+TEST(GradientBoostedTrees, XENDCGTruncation) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "synthetic_ranking_gbdt_xe_ndcg"),
+      &model));
+  const auto* gbt_model = dynamic_cast<
+      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+      model.get());
+  ASSERT_EQ(gbt_model->loss(), proto::XE_NDCG_MART);
+  std::string description = gbt_model->DescriptionAndStatistics();
+  EXPECT_THAT(description, testing::HasSubstr("XE_NDCG_MART@5"));
+}
+
 TEST(GradientBoostedTrees, NDCGTruncationNonRankingModel) {
   std::unique_ptr<model::AbstractModel> model;
   EXPECT_OK(model::LoadModel(
