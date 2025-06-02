@@ -237,7 +237,7 @@ using AllCompatibleEnginesTest =
     testing::TestWithParam<AllCompatibleEnginesTestParams>;
 
 // Test all the compatible engines. Make sure at least one engine is compatible.
-TEST_P(AllCompatibleEnginesTest, Automtac) {
+TEST_P(AllCompatibleEnginesTest, Automatic) {
   const auto model = LoadModel(GetParam().model);
   const auto dataset = LoadDataset(model->data_spec(), GetParam().dataset,
                                    GetParam().dataset_format);
@@ -289,7 +289,7 @@ TEST_P(AllCompatibleEnginesTest, Concurent) {
   }
 }
 
-TEST_P(AllCompatibleEnginesTest, AutomtacForceCheckFail) {
+TEST_P(AllCompatibleEnginesTest, AutomaticForceCheckFail) {
   const auto model = LoadModel(GetParam().model);
 
   // Make it look like the model is not compatible with global imputation
@@ -311,6 +311,22 @@ TEST_P(AllCompatibleEnginesTest, AutomtacForceCheckFail) {
   auto expected_engines = GetParam().expected_engines;
   expected_engines.erase(gradient_boosted_trees::kOptPred);
   expected_engines.erase(random_forest::kOptPred);
+
+  // Oblique conditions are not compatible with the generic engine if global
+  // imputation is not enabled.
+  if (dynamic_cast<GradientBoostedTreesModel*>(model.get())) {
+    if (!dynamic_cast<GradientBoostedTreesModel*>(model.get())
+             ->CheckStructure(model::decision_tree::CheckStructureOptions::
+                                  NoObliqueConditions())) {
+      return;
+    }
+  } else if (dynamic_cast<RandomForestModel*>(model.get())) {
+    if (!dynamic_cast<RandomForestModel*>(model.get())
+             ->CheckStructure(model::decision_tree::CheckStructureOptions::
+                                  NoObliqueConditions())) {
+      return;
+    }
+  }
 
   const auto dataset = LoadDataset(model->data_spec(), GetParam().dataset,
                                    GetParam().dataset_format);
