@@ -128,12 +128,6 @@ bool IsNumerical(ColumnType type) {
          type == ColumnType::NUMERICAL_VECTOR_SEQUENCE;
 }
 
-int32_t CategoricalStringToValue(const std::string& value,
-                                 const proto::Column& col_spec) {
-  // TODO: Update.
-  return CategoricalStringToValueWithStatus(value, col_spec).value();
-}
-
 int32_t NonintegerizedCategoricalStringToValue(absl::string_view value,
                                                const proto::Column& col_spec) {
   DCHECK(!col_spec.categorical().is_already_integerized());
