@@ -1,0 +1,610 @@
+#ifndef YDF_MODEL_MY_MODEL_H_
+#define YDF_MODEL_MY_MODEL_H_
+
+#include <stdint.h>
+#include <array>
+#include <algorithm>
+
+namespace my_model {
+
+constexpr const int kNumFeatures = 14;
+
+struct Instance {
+  int32_t age;
+  uint32_t workclass;
+  int32_t fnlwgt;
+  uint32_t education;
+  int32_t education_num;
+  uint32_t marital_status;
+  uint32_t occupation;
+  uint32_t relationship;
+  uint32_t race;
+  uint32_t sex;
+  int32_t capital_gain;
+  int32_t capital_loss;
+  int32_t hours_per_week;
+  uint32_t native_country;
+};
+
+struct Label {
+  enum {
+    kLt50K = 0,
+    kGt50K = 1,
+  };
+};
+
+struct FeatureWorkclass {
+  enum {
+    kOutOfVocabulary = 0,
+    kPrivate = 1,
+    kSelfEmpNotInc = 2,
+    kLocalGov = 3,
+    kStateGov = 4,
+    kSelfEmpInc = 5,
+    kFederalGov = 6,
+    kWithoutPay = 7,
+  };
+};
+
+struct FeatureEducation {
+  enum {
+    kOutOfVocabulary = 0,
+    kHsGrad = 1,
+    kSomeCollege = 2,
+    kBachelors = 3,
+    kMasters = 4,
+    kAssocVoc = 5,
+    k11th = 6,
+    kAssocAcdm = 7,
+    k10th = 8,
+    k7th8th = 9,
+    kProfSchool = 10,
+    k9th = 11,
+    k12th = 12,
+    kDoctorate = 13,
+    k5th6th = 14,
+    k1st4th = 15,
+    kPreschool = 16,
+  };
+};
+
+struct FeatureMaritalStatus {
+  enum {
+    kOutOfVocabulary = 0,
+    kMarriedCivSpouse = 1,
+    kNeverMarried = 2,
+    kDivorced = 3,
+    kWidowed = 4,
+    kSeparated = 5,
+    kMarriedSpouseAbsent = 6,
+    kMarriedAfSpouse = 7,
+  };
+};
+
+struct FeatureOccupation {
+  enum {
+    kOutOfVocabulary = 0,
+    kProfSpecialty = 1,
+    kExecManagerial = 2,
+    kCraftRepair = 3,
+    kAdmClerical = 4,
+    kSales = 5,
+    kOtherService = 6,
+    kMachineOpInspct = 7,
+    kTransportMoving = 8,
+    kHandlersCleaners = 9,
+    kFarmingFishing = 10,
+    kTechSupport = 11,
+    kProtectiveServ = 12,
+    kPrivHouseServ = 13,
+  };
+};
+
+struct FeatureRelationship {
+  enum {
+    kOutOfVocabulary = 0,
+    kHusband = 1,
+    kNotInFamily = 2,
+    kOwnChild = 3,
+    kUnmarried = 4,
+    kWife = 5,
+    kOtherRelative = 6,
+  };
+};
+
+struct FeatureRace {
+  enum {
+    kOutOfVocabulary = 0,
+    kWhite = 1,
+    kBlack = 2,
+    kAsianPacIslander = 3,
+    kAmerIndianEskimo = 4,
+    kOther = 5,
+  };
+};
+
+struct FeatureSex {
+  enum {
+    kOutOfVocabulary = 0,
+    kMale = 1,
+    kFemale = 2,
+  };
+};
+
+struct FeatureNativeCountry {
+  enum {
+    kOutOfVocabulary = 0,
+    kUnitedStates = 1,
+    kMexico = 2,
+    kPhilippines = 3,
+    kGermany = 4,
+    kCanada = 5,
+    kPuertoRico = 6,
+    kIndia = 7,
+    kElSalvador = 8,
+    kCuba = 9,
+    kEngland = 10,
+    kJamaica = 11,
+    kDominicanRepublic = 12,
+    kSouth = 13,
+    kChina = 14,
+    kItaly = 15,
+    kColumbia = 16,
+    kGuatemala = 17,
+    kJapan = 18,
+    kVietnam = 19,
+    kTaiwan = 20,
+    kIran = 21,
+    kPoland = 22,
+    kHaiti = 23,
+    kNicaragua = 24,
+    kGreece = 25,
+    kPortugal = 26,
+    kEcuador = 27,
+    kFrance = 28,
+    kPeru = 29,
+    kThailand = 30,
+    kCambodia = 31,
+    kIreland = 32,
+    kLaos = 33,
+    kYugoslavia = 34,
+    kTrinadadTobago = 35,
+    kHonduras = 36,
+    kHong = 37,
+    kHungary = 38,
+    kScotland = 39,
+    kOutlyingUsGuamUsviEtc = 40,
+  };
+};
+
+inline float Predict(const Instance& instance) {
+  float accumulator {-1.1631};
+  // Tree #0
+  if (instance.relationship == 0 ||
+      instance.relationship == 1 ||
+      instance.relationship == 5) {
+    if (instance.education == 3 ||
+        instance.education == 4 ||
+        instance.education == 10 ||
+        instance.education == 13) {
+      if (instance.capital_gain >= 5095.5) {
+        if (std::array<uint32_t,12> mask = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12};
+            std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
+          if (instance.age >= 79.5) {
+            accumulator += 0.309737;
+          } else {
+            accumulator += 0.418684;
+          }
+        } else {
+          accumulator += 0.309737;
+        }
+      } else {
+        if (instance.capital_loss >= 1782.5) {
+          if (instance.capital_loss >= 1989.5) {
+            accumulator += 0.349312;
+          } else {
+            accumulator += 0.417359;
+          }
+        } else {
+          if (instance.occupation == 1 ||
+              instance.occupation == 2 ||
+              instance.occupation == 5 ||
+              instance.occupation == 11 ||
+              instance.occupation == 12) {
+            accumulator += 0.253437;
+          } else {
+            accumulator += 0.11557;
+          }
+        }
+      }
+    } else {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 60.5) {
+          if (instance.occupation == 1 ||
+              instance.occupation == 2 ||
+              instance.occupation == 4 ||
+              instance.occupation == 5 ||
+              instance.occupation == 7 ||
+              instance.occupation == 8 ||
+              instance.occupation == 9) {
+            accumulator += 0.397934;
+          } else {
+            accumulator += 0.205614;
+          }
+        } else {
+          if (instance.fnlwgt >= 36212.5) {
+            accumulator += 0.419984;
+          } else {
+            accumulator += 0.419984;
+          }
+        }
+      } else {
+        if (instance.occupation == 1 ||
+            instance.occupation == 2 ||
+            instance.occupation == 4 ||
+            instance.occupation == 5 ||
+            instance.occupation == 11 ||
+            instance.occupation == 12) {
+          if (instance.age >= 33.5) {
+            accumulator += 0.132992;
+          } else {
+            accumulator += 0.00826457;
+          }
+        } else {
+          if (instance.education_num >= 8.5) {
+            accumulator += 0.00969668;
+          } else {
+            accumulator += -0.0813718;
+          }
+        }
+      }
+    }
+  } else {
+    if (instance.capital_gain >= 7073.5) {
+      if (instance.age >= 21.5) {
+        if (instance.capital_gain >= 7565.5) {
+          if (instance.capital_gain >= 30961.5) {
+            accumulator += 0.392422;
+          } else {
+            accumulator += 0.419984;
+          }
+        } else {
+          if (instance.education == 3 ||
+              instance.education == 4 ||
+              instance.education == 5 ||
+              instance.education == 10) {
+            accumulator += 0.419984;
+          } else {
+            accumulator += -0.0210046;
+          }
+        }
+      } else {
+        accumulator += 0.0892425;
+      }
+    } else {
+      if (instance.education_num >= 12.5) {
+        if (instance.age >= 31.5) {
+          if (instance.education_num >= 14.5) {
+            accumulator += 0.16421;
+          } else {
+            accumulator += -0.0295298;
+          }
+        } else {
+          if (instance.capital_loss >= 1977) {
+            accumulator += 0.19949;
+          } else {
+            accumulator += -0.106976;
+          }
+        }
+      } else {
+        if (instance.capital_loss >= 2218.5) {
+          if (instance.fnlwgt >= 125450) {
+            accumulator += -0.0328167;
+          } else {
+            accumulator += 0.292776;
+          }
+        } else {
+          if (instance.hours_per_week >= 40.5) {
+            accumulator += -0.0927111;
+          } else {
+            accumulator += -0.123347;
+          }
+        }
+      }
+    }
+  }
+
+  // Tree #1
+  if (instance.relationship == 0 ||
+      instance.relationship == 1 ||
+      instance.relationship == 5) {
+    if (instance.education == 3 ||
+        instance.education == 4 ||
+        instance.education == 10 ||
+        instance.education == 13) {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 62.5) {
+          if (instance.workclass == 0 ||
+              instance.workclass == 1 ||
+              instance.workclass == 3 ||
+              instance.workclass == 4 ||
+              instance.workclass == 5) {
+            accumulator += 0.300409;
+          } else {
+            accumulator += 0.222857;
+          }
+        } else {
+          if (instance.occupation == 10 ||
+              instance.occupation == 12) {
+            accumulator += 0.318377;
+          } else {
+            accumulator += 0.310521;
+          }
+        }
+      } else {
+        if (instance.occupation == 1 ||
+            instance.occupation == 2 ||
+            instance.occupation == 4 ||
+            instance.occupation == 5 ||
+            instance.occupation == 11 ||
+            instance.occupation == 12) {
+          if (instance.capital_loss >= 1782.5) {
+            accumulator += 0.303271;
+          } else {
+            accumulator += 0.198242;
+          }
+        } else {
+          if (instance.native_country == 4 ||
+              instance.native_country == 15 ||
+              instance.native_country == 21 ||
+              instance.native_country == 22 ||
+              instance.native_country == 23 ||
+              instance.native_country == 31) {
+            accumulator += 0.38506;
+          } else {
+            accumulator += 0.0771326;
+          }
+        }
+      }
+    } else {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 60.5) {
+          if (instance.occupation == 1 ||
+              instance.occupation == 2 ||
+              instance.occupation == 4 ||
+              instance.occupation == 5 ||
+              instance.occupation == 7 ||
+              instance.occupation == 8 ||
+              instance.occupation == 9) {
+            accumulator += 0.296477;
+          } else {
+            accumulator += 0.166497;
+          }
+        } else {
+          if (instance.fnlwgt >= 45793.5) {
+            accumulator += 0.310248;
+          } else {
+            accumulator += 0.310248;
+          }
+        }
+      } else {
+        if (instance.occupation == 1 ||
+            instance.occupation == 2 ||
+            instance.occupation == 4 ||
+            instance.occupation == 5 ||
+            instance.occupation == 11 ||
+            instance.occupation == 12) {
+          if (instance.capital_loss >= 1782.5) {
+            accumulator += 0.291468;
+          } else {
+            accumulator += 0.0773945;
+          }
+        } else {
+          if (instance.capital_loss >= 1794) {
+            accumulator += 0.192961;
+          } else {
+            accumulator += -0.0159635;
+          }
+        }
+      }
+    }
+  } else {
+    if (instance.capital_gain >= 7073.5) {
+      if (instance.age >= 21.5) {
+        if (instance.capital_gain >= 7565.5) {
+          if (instance.capital_gain >= 30961.5) {
+            accumulator += 0.293003;
+          } else {
+            accumulator += 0.310248;
+          }
+        } else {
+          if (instance.education_num >= 10.5) {
+            accumulator += 0.310248;
+          } else {
+            accumulator += -0.0191264;
+          }
+        }
+      } else {
+        accumulator += 0.0765646;
+      }
+    } else {
+      if (instance.education == 0 ||
+          instance.education == 3 ||
+          instance.education == 4 ||
+          instance.education == 10 ||
+          instance.education == 13) {
+        if (instance.age >= 31.5) {
+          if (instance.education_num >= 14.5) {
+            accumulator += 0.13565;
+          } else {
+            accumulator += -0.0270186;
+          }
+        } else {
+          if (instance.hours_per_week >= 44.5) {
+            accumulator += -0.0633502;
+          } else {
+            accumulator += -0.114477;
+          }
+        }
+      } else {
+        if (instance.capital_loss >= 2218.5) {
+          if (instance.fnlwgt >= 125450) {
+            accumulator += -0.0300817;
+          } else {
+            accumulator += 0.227849;
+          }
+        } else {
+          if (instance.hours_per_week >= 40.5) {
+            accumulator += -0.0879641;
+          } else {
+            accumulator += -0.11917;
+          }
+        }
+      }
+    }
+  }
+
+  // Tree #2
+  if (instance.relationship == 0 ||
+      instance.relationship == 1 ||
+      instance.relationship == 5) {
+    if (instance.education_num >= 12.5) {
+      if (instance.capital_gain >= 5095.5) {
+        if (std::array<uint32_t,11> mask = {1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12};
+            std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
+          if (instance.age >= 75.5) {
+            accumulator += 0.186707;
+          } else {
+            accumulator += 0.254644;
+          }
+        } else {
+          if (instance.fnlwgt >= 197568) {
+            accumulator += 0.168122;
+          } else {
+            accumulator += 0.260133;
+          }
+        }
+      } else {
+        if (instance.occupation == 1 ||
+            instance.occupation == 2 ||
+            instance.occupation == 4 ||
+            instance.occupation == 5 ||
+            instance.occupation == 11 ||
+            instance.occupation == 12) {
+          if (instance.capital_loss >= 1782.5) {
+            accumulator += 0.248387;
+          } else {
+            accumulator += 0.164478;
+          }
+        } else {
+          if (instance.age >= 67.5) {
+            accumulator += -0.0922758;
+          } else {
+            accumulator += 0.0869682;
+          }
+        }
+      }
+    } else {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 60.5) {
+          if (instance.occupation == 1 ||
+              instance.occupation == 2 ||
+              instance.occupation == 4 ||
+              instance.occupation == 5 ||
+              instance.occupation == 7 ||
+              instance.occupation == 8 ||
+              instance.occupation == 9) {
+            accumulator += 0.242895;
+          } else {
+            accumulator += 0.139375;
+          }
+        } else {
+          if (instance.fnlwgt >= 95258) {
+            accumulator += 0.254167;
+          } else {
+            accumulator += 0.254167;
+          }
+        }
+      } else {
+        if (std::array<uint32_t,8> mask = {1, 2, 3, 4, 5, 8, 11, 12};
+            std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
+          if (instance.age >= 35.5) {
+            accumulator += 0.078723;
+          } else {
+            accumulator += -0.00694594;
+          }
+        } else {
+          if (instance.capital_loss >= 1794) {
+            accumulator += 0.162805;
+          } else {
+            accumulator += -0.048394;
+          }
+        }
+      }
+    }
+  } else {
+    if (instance.capital_gain >= 7073.5) {
+      if (instance.age >= 21.5) {
+        if (instance.capital_gain >= 7565.5) {
+          if (instance.workclass == 0 ||
+              instance.workclass == 1 ||
+              instance.workclass == 3 ||
+              instance.workclass == 4 ||
+              instance.workclass == 5 ||
+              instance.workclass == 6) {
+            accumulator += 0.254692;
+          } else {
+            accumulator += 0.238989;
+          }
+        } else {
+          if (instance.education_num >= 10.5) {
+            accumulator += 0.254167;
+          } else {
+            accumulator += -0.0174006;
+          }
+        }
+      } else {
+        accumulator += 0.0663047;
+      }
+    } else {
+      if (instance.occupation == 1 ||
+          instance.occupation == 2 ||
+          instance.occupation == 12) {
+        if (instance.age >= 32.5) {
+          if (instance.education == 8 ||
+              instance.education == 10 ||
+              instance.education == 13) {
+            accumulator += 0.123551;
+          } else {
+            accumulator += -0.0303353;
+          }
+        } else {
+          if (instance.hours_per_week >= 44.5) {
+            accumulator += -0.0519256;
+          } else {
+            accumulator += -0.110506;
+          }
+        }
+      } else {
+        if (instance.hours_per_week >= 40.5) {
+          if (instance.education_num >= 13.5) {
+            accumulator += 0.101877;
+          } else {
+            accumulator += -0.081978;
+          }
+        } else {
+          if (instance.capital_gain >= 4668.5) {
+            accumulator += -0.0101649;
+          } else {
+            accumulator += -0.116423;
+          }
+        }
+      }
+    }
+  }
+
+  return accumulator;
+}
+
+}  // namespace my_model
+#endif

@@ -19,12 +19,21 @@
 #include <cstdint>
 #include <string>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
+namespace {
+
+// Replacement of characters with a string for feature names. Note that feature
+// names can only be: alpha numericals, _, and the values in kReplacements.
+const absl::flat_hash_map<char, std::string> kReplacements = {{'<', "Lt"},
+                                                              {'>', "Gt"}};
+
+}  // namespace
 
 absl::Status CheckModelName(absl::string_view value) {
   for (const char c : value) {
@@ -33,6 +42,21 @@ absl::Status CheckModelName(absl::string_view value) {
           absl::StrCat("Invalid model name: ", value,
                        ". The model name can only contain lowercase letters, "
                        "numbers, and _."));
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status CheckFeatureName(absl::string_view value) {
+  for (const char c : value) {
+    if (!std::isalpha(c) && !std::isdigit(c) && c != '_') {
+      if (kReplacements.contains(c)) {
+        continue;
+      }
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Invalid model name: ", value,
+          ". The feature names can only be alpha numericals, _, or "
+          "symbols defined in kReplacements"));
     }
   }
   return absl::OkStatus();
@@ -78,6 +102,15 @@ std::string StringToSnakeCaseSymbol(const std::string_view input,
         last_char_was_separator = true;
       }
     }
+
+    const auto replace_it = kReplacements.find(ch);
+    if (replace_it != kReplacements.end()) {
+      if (!result.empty() && !last_char_was_separator) {
+        absl::StrAppend(&result, replace_it->second);
+        last_char_was_separator = true;
+      }
+    }
+
     // Other characters are skipped.
     first_char = false;
   }
@@ -97,7 +130,8 @@ std::string StringToVariableSymbol(const absl::string_view input) {
   return StringToSnakeCaseSymbol(input, false, 'v');
 }
 
-std::string StringToStructSymbol(const absl::string_view input) {
+std::string StringToStructSymbol(const absl::string_view input,
+                                 const bool ensure_letter_first) {
   if (input.empty()) {
     return "";
   }
@@ -110,7 +144,7 @@ std::string StringToStructSymbol(const absl::string_view input) {
 
   for (const char ch : input) {
     if (std::isalnum(ch)) {
-      if (std::isdigit(ch) && first_char) {
+      if (ensure_letter_first && std::isdigit(ch) && first_char) {
         // Add a prefix if the first character is a number.
         result.push_back('V');
       }
@@ -128,6 +162,11 @@ std::string StringToStructSymbol(const absl::string_view input) {
       }
     } else {
       capitalize_next_char = true;
+
+      const auto replace_it = kReplacements.find(ch);
+      if (replace_it != kReplacements.end()) {
+        absl::StrAppend(&result, replace_it->second);
+      }
     }
     // Other characters are skipped.
     first_char = false;

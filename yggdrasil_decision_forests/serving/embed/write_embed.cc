@@ -27,15 +27,17 @@
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 ABSL_FLAG(std::string, name, "", "Name of the model");
 ABSL_FLAG(std::string, input, "", "Input YDF model directory");
 ABSL_FLAG(std::string, output, "",
           "Output directory where to write the generated files.");
-
+ABSL_FLAG(std::string, options, "", "Options for the embedded model");
 ABSL_FLAG(bool, remove_output_filename, false,
           "If set, 'output' is a file path. The filename should be removed to "
           "get the real output directory.");
@@ -48,6 +50,7 @@ absl::Status WriteEmbeddedModel() {
   std::string output = absl::GetFlag(FLAGS_output);
   const auto remove_output_filename =
       absl::GetFlag(FLAGS_remove_output_filename);
+  const auto options_text = absl::GetFlag(FLAGS_options);
 
   if (remove_output_filename) {
     output = file::GetDirname(output);
@@ -59,6 +62,10 @@ absl::Status WriteEmbeddedModel() {
 
   LOG(INFO) << "Embedding model";
   proto::Options options;
+  if (!options_text.empty()) {
+    ASSIGN_OR_RETURN(options,
+                     utils::ParseTextProto<proto::Options>(options_text));
+  }
   options.set_name(name);
   ASSIGN_OR_RETURN(const auto embedded_model, EmbedModelCC(*model, options));
 

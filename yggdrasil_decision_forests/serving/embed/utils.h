@@ -28,6 +28,7 @@ namespace yggdrasil_decision_forests::serving::embed {
 // Checks that a model name is valid. A model name can only contain letters,
 // numbers, and _.
 absl::Status CheckModelName(absl::string_view value);
+absl::Status CheckFeatureName(absl::string_view value);
 
 // Converts any string into a c++ constant (with the "k") e.g. "HELLO_WOLRD_1".
 std::string StringToConstantSymbol(absl::string_view input);
@@ -36,7 +37,10 @@ std::string StringToConstantSymbol(absl::string_view input);
 std::string StringToVariableSymbol(absl::string_view input);
 
 // Converts any string into a c++ struct name e.g. "HelloWorld1".
-std::string StringToStructSymbol(absl::string_view input);
+// If "ensure_letter_first=true", adds a "V" character in front if the first
+// character is not a letter.
+std::string StringToStructSymbol(absl::string_view input,
+                                 bool ensure_letter_first = true);
 
 // Computes the number of bytes to encode an unsigned value. Can return 1, 2,
 // or 4. For example, "MaxUnsignedValueToNumBytes" returns 2 for value=600

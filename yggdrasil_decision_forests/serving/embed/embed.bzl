@@ -1,6 +1,6 @@
 """Blaze / Bazel rule to embed YDF models in a binary."""
 
-def cc_ydf_embedded_model(name, data, path = None, **attrs):
+def cc_ydf_embedded_model(name, data, path = None, classification_output = "CLASS", **attrs):
     """Embed a YDF model into a CC library.
 
     Args:
@@ -11,8 +11,14 @@ def cc_ydf_embedded_model(name, data, path = None, **attrs):
             a directory containing a data_spec.pb file. If path is specified, it is the path to the
             model directory (a directory containing a data_spec.pb file) inside of the "data"
             filegroup.
+        classification_output: What is the Predict function is returning in case of a classification
+            model. Can be one of: CLASS, SCORE or PROBABILITY. See "embed.proto" for details
+            about those values. Has no impact on non-classification models.
         **attrs: Classical cc_library attributes.
     """
+
+    if classification_output not in ["CLASS", "SCORE", "PROBABILITY"]:
+        fail("Invalid classification_output value: %s. Possible values are: CLASS, SCORE, or PROBABILITY." % classification_output)
 
     if path == None:
         # Determine the path from the data.
@@ -35,10 +41,13 @@ def cc_ydf_embedded_model(name, data, path = None, **attrs):
         )
 
     # Convert the model into source files.
+
+    options = "classification_output: " + classification_output
+
     native.genrule(
         name = name + "_write_embed",
         outs = [name + ".h"],
-        cmd = "$(location write_embed) --input=$$(cat $(location " + name + "_create_path ) ) --output='$@' --remove_output_filename --name=" + name + " --alsologtostderr",
+        cmd = "$(location write_embed) --input=$$(cat $(location " + name + "_create_path ) ) --options='" + options + "' --output='$@' --remove_output_filename --name=" + name + " --alsologtostderr",
         tools = [":write_embed", name + "_create_path", data],
     )
 

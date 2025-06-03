@@ -33,6 +33,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -96,17 +97,64 @@ TestData BuildToyTestData() {
   return TestData{.model = std::move(model)};
 };
 
-TEST(Embed, SimpleModel) {
-  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
-                                             TestDataDir(), "model",
-                                             "adult_binary_class_gbdt_v2")));
+TEST(Embed, AdultBinaryGBTClass) {
+  ASSERT_OK_AND_ASSIGN(
+      auto model, model::LoadModel(file::JoinPath(
+                      TestDataDir(), "model", "adult_binary_class_gbdt_v2")));
+  auto model_gbt =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model.get());
+  model_gbt->mutable_decision_trees()->resize(3);
+
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model));
   EXPECT_EQ(embed.size(), 1);
   EXPECT_TRUE(embed.contains("my_model.h"));
 
-  test::ExpectEqualGolden(embed.at("my_model.h"),
-                          "yggdrasil_decision_forests/test_data/"
-                          "golden/embed/model1.h.golden");
+  test::ExpectEqualGolden(
+      embed.at("my_model.h"),
+      "yggdrasil_decision_forests/test_data/"
+      "golden/embed/adult_binary_class_gbdt_v2_class.h.golden");
+}
+
+TEST(Embed, AdultBinaryGBTScore) {
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
+                                             TestDataDir(), "model",
+                                             "adult_binary_class_gbdt_v2")));
+  auto model_gbt =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model.get());
+  model_gbt->mutable_decision_trees()->resize(3);
+
+  proto::Options options;
+  options.set_classification_output(proto::ClassificationOutput::SCORE);
+  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
+  EXPECT_EQ(embed.size(), 1);
+  EXPECT_TRUE(embed.contains("my_model.h"));
+
+  test::ExpectEqualGolden(
+      embed.at("my_model.h"),
+      "yggdrasil_decision_forests/test_data/"
+      "golden/embed/adult_binary_class_gbdt_v2_score.h.golden");
+}
+
+TEST(Embed, AdultBinaryGBTProbability) {
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
+                                             TestDataDir(), "model",
+                                             "adult_binary_class_gbdt_v2")));
+  auto model_gbt =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model.get());
+  model_gbt->mutable_decision_trees()->resize(3);
+  proto::Options options;
+  options.set_classification_output(proto::ClassificationOutput::SCORE);
+  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
+  EXPECT_EQ(embed.size(), 1);
+  EXPECT_TRUE(embed.contains("my_model.h"));
+
+  test::ExpectEqualGolden(
+      embed.at("my_model.h"),
+      "yggdrasil_decision_forests/test_data/"
+      "golden/embed/adult_binary_class_gbdt_v2_probability.h.golden");
 }
 
 TEST(Process, ManualBinaryGBT) {
@@ -143,6 +191,18 @@ TEST(Process, ManualBinaryGBT) {
       internal::ComputeInternalOptions(*test_data.model, *df, stats, {}));
   EXPECT_EQ(internal_options.feature_value_bytes, 2);
   EXPECT_EQ(internal_options.numerical_feature_is_float, false);
+
+  EXPECT_EQ(internal_options.categorical_dicts.size(), 2);
+
+  EXPECT_EQ(internal_options.categorical_dicts.at(0).sanitized_name, "Label");
+  EXPECT_EQ(internal_options.categorical_dicts.at(0).is_label, true);
+  EXPECT_THAT(internal_options.categorical_dicts.at(0).sanitized_items,
+              testing::ElementsAre("A", "B"));
+
+  EXPECT_EQ(internal_options.categorical_dicts.at(2).sanitized_name, "F2");
+  EXPECT_EQ(internal_options.categorical_dicts.at(2).is_label, false);
+  EXPECT_THAT(internal_options.categorical_dicts.at(2).sanitized_items,
+              testing::ElementsAre("OutOfVocabulary", "X", "Y", "Z"));
 }
 
 TEST(Process, RealBinaryGBT) {

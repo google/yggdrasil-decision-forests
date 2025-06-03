@@ -32,6 +32,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
@@ -46,6 +47,7 @@
 namespace yggdrasil_decision_forests::serving::embed {
 
 namespace {
+constexpr absl::string_view kLabelReservedSymbol = "Label";
 
 // Generates the struct for a single instance (i.e., an example without a
 // label).
@@ -83,6 +85,35 @@ struct Instance {
   return content;
 }
 
+// Generates the enum constants for the categorical string input features and
+// the label.
+absl::StatusOr<std::string> GenCategoricalStringDictionaries(
+    const model::AbstractModel& model, const proto::Options& options,
+    const internal::InternalOptions& internal_options) {
+  std::string content;
+
+  // TODO: Create a hashmap with the string values is the user requests it.
+  for (const auto& dict : internal_options.categorical_dicts) {
+    absl::SubstituteAndAppend(&content, R"(
+struct $0$1 {
+  enum {
+)",
+                              dict.second.is_label ? "" : "Feature",
+                              dict.second.sanitized_name);
+    // Create the enum values
+    for (int item_idx = 0; item_idx < dict.second.sanitized_items.size();
+         item_idx++) {
+      absl::SubstituteAndAppend(&content, "    k$0 = $1,\n",
+                                dict.second.sanitized_items[item_idx],
+                                item_idx);
+    }
+    absl::StrAppend(&content, R"(  };
+};
+)");
+  }
+  return content;
+}
+
 }  // namespace
 
 absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
@@ -95,6 +126,10 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   }
 
   RETURN_IF_ERROR(CheckModelName(options.name()));
+  for (const auto& column_idx : model.input_features()) {
+    RETURN_IF_ERROR(
+        CheckFeatureName(model.data_spec().columns(column_idx).name()));
+  }
 
   ASSIGN_OR_RETURN(const internal::ModelStatistics stats,
                    internal::ComputeStatistics(model, *df_interface));
@@ -121,6 +156,9 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   if (internal_options.include_algorithm) {
     absl::StrAppend(&header, "#include <algorithm>\n");
   }
+  if (internal_options.include_cmath) {
+    absl::StrAppend(&header, "#include <cmath>\n");
+  }
 
   absl::SubstituteAndAppend(&header, R"(
 namespace $0 {
@@ -131,6 +169,12 @@ namespace $0 {
   ASSIGN_OR_RETURN(const auto instance_struct,
                    GenInstanceStruct(model, options, internal_options));
   absl::StrAppend(&header, instance_struct);
+
+  // Categorical dictionary
+  ASSIGN_OR_RETURN(
+      const auto categorical_dict,
+      GenCategoricalStringDictionaries(model, options, internal_options));
+  absl::StrAppend(&header, categorical_dict);
 
   // Predict method
   absl::SubstituteAndAppend(&header, R"(
@@ -268,8 +312,7 @@ absl::Status GenPredictionGBT(
           } else {
             absl::StrAppend(&return_accumulator, R"(
   // Sigmoid
-  return std::clamp(
-      1.f / (1.f + std::exp(-accumulator)), 0.f, 1.f)
+  return 1.f / (1.f + std::exp(-accumulator));
 )");
           }
           break;
@@ -407,6 +450,8 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
       ComputeInternalOptionsFeature(model, options, &internal_options));
   RETURN_IF_ERROR(
       ComputeInternalOptionsOutput(model, stats, options, &internal_options));
+  RETURN_IF_ERROR(ComputeInternalOptionsCategoricalDictionaries(
+      model, stats, options, &internal_options));
   return internal_options;
 }
 
@@ -507,6 +552,7 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
             out->output_type =
                 absl::StrCat("std::array<float, ", num_classes, ">");
           }
+          out->include_cmath = true;
           break;
       }
     } break;
@@ -521,6 +567,61 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
       return absl::InvalidArgumentError(absl::StrCat(
           "Non supported task: ", model::proto::Task_Name(model.task())));
   }
+  return absl::OkStatus();
+}
+
+absl::Status ComputeInternalOptionsCategoricalDictionaries(
+    const model::AbstractModel& model, const ModelStatistics& stats,
+    const proto::Options& options, InternalOptions* out) {
+  const auto add_dict = [&](absl::string_view name, const int column_idx,
+                            const dataset::proto::CategoricalSpec& column,
+                            const bool is_label) {
+    // Get the list of values.
+    auto& dictionary = out->categorical_dicts[column_idx];
+    dictionary.sanitized_name = name;
+    dictionary.is_label = is_label;
+    dictionary.sanitized_items.assign(
+        column.number_of_unique_values() - is_label, "");
+    for (const auto& item : column.items()) {
+      int index = item.second.index();
+
+      // Labels don't have the OOB item.
+      if (is_label) {
+        if (index == dataset::kOutOfDictionaryItemIndex) {
+          continue;
+        }
+        index--;
+      }
+
+      std::string item_symbol;
+      if (!is_label && index == dataset::kOutOfDictionaryItemIndex) {
+        item_symbol =
+            "OutOfVocabulary";  // Better than the default <OOV> symbol.
+      } else {
+        item_symbol = StringToStructSymbol(item.first,
+                                           /*.ensure_letter_first=*/false);
+      }
+      dictionary.sanitized_items[index] = item_symbol;
+    }
+  };
+
+  if (model.task() == model::proto::Task::CLASSIFICATION &&
+      !model.LabelColumnSpec().categorical().is_already_integerized()) {
+    // The classification labels
+    add_dict(kLabelReservedSymbol, model.label_col_idx(),
+             model.LabelColumnSpec().categorical(), true);
+  }
+
+  // The categorical features.
+  for (const auto input_feature : model.input_features()) {
+    const auto& col_spec = model.data_spec().columns(input_feature);
+    if (col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
+      continue;
+    }
+    add_dict(StringToStructSymbol(col_spec.name()), input_feature,
+             col_spec.categorical(), false);
+  }
+
   return absl::OkStatus();
 }
 

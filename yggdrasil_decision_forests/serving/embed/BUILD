@@ -17,6 +17,7 @@ cc_library_ydf(
     deps = [
         ":embed_cc_proto",
         ":utils",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/decision_tree",
@@ -25,6 +26,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/utils:bitmap",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
@@ -41,6 +43,7 @@ cc_library_ydf(
     hdrs = ["utils.h"],
     deps = [
         ":embed_cc_proto",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
@@ -54,10 +57,12 @@ cc_binary_ydf(
     srcs = ["write_embed.cc"],
     deps = [
         ":embed",
+        ":embed_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/log",
@@ -95,6 +100,7 @@ cc_test(
     ],
     deps = [
         ":embed",
+        ":embed_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
@@ -129,7 +135,9 @@ cc_test(
     srcs = ["embed_pred_test.cc"],
     deps = [
         ":test_model_adult_binary_class_gbdt_filegroup_filegroup",
-        ":test_model_adult_binary_class_gbdt_v2",
+        ":test_model_adult_binary_class_gbdt_v2_class",
+        ":test_model_adult_binary_class_gbdt_v2_proba",
+        ":test_model_adult_binary_class_gbdt_v2_score",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -140,7 +148,22 @@ cc_ydf_embedded_model(
 )
 
 cc_ydf_embedded_model(
-    name = "test_model_adult_binary_class_gbdt_v2",
+    name = "test_model_adult_binary_class_gbdt_v2_class",
+    classification_output = "CLASS",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
+)
+
+cc_ydf_embedded_model(
+    name = "test_model_adult_binary_class_gbdt_v2_score",
+    classification_output = "SCORE",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
+)
+
+cc_ydf_embedded_model(
+    name = "test_model_adult_binary_class_gbdt_v2_proba",
+    classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
 )

@@ -21,7 +21,9 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <vector>
 
+#include "absl/container/btree_map.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -110,10 +112,24 @@ struct InternalOptions {
   bool include_array = false;
   // If true, the model requires the <algorithm> include.
   bool include_algorithm = false;
+  // If true, the model requires the <cmath> include.
+  bool include_cmath = false;
 
   // Coefficient applied on the numerical leaf values. Only use when
   // "integerize_output=true" and if the tree leaves contain numerical values.
   std::optional<double> coefficient;
+
+  // Mapping between column idx of a categorical-string column, to the sanitized
+  // dictionary of possible values.
+  struct CategoricalDict {
+    // Name of the column
+    std::string sanitized_name;
+    // Possible values
+    std::vector<std::string> sanitized_items;
+    // If this column a label.
+    bool is_label;
+  };
+  absl::btree_map<int, CategoricalDict> categorical_dicts;
 };
 
 // Computes the internal options of the model.
@@ -132,6 +148,11 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
                                           const ModelStatistics& stats,
                                           const proto::Options& options,
                                           InternalOptions* out);
+
+// Populates the categorical dictionary parts of the internal option.
+absl::Status ComputeInternalOptionsCategoricalDictionaries(
+    const model::AbstractModel& model, const ModelStatistics& stats,
+    const proto::Options& options, InternalOptions* out);
 
 // Computes the statistics of the model.
 absl::StatusOr<ModelStatistics> ComputeStatistics(

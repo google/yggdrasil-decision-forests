@@ -33,11 +33,22 @@ TEST(Embed, CheckModelName) {
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
+TEST(Embed, CheckFeatureName) {
+  EXPECT_OK(CheckFeatureName("my_feature_123"));
+  EXPECT_THAT(CheckFeatureName("my-feature"),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CheckFeatureName("my feature"),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_OK(CheckFeatureName("A<B"));
+}
+
 TEST(Embed, StringToUpperCaseVariable) {
   EXPECT_EQ(StringToConstantSymbol("A nice-and-cold_day 123!"),
             "A_NICE_AND_COLD_DAY_123");
   EXPECT_EQ(StringToConstantSymbol("123AAA!"), "V123AAA");
   EXPECT_EQ(StringToConstantSymbol(""), "");
+
+  EXPECT_EQ(StringToConstantSymbol("A<B"), "ALtB");
 }
 
 TEST(Embed, StringToLowerCaseVariable) {
@@ -45,6 +56,7 @@ TEST(Embed, StringToLowerCaseVariable) {
             "a_nice_and_cold_day_123");
   EXPECT_EQ(StringToVariableSymbol("123AAA!"), "v123aaa");
   EXPECT_EQ(StringToVariableSymbol(""), "");
+  EXPECT_EQ(StringToVariableSymbol("A<B"), "aLtb");
 }
 
 TEST(Embed, StringToStructSymbol) {
@@ -52,6 +64,7 @@ TEST(Embed, StringToStructSymbol) {
             "ANiceAndColdDay123");
   EXPECT_EQ(StringToStructSymbol("123AAA!"), "V123AAA");
   EXPECT_EQ(StringToStructSymbol(""), "");
+  EXPECT_EQ(StringToStructSymbol("A<B"), "ALtB");
 }
 
 TEST(Embed, MaxUnsignedValueToNumBytes) {
