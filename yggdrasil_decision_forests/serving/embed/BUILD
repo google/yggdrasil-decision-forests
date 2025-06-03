@@ -22,12 +22,15 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
+        "//yggdrasil_decision_forests/utils:bitmap",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -87,6 +90,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:builder",
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
@@ -101,19 +105,19 @@ cc_test(
     name = "embed_pred_test",
     srcs = ["embed_pred_test.cc"],
     deps = [
-        ":test_model1",
-        ":test_model2",
+        ":test_model_adult_binary_class_gbdt_filegroup_filegroup",
+        ":test_model_adult_binary_class_gbdt_v2",
         "@com_google_googletest//:gtest_main",
     ],
 )
 
 cc_ydf_embedded_model(
-    name = "test_model1",
+    name = "test_model_adult_binary_class_gbdt_filegroup_filegroup",
     data = "//yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_filegroup",
 )
 
 cc_ydf_embedded_model(
-    name = "test_model2",
+    name = "test_model_adult_binary_class_gbdt_v2",
     data = "//yggdrasil_decision_forests/test_data",
-    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
 )

@@ -17,21 +17,30 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
+#include <vector>
 
 #include "absl/container/node_hash_map.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
+#include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
@@ -162,6 +171,9 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   if (internal_options.include_array) {
     absl::StrAppend(&header, "#include <array>\n");
   }
+  if (internal_options.include_algorithm) {
+    absl::StrAppend(&header, "#include <algorithm>\n");
+  }
 
   absl::SubstituteAndAppend(&header, R"(
 namespace $0 {
@@ -176,10 +188,24 @@ namespace $0 {
   // Predict method
   absl::SubstituteAndAppend(&header, R"(
 inline $0 Predict(const Instance& instance) {
-  return {};
-}
 )",
                             internal_options.output_type);
+
+  const auto model_gbt = dynamic_cast<
+      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(&model);
+  const auto model_rf =
+      dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
+  if (model_gbt) {
+    RETURN_IF_ERROR(internal::GenPredictionGBT(
+        *model_gbt, stats, internal_options, options, &header));
+  } else if (model_rf) {
+    RETURN_IF_ERROR(internal::GenPredictionRF(
+        *model_rf, stats, internal_options, options, &header));
+  } else {
+    return absl::InvalidArgumentError("The model type is not supported.");
+  }
+
+  absl::StrAppend(&header, "}\n");
 
   // Close define and namespace.
   absl::SubstituteAndAppend(&header, R"(
@@ -193,6 +219,152 @@ inline $0 Predict(const Instance& instance) {
 }
 
 namespace internal {
+
+AccumulatorDef GenAccumulatorDef(const proto::Options& options,
+                                 const ModelStatistics& stats) {
+  AccumulatorDef accumulator_def;
+  // Base type.
+  if (options.integerize_output()) {
+    if (stats.leaf_output_is_signed) {
+      accumulator_def.base_type =
+          SignedInteger(options.accumulator_precision_bytes());
+    } else {
+      accumulator_def.base_type =
+          UnsignedInteger(options.accumulator_precision_bytes());
+    }
+  } else {
+    accumulator_def.base_type = "float";
+  }
+
+  DCHECK_GE(stats.internal_output_dim, 1);
+  if (stats.internal_output_dim == 1) {
+    accumulator_def.type = accumulator_def.base_type;
+  } else {
+    accumulator_def.use_array = true;
+    accumulator_def.type =
+        absl::StrCat("std::array<", accumulator_def.base_type, ", ",
+                     stats.internal_output_dim, ">");
+  }
+
+  // TODO: Compute coefficient.
+  return accumulator_def;
+}
+
+absl::Status GenPredictionGBT(
+    const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
+    const ModelStatistics& stats, const InternalOptions& internal_options,
+    const proto::Options& options, std::string* content) {
+  const auto acc_def = GenAccumulatorDef(options, stats);
+
+  // Accumulator
+  const auto& initial_predictions = model.initial_predictions();
+  std::string accumulator_initial_value;
+  // TODO: Handle coefficient.
+  accumulator_initial_value = absl::StrJoin(initial_predictions, ", ");
+  absl::SubstituteAndAppend(content, "  $0 accumulator {$1};\n", acc_def.type,
+                            accumulator_initial_value);
+
+  // Task / loss specifics.
+  std::string return_accumulator;
+  IfElseSetNodeFn set_node_fn;
+
+  switch (model.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      // Leaf setter
+      if (stats.internal_output_dim == 1) {
+        set_node_fn =
+            [](const model::decision_tree::proto::Node& node, const int depth,
+               const int tree_idx,
+               absl::string_view prefix) -> absl::StatusOr<std::string> {
+          const float node_value = node.regressor().top_value();
+          return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+        };
+      } else {
+        set_node_fn =
+            [&](const model::decision_tree::proto::Node& node, const int depth,
+                const int tree_idx,
+                absl::string_view prefix) -> absl::StatusOr<std::string> {
+          const float node_value = node.regressor().top_value();
+          const int output_dim_idx = tree_idx % stats.internal_output_dim;
+          return absl::StrCat(prefix, "accumulator[", output_dim_idx,
+                              "] += ", node_value, ";\n");
+        };
+      }
+      // Return accumulator
+      switch (options.classification_output()) {
+        case proto::ClassificationOutput::CLASS:
+          if (acc_def.use_array) {
+            absl::StrAppend(
+                &return_accumulator,
+                "  return std::distance(accumulator.begin(), "
+                "std::max_element(accumulator.begin(), accumulator.end()));\n");
+          } else {
+            absl::StrAppend(&return_accumulator,
+                            "  return accumulator >= 0;\n");
+          }
+          break;
+        case proto::ClassificationOutput::SCORE:
+          absl::StrAppend(&return_accumulator, "  return accumulator;\n");
+          break;
+        case proto::ClassificationOutput::PROBABILITY:
+          if (acc_def.use_array) {
+            absl::SubstituteAndAppend(&return_accumulator, R"(
+  // Softmax
+  std::array<float,$0> probas;
+  const float max_logit = *std::max_element(accumulator.begin(), accumulator.end());
+  float sum_exps = 0.f;
+  for(int i=0;i<$0;i++){ probas[i] = std::exp(x - max_logit); sum_exps+= probas[i]; }
+  for(int i=0;i<$0;i++){ probas[i] /= sum_exps; }
+  return probas;
+)",
+                                      stats.internal_output_dim);
+          } else {
+            absl::StrAppend(&return_accumulator, R"(
+  // Sigmoid
+  return std::clamp(
+      1.f / (1.f + std::exp(-accumulator)), 0.f, 1.f)
+)");
+          }
+          break;
+      }
+    } break;
+
+    case model::proto::Task::REGRESSION:
+      absl::StrAppend(&return_accumulator, "  return accumulator;\n");
+      set_node_fn =
+          [](const model::decision_tree::proto::Node& node, const int depth,
+             const int tree_idx,
+             absl::string_view prefix) -> absl::StatusOr<std::string> {
+        const float node_value = node.regressor().top_value();
+        return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+      };
+      break;
+
+    default:
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Non supported task: ", model::proto::Task_Name(model.task())));
+  }
+
+  // Accumulate leaf values
+  DCHECK_EQ(options.algorithm(), proto::Algorithm::IF_ELSE);
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElse(model.data_spec(), model, options,
+                                              internal_options, set_node_fn,
+                                              content));
+
+  // Accumulator to predictions.
+  absl::StrAppend(content, return_accumulator);
+
+  return absl::OkStatus();
+}
+
+absl::Status GenPredictionRF(
+    const model::random_forest::RandomForestModel& model,
+    const ModelStatistics& stats, const InternalOptions& internal_options,
+    const proto::Options& options, std::string* content) {
+  absl::StrAppend(content, R"(return {};
+)");
+  return absl::OkStatus();
+}
 
 absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::AbstractModel& model,
@@ -215,10 +387,25 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
   const auto model_rf =
       dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
 
+  // TODO: Handle integerized leaf values.
+  std::optional<
+      std::function<double(const model::decision_tree::proto::Node& node)>>
+      get_max_abs_output;
+
   if (model_gbt) {
     stats.multi_dim_tree = false;  // GBT trees are single dimensional.
+    get_max_abs_output =
+        [](const model::decision_tree::proto::Node& node) -> double {
+      return std::abs(node.regressor().top_value());
+    };
   } else if (model_rf) {
     stats.multi_dim_tree = true;  // RF trees are multidimensional.
+    if (model.task() == model::proto::Task::REGRESSION) {
+      get_max_abs_output =
+          [](const model::decision_tree::proto::Node& node) -> double {
+        return std::abs(node.regressor().top_value());
+      };
+    }
   } else {
     return absl::InvalidArgumentError("The model type is not supported.");
   }
@@ -237,16 +424,29 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
   // Scan the trees
   for (const auto& tree : df_interface.decision_trees()) {
     int64_t num_leaves_in_tree = 0;
+    double max_abs_output_in_tree = 0;
     tree->IterateOnNodes([&](const model::decision_tree::NodeWithChildren& node,
                              int depth) {
       stats.max_depth = std::max(stats.max_depth, static_cast<int64_t>(depth));
       if (node.IsLeaf()) {
         num_leaves_in_tree++;
         stats.num_leaves++;
+        if (get_max_abs_output.has_value()) {
+          const auto node_max_abs_output =
+              get_max_abs_output.value()(node.node());
+          stats.max_abs_output =
+              std::max(stats.max_abs_output, node_max_abs_output);
+          max_abs_output_in_tree =
+              std::max(max_abs_output_in_tree, node_max_abs_output);
+        }
+      } else {
+        stats.has_conditions[node.node().condition().condition().type_case()] =
+            true;
       }
     });
     stats.max_num_leaves_per_tree =
         std::max(stats.max_num_leaves_per_tree, num_leaves_in_tree);
+    stats.sum_max_abs_output += max_abs_output_in_tree;
   }
   return stats;
 }
@@ -335,6 +535,14 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
                                           const ModelStatistics& stats,
                                           const proto::Options& options,
                                           InternalOptions* out) {
+  if (stats.has_conditions
+          [model::decision_tree::proto::Condition::kContainsBitmapCondition] ||
+      stats.has_conditions
+          [model::decision_tree::proto::Condition::kContainsCondition]) {
+    out->include_algorithm = true;
+    out->include_array = true;
+  }
+
   switch (model.task()) {
     case model::proto::Task::CLASSIFICATION: {
       const int num_classes =
@@ -346,27 +554,14 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
           } else {
             out->output_type =
                 UnsignedInteger(MaxUnsignedValueToNumBytes(num_classes));
+            out->include_algorithm = true;
           }
           break;
         case proto::ClassificationOutput::SCORE: {
-          std::string base_output_type;
-          if (options.integerize_output()) {
-            if (stats.leaf_output_is_signed) {
-              base_output_type =
-                  SignedInteger(options.accumulator_precision_bytes());
-            } else {
-              base_output_type =
-                  UnsignedInteger(options.accumulator_precision_bytes());
-            }
-          } else {
-            base_output_type = "float";
-          }
-          if (num_classes == 2) {
-            out->output_type = base_output_type;
-          } else {
+          const auto acc_def = GenAccumulatorDef(options, stats);
+          out->output_type = acc_def.type;
+          if (acc_def.use_array) {
             out->include_array = true;
-            out->output_type = absl::StrCat("std::array<", base_output_type,
-                                            ", ", num_classes, ">");
           }
         } break;
         case proto::ClassificationOutput::PROBABILITY:
@@ -507,6 +702,128 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
           absl::StrCat("Non supported feature type: ",
                        dataset::proto::ColumnType_Name(col.type())));
   }
+}
+
+absl::Status GenerateTreeInferenceIfElseNode(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::decision_tree::NodeWithChildren& node, const int depth,
+    const IfElseSetNodeFn& set_node_fn, const int tree_idx,
+    std::string* content) {
+  std::string prefix(depth * 2 + 2, ' ');
+
+  if (node.IsLeaf()) {
+    // The leaf value
+    ASSIGN_OR_RETURN(const auto leaf,
+                     set_node_fn(node.node(), depth, tree_idx, prefix));
+    absl::StrAppend(content, leaf);
+    return absl::OkStatus();
+  }
+
+  std::string condition;
+
+  // Create a contains condition.
+  const auto categorical_contains_condition =
+      [&](absl::string_view variable_name, absl::Span<const int32_t> elements) {
+        // TODO: Use constants (e.g. kFeatureABC) instead of raw integers
+        // if the column has a dictionary. elements is large.
+        if (elements.size() < 8) {
+          // List the elements are a sequence of ==.
+          for (int element_idx = 0; element_idx < elements.size();
+               element_idx++) {
+            if (element_idx > 0) {
+              absl::StrAppend(&condition, " ||\n", prefix, "    ");
+            }
+            absl::SubstituteAndAppend(&condition, "instance.$0 == $1",
+                                      variable_name, elements[element_idx]);
+          }
+        } else {
+          // Use binary search.
+          absl::SubstituteAndAppend(
+              &condition,
+              "std::array<uint32_t,$0> mask = {$1};\n$3    "
+              "std::binary_search(mask.begin(), mask.end(),  instance.$2)",
+              elements.size(), absl::StrJoin(elements, ", "), variable_name,
+              prefix);
+        }
+      };
+
+  // Evaluate condition
+  switch (node.node().condition().condition().type_case()) {
+    case model::decision_tree::proto::Condition::TypeCase::kHigherCondition: {
+      const auto& typed_condition =
+          node.node().condition().condition().higher_condition();
+      const int attribute_idx = node.node().condition().attribute();
+      const auto variable_name =
+          StringToVariableSymbol(dataspec.columns(attribute_idx).name());
+      absl::SubstituteAndAppend(&condition, "instance.$0 >= $1", variable_name,
+                                typed_condition.threshold());
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::kContainsCondition: {
+      const auto& typed_condition =
+          node.node().condition().condition().contains_condition();
+      const int attribute_idx = node.node().condition().attribute();
+      const auto variable_name =
+          StringToVariableSymbol(dataspec.columns(attribute_idx).name());
+      categorical_contains_condition(variable_name, typed_condition.elements());
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::
+        kContainsBitmapCondition: {
+      const auto& typed_condition =
+          node.node().condition().condition().contains_bitmap_condition();
+      const int attribute_idx = node.node().condition().attribute();
+      const auto variable_name =
+          StringToVariableSymbol(dataspec.columns(attribute_idx).name());
+      std::vector<int32_t> elements;
+      for (int item_idx = 0; item_idx < dataspec.columns(attribute_idx)
+                                            .categorical()
+                                            .number_of_unique_values();
+           item_idx++) {
+        if (utils::bitmap::GetValueBit(typed_condition.elements_bitmap(),
+                                       item_idx)) {
+          elements.push_back(item_idx);
+        }
+      }
+      categorical_contains_condition(variable_name, elements);
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::
+        kTrueValueCondition: {
+      const int attribute_idx = node.node().condition().attribute();
+      const auto variable_name =
+          StringToVariableSymbol(dataspec.columns(attribute_idx).name());
+      absl::SubstituteAndAppend(&condition, "instance.$0", variable_name);
+    } break;
+
+    default:
+      return absl::InvalidArgumentError("Non supported condition type.");
+  }
+
+  // Branching
+  absl::SubstituteAndAppend(content, "$0if ($1) {\n", prefix, condition);
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
+      dataspec, *node.pos_child(), depth + 1, set_node_fn, tree_idx, content));
+  absl::StrAppend(content, prefix, "} else {\n");
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
+      dataspec, *node.neg_child(), depth + 1, set_node_fn, tree_idx, content));
+  absl::StrAppend(content, prefix, "}\n");
+  return absl::OkStatus();
+};
+
+absl::Status GenerateTreeInferenceIfElse(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const proto::Options& options, const InternalOptions& internal_options,
+    const IfElseSetNodeFn& set_node_fn, std::string* content) {
+  for (int tree_idx = 0; tree_idx < df_interface.num_trees(); tree_idx++) {
+    absl::StrAppend(content, "  // Tree #", tree_idx, "\n");
+    const auto& tree = df_interface.decision_trees()[tree_idx];
+    RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
+        dataspec, tree->root(), 0, set_node_fn, tree_idx, content));
+    absl::StrAppend(content, "\n");
+  }
+  return absl::OkStatus();
 }
 
 }  // namespace internal

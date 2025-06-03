@@ -33,6 +33,9 @@ message Options {
 
   // Precision of the accumulator when integerize_output=true;
   optional int32 accumulator_precision_bytes = 4 [default = 2];
+
+  // Algorithm used to compute the tree output.
+  optional Algorithm.Enum algorithm = 5 [default = IF_ELSE];
 }
 
 // Output of a classification model.
@@ -71,5 +74,15 @@ message DType {
     INT16 = 1;
     INT32 = 2;
     FLOAT32 = 3;
+  }
+}
+
+message Algorithm {
+  enum Enum {
+    UNDEFINED = 0;
+    // Generate a large imbricated if-else structure.
+    // This solution is slow, consumes a lot of memory, and is mostly
+    // implemented for experimentation.
+    IF_ELSE = 1;
   }
 }

@@ -16,18 +16,26 @@
 // Test the predictions value of embedded models.
 
 #include "gtest/gtest.h"
-#include "yggdrasil_decision_forests/serving/embed/test_model1.h"
-#include "yggdrasil_decision_forests/serving/embed/test_model2.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_filegroup_filegroup.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
 namespace {
 
-TEST(Embed, Example) {
-  const float pred1 = test_model1::Predict(test_model1::Instance{});
-  const float pred2 = test_model2::Predict(test_model2::Instance{});
+TEST(Embed, test_model_adult_binary_class_gbdt_filegroup_filegroup) {
+  using test_model_adult_binary_class_gbdt_filegroup_filegroup::Instance;
+  using test_model_adult_binary_class_gbdt_filegroup_filegroup::Predict;
 
-  (void)pred1;
-  (void)pred2;
+  const float pred = Predict(Instance{});
+  (void)pred;
+}
+
+TEST(Embed, test_model_adult_binary_class_gbdt_v2) {
+  using test_model_adult_binary_class_gbdt_v2::Instance;
+  using test_model_adult_binary_class_gbdt_v2::Predict;
+
+  const float pred = Predict(Instance{});
+  (void)pred;
 }
 
 }  // namespace

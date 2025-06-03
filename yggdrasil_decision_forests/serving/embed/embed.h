@@ -16,7 +16,10 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_EMBED_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_EMBED_H_
 
+#include <array>
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
 
 #include "absl/container/node_hash_map.h"
@@ -26,6 +29,9 @@
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
+#include "yggdrasil_decision_forests/model/decision_tree/structure_analysis.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
@@ -60,6 +66,18 @@ struct ModelStatistics {
 
   // If the individual trees can output a negative value.
   bool leaf_output_is_signed = true;
+
+  // Maximum of the absolute value of the node outputs over all the trees and
+  // nodes.
+  double max_abs_output = 0;
+
+  // Sum over all the trees, of the maximum absolute values over all the
+  // nodes.
+  double sum_max_abs_output = 0;
+
+  // Which conditions are used by the model.
+  std::array<bool, model::decision_tree::kNumConditionTypes + 1> has_conditions{
+      false};
 };
 
 // Specific options for the generation of the model.
@@ -90,6 +108,12 @@ struct InternalOptions {
 
   // If true, the model requires the <array> include.
   bool include_array = false;
+  // If true, the model requires the <algorithm> include.
+  bool include_algorithm = false;
+
+  // Coefficient applied on the numerical leaf values. Only use when
+  // "integerize_output=true" and if the tree leaves contain numerical values.
+  std::optional<double> coefficient;
 };
 
 // Computes the internal options of the model.
@@ -147,6 +171,39 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
 
 // Convert a proto dtype to the corresponding c++ class.
 std::string DTypeToCCType(proto::DType::Enum value);
+
+// Generation of the prediction code for a GBT model.
+absl::Status GenPredictionGBT(
+    const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
+    const ModelStatistics& stats, const InternalOptions& internal_options,
+    const proto::Options& options, std::string* content);
+
+// Generation of the prediction code for a RF model.
+absl::Status GenPredictionRF(
+    const model::random_forest::RandomForestModel& model,
+    const ModelStatistics& stats, const InternalOptions& internal_options,
+    const proto::Options& options, std::string* content);
+
+// The scalar type of an accumulator.
+struct AccumulatorDef {
+  std::string type;
+  std::string base_type;
+  bool use_array = false;
+};
+AccumulatorDef GenAccumulatorDef(const proto::Options& options,
+                                 const ModelStatistics& stats);
+
+// Generates the tree inference code using the if-else algorithm.
+typedef std::function<absl::StatusOr<std::string>(
+    const model::decision_tree::proto::Node& noden, int depth, int tree_idx,
+    absl::string_view prefix)>
+    IfElseSetNodeFn;
+
+absl::Status GenerateTreeInferenceIfElse(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const proto::Options& options, const InternalOptions& internal_options,
+    const IfElseSetNodeFn& set_node_fn, std::string* content);
 
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed
