@@ -138,27 +138,6 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface);
 
-// Checks that a model name is valid. A model name can only contain letters,
-// numbers, and _.
-absl::Status CheckModelName(absl::string_view value);
-
-// Converts any string into a c++ constant (with the "k") e.g. "HELLO_WOLRD_1".
-std::string StringToConstantSymbol(absl::string_view input);
-
-// Converts any string into a c++ variable name e.g. "hello_world_1".
-std::string StringToVariableSymbol(absl::string_view input);
-
-// Converts any string into a c++ struct name e.g. "HelloWorld1".
-std::string StringToStructSymbol(absl::string_view input);
-
-// Computes the number of bytes to encode an unsigned value. Can return 1, 2,
-// or 4. For example, "MaxUnsignedValueToNumBytes" returns 2 for value=600
-// (since using a single byte cannot encode a value greater than 255).
-int MaxUnsignedValueToNumBytes(uint32_t value);
-
-// Same as MaxUnsignedValueToNumBytes, but for signed values.
-int MaxSignedValueToNumBytes(int32_t value);
-
 struct FeatureDef {
   std::string type;  // Type to encode a feature e.g. "float".
   absl::optional<std::string> default_value = {};  // Optional default value.
@@ -168,9 +147,6 @@ struct FeatureDef {
 absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
     const internal::InternalOptions& internal_options);
-
-// Convert a proto dtype to the corresponding c++ class.
-std::string DTypeToCCType(proto::DType::Enum value);
 
 // Generation of the prediction code for a GBT model.
 absl::Status GenPredictionGBT(

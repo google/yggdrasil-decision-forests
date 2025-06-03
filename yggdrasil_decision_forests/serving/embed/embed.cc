@@ -16,7 +16,6 @@
 #include "yggdrasil_decision_forests/serving/embed/embed.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -40,64 +39,13 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
+#include "yggdrasil_decision_forests/serving/embed/utils.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
 
 namespace {
-
-// Integer type.
-std::string UnsignedInteger(int bytes) {
-  return absl::StrCat("uint", bytes * 8, "_t");
-}
-std::string SignedInteger(int bytes) {
-  return absl::StrCat("int", bytes * 8, "_t");
-}
-
-// Converts any string into a snake case symbol.
-std::string StringToSnakeCaseSymbol(const std::string_view input,
-                                    const bool to_upper,
-                                    const char prefix_char_if_digit) {
-  if (input.empty()) {
-    return "";
-  }
-
-  std::string result;
-  result.reserve(input.size());
-  bool last_char_was_separator = true;
-  bool first_char = true;
-
-  for (const char ch : input) {
-    if (std::isalnum(ch)) {
-      if (std::isdigit(ch) && first_char) {
-        // Add a prefix if the first character is a number.
-        result.push_back(prefix_char_if_digit);
-      }
-      // Change the case of letters.
-      if (to_upper) {
-        result.push_back(std::toupper(ch));
-      } else {
-        result.push_back(std::tolower(ch));
-      }
-      last_char_was_separator = false;
-    } else if (ch == ' ' || ch == '-' || ch == '_') {
-      // Characters that are replaced with "_".
-      if (!result.empty() && !last_char_was_separator) {
-        result.push_back('_');
-        last_char_was_separator = true;
-      }
-    }
-    // Other characters are skipped.
-    first_char = false;
-  }
-
-  // Remove the last character if it is a separator.
-  if (!result.empty() && result.back() == '_') {
-    result.pop_back();
-  }
-  return result;
-}
 
 // Generates the struct for a single instance (i.e., an example without a
 // label).
@@ -116,8 +64,7 @@ struct Instance {
 
   for (const auto input_feature : model.input_features()) {
     const auto& col = model.data_spec().columns(input_feature);
-    const std::string variable_name =
-        internal::StringToVariableSymbol(col.name());
+    const std::string variable_name = StringToVariableSymbol(col.name());
     ASSIGN_OR_RETURN(const auto feature_def,
                      internal::GenFeatureDef(col, internal_options));
     absl::StrAppend(&content, "  ", feature_def.type, " ", variable_name);
@@ -147,7 +94,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
         "The model is not a decision forest model.");
   }
 
-  RETURN_IF_ERROR(internal::CheckModelName(options.name()));
+  RETURN_IF_ERROR(CheckModelName(options.name()));
 
   ASSIGN_OR_RETURN(const internal::ModelStatistics stats,
                    internal::ComputeStatistics(model, *df_interface));
@@ -166,7 +113,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
 
 #include <stdint.h>
 )",
-                            internal::StringToConstantSymbol(options.name()));
+                            StringToConstantSymbol(options.name()));
 
   if (internal_options.include_array) {
     absl::StrAppend(&header, "#include <array>\n");
@@ -178,7 +125,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   absl::SubstituteAndAppend(&header, R"(
 namespace $0 {
 )",
-                            internal::StringToVariableSymbol(options.name()));
+                            StringToVariableSymbol(options.name()));
 
   // Instance struct.
   ASSIGN_OR_RETURN(const auto instance_struct,
@@ -212,7 +159,7 @@ inline $0 Predict(const Instance& instance) {
 }  // namespace $0
 #endif
 )",
-                            internal::StringToVariableSymbol(options.name()));
+                            StringToVariableSymbol(options.name()));
 
   result[absl::StrCat(options.name(), ".h")] = header;
   return result;
@@ -451,18 +398,6 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
   return stats;
 }
 
-absl::Status CheckModelName(absl::string_view value) {
-  for (const char c : value) {
-    if (!std::islower(c) && !std::isdigit(c) && c != '_') {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid model name: ", value,
-                       ". The model name can only contain lowercase letters, "
-                       "numbers, and _."));
-    }
-  }
-  return absl::OkStatus();
-}
-
 absl::StatusOr<InternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface,
@@ -587,90 +522,6 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
           "Non supported task: ", model::proto::Task_Name(model.task())));
   }
   return absl::OkStatus();
-}
-
-std::string StringToConstantSymbol(const absl::string_view input) {
-  return StringToSnakeCaseSymbol(input, true, 'V');
-}
-
-std::string StringToVariableSymbol(const absl::string_view input) {
-  return StringToSnakeCaseSymbol(input, false, 'v');
-}
-
-std::string StringToStructSymbol(const absl::string_view input) {
-  if (input.empty()) {
-    return "";
-  }
-
-  std::string result;
-  result.reserve(input.size());
-  bool capitalize_next_char = true;
-  bool current_word_started_with_letter = false;
-  bool first_char = true;
-
-  for (const char ch : input) {
-    if (std::isalnum(ch)) {
-      if (std::isdigit(ch) && first_char) {
-        // Add a prefix if the first character is a number.
-        result.push_back('V');
-      }
-      // Change the case of letters.
-      if (capitalize_next_char) {
-        result.push_back(std::toupper(ch));
-        current_word_started_with_letter = std::isalpha(ch);
-        capitalize_next_char = false;
-      } else {
-        if (current_word_started_with_letter && std::isalpha(ch)) {
-          result.push_back(std::tolower(ch));
-        } else {
-          result.push_back(ch);
-        }
-      }
-    } else {
-      capitalize_next_char = true;
-    }
-    // Other characters are skipped.
-    first_char = false;
-  }
-
-  // Remove the last character if it is a separator.
-  if (!result.empty() && result.back() == '_') {
-    result.pop_back();
-  }
-  return result;
-}
-
-int MaxUnsignedValueToNumBytes(uint32_t value) {
-  if (value <= 0xff) {
-    return 1;
-  } else if (value <= 0xffff) {
-    return 2;
-  } else {
-    return 4;
-  }
-}
-
-int MaxSignedValueToNumBytes(int32_t value) {
-  if (value <= 0x7f && value >= -0x80) {
-    return 1;
-  } else if (value <= 0x7fff && value >= -0x8000) {
-    return 2;
-  } else {
-    return 4;
-  }
-}
-
-std::string DTypeToCCType(const proto::DType::Enum value) {
-  switch (value) {
-    case proto::DType::INT8:
-      return "int8_t";
-    case proto::DType::INT16:
-      return "int16_t";
-    case proto::DType::INT32:
-      return "int32_t";
-    case proto::DType::FLOAT32:
-      return "float";
-  }
 }
 
 absl::StatusOr<FeatureDef> GenFeatureDef(

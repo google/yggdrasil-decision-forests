@@ -23,7 +23,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/status/status.h"
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -300,58 +299,6 @@ SIMPLE_PARAMETERIZED_TEST(
   EXPECT_EQ(internal_options.output_type, test_case.expected_output_type);
 }
 
-TEST(Embed, CheckModelName) {
-  EXPECT_OK(internal::CheckModelName("my_model_123"));
-  EXPECT_THAT(internal::CheckModelName("my-model"),
-              test::StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(internal::CheckModelName("my model"),
-              test::StatusIs(absl::StatusCode::kInvalidArgument));
-}
-
-TEST(Embed, StringToUpperCaseVariable) {
-  EXPECT_EQ(internal::StringToConstantSymbol("A nice-and-cold_day 123!"),
-            "A_NICE_AND_COLD_DAY_123");
-  EXPECT_EQ(internal::StringToConstantSymbol("123AAA!"), "V123AAA");
-  EXPECT_EQ(internal::StringToConstantSymbol(""), "");
-}
-
-TEST(Embed, StringToLowerCaseVariable) {
-  EXPECT_EQ(internal::StringToVariableSymbol("A nice-and-cold_day 123!"),
-            "a_nice_and_cold_day_123");
-  EXPECT_EQ(internal::StringToVariableSymbol("123AAA!"), "v123aaa");
-  EXPECT_EQ(internal::StringToVariableSymbol(""), "");
-}
-
-TEST(Embed, StringToStructSymbol) {
-  EXPECT_EQ(internal::StringToStructSymbol("A nice-and-cold_day 123!"),
-            "ANiceAndColdDay123");
-  EXPECT_EQ(internal::StringToStructSymbol("123AAA!"), "V123AAA");
-  EXPECT_EQ(internal::StringToStructSymbol(""), "");
-}
-
-TEST(Embed, MaxUnsignedValueToNumBytes) {
-  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(0), 1);
-  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(255), 1);
-  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(256), 2);
-  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(65535), 2);
-  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(65536), 4);
-  EXPECT_EQ(internal::MaxUnsignedValueToNumBytes(4294967295), 4);
-}
-
-TEST(Embed, MaxSignedValueToNumBytes) {
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(0), 1);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(127), 1);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-128), 1);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(128), 2);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-129), 2);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(32767), 2);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-32768), 2);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(32768), 4);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-32769), 4);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(2147483647), 4);
-  EXPECT_EQ(internal::MaxSignedValueToNumBytes(-2147483648), 4);
-}
-
 struct GenFeatureDefCase {
   dataset::proto::Column col_spec;
   internal::InternalOptions internal_options;
@@ -408,13 +355,6 @@ SIMPLE_PARAMETERIZED_TEST(
       internal::GenFeatureDef(test_case.col_spec, test_case.internal_options));
   EXPECT_EQ(value.type, test_case.expected_type);
   EXPECT_EQ(value.default_value, test_case.expected_default_value);
-}
-
-TEST(Embed, DTypeToCCType) {
-  EXPECT_EQ(internal::DTypeToCCType(proto::DType::INT8), "int8_t");
-  EXPECT_EQ(internal::DTypeToCCType(proto::DType::INT16), "int16_t");
-  EXPECT_EQ(internal::DTypeToCCType(proto::DType::INT32), "int32_t");
-  EXPECT_EQ(internal::DTypeToCCType(proto::DType::FLOAT32), "float");
 }
 
 }  // namespace
