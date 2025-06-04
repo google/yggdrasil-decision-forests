@@ -1,148 +1,33 @@
-
-<style>
-
-.tab_block .header {
-    flex-direction: row;
-    display: flex;
-}
-
-.tab_block .header .tab {
-    cursor: pointer;
-    background-color: #F6F5F5;
-    text-decoration: none;
-    text-align: center;
-    padding: 4px 12px;
-    color: black;
-}
-
-.tab_block .header .tab.selected {
-    border-bottom: 2px solid #2F80ED;
-}
-
-.tab_block .header .tab:hover {
-    text-decoration: none;
-    background-color: #DCDCDC;
-}
-
-.tab_block .body .tab_content {
-    display: none;
-    padding: 5px;
-}
-
-.tab_block .body .tab_content.selected {
-    display: block;
-}
-
-.ydf_pre {
-    font-size: medium;
-}
-
-
-
-.variable_importance {
-}
-
-.variable_importance select {
-}
-
-.variable_importance .content {
-  display: none;
-}
-
-.variable_importance .content.selected {
-  display: block;
-}
-
-.ydf_tuning_table {
-  border-collapse: collapse;
-  border: 1px solid lightgray;
-}
-
-.ydf_tuning_table th {
-  background-color: #ededed;
-  font-weight: bold;
-  text-align: left;
-  padding: 3px 4px;
-  border: 1px solid lightgray;
-}
-
-.ydf_tuning_table td {
-  text-align: right;
-  padding: 3px 4px;
-  border: 1px solid lightgray;
-}
-
-.ydf_tuning_table .best {
-  background-color: khaki;
-}
-
-</style>
-
-<script>
-
-function ydfShowTab(block_id, item) {
-    const block = document.getElementById(block_id);
-    
-    
-    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
-    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
-    
-    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
-    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
-    document.getElementById(block_id + "_" + item).classList.add("selected");
-    document.getElementById(block_id + "_body_" + item).classList.add("selected");
-}
-  
-
-function ydfShowVariableImportance(block_id) {
-    const block = document.getElementById(block_id);
-    const item = block.getElementsByTagName("select")[0].value;
-    block.getElementsByClassName("content selected")[0].classList.remove("selected");
-    document.getElementById(block_id + "_body_" + item).classList.add("selected");
-}
-
-</script>
-  <div class="tab_block" id="my_report"><div class="header"><a id="my_report_fvar" class="tab selected" onclick="ydfShowTab('my_report', 'fvar')">Feature Variation</a></div><div class="body"><div id="my_report_body_fvar" class="tab_content selected"><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_my_report_feature_variation_0" style="display: inline-block;" ></div><script>
+<div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chard_1" style="display: inline-block;" ></div><script>
 (function() {
     function user_code(Plotly) {
         console.log("Running user code");
         
   Plotly.newPlot(
-    'chart_my_report_feature_variation_0',
+    'chard_1',
     [{
-x: [1,2.33333,3.66667,5],
-y: [2,2,1,1],
+x: [1,2,3],
+y: [2,0.5,4],
 type: 'scatter',
 mode: 'lines',
 line: {
   dash: 'solid',
   width: 1
 },
-name: 'output',
-},
-{
-x: [2,2],
-y: [1,2],
-type: 'scatter',
-mode: 'lines',
-line: {
-  dash: 'dot',
-  width: 1
-},
-name: 'selected',
+name: 'curve 1',
 },
 ],
     {
-      width: 400,
-      height: 300,
-      title: '',
+      width: 600,
+      height: 400,
+      title: 'Plot 1',
       showlegend: true,
       xaxis: {
         ticks: 'outside',
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: 'f1',
+        title: 'x axis',
         },
       font: {
         size: 10,
@@ -152,7 +37,7 @@ name: 'selected',
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: 'prediction',
+        title: 'y axis',
         },
       margin: {
         l: 50,
@@ -169,7 +54,7 @@ name: 'selected',
 
     }
     function show_error(err) {
-      document.getElementById("chart_my_report_feature_variation_0").innerHTML = "Cannot load dep: " + err;
+      document.getElementById("chard_1").innerHTML = "Cannot load dep: " + err;
       console.error("Cannot load dep:", err);
     }
     if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
@@ -205,47 +90,36 @@ name: 'selected',
         }
     }
 })();
-</script><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_my_report_feature_variation_1" style="display: inline-block;" ></div><script>
+</script></div><div style='grid-row:1 / span 1; grid-column:2 / span 1;'><div id="chard_2" style="display: inline-block;" ></div><script>
 (function() {
     function user_code(Plotly) {
         console.log("Running user code");
         
   Plotly.newPlot(
-    'chart_my_report_feature_variation_1',
+    'chard_2',
     [{
-x: [0,1,2,3,4],
-y: [3,3,2,2,3],
+x: [10,11,15],
+y: [7,9,2],
 type: 'scatter',
 mode: 'lines',
 line: {
   dash: 'solid',
   width: 1
 },
-name: 'output',
-},
-{
-x: [2,2],
-y: [2,3],
-type: 'scatter',
-mode: 'lines',
-line: {
-  dash: 'dot',
-  width: 1
-},
-name: 'selected',
+name: 'curve 2',
 },
 ],
     {
-      width: 400,
-      height: 300,
-      title: '',
+      width: 600,
+      height: 400,
+      title: 'Plot 2',
       showlegend: true,
       xaxis: {
         ticks: 'outside',
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: 'f2',tickvals: [0,1,2,3,4],ticktext: ["0","1","2","3","4",],
+        title: '',
         },
       font: {
         size: 10,
@@ -255,7 +129,7 @@ name: 'selected',
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: 'prediction',
+        title: '',
         },
       margin: {
         l: 50,
@@ -272,7 +146,7 @@ name: 'selected',
 
     }
     function show_error(err) {
-      document.getElementById("chart_my_report_feature_variation_1").innerHTML = "Cannot load dep: " + err;
+      document.getElementById("chard_2").innerHTML = "Cannot load dep: " + err;
       console.error("Cannot load dep:", err);
     }
     if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
@@ -308,4 +182,91 @@ name: 'selected',
         }
     }
 })();
-</script></div></div></div>
+</script></div><div style='grid-row:2 / span 1; grid-column:1 / span 2;'><div id="chard_3" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
+  Plotly.newPlot(
+    'chard_3',
+    [{
+x: [10,11,15],
+y: [7,9,2],
+type: 'bar',
+name: 'bars 3',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: 'Plot 3',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+
+    }
+    function show_error(err) {
+      document.getElementById("chard_3").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script></div></div>

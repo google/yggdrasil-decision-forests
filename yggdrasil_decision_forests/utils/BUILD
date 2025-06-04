@@ -1372,6 +1372,7 @@ cc_test(
 cc_test(
     name = "plot_test",
     srcs = ["plot_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
         ":filesystem",
         ":plot",

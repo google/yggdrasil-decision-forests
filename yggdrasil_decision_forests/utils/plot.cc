@@ -66,6 +66,64 @@ std::string VectorToJsVector(const std::vector<std::string>& values) {
   return absl::StrCat("[", joined_elements, "]");
 }
 
+// Returns a JS code that encapsulate the js code "js_content" and make sure it
+// is executed after all the dependencies (currently,plotly 2.3) are loaded).
+// Should work on Google Colab, Jupiter Notebook, and Code Studio + Jupiter
+// extension.
+//
+// Args:
+//   js_content: JS code to run.
+//   div_id: ID of a div used to display error messages if the dependencies
+//     loading fails.
+std::string RunJsScriptWhenDepsAreloaded(const absl::string_view js_content,
+                                         const absl::string_view div_id) {
+  return absl::Substitute(R"(
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        $0
+    }
+    function show_error(err) {
+      document.getElementById("$1").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+)",
+                          js_content, div_id);
+}
+
 }  // namespace
 
 absl::Status Curve::Check() const {
@@ -402,10 +460,8 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
   ASSIGN_OR_RETURN(const auto y_axis_extra, AxisExtra(plot.y_axis));
 
   // Export the html
-  absl::SubstituteAndAppend(&html,
-                            R"(
-<div id="$0" style="display: inline-block;" ></div>
-<script>
+  const std::string js_code = absl::Substitute(
+      R"(
   Plotly.newPlot(
     '$0',
     [$1],
@@ -440,17 +496,21 @@ $2
       displaylogo: false,$7
     }
   );
-</script>
 )",
-                            chart_id,                         // $0
-                            export_acc.data,                  // $1
-                            layout_base,                      // $2
-                            html::Escape(plot.x_axis.label),  // $3
-                            html::Escape(plot.y_axis.label),  // $4
-                            x_axis_extra,                     // $5
-                            y_axis_extra,                     // $6
-                            config_extra                      // $7
+      chart_id,                         // $0
+      export_acc.data,                  // $1
+      layout_base,                      // $2
+      html::Escape(plot.x_axis.label),  // $3
+      html::Escape(plot.y_axis.label),  // $4
+      x_axis_extra,                     // $5
+      y_axis_extra,                     // $6
+      config_extra                      // $7
   );
+
+  absl::SubstituteAndAppend(
+      &html,
+      R"(<div id="$0" style="display: inline-block;" ></div><script>$1</script>)",
+      chart_id, RunJsScriptWhenDepsAreloaded(js_code, chart_id));
   return html;
 }
 }  // namespace plotly

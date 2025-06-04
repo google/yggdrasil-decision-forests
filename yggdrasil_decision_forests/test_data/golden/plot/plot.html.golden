@@ -1,0 +1,93 @@
+<script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chard_1" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
+  Plotly.newPlot(
+    'chard_1',
+    [{
+x: [1,2,3],
+y: [2,0.5,4],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'curve 1',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: 'Hello world',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'x label', type: 'log',tickvals: [1,2],ticktext: ["v1","v2",],
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: '',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+
+    }
+    function show_error(err) {
+      document.getElementById("chard_1").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script>
