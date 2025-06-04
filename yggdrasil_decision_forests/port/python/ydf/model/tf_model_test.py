@@ -766,7 +766,9 @@ class TfModelTest(parameterized.TestCase):
                       ),
                       "b1": tf.train.Feature(
                           int64_list=tf.train.Int64List(
-                              value=[test_ds["b1"][example_idx]]
+                              value=[
+                                  test_ds["b1"][example_idx].astype(np.int32)
+                              ]
                           )
                       ),
                       "b2": tf.train.Feature(
@@ -867,7 +869,7 @@ class TfModelTest(parameterized.TestCase):
       if not with_filter:
         proto_feature["multi_b1"] = tf.train.Feature(
             int64_list=tf.train.Int64List(
-                value=test_ds["multi_b1"][example_idx][:]
+                value=test_ds["multi_b1"][example_idx][:].astype(np.int32)
             )
         )
       tf_test_ds.append(
@@ -1346,9 +1348,12 @@ class TfModelTest(parameterized.TestCase):
 
     if mode == "keras":
       tf_dataset = tf.data.Dataset.from_tensor_slices({
-          "feature": np.array(
-              ["Café".encode("windows-1252"), "foobar".encode("windows-1252")]
-          ).reshape(-1, 1)
+          "feature": (
+              np.array([
+                  "Café".encode("windows-1252"),
+                  "foobar".encode("windows-1252"),
+              ]).reshape(-1, 1)
+          )
       })
       tfdf_model = tf.keras.models.load_model(model_path)
       tfdf_predictions = tfdf_model.predict(tf_dataset)
