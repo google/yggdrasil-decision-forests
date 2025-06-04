@@ -22,16 +22,15 @@ def determine_optimal_num_threads(training: bool):
   """Returns the optimal number of computation threads."""
   num_threads = os.cpu_count()
   if num_threads is None:
-    log.warning("Cannot determine the number of CPUs. Set `num_threads=6`")
+    log.warning("Cannot determine the number of CPUs. Setting `num_threads=6`")
     num_threads = 6
   else:
-    # TODO: Remove 32 limit.
-    if training and num_threads > 32:
+    if training and num_threads > 256:
       log.warning(
           "The `num_threads` argument is not set and the number of CPU is"
-          " os.cpu_count()=%d > 32. Set `num_threads` manually to use more than"
-          " 32 threads.",
+          " os.cpu_count()=%d > 256. Set `num_threads` manually to use more"
+          " than 256 threads.",
           num_threads,
       )
-      num_threads = 32
+      num_threads = 256
   return num_threads

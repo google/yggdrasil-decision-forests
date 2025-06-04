@@ -236,9 +236,9 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
