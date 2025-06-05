@@ -224,6 +224,8 @@ AccumulatorDef GenAccumulatorDef(const proto::Options& options,
           UnsignedInteger(options.accumulator_precision_bytes());
     }
   } else {
+    // TODO: Make sure a winner-take-all multi-class random forest uses
+    // integer accumulators.
     accumulator_def.base_type = "float";
   }
 
@@ -304,7 +306,7 @@ absl::Status GenPredictionGBT(
   std::array<float,$0> probas;
   const float max_logit = *std::max_element(accumulator.begin(), accumulator.end());
   float sum_exps = 0.f;
-  for(int i=0;i<$0;i++){ probas[i] = std::exp(x - max_logit); sum_exps+= probas[i]; }
+  for(int i=0;i<$0;i++){ probas[i] = std::exp(accumulator[i] - max_logit); sum_exps += probas[i];}
   for(int i=0;i<$0;i++){ probas[i] /= sum_exps; }
   return probas;
 )",
@@ -351,8 +353,144 @@ absl::Status GenPredictionRF(
     const model::random_forest::RandomForestModel& model,
     const ModelStatistics& stats, const InternalOptions& internal_options,
     const proto::Options& options, std::string* content) {
-  absl::StrAppend(content, R"(return {};
-)");
+  const auto acc_def = GenAccumulatorDef(options, stats);
+
+  // Accumulator
+  // TODO: Handle coefficient.
+  absl::SubstituteAndAppend(content, "  $0 accumulator {0};\n", acc_def.type);
+
+  // Task / loss specifics.
+  std::string return_accumulator;
+  IfElseSetNodeFn set_node_fn;
+
+  switch (model.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      // Leaf setter
+      if (stats.internal_output_dim == 1) {
+        if (model.winner_take_all_inference()) {
+          set_node_fn =
+              [](const model::decision_tree::proto::Node& node, const int depth,
+                 const int tree_idx,
+                 absl::string_view prefix) -> absl::StatusOr<std::string> {
+            const int node_value = node.classifier().top_value();
+            if (node_value == 2) {
+              return absl::StrCat(prefix, "accumulator++;\n");
+            } else {
+              return "";
+            }
+          };
+        } else {
+          set_node_fn =
+              [&](const model::decision_tree::proto::Node& node,
+                  const int depth, const int tree_idx,
+                  absl::string_view prefix) -> absl::StatusOr<std::string> {
+            const float node_value =
+                node.classifier().distribution().counts(2) /
+                (node.classifier().distribution().sum() * model.NumTrees());
+            if (node_value == 0) {
+              return "";
+            } else {
+              return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+            }
+          };
+        }
+      } else {
+        if (model.winner_take_all_inference()) {
+          set_node_fn =
+              [&](const model::decision_tree::proto::Node& node,
+                  const int depth, const int tree_idx,
+                  absl::string_view prefix) -> absl::StatusOr<std::string> {
+            const int node_value = node.classifier().top_value() - 1;
+            return absl::StrCat(prefix, "accumulator[", node_value, "]++;\n");
+          };
+        } else {
+          set_node_fn =
+              [&](const model::decision_tree::proto::Node& node,
+                  const int depth, const int tree_idx,
+                  absl::string_view prefix) -> absl::StatusOr<std::string> {
+            std::string content;
+            for (int output_idx = 0; output_idx < stats.internal_output_dim;
+                 output_idx++) {
+              const float node_value =
+                  node.classifier().distribution().counts(output_idx + 1) /
+                  (node.classifier().distribution().sum() * model.NumTrees());
+              if (node_value != 0) {
+                absl::SubstituteAndAppend(&content,
+                                          "$0accumulator[$1] += $2;\n", prefix,
+                                          output_idx, node_value);
+              }
+            }
+            return content;
+          };
+        }
+      }
+      // Return accumulator
+      switch (options.classification_output()) {
+        case proto::ClassificationOutput::CLASS:
+          if (acc_def.use_array) {
+            absl::StrAppend(
+                &return_accumulator,
+                "  return std::distance(accumulator.begin(), "
+                "std::max_element(accumulator.begin(), accumulator.end()));\n");
+          } else {
+            absl::SubstituteAndAppend(&return_accumulator,
+                                      "  return accumulator >= $0;\n",
+                                      model.NumTrees() / 2);
+          }
+          break;
+        case proto::ClassificationOutput::SCORE:
+          absl::StrAppend(&return_accumulator, "  return accumulator;\n");
+          break;
+        case proto::ClassificationOutput::PROBABILITY:
+          if (model.winner_take_all_inference()) {
+            if (stats.internal_output_dim == 1) {
+              absl::SubstituteAndAppend(
+                  &return_accumulator,
+                  "return static_cast<float>(accumulator) / $0;\n",
+                  model.NumTrees());
+            } else {
+              absl::SubstituteAndAppend(&return_accumulator,
+                                        R"(
+  std::array<float,$0> probas;
+  for(int i=0;i<$0;i++){ probas[i] = static_cast<float>(accumulator[i]) / $1; }
+  return probas;
+)",
+                                        stats.internal_output_dim,
+                                        model.NumTrees());
+            }
+          } else {
+            absl::StrAppend(&return_accumulator, "return accumulator;\n");
+          }
+          break;
+      }
+    } break;
+
+    case model::proto::Task::REGRESSION:
+      absl::StrAppend(&return_accumulator, "  return accumulator;\n");
+      set_node_fn =
+          [&](const model::decision_tree::proto::Node& node, const int depth,
+              const int tree_idx,
+              absl::string_view prefix) -> absl::StatusOr<std::string> {
+        const float node_value =
+            node.regressor().top_value() / model.NumTrees();
+        return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+      };
+      break;
+
+    default:
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Non supported task: ", model::proto::Task_Name(model.task())));
+  }
+
+  // Accumulate leaf values
+  DCHECK_EQ(options.algorithm(), proto::Algorithm::IF_ELSE);
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElse(model.data_spec(), model, options,
+                                              internal_options, set_node_fn,
+                                              content));
+
+  // Accumulator to predictions.
+  absl::StrAppend(content, return_accumulator);
+
   return absl::OkStatus();
 }
 
@@ -535,6 +673,8 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
             out->output_type =
                 UnsignedInteger(MaxUnsignedValueToNumBytes(num_classes));
             out->include_algorithm = true;
+            out->include_array = true;
+            out->include_algorithm = true;
           }
           break;
         case proto::ClassificationOutput::SCORE: {
@@ -549,6 +689,7 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
             out->output_type = "float";
           } else {
             out->include_array = true;
+            out->include_algorithm = true;
             out->output_type =
                 absl::StrCat("std::array<float, ", num_classes, ">");
           }

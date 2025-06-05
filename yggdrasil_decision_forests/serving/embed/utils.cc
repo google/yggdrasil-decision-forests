@@ -30,8 +30,11 @@ namespace {
 
 // Replacement of characters with a string for feature names. Note that feature
 // names can only be: alpha numericals, _, and the values in kReplacements.
-const absl::flat_hash_map<char, std::string> kReplacements = {{'<', "Lt"},
-                                                              {'>', "Gt"}};
+const absl::flat_hash_map<char, std::string> kReplacements = {
+    {'<', "Lt"},
+    {'>', "Gt"},
+    {'.', "_"},
+};
 
 }  // namespace
 
