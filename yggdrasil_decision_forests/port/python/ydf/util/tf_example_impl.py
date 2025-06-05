@@ -164,6 +164,8 @@ def _read_shard(
 
       # Column with values for this example
       for key, value in example.features.feature.items():
+        dst_value = None
+        single_default_value = None
         if value.HasField("float_list"):
           dst_value = value.float_list.value
           single_default_value = math.nan
@@ -174,26 +176,34 @@ def _read_shard(
           dst_value = value.int64_list.value
           single_default_value = 0
         else:
-          raise ValueError(f"Unsupported value {value!r}")
+          pass  # Missing
 
-        dim = len(dst_value)
-        if dim == 0:
+        if not dst_value:
+          dst_value = None
           # Giving an empty array of values is equivalent to not giving the
           # value.
-          continue
 
-        if key not in local_data:
-          # This is a new column
-          default_value = [single_default_value] * dim
-          local_data[key] = (
-              [default_value] * local_num_examples,
-              ColumnSpec(
-                  default_value=default_value,
-                  dim=dim,
-              ),
-          )
+        if dst_value is None:
+          # Missing value
+          spec = local_data.get(key)
+          if spec is not None:
+            # A non-missing value was already observed for this column.
+            local_data[key][0].append(spec[1].default_value)
 
-        local_data[key][0].append(dst_value)
+        else:
+          if key not in local_data:
+            dim = len(dst_value)
+            # This is a new column
+            default_value = [single_default_value] * dim
+            local_data[key] = (
+                [default_value] * local_num_examples,
+                ColumnSpec(
+                    default_value=default_value,
+                    dim=dim,
+                ),
+            )
+
+          local_data[key][0].append(dst_value)
 
       local_num_examples += 1
 
@@ -412,6 +422,8 @@ def _dict_row_to_tf_example(
       dst_feature.bytes_list.value.append(values.encode("utf-8"))
     elif isinstance(values, bytes):
       dst_feature.bytes_list.value.append(values)
+    elif values is None:
+      pass  # Missing value
     else:
       raise ValueError(
           f"Unsupported value {values!r} of type {type(values)} for key {key!r}"
