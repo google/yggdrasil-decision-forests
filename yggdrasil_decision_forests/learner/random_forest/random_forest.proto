@@ -48,6 +48,14 @@ message RandomForestTrainingConfig {
   // models.
   optional bool winner_take_all_inference = 3 [default = true];
 
+  // Whether to use kernel-based tree weighting during aggregation.
+  //
+  // If true, tree predictions are raw class counts (unweighted). 
+  // If false (default), standard aggregation applies.
+  // This option only affects prediction (inference), not training.
+  optional bool kernel_method = 17 [default = true];
+
+
   // Computes and report the OOB performances of the model during training. The
   // added computing cost is relatively small.
   optional bool compute_oob_performances = 4 [default = true];

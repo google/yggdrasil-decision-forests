@@ -33,6 +33,13 @@ message Header {
   // Evaluation of the model, on the out-of-bag examples, during the training.
   repeated OutOfBagTrainingEvaluations out_of_bag_evaluations = 4;
 
+  // Whether to use kernel-based tree weighting during aggregation.
+  //
+  // If true, tree predictions are raw class counts (unweighted). 
+  // If false (default), standard aggregation applies.
+  // This option only affects prediction (inference), not training.
+  optional bool kernel_method = 17 [default = true];
+
   // Variable importance measures.
   repeated model.proto.VariableImportance mean_decrease_in_accuracy = 5;
   repeated model.proto.VariableImportance mean_increase_in_rmse = 6;
