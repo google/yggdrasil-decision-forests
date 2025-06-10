@@ -76,6 +76,16 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
 
+// Generic fallback NormalizeScore helper
+template <typename InitializerT>
+auto NormalizeScore(const InitializerT& initializer, double score)
+    -> decltype(initializer.NormalizeScore(score)) {
+  return initializer.NormalizeScore(score);
+}
+
+
+
+
 // TODO: Explain the expected signature of FeatureBucket and LabelBucket.
 template <typename FeatureBucket, typename LabelBucket>
 struct ExampleBucket {
@@ -662,13 +672,27 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE double Score(const Initializer& initializer,
   const double score_neg = neg.Score();
   const double score_pos = pos.Score();
 
+  // if constexpr (LabelScoreAccumulator::kNormalizeByWeight) {
+  //   const double ratio_pos = pos.WeightedNumExamples() / weighted_num_examples;
+  //   return initializer.NormalizeScore(score_pos * ratio_pos +
+  //                                     score_neg * (1. - ratio_pos));
+  // } else {
+  //   return initializer.NormalizeScore(score_pos + score_neg);
+  // }
+
+
   if constexpr (LabelScoreAccumulator::kNormalizeByWeight) {
     const double ratio_pos = pos.WeightedNumExamples() / weighted_num_examples;
-    return initializer.NormalizeScore(score_pos * ratio_pos +
+    return NormalizeScore(initializer,score_pos * ratio_pos +
                                       score_neg * (1. - ratio_pos));
   } else {
-    return initializer.NormalizeScore(score_pos + score_neg);
+    return NormalizeScore(initializer,score_pos + score_neg);
   }
+
+
+
+
+
 }
 
 // Scans the buckets iteratively. At each iteration evaluate the split that

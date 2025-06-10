@@ -76,6 +76,7 @@ proto::Header RandomForestModel::BuildHeaderProto() const {
   proto::Header header;
   header.set_num_trees(decision_trees_.size());
   header.set_winner_take_all_inference(winner_take_all_inference_);
+  header.set_kernel_method(kernel_method_);
   *header.mutable_out_of_bag_evaluations() = {out_of_bag_evaluations_.begin(),
                                               out_of_bag_evaluations_.end()};
   *header.mutable_mean_decrease_in_accuracy() = {
@@ -90,6 +91,7 @@ proto::Header RandomForestModel::BuildHeaderProto() const {
 
 void RandomForestModel::ApplyHeaderProto(const proto::Header& header) {
   winner_take_all_inference_ = header.winner_take_all_inference();
+  kernel_method_ = header.kernel_method();
   out_of_bag_evaluations_.assign(header.out_of_bag_evaluations().begin(),
                                  header.out_of_bag_evaluations().end());
   mean_decrease_in_accuracy_.assign(header.mean_decrease_in_accuracy().begin(),
@@ -382,12 +384,16 @@ void RandomForestModel::PredictClassification(
       data_spec_.columns(label_col_idx_)
           .categorical()
           .number_of_unique_values());
+
+  //CHECK(false) << "Reached RandomForestModel::PredictClassification";
+
   CallOnAllLeafs(dataset, row_idx,
                  [&accumulator, this](const decision_tree::proto::Node& node) {
                    internal::AddClassificationLeafToAccumulator(
-                       winner_take_all_inference_, node, &accumulator);
+                       winner_take_all_inference_, kernel_method_, node, &accumulator);
                  });
-  internal::FinalizeClassificationLeafToAccumulator(accumulator, prediction);
+  internal::FinalizeClassificationLeafToAccumulator(accumulator, prediction, kernel_method_);
+
 }
 
 void RandomForestModel::PredictRegression(
@@ -434,13 +440,14 @@ void RandomForestModel::PredictClassification(
       data_spec_.columns(label_col_idx_)
           .categorical()
           .number_of_unique_values());
+  std::cerr << "[DEBUG] Entered PredictClassification222222. kernel_method_: " << kernel_method_ << std::endl;
 
   CallOnAllLeafs(example,
                  [&accumulator, this](const decision_tree::proto::Node& node) {
                    internal::AddClassificationLeafToAccumulator(
-                       winner_take_all_inference_, node, &accumulator);
+                       winner_take_all_inference_, kernel_method_, node, &accumulator);
                  });
-  internal::FinalizeClassificationLeafToAccumulator(accumulator, prediction);
+  internal::FinalizeClassificationLeafToAccumulator(accumulator, prediction, kernel_method_);
 }
 
 void RandomForestModel::PredictRegression(
@@ -506,6 +513,13 @@ void RandomForestModel::AppendDescriptionAndStatistics(
     absl::SubstituteAndAppend(description, "Winner takes all: $0\n",
                               winner_take_all_inference_);
   }
+  
+
+  if (task() == model::proto::Task::CLASSIFICATION) {
+    absl::SubstituteAndAppend(description, "Kernel Method: $0\n",
+                              kernel_method_);
+  }
+  
 
   if (!out_of_bag_evaluations_.empty()) {
     absl::SubstituteAndAppend(description, "Out-of-bag evaluation: $0\n",
@@ -778,25 +792,69 @@ std::string EvaluationSnippet(
   }
 }
 
+// void AddClassificationLeafToAccumulator(
+//     const bool winner_take_all_inference,
+//     const decision_tree::proto::Node& node,
+//     utils::IntegerDistribution<float>* accumulator) {
+//   if (winner_take_all_inference) {
+//     accumulator->Add(node.classifier().top_value());
+//   } else {
+//     DCHECK(node.classifier().has_distribution());
+//     accumulator->AddNormalizedProto(node.classifier().distribution());
+//   }
+// }
+
 void AddClassificationLeafToAccumulator(
     const bool winner_take_all_inference,
+    const bool kernel_method,
     const decision_tree::proto::Node& node,
     utils::IntegerDistribution<float>* accumulator) {
   if (winner_take_all_inference) {
     accumulator->Add(node.classifier().top_value());
   } else {
     DCHECK(node.classifier().has_distribution());
-    accumulator->AddNormalizedProto(node.classifier().distribution());
+    if (kernel_method) {
+      accumulator->AddProto(node.classifier().distribution());
+    } else {
+      accumulator->AddNormalizedProto(node.classifier().distribution());
+    }
   }
 }
 
+
+
+// void FinalizeClassificationLeafToAccumulator(
+//     const utils::IntegerDistribution<float>& accumulator,
+//     model::proto::Prediction* prediction) {
+//   prediction->mutable_classification()->set_value(accumulator.TopClass());
+//   accumulator.Save(
+//       prediction->mutable_classification()->mutable_distribution());
+// }
+
 void FinalizeClassificationLeafToAccumulator(
-    const utils::IntegerDistribution<float>& accumulator,
-    model::proto::Prediction* prediction) {
+    utils::IntegerDistribution<float>& accumulator,
+    model::proto::Prediction* prediction,
+    bool kernel_method) {
+
+  if (kernel_method) {
+    //std::cerr << "[DEBUG] Sum BEFORE Normalize: " << accumulator.sum_ << std::endl;
+    accumulator.Normalize();  
+    //std::cerr << "[DEBUG] Sum AFTER Normalize: " << accumulator.sum_ << std::endl;
+    }
+
   prediction->mutable_classification()->set_value(accumulator.TopClass());
+
   accumulator.Save(
       prediction->mutable_classification()->mutable_distribution());
+  
+
+
 }
+
+
+
+
+
 
 void AddRegressionLeafToAccumulator(const decision_tree::proto::Node& node,
                                     double* accumulator) {
