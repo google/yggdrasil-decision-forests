@@ -151,8 +151,7 @@ TEST_P(NDCGLossTest, UpdateGradientsArbitraryLabels) {
   const NDCGLoss loss_imp(
       {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx=*/0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx=*/0, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
@@ -207,9 +206,8 @@ TEST(NDCGLossTest, UpdateGradientsIndicatorLabels) {
     std::vector<float> predictions = {1.f, 0.f, 1.f, 0.5f, 0.f};
     ASSERT_OK(internal::CreateGradientDataset(
         dataset,
-        /* label_col_idx=*/0,
-        /*hessian_splits=*/false, loss_imp_indicator,
-        &gradient_dataset_indicator, &gradients_indicator, &predictions));
+        /* label_col_idx=*/0, loss_imp_indicator, &gradient_dataset_indicator,
+        &gradients_indicator, &predictions));
     utils::RandomEngine random(1234);
     CHECK_OK(loss_imp_indicator.UpdateGradients(gradient_dataset_indicator,
                                                 /* label_col_idx=*/0,
@@ -220,8 +218,7 @@ TEST(NDCGLossTest, UpdateGradientsIndicatorLabels) {
     std::vector<float> predictions = {1.f, 0.f, 1.f, 0.5f, 0.f};
     ASSERT_OK(internal::CreateGradientDataset(
         dataset,
-        /* label_col_idx=*/0,
-        /*hessian_splits=*/false, loss_imp_no_indicator,
+        /* label_col_idx=*/0, loss_imp_no_indicator,
         &gradient_dataset_no_indicator, &gradients_no_indicator, &predictions));
     utils::RandomEngine random(1234);
     CHECK_OK(loss_imp_no_indicator.UpdateGradients(
@@ -254,8 +251,7 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
   const CrossEntropyNDCGLoss loss_imp(
       {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 0, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};

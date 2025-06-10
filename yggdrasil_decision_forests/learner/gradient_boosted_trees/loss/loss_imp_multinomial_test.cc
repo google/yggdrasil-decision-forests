@@ -117,8 +117,7 @@ TEST(MultinomialLogLikelihoodLossTest, UpdateGradients) {
        model::proto::Task::CLASSIFICATION,
        dataset.data_spec().columns(1)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 1,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 1, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
 

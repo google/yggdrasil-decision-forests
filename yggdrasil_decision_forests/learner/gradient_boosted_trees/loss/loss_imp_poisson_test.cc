@@ -174,8 +174,7 @@ TEST_P(PoissonLossTest, UpdateGradientsLabelColIdx) {
                                        dataset.data_spec().columns(0)}));
 
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, *loss_imp,
+                                            /* label_col_idx= */ 0, *loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
 
@@ -226,8 +225,7 @@ TEST_P(PoissonLossTest, UpdateGradientsPredictions) {
                                        dataset.data_spec().columns(0)}));
   std::vector<float> labels = {1.f, 2.f, 3.f, 4.f};
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, *loss_imp,
+                                            /* label_col_idx= */ 0, *loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   GradientDataRef compact_gradient(gradients.size());

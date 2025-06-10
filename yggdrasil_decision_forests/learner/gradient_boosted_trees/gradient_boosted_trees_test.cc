@@ -437,8 +437,7 @@ TEST(GradientBoostedTrees, CreateGradientDataset) {
                                    dataset.data_spec().columns(1), {}, {})
                             .value();
   CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 1,
-                                           /*hessian_splits=*/false, *loss_imp,
+                                           /* label_col_idx= */ 1, *loss_imp,
                                            &gradient_dataset, &gradients,
                                            &predictions));
   EXPECT_EQ(gradient_dataset.nrow(), 4);
@@ -1969,8 +1968,7 @@ TEST(DartPredictionAccumulator, Base) {
                  dataset.data_spec().columns(0), {}, {})
           .value();
   CHECK_OK(internal::CreateGradientDataset(dataset,
-                                           /* label_col_idx= */ 0,
-                                           /*hessian_splits=*/false, *loss_imp,
+                                           /* label_col_idx= */ 0, *loss_imp,
                                            &gradient_dataset, &gradients,
                                            &predictions));
   const auto initial_predictions =

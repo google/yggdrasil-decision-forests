@@ -1243,8 +1243,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   std::vector<float> sub_train_predictions;
   // Initialize the gradient dataset.
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      sub_train_dataset, config.train_config_link.label(),
-      config.gbt_config->use_hessian_gain(), *config.loss,
+      sub_train_dataset, config.train_config_link.label(), *config.loss,
       &gradient_sub_train_dataset, &gradients, &sub_train_predictions));
   // Note: At each iteration, one tree is created for each gradient dimensions.
   mdl->num_trees_per_iter_ = gradients.size();
@@ -1252,8 +1251,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   dataset::VerticalDataset gradient_validation_dataset;
   std::vector<float> validation_predictions;
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      validation_dataset, config.train_config_link.label(),
-      config.gbt_config->use_hessian_gain(), *config.loss,
+      validation_dataset, config.train_config_link.label(), *config.loss,
       &gradient_validation_dataset,
       /*gradients=*/nullptr, &validation_predictions));
 
@@ -2638,8 +2636,7 @@ LoadCompleteDatasetForWeakLearner(
                                       &complete_dataset->weights));
 
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      complete_dataset->dataset, config.train_config_link.label(),
-      config.gbt_config->use_hessian_gain(), *config.loss,
+      complete_dataset->dataset, config.train_config_link.label(), *config.loss,
       &complete_dataset->gradient_dataset,
       allocate_gradient ? &complete_dataset->gradients : nullptr,
       &complete_dataset->predictions));
@@ -2745,7 +2742,6 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
 
 absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
                                    const int label_col_idx,
-                                   const bool hessian_splits,
                                    const AbstractLoss& loss_impl,
                                    dataset::VerticalDataset* gradient_dataset,
                                    std::vector<GradientData>* gradients,

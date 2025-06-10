@@ -148,8 +148,7 @@ TEST_P(MeanAverageErrorLossWeightAndThreadingTest, UpdateGradients) {
   const MeanAverageErrorLoss loss_imp(
       {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 0, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   ASSERT_OK_AND_ASSIGN(

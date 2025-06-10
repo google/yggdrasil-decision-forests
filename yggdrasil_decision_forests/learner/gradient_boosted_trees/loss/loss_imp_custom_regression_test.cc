@@ -138,8 +138,7 @@ TEST(CustomRegressionLossTest, UpdateGradients) {
                                                CreateToyLoss()));
 
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, *loss_imp,
+                                            /* label_col_idx= */ 0, *loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   const std::vector<float> loss_initial_predictions = {1};

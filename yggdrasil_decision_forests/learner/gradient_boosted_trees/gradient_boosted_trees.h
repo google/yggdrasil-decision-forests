@@ -252,7 +252,7 @@ absl::Status ExtractValidationDataset(const dataset::VerticalDataset& dataset,
 //
 // "predictions" is initialized to contain the predictions.
 absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
-                                   int label_col_idx, bool hessian_splits,
+                                   int label_col_idx,
                                    const AbstractLoss& loss_impl,
                                    dataset::VerticalDataset* gradient_dataset,
                                    std::vector<GradientData>* gradients,
