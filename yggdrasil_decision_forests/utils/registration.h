@@ -48,6 +48,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "absl/base/no_destructor.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
@@ -139,9 +140,10 @@ class ClassPool {
  public:
   static std::vector<std::unique_ptr<AbstractCreator<Interface, Args...>>>*
   InternalGetItems() {
-    static std::vector<std::unique_ptr<AbstractCreator<Interface, Args...>>>
+    static absl::NoDestructor<
+        std::vector<std::unique_ptr<AbstractCreator<Interface, Args...>>>>
         items;
-    return &items;
+    return items.get();
   }
 
   static std::vector<std::string> GetNames() {
@@ -151,8 +153,8 @@ class ClassPool {
 
   static bool IsName(absl::string_view name) {
     utils::concurrency::MutexLock l(&registration_mutex);
-    auto& items = *InternalGetItems();
-    for (const auto& item : items) {
+    auto* items = InternalGetItems();
+    for (const auto& item : *items) {
       if (name == item->name()) {
         return true;
       }
@@ -163,8 +165,8 @@ class ClassPool {
   static absl::StatusOr<std::unique_ptr<Interface>> Create(
       absl::string_view name, Args... args) {
     utils::concurrency::MutexLock l(&registration_mutex);
-    auto& items = *InternalGetItems();
-    for (const auto& item : items) {
+    auto* items = InternalGetItems();
+    for (const auto& item : *items) {
       if (name != item->name()) {
         continue;
       }
@@ -181,8 +183,8 @@ class ClassPool {
  private:
   static std::vector<std::string> InternalGetNames() {
     std::vector<std::string> names;
-    auto& items = *InternalGetItems();
-    for (const auto& item : items) {
+    auto* items = InternalGetItems();
+    for (const auto& item : *items) {
       names.push_back(item->name());
     }
     return names;
