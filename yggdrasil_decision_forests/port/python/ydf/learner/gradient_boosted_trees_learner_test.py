@@ -541,9 +541,15 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
           label="l", task=generic_learner.Task.REGRESSION
       ).train(pd.DataFrame({"l": ["A", "B"], "f": [0, 1]}))
 
-  def test_shap_adult(self):
+  @parameterized.parameters(
+      ("LOCAL",),
+      ("BEST_FIRST_GLOBAL",),
+  )
+  def test_shap_adult(self, growing_strategy):
     model = specialized_learners.GradientBoostedTreesLearner(
-        label="income", num_trees=20
+        label="income",
+        num_trees=20,
+        growing_strategy=growing_strategy,
     ).train(self.adult.train_pd)
 
     shape_values, initial_values = model.predict_shap(self.adult.test_pd)

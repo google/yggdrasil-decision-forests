@@ -2976,6 +2976,79 @@ TEST(DecisionTree, MinNumExamplePerTreatment) {
   }
 }
 
+TEST(DecisionTree, NumPosTrainingExamplesLocalGrowth) {
+  const std::string ds_typed_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
+  dataset::proto::DataSpecification data_spec;
+  dataset::proto::DataSpecificationGuide guide;
+  dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
+
+  dataset::VerticalDataset train_dataset;
+  ASSERT_OK(LoadVerticalDataset(ds_typed_path, data_spec, &train_dataset));
+
+  std::vector<UnsignedExampleIdx> selected_examples(train_dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+
+  const std::vector<float> weights(train_dataset.nrow(), 1.f);
+
+  model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::CLASSIFICATION);
+  config.set_label("income");
+  config.add_features(".*");
+
+  const model::proto::DeploymentConfig deployment;
+
+  model::proto::TrainingConfigLinking config_link;
+  ASSERT_OK(
+      AbstractLearner::LinkTrainingConfig(config, data_spec, &config_link));
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_growing_strategy_local();
+
+  utils::RandomEngine random;
+  DecisionTree dt;
+  ASSERT_OK(Train(train_dataset, selected_examples, config, config_link,
+                  dt_config, deployment, weights, &random, &dt, {}));
+  ASSERT_TRUE(dt.root().node().has_num_pos_training_examples_without_weight());
+}
+
+TEST(DecisionTree, NumPosTrainingExamplesGlobalGrowth) {
+  const std::string ds_typed_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
+  dataset::proto::DataSpecification data_spec;
+  dataset::proto::DataSpecificationGuide guide;
+  dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
+
+  dataset::VerticalDataset train_dataset;
+  ASSERT_OK(LoadVerticalDataset(ds_typed_path, data_spec, &train_dataset));
+
+  std::vector<UnsignedExampleIdx> selected_examples(train_dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+
+  const std::vector<float> weights(train_dataset.nrow(), 1.f);
+
+  model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::CLASSIFICATION);
+  config.set_label("income");
+  config.add_features(".*");
+
+  const model::proto::DeploymentConfig deployment;
+
+  model::proto::TrainingConfigLinking config_link;
+  ASSERT_OK(
+      AbstractLearner::LinkTrainingConfig(config, data_spec, &config_link));
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.set_internal_error_on_wrong_splitter_statistics(true);
+  dt_config.mutable_growing_strategy_best_first_global();
+
+  utils::RandomEngine random;
+  DecisionTree dt;
+  ASSERT_OK(Train(train_dataset, selected_examples, config, config_link,
+                  dt_config, deployment, weights, &random, &dt, {}));
+  ASSERT_TRUE(dt.root().node().has_num_pos_training_examples_without_weight());
+}
+
 TEST(Monotonic, FindSplitLabelHessianRegressionFeatureNumericalCart) {
   std::vector<float> weights;
   const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};

@@ -4226,6 +4226,8 @@ absl::Status GrowTreeBestFirstGlobal(
   const auto ingest_node = [&](const SelectedExamplesRollingBuffer example_idxs,
                                NodeWithChildren* node,
                                const int depth) -> absl::Status {
+    node->mutable_node()->set_num_pos_training_examples_without_weight(
+        example_idxs.size());
     RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
         train_dataset, example_idxs.active, weights, config, config_link,
         node));
