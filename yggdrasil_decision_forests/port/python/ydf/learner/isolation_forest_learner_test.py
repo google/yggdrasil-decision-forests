@@ -74,7 +74,7 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
     ):
       _ = model.evaluate(
           self.gaussians.test,
-          evaluation_task=generic_learner.Task.CLASSIFICATION,
+          task=generic_learner.Task.CLASSIFICATION,
       )
 
   def test_gaussians_evaluation_with_label(self):
@@ -82,7 +82,7 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
     model = learner.train(self.gaussians.train)
     evaluation = model.evaluate(
         self.gaussians.test,
-        evaluation_task=generic_learner.Task.CLASSIFICATION,
+        task=generic_learner.Task.CLASSIFICATION,
     )
     self.assertSameElements(
         evaluation.to_dict().keys(),

@@ -402,7 +402,6 @@ class GenericJAXModel(generic_model.GenericModel):
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
       map_truncation: int = 5,
-      evaluation_task: Optional[generic_model.Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> metric_lib.Evaluation:
@@ -422,16 +421,6 @@ class GenericJAXModel(generic_model.GenericModel):
     if label is None:
       label = self.label()
     labels = []
-
-    # Warning about deprecation of "evaluation_task"
-    if evaluation_task is not None:
-      log.warning(
-          "The `evaluation_task` argument is deprecated. Use `task` instead.",
-          message_id=log.WarningMessage.DEPRECATED_EVALUATION_TASK,
-      )
-      if task is not None:
-        raise ValueError("Cannot specify both `task` and `evaluation_task`")
-      task = evaluation_task
 
     # TODO: Implement non-supported cases.
     if weighted is not None:

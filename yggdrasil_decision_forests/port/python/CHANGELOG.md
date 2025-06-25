@@ -2,10 +2,16 @@
 
 ## HEAD
 
+### API Changes
+
+-   `model.label()` returns None for models trained without label.
+-   Remove deprecated `evaluation_task` argument for `model.evaluate()`. Use 
+    `task` instead.
+
 ### Feature
 
-
 -   Expose Mean Average Precision for Ranking tasks.
+-   Clear error messages when attempting to evaluate models without label.
 
 ## 0.12.0 - 2025-05-20
 

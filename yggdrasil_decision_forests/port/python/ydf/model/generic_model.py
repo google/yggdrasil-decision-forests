@@ -549,7 +549,6 @@ Use `model.describe()` for more details
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
       map_truncation: int = 5,
-      evaluation_task: Optional[Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> metric.Evaluation:
@@ -575,8 +574,7 @@ Use `model.describe()` for more details
     ```
     evaluation = model.evaluate(test_ds)
     # If model is an anomaly detection model:
-    # evaluation = model.evaluate(test_ds,
-                                  evaluation_task=ydf.Task.CLASSIFICATION)
+    # evaluation = model.evaluate(test_ds, task=ydf.Task.CLASSIFICATION)
     evaluation
     ```
 
@@ -624,7 +622,6 @@ Use `model.describe()` for more details
         should be truncated. Default to 5. Ignored for non-ranking models.
       map_truncation: Controls at which ranking position the MAP metric loss
         should be truncated. Default to 5. Ignored for non-ranking models.
-      evaluation_task: Deprecated. Use `task` instead.
       use_slow_engine: If true, uses the slow engine for making predictions. The
         slow engine of YDF is an order of magnitude slower than the other
         prediction engines. There exist very rare edge cases where predictions
@@ -1626,22 +1623,11 @@ class GenericCCModel(GenericModel):
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
       map_truncation: int = 5,
-      evaluation_task: Optional[Task] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> metric.Evaluation:
     if num_threads is None:
       num_threads = concurrency.determine_optimal_num_threads(training=False)
-
-    # Warning about deprecation of "evaluation_task"
-    if evaluation_task is not None:
-      log.warning(
-          "The `evaluation_task` argument is deprecated. Use `task` instead.",
-          message_id=log.WarningMessage.DEPRECATED_EVALUATION_TASK,
-      )
-      if task is not None:
-        raise ValueError("Cannot specify both `task` and `evaluation_task`")
-      task = evaluation_task
 
     # Warning about change default value of "weighted")
     if weighted is None:
