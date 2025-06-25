@@ -440,9 +440,9 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -676,7 +676,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.RandomForestLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -952,9 +952,9 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -1100,7 +1100,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.IsolationForestLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -1652,9 +1652,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -1934,7 +1934,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.GradientBoostedTreesLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -2224,9 +2224,9 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -2376,7 +2376,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.DistributedGradientBoostedTreesLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -2777,9 +2777,9 @@ class CartLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -2993,7 +2993,7 @@ class CartLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.CartLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution

@@ -749,7 +749,7 @@ $8
 
     learner = ydf.$0(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
