@@ -305,6 +305,15 @@ class CARTLearnerTest(learner_test_utils.LearnerTest):
     self.assertEqual(evaluation.accuracy, 1)
     model.save(model_path)
 
+  def test_label_stored_in_model(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "my_label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.CartLearner(label="my_label").train(ds)
+    self.assertEqual(model.label_col_idx(), 0)
+    self.assertEqual(model.label(), "my_label")
+
 
 if __name__ == "__main__":
   absltest.main()

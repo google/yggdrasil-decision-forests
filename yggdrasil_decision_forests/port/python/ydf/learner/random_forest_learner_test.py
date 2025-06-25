@@ -846,6 +846,15 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
         row_sums, np.ones(predictions.shape[0]), decimal=5
     )
 
+  def test_label_stored_in_model(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "my_label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.RandomForestLearner(label="my_label").train(ds)
+    self.assertEqual(model.label_col_idx(), 0)
+    self.assertEqual(model.label(), "my_label")
+
 
 if __name__ == "__main__":
   absltest.main()

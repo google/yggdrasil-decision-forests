@@ -1240,6 +1240,10 @@ Use `model.describe()` for more details
 
   @abc.abstractmethod
   def label_col_idx(self) -> int:
+    """Returns the index of the label column in the dataspec or -1.
+
+    If the model has been trained without a label, returns -1.
+    """
     raise NotImplementedError
 
   @abc.abstractmethod
@@ -1326,8 +1330,16 @@ Use `model.describe()` for more details
 
     return [f.name for f in self.input_features()]
 
-  def label(self) -> str:
-    """Name of the label column."""
+  def label(self) -> Optional[str]:
+    """Name of the label column or None if the model has no label column."""
+    label_col_idx = self.label_col_idx()
+    if label_col_idx < -1:
+      raise ValueError(
+          f"Invalid label column index {label_col_idx}. This model might be"
+          " corrupted."
+      )
+    if label_col_idx == -1:
+      return None
     return self.data_spec().columns[self.label_col_idx()].name
 
   def label_classes(self) -> List[str]:

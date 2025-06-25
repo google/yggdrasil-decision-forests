@@ -216,6 +216,23 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
           class_weights={"a": 1.0, "b": 1.0, "c": 1.0},
       ).train(ds)
 
+  def test_no_label_in_training(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+    }
+    model = specialized_learners.IsolationForestLearner().train(ds)
+    self.assertEqual(model.label_col_idx(), -1)
+    self.assertIsNone(model.label())
+
+  def test_label_in_training(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.IsolationForestLearner(label="label").train(ds)
+    self.assertEqual(model.label_col_idx(), 0)
+    self.assertEqual(model.label(), "label")
+
 
 if __name__ == "__main__":
   absltest.main()

@@ -590,6 +590,17 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     )
     npt.assert_almost_equal(predictions, predictions_from_shap, decimal=5)
 
+  def test_label_stored_in_model(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="label"
+    ).train(ds)
+    self.assertEqual(model.label_col_idx(), 0)
+    self.assertEqual(model.label(), "label")
+
 
 if __name__ == "__main__":
   absltest.main()
