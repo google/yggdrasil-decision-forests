@@ -903,8 +903,8 @@ def to_jax_function(
       model, gradient_boosted_trees_model.GradientBoostedTreesModel
   ):
     raise ValueError(
-        "The YDF JAX convertor only support GBDT models. Instead, got model of"
-        f" type {type(model)}"
+        "The YDF JAX convertor only support Gradient Boosted Trees models."
+        f" Instead, got model of type {model.name()}"
     )
 
   forest = InternalForest(model)

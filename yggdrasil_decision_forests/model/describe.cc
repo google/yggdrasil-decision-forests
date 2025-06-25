@@ -82,6 +82,8 @@ utils::html::Html Model(const model::AbstractModel& model) {
   AddKeyValue(&content, "Task", proto::Task_Name(model.task()));
   if (model.has_label()) {
     AddKeyValue(&content, "Label", model.label());
+  } else {
+    AddKeyValue(&content, "No Label provided", "");
   }
 
   if (model.ranking_group_col_idx() != -1) {
@@ -119,10 +121,13 @@ utils::html::Html Model(const model::AbstractModel& model) {
 
   AddKeyValue(&content, "Trained with tuner", HasTuner(model) ? "Yes" : "No");
 
+  AddKeyValue(&content, "Trained with Feature Selection",
+              HasFeatureSelector(model) ? "Yes" : "No");
+
   if (const auto model_size = model.ModelSizeInBytes();
       model_size.has_value()) {
     AddKeyValue(&content, "Model size",
-                absl::StrCat(*model_size / 1000, " kB"));
+                absl::StrCat(*model_size / 1024, " kB"));
   }
 
   return content;
@@ -494,24 +499,27 @@ absl::StatusOr<utils::html::Html> Structure(const model::AbstractModel& model) {
     return content;
   }
 
-  // TODO: Plot the trees.
-  AddKeyValue(&content, "Num trees", absl::StrCat(df->num_trees()));
+  AddKeyValue(&content, "Number of trees", absl::StrCat(df->num_trees()));
 
-  const int max_trees = 1;
   const int num_trees = df->num_trees();
-  if (num_trees > max_trees) {
-    content.Append(h::P("Only printing the first tree."));
+
+  if (num_trees == 0) {
+    content.Append(h::P("This model does not contain any trees"));
+    return content;
+  }
+  if (num_trees > 1) {
+    content.Append(h::P(absl::Substitute(
+        "Below is the first tree of the model. The model "
+        "contains $0 trees, "
+        "which jointly make the prediction. Other trees can be printed with "
+        "`model.print_tree(tree_idx)` or plotted with "
+        "`model.plot_tree(tree_idx)`",
+        num_trees)));
   }
 
   std::string str_trees;
-  for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
-    if (tree_idx >= max_trees) {
-      break;
-    }
-    absl::StrAppend(&str_trees, "Tree #", tree_idx, ":\n");
-    df->decision_trees()[tree_idx]->AppendModelStructure(
-        model.data_spec(), model.label_col_idx(), &str_trees);
-  }
+  df->decision_trees()[0]->AppendModelStructure(
+      model.data_spec(), model.label_col_idx(), &str_trees);
   content.Append(h::Pre(h::Class("ydf_pre"), str_trees));
   return content;
 }

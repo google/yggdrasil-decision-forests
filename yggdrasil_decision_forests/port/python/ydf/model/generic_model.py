@@ -1828,6 +1828,13 @@ class GenericCCModel(GenericModel):
       feature_specs: Optional[Dict[str, Any]] = None,
       force: bool = False,
   ) -> None:
+
+    # TODO: Add tensorflow support for anomaly detection.
+    if self.task() == Task.ANOMALY_DETECTION:
+      raise ValueError(
+          "Anomaly Detection models are not yet supported for export to"
+          " Tensorflow."
+      )
     if mode == "keras":
       log.warning(
           "Calling `to_tensorflow_saved_model(mode='keras', ...)`. Use"
@@ -1859,6 +1866,13 @@ class GenericCCModel(GenericModel):
       squeeze_binary_classification: bool = True,
       force: bool = False,
   ) -> "tensorflow.Module":  # pylint: disable=undefined-variable
+
+    # TODO: Add tensorflow support for anomaly detection.
+    if self.task() == Task.ANOMALY_DETECTION:
+      raise ValueError(
+          "Anomaly Detection models are not yet supported for export to"
+          " Tensorflow."
+      )
     return _get_export_tf().ydf_model_to_tf_function(
         ydf_model=self,
         temp_dir=temp_dir,
