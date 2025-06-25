@@ -1670,6 +1670,20 @@ class GenericCCModel(GenericModel):
           message_id=log.WarningMessage.UNNECESSARY_LABEL_ARGUMENT,
       )
 
+    if self.label() is None:
+      if self.task() == Task.ANOMALY_DETECTION:
+        raise ValueError(
+            "This Anomaly Detection model has been trained without specifying"
+            " the label column during training. Set `label=` in the learner"
+            " before training to enable model evaluation. Alternatively, use"
+            " `ydf.evaluate_predictions()` to evaluate the model without"
+            " specifying a label.",
+        )
+      else:
+        raise ValueError(
+            "This model does not have a label and cannot be evaluated."
+        )
+
     if isinstance(bootstrapping, bool):
       bootstrapping_samples = 2000 if bootstrapping else -1
     elif isinstance(bootstrapping, int) and bootstrapping >= 100:

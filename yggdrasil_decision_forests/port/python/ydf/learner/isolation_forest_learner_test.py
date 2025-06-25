@@ -69,7 +69,8 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
     model = learner.train(self.gaussians.train_pd)
     with self.assertRaisesRegex(
         ValueError,
-        ".*A model cannot be evaluated without a label..*",
+        "This Anomaly Detection model has been trained without specifying the"
+        " label column during training.",
     ):
       _ = model.evaluate(
           self.gaussians.test,
