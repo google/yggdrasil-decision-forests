@@ -799,7 +799,7 @@ Use `model.describe()` for more details
       path: str,
       input_model_signature_fn: Any = None,
       *,
-      mode: Literal["keras", "tf"] = "keras",
+      mode: Literal["keras", "tf"] = "tf",
       feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
       servo_api: bool = False,
       feed_example_proto: bool = False,
@@ -1817,7 +1817,7 @@ class GenericCCModel(GenericModel):
       path: str,
       input_model_signature_fn: Any = None,
       *,
-      mode: Literal["keras", "tf"] = "keras",
+      mode: Literal["keras", "tf"] = "tf",
       feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
       servo_api: bool = False,
       feed_example_proto: bool = False,
@@ -1839,8 +1839,7 @@ class GenericCCModel(GenericModel):
       log.warning(
           "Calling `to_tensorflow_saved_model(mode='keras', ...)`. Use"
           " `to_tensorflow_saved_model(mode='tf', ...)` instead. mode='tf' is"
-          " more efficient, has better compatibility, and offers more options."
-          " Starting June 2024, `mode='tf'` will become the default value.",
+          " more efficient, has better compatibility, and offers more options.",
           message_id=log.WarningMessage.TO_TF_SAVED_MODEL_KERAS_MODE,
       )
 

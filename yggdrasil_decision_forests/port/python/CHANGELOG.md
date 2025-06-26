@@ -4,6 +4,8 @@
 
 ### API Changes
 
+-   `mode="tf"` is now the default on `model.to_tensorflow_saved_model()`. The
+    previous default is still available by setting `mode="keras"`.
 -   `model.label()` returns None for models trained without label.
 -   Remove deprecated `evaluation_task` argument for `model.evaluate()`. Use 
     `task` instead.

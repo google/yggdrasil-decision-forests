@@ -243,7 +243,7 @@ class TfModelTest(parameterized.TestCase):
     # Create the YDF model.
     ydf_model = model_lib.from_tensorflow_decision_forests(model_dir)
     # Convert the YDF model back to a TF-DF model and load it.
-    ydf_model.to_tensorflow_saved_model(new_model_dir)
+    ydf_model.to_tensorflow_saved_model(new_model_dir, mode="keras")
     new_tfdf_model = tf.keras.models.load_model(new_model_dir)
 
     # Check for prediction equality.
@@ -279,7 +279,7 @@ class TfModelTest(parameterized.TestCase):
     # Create the YDF model.
     ydf_model = model_lib.from_tensorflow_decision_forests(model_dir)
     # Convert the YDF model back to a TF-DF model and load it.
-    ydf_model.to_tensorflow_saved_model(new_model_dir)
+    ydf_model.to_tensorflow_saved_model(new_model_dir, mode="keras")
     new_tfdf_model = tf.keras.models.load_model(new_model_dir)
 
     # Prepare the test dataset for the loaded model: Categorical integer
@@ -322,7 +322,7 @@ class TfModelTest(parameterized.TestCase):
     #
     # This is referred as the "predict" API.
     path_wo_signature = os.path.join(tempdir, "mdl")
-    ydf_model.to_tensorflow_saved_model(path_wo_signature)
+    ydf_model.to_tensorflow_saved_model(path_wo_signature, mode="keras")
 
     # Load the model, and add a serialized tensorflow examples protobuffer
     # input signature. In other words, the model expects as input a serialized
