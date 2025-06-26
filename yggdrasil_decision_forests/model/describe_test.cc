@@ -48,7 +48,7 @@ TEST(Describe, GBT) {
       html,
       "yggdrasil_decision_forests/test_data/"
       "golden/describe_gbt.html.expected",
-      {{"MODEL_SIZE", absl::StrCat(*model_size / 1000, " kB")}});
+      {{"MODEL_SIZE", absl::StrCat(*model_size / 1024, " kB")}});
 }
 
 TEST(Describe, RF) {
@@ -64,7 +64,7 @@ TEST(Describe, RF) {
       html,
       "yggdrasil_decision_forests/test_data/"
       "golden/describe_rf.html.expected",
-      {{"MODEL_SIZE", absl::StrCat(*model_size / 1000, " kB")}});
+      {{"MODEL_SIZE", absl::StrCat(*model_size / 1024, " kB")}});
 }
 
 TEST(Describe, TunedGBT) {
@@ -79,7 +79,7 @@ TEST(Describe, TunedGBT) {
       html,
       "yggdrasil_decision_forests/test_data/"
       "golden/describe_gbt_tuned.html.expected",
-      {{"MODEL_SIZE", absl::StrCat(*model_size / 1000, " kB")}});
+      {{"MODEL_SIZE", absl::StrCat(*model_size / 1024, " kB")}});
 }
 
 }  // namespace
