@@ -363,6 +363,11 @@ absl::Status FillDiscretizedNumericalAccumulatorPartial(
       common.dataset->InOrderDiscretizedNumericalFeatureValueIterator(
           feature, begin_idx, end_idx));
 
+  DCHECK_LT(begin_idx, common.dataset->num_examples());
+  DCHECK_LE(end_idx, common.dataset->num_examples());
+  DCHECK_LT(begin_idx, common.example_to_node.size());
+  DCHECK_LE(end_idx, common.example_to_node.size());
+
   const auto has_multiple_node_idxs = common.has_multiple_node_idxs_;
 
   ExampleIndex example_idx = begin_idx;
@@ -1103,12 +1108,18 @@ TemplatedFindBestSplitsWithDiscretizedNumericalFeatureMultiThreading(
           example_bucket_set_per_node.front();
     }
 
+    DCHECK_EQ(common.dataset->num_examples(), common.example_to_node.size());
+
     size_t begin_idx = 0;
     const auto block_size =
         (common.dataset->num_examples() + num_threads - 1) / num_threads;
     for (int thread_idx = 0; thread_idx < num_threads; thread_idx++) {
       const auto end_idx =
           std::min(begin_idx + block_size, common.dataset->num_examples());
+
+      if (begin_idx >= end_idx) {
+        continue;
+      }
 
       thread_pool.Schedule([&common, &feature, &is_target_node, &label_filler,
                             &example_bucket_set_per_node,
