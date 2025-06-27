@@ -19,7 +19,6 @@
 #include <array>
 #include <cstdint>
 #include <functional>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -51,35 +50,49 @@ namespace internal {
 struct ModelStatistics {
   // Number of trees.
   int64_t num_trees = 0;
+
   // Number of leaves.
   int64_t num_leaves = 0;
+
+  // Number of conditions.
+  int64_t num_conditions = 0;
+
   // Maximum number of leaves among all the trees.
   int64_t max_num_leaves_per_tree = 0;
+
   // Maximum depth. max_depth=0 indicates that the tree contains a single node.
   int64_t max_depth = 0;
+
   // Number of input features.
   int num_features = 0;
-  // Number of outputs of the forest i.e., before any possibly reduction by the
-  // compiled model. For instance, a 3 classes classification model will have
-  // "internal_output_dim=3".
-  int internal_output_dim = 0;
-  // Are individual trees returning multidimensional outputs.
-  bool multi_dim_tree = false;
 
-  // If the individual trees can output a negative value.
-  bool leaf_output_is_signed = true;
+  // Task solved by the model.
+  model::proto::Task task = model::proto::Task::UNDEFINED;
 
-  // Maximum of the absolute value of the node outputs over all the trees and
-  // nodes.
-  double max_abs_output = 0;
-
-  // Sum over all the trees, of the maximum absolute values over all the
-  // nodes.
-  double sum_max_abs_output = 0;
+  // Number of label classes in the case of classification.
+  int num_classification_classes = -1;
 
   // Which conditions are used by the model.
   std::array<bool, model::decision_tree::kNumConditionTypes + 1> has_conditions{
       false};
+
+  bool is_classification() const {
+    return task == model::proto::Task::CLASSIFICATION;
+  }
+
+  bool is_binary_classification() const {
+    return is_classification() && num_classification_classes == 2;
+  }
+};
+
+// C++ headers to include in the generated source code.
+struct Includes {
+  // <array> include.
+  bool array = false;
+  // <algorithm> include.
+  bool algorithm = false;
+  // <cmath> include.
+  bool cmath = false;
 };
 
 // Specific options for the generation of the model.
@@ -88,36 +101,34 @@ struct ModelStatistics {
 // internal options are computed using the user provided options (simply called
 // "options" in the code) and the model.
 struct InternalOptions {
-  // Number of bits to encode a fixed-size feature.
+  // Number of bytes to encode a fixed-size feature.
   // Note: Currently, all the fixed-size features are encoded with the same
   // precision (e.g. all the numerical and categorical values are encoded with
-  // the same number of bits). Can be 1, 2, or 4.
+  // the same number of bytes). Can be 1, 2, or 4.
   int feature_value_bytes = 0;
 
   // If the numerical features are encoded as float. In this case
-  // feature_value_bits=4 (currently). If false, numerical features are encoded
+  // feature_value_bytes=4 (currently). If false, numerical features are encoded
   // as ints, and "feature_value_bytes" specify the precision.
   bool numerical_feature_is_float = false;
+
+  // Number of bytes to encode a feature index.
+  int feature_index_bytes = 0;
+
+  // Number of bytes to encode a tree index.
+  int tree_index_bytes;
+
+  // Number of bytes to encode a node index.
+  int node_index_bytes;
+
+  // Number of bytes to encode a node index withing a tree.
+  int node_offset_bytes;
 
   // The type returned by the prediction function.
   std::string output_type;
 
-  // Type of the accumulator to accumulate the leaf values.
-  std::string accumulator_type;
-
-  // Type of the leaf values.
-  std::string leaf_value_type;
-
-  // If true, the model requires the <array> include.
-  bool include_array = false;
-  // If true, the model requires the <algorithm> include.
-  bool include_algorithm = false;
-  // If true, the model requires the <cmath> include.
-  bool include_cmath = false;
-
-  // Coefficient applied on the numerical leaf values. Only use when
-  // "integerize_output=true" and if the tree leaves contain numerical values.
-  std::optional<double> coefficient;
+  // C++ includes.
+  Includes includes;
 
   // Mapping between column idx of a categorical-string column, to the sanitized
   // dictionary of possible values.
@@ -132,6 +143,39 @@ struct InternalOptions {
   absl::btree_map<int, CategoricalDict> categorical_dicts;
 };
 
+// Generates the tree inference code using the if-else algorithm.
+typedef std::function<absl::StatusOr<std::string>(
+    const model::decision_tree::proto::Node& noden, int depth, int tree_idx,
+    absl::string_view prefix)>
+    IfElseSetNodeFn;
+
+// Specification of the leaf values.
+struct LeafValueSpec {
+  proto::DType::Enum dtype = proto::DType::UNDEFINED;
+  int dims = 0;
+};
+
+// Constants and functions specific to certain decision forest models.
+struct SpecializedConversion {
+  std::string accumulator_type;
+  std::string accumulator_initial_value;
+  std::string return_prediction;
+  LeafValueSpec leaf_value_spec;
+  IfElseSetNodeFn set_node_ifelse_fn;
+};
+
+absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
+    const model::random_forest::RandomForestModel& model,
+    const internal::ModelStatistics& stats,
+    const internal::InternalOptions& internal_options,
+    const proto::Options& options);
+
+absl::StatusOr<SpecializedConversion> SpecializedConversionGradientBoostedTrees(
+    const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
+    const internal::ModelStatistics& stats,
+    const internal::InternalOptions& internal_options,
+    const proto::Options& options);
+
 // Computes the internal options of the model.
 absl::StatusOr<InternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
@@ -139,13 +183,13 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
     const ModelStatistics& stats, const proto::Options& options);
 
 // Populates the feature parts of the internal option.
-absl::Status ComputeInternalOptionsFeature(const model::AbstractModel& model,
+absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
+                                           const model::AbstractModel& model,
                                            const proto::Options& options,
                                            InternalOptions* out);
 
 // Populates the output parts of the internal option.
-absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
-                                          const ModelStatistics& stats,
+absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
                                           const proto::Options& options,
                                           InternalOptions* out);
 
@@ -169,17 +213,12 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
     const internal::InternalOptions& internal_options);
 
-// Generation of the prediction code for a GBT model.
-absl::Status GenPredictionGBT(
-    const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
-    const ModelStatistics& stats, const InternalOptions& internal_options,
-    const proto::Options& options, std::string* content);
-
-// Generation of the prediction code for a RF model.
-absl::Status GenPredictionRF(
-    const model::random_forest::RandomForestModel& model,
-    const ModelStatistics& stats, const InternalOptions& internal_options,
-    const proto::Options& options, std::string* content);
+absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
+                         const model::DecisionForestInterface& df_interface,
+                         const SpecializedConversion& specialized_conversion,
+                         const ModelStatistics& stats,
+                         const InternalOptions& internal_options,
+                         const proto::Options& options, std::string* content);
 
 // The scalar type of an accumulator.
 struct AccumulatorDef {
@@ -190,17 +229,23 @@ struct AccumulatorDef {
 AccumulatorDef GenAccumulatorDef(const proto::Options& options,
                                  const ModelStatistics& stats);
 
-// Generates the tree inference code using the if-else algorithm.
-typedef std::function<absl::StatusOr<std::string>(
-    const model::decision_tree::proto::Node& noden, int depth, int tree_idx,
-    absl::string_view prefix)>
-    IfElseSetNodeFn;
-
 absl::Status GenerateTreeInferenceIfElse(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
     const proto::Options& options, const InternalOptions& internal_options,
-    const IfElseSetNodeFn& set_node_fn, std::string* content);
+    const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content);
+
+absl::Status GenerateTreeInferenceRouting(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const proto::Options& options, const InternalOptions& internal_options,
+    const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content);
+
+absl::Status GenRoutingModelData(
+    const ModelStatistics& stats,
+    const SpecializedConversion& specialized_conversion,
+    const proto::Options& options, const InternalOptions& internal_options,
+    std::string* content);
 
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed

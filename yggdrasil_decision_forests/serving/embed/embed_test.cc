@@ -27,6 +27,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -146,7 +147,7 @@ TEST(Embed, AdultBinaryGBTProbability) {
           model.get());
   model_gbt->mutable_decision_trees()->resize(3);
   proto::Options options;
-  options.set_classification_output(proto::ClassificationOutput::SCORE);
+  options.set_classification_output(proto::ClassificationOutput::PROBABILITY);
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
   EXPECT_EQ(embed.size(), 1);
   EXPECT_TRUE(embed.contains("my_model.h"));
@@ -155,6 +156,27 @@ TEST(Embed, AdultBinaryGBTProbability) {
       embed.at("my_model.h"),
       "yggdrasil_decision_forests/test_data/"
       "golden/embed/adult_binary_class_gbdt_v2_probability.h.golden");
+}
+
+TEST(Embed, AdultBinaryGBTProbabilityRouting) {
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
+                                             TestDataDir(), "model",
+                                             "adult_binary_class_gbdt_v2")));
+  auto model_gbt =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model.get());
+  model_gbt->mutable_decision_trees()->resize(3);
+  proto::Options options;
+  options.set_classification_output(proto::ClassificationOutput::PROBABILITY);
+  options.set_algorithm(proto::Algorithm::ROUTING);
+  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
+  EXPECT_EQ(embed.size(), 1);
+  EXPECT_TRUE(embed.contains("my_model.h"));
+
+  test::ExpectEqualGolden(
+      embed.at("my_model.h"),
+      "yggdrasil_decision_forests/test_data/"
+      "golden/embed/adult_binary_class_gbdt_v2_probability_routing.h.golden");
 }
 
 TEST(Process, ManualBinaryGBT) {
@@ -171,12 +193,11 @@ TEST(Process, ManualBinaryGBT) {
   EXPECT_EQ(stats.num_leaves, 6);
   EXPECT_EQ(stats.max_num_leaves_per_tree, 4);
   EXPECT_EQ(stats.max_depth, 3);
-  EXPECT_EQ(stats.internal_output_dim, 1);
-  EXPECT_EQ(stats.multi_dim_tree, false);
-  EXPECT_EQ(stats.leaf_output_is_signed, true);
-
-  EXPECT_EQ(stats.max_abs_output, 6);
-  EXPECT_EQ(stats.sum_max_abs_output, 6 + 4);
+  EXPECT_TRUE(stats.is_classification());
+  EXPECT_TRUE(stats.is_binary_classification());
+  EXPECT_EQ(stats.num_classification_classes, 2);
+  EXPECT_EQ(stats.num_conditions, 4);
+  EXPECT_EQ(stats.task, model::proto::Task::CLASSIFICATION);
 
   EXPECT_TRUE(stats.has_conditions
                   [model::decision_tree::proto::Condition::kHigherCondition]);
@@ -203,6 +224,11 @@ TEST(Process, ManualBinaryGBT) {
   EXPECT_EQ(internal_options.categorical_dicts.at(2).is_label, false);
   EXPECT_THAT(internal_options.categorical_dicts.at(2).sanitized_items,
               testing::ElementsAre("OutOfVocabulary", "X", "Y", "Z"));
+
+  EXPECT_EQ(internal_options.feature_index_bytes, 1);
+  EXPECT_EQ(internal_options.tree_index_bytes, 1);
+  EXPECT_EQ(internal_options.node_index_bytes, 1);
+  EXPECT_EQ(internal_options.node_offset_bytes, 1);
 }
 
 TEST(Process, RealBinaryGBT) {
@@ -220,15 +246,20 @@ TEST(Process, RealBinaryGBT) {
   EXPECT_EQ(stats.num_leaves, 4476);
   EXPECT_EQ(stats.max_num_leaves_per_tree, 32);
   EXPECT_EQ(stats.max_depth, 5);
-  EXPECT_EQ(stats.internal_output_dim, 1);
-  EXPECT_EQ(stats.multi_dim_tree, false);
-  EXPECT_EQ(stats.leaf_output_is_signed, true);
+  EXPECT_TRUE(stats.is_classification());
+  EXPECT_TRUE(stats.is_binary_classification());
+  EXPECT_EQ(stats.num_classification_classes, 2);
 
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
       internal::ComputeInternalOptions(*model, *df, stats, {}));
   EXPECT_EQ(internal_options.feature_value_bytes, 4);
   EXPECT_EQ(internal_options.numerical_feature_is_float, false);
+
+  EXPECT_EQ(internal_options.feature_index_bytes, 1);
+  EXPECT_EQ(internal_options.tree_index_bytes, 1);
+  EXPECT_EQ(internal_options.node_index_bytes, 2);
+  EXPECT_EQ(internal_options.node_offset_bytes, 1);
 }
 
 TEST(Process, RealMultiClassGBT) {
@@ -246,9 +277,9 @@ TEST(Process, RealMultiClassGBT) {
   EXPECT_EQ(stats.num_leaves, 611);
   EXPECT_EQ(stats.max_num_leaves_per_tree, 17);
   EXPECT_EQ(stats.max_depth, 5);
-  EXPECT_EQ(stats.internal_output_dim, 3);
-  EXPECT_EQ(stats.multi_dim_tree, false);
-  EXPECT_EQ(stats.leaf_output_is_signed, true);
+  EXPECT_TRUE(stats.is_classification());
+  EXPECT_FALSE(stats.is_binary_classification());
+  EXPECT_EQ(stats.num_classification_classes, 3);
 
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
@@ -258,8 +289,6 @@ TEST(Process, RealMultiClassGBT) {
 }
 
 struct ComputeInternalOptionsOutputCase {
-  model::proto::Task task;
-  dataset::proto::Column label_column;
   proto::Options options;
   internal::ModelStatistics stats;
   std::string expected_output_type;
@@ -269,93 +298,49 @@ SIMPLE_PARAMETERIZED_TEST(
     ComputeInternalOptionsOutput, ComputeInternalOptionsOutputCase,
     {
         // Classification + class
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 3 })pb"),
-         {},
-         {.internal_output_dim = 1},
+        {{},
+         {.task = model::proto::Task::CLASSIFICATION,
+          .num_classification_classes = 2},
          "bool"},
 
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 5 })pb"),
-         {},
-         {.internal_output_dim = 4},
+        {{},
+         {.task = model::proto::Task::CLASSIFICATION,
+          .num_classification_classes = 4},
          "uint8_t"},
 
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(
-             R"pb(type: CATEGORICAL
-                  categorical { number_of_unique_values: 300 })pb"),
-         {},
-         {.internal_output_dim = 299},
+        {{},
+         {.task = model::proto::Task::CLASSIFICATION,
+          .num_classification_classes = 299},
          "uint16_t"},
 
         // Classification + score
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 3 })pb"),
-         PARSE_TEST_PROTO("classification_output: SCORE"),
-         {.internal_output_dim = 1},
-         "float"},
-
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 5 })pb"),
-         PARSE_TEST_PROTO("classification_output: SCORE"),
-         {.internal_output_dim = 4},
-         "std::array<float, 4>"},
-
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 3 })pb"),
-         PARSE_TEST_PROTO("classification_output:SCORE integerize_output:true"),
-         {.internal_output_dim = 1},
-         "int16_t"},
-
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 5 })pb"),
-         PARSE_TEST_PROTO("classification_output:SCORE integerize_output:true"),
-         {.internal_output_dim = 4},
-         "std::array<int16_t, 4>"},
+        {PARSE_TEST_PROTO("classification_output: SCORE"),
+         {.task = model::proto::Task::CLASSIFICATION,
+          .num_classification_classes = 2},
+         ""},
 
         // Classification + probability
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 3 })pb"),
-         PARSE_TEST_PROTO("classification_output:PROBABILITY"),
-         {.internal_output_dim = 1},
+        {PARSE_TEST_PROTO("classification_output:PROBABILITY"),
+         {.task = model::proto::Task::CLASSIFICATION,
+          .num_classification_classes = 2},
          "float"},
 
-        {model::proto::Task::CLASSIFICATION,
-         PARSE_TEST_PROTO(R"pb(type: CATEGORICAL
-                               categorical { number_of_unique_values: 5 })pb"),
-         PARSE_TEST_PROTO("classification_output:PROBABILITY"),
-         {.internal_output_dim = 4},
+        {PARSE_TEST_PROTO("classification_output:PROBABILITY"),
+         {.task = model::proto::Task::CLASSIFICATION,
+          .num_classification_classes = 4},
          "std::array<float, 4>"},
 
         // Regression
-        {model::proto::Task::REGRESSION,
-         PARSE_TEST_PROTO(R"pb(type: NUMERICAL)pb"),
-         {},
-         {.internal_output_dim = 1},
-         "float"},
+        {{}, {.task = model::proto::Task::REGRESSION}, "float"},
 
-        {model::proto::Task::REGRESSION,
-         PARSE_TEST_PROTO(R"pb(type: NUMERICAL)pb"),
-         PARSE_TEST_PROTO("integerize_output:true"),
-         {.internal_output_dim = 1},
+        {PARSE_TEST_PROTO("integerize_output:true"),
+         {.task = model::proto::Task::REGRESSION},
          "int16_t"},
     }) {
   const auto& test_case = GetParam();
-  auto model = BuildToyTestData().model;
-  model->set_task(test_case.task);
-  *model->mutable_data_spec()->mutable_columns(model->label_col_idx()) =
-      test_case.label_column;
   internal::InternalOptions internal_options;
   ASSERT_OK(internal::ComputeInternalOptionsOutput(
-      *model, test_case.stats, test_case.options, &internal_options));
+      test_case.stats, test_case.options, &internal_options));
   EXPECT_EQ(internal_options.output_type, test_case.expected_output_type);
 }
 

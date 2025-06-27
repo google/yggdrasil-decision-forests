@@ -8,6 +8,7 @@
 namespace my_model {
 
 constexpr const int kNumFeatures = 14;
+constexpr const int kNumTrees = 3;
 
 struct Instance {
   int32_t age;

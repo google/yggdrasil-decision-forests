@@ -20,6 +20,7 @@
 #include <string>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -63,13 +64,6 @@ absl::Status CheckFeatureName(absl::string_view value) {
     }
   }
   return absl::OkStatus();
-}
-
-std::string UnsignedInteger(int bytes) {
-  return absl::StrCat("uint", bytes * 8, "_t");
-}
-std::string SignedInteger(int bytes) {
-  return absl::StrCat("int", bytes * 8, "_t");
 }
 
 // Converts any string into a snake case symbol.
@@ -202,17 +196,61 @@ int MaxSignedValueToNumBytes(int32_t value) {
   }
 }
 
+std::string UnsignedInteger(int bytes) {
+  return absl::StrCat("uint", bytes * 8, "_t");
+}
+std::string SignedInteger(int bytes) {
+  return absl::StrCat("int", bytes * 8, "_t");
+}
+
 std::string DTypeToCCType(const proto::DType::Enum value) {
   switch (value) {
+    case proto::DType::UNDEFINED:
+      DCHECK(false);
+      return "UNDEFINED";
+
     case proto::DType::INT8:
       return "int8_t";
     case proto::DType::INT16:
       return "int16_t";
     case proto::DType::INT32:
       return "int32_t";
+
+    case proto::DType::UINT8:
+      return "uint8_t";
+    case proto::DType::UINT16:
+      return "uint16_t";
+    case proto::DType::UINT32:
+      return "uint32_t";
+
     case proto::DType::FLOAT32:
       return "float";
+
+    case proto::DType::BOOL:
+      return "bool";
   }
+}
+
+proto::DType::Enum UnsignedIntegerToDtype(int bytes) {
+  switch (bytes) {
+    case 1:
+      return proto::DType::UINT8;
+    case 2:
+      return proto::DType::UINT16;
+    case 4:
+      return proto::DType::UINT32;
+    default:
+      DCHECK(false);
+      return proto::DType::UNDEFINED;
+  }
+}
+
+int NumLeavesToNumNodes(int num_leaves) {
+  DCHECK_GE(num_leaves, 0);
+  if (num_leaves == 0) {
+    return 0;
+  }
+  return 2 * num_leaves - 1;
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed

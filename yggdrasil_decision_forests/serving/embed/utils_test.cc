@@ -97,5 +97,18 @@ TEST(Embed, DTypeToCCType) {
   EXPECT_EQ(DTypeToCCType(proto::DType::FLOAT32), "float");
 }
 
+TEST(Embed, NumLeavesToNumNodes) {
+  EXPECT_EQ(NumLeavesToNumNodes(0), 0);
+  EXPECT_EQ(NumLeavesToNumNodes(1), 1);
+  EXPECT_EQ(NumLeavesToNumNodes(2), 3);
+  EXPECT_EQ(NumLeavesToNumNodes(3), 5);
+}
+
+TEST(Embed, UnsignedIntegerToDtype) {
+  EXPECT_EQ(UnsignedIntegerToDtype(1), proto::DType::UINT8);
+  EXPECT_EQ(UnsignedIntegerToDtype(2), proto::DType::UINT16);
+  EXPECT_EQ(UnsignedIntegerToDtype(4), proto::DType::UINT32);
+}
+
 }  // namespace
 }  // namespace yggdrasil_decision_forests::serving::embed

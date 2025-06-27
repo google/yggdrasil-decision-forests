@@ -16,10 +16,9 @@
 #include "yggdrasil_decision_forests/serving/embed/embed.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <functional>
-#include <optional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -53,16 +52,18 @@ constexpr absl::string_view kLabelReservedSymbol = "Label";
 // label).
 absl::StatusOr<std::string> GenInstanceStruct(
     const model::AbstractModel& model, const proto::Options& options,
-    const internal::InternalOptions& internal_options) {
+    const internal::InternalOptions& internal_options,
+    const internal::ModelStatistics& stats) {
   std::string content;
 
   // Start
   absl::SubstituteAndAppend(&content, R"(
 constexpr const int kNumFeatures = $0;
+constexpr const int kNumTrees = $1;
 
 struct Instance {
 )",
-                            model.input_features().size());
+                            model.input_features().size(), stats.num_trees);
 
   for (const auto input_feature : model.input_features()) {
     const auto& col = model.data_spec().columns(input_feature);
@@ -118,6 +119,7 @@ struct $0$1 {
 
 absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
     const model::AbstractModel& model, const proto::Options& options) {
+  // Make sure the model is a decision forest.
   const auto* df_interface =
       dynamic_cast<const model::DecisionForestInterface*>(&model);
   if (!df_interface) {
@@ -125,6 +127,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
         "The model is not a decision forest model.");
   }
 
+  // Check names.
   RETURN_IF_ERROR(CheckModelName(options.name()));
   for (const auto& column_idx : model.input_features()) {
     RETURN_IF_ERROR(
@@ -138,8 +141,36 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
       const internal::InternalOptions internal_options,
       internal::ComputeInternalOptions(model, *df_interface, stats, options));
 
-  absl::node_hash_map<Filename, Content> result;
+  // Implementation specific specialization.
+  internal::SpecializedConversion specialized_conversion;
+  {
+    const auto* model_gbt = dynamic_cast<
+        const model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+        &model);
+    const auto* model_rf =
+        dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
+    if (model_gbt) {
+      ASSIGN_OR_RETURN(specialized_conversion,
+                       internal::SpecializedConversionGradientBoostedTrees(
+                           *model_gbt, stats, internal_options, options));
+    } else if (model_rf) {
+      ASSIGN_OR_RETURN(specialized_conversion,
+                       internal::SpecializedConversionRandomForest(
+                           *model_rf, stats, internal_options, options));
+    } else {
+      return absl::InvalidArgumentError("The model type is not supported.");
+    }
+    STATUS_CHECK(!specialized_conversion.accumulator_type.empty());
+    STATUS_CHECK(!specialized_conversion.accumulator_initial_value.empty());
+    STATUS_CHECK(!specialized_conversion.return_prediction.empty());
+    STATUS_CHECK(!specialized_conversion.accumulator_type.empty());
+    STATUS_CHECK_GT(specialized_conversion.leaf_value_spec.dims, 0);
+    STATUS_CHECK_NE(specialized_conversion.leaf_value_spec.dtype,
+                    proto::DType::UNDEFINED);
+  }
 
+  // Generate the code.
+  absl::node_hash_map<Filename, Content> result;
   std::string header;
 
   // Open define and namespace.
@@ -150,13 +181,13 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
 )",
                             StringToConstantSymbol(options.name()));
 
-  if (internal_options.include_array) {
+  if (internal_options.includes.array) {
     absl::StrAppend(&header, "#include <array>\n");
   }
-  if (internal_options.include_algorithm) {
+  if (internal_options.includes.algorithm) {
     absl::StrAppend(&header, "#include <algorithm>\n");
   }
-  if (internal_options.include_cmath) {
+  if (internal_options.includes.cmath) {
     absl::StrAppend(&header, "#include <cmath>\n");
   }
 
@@ -167,7 +198,7 @@ namespace $0 {
 
   // Instance struct.
   ASSIGN_OR_RETURN(const auto instance_struct,
-                   GenInstanceStruct(model, options, internal_options));
+                   GenInstanceStruct(model, options, internal_options, stats));
   absl::StrAppend(&header, instance_struct);
 
   // Categorical dictionary
@@ -176,27 +207,36 @@ namespace $0 {
       GenCategoricalStringDictionaries(model, options, internal_options));
   absl::StrAppend(&header, categorical_dict);
 
-  // Predict method
-  absl::SubstituteAndAppend(&header, R"(
-inline $0 Predict(const Instance& instance) {
-)",
-                            internal_options.output_type);
-
-  const auto model_gbt = dynamic_cast<
-      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(&model);
-  const auto model_rf =
-      dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
-  if (model_gbt) {
-    RETURN_IF_ERROR(internal::GenPredictionGBT(
-        *model_gbt, stats, internal_options, options, &header));
-  } else if (model_rf) {
-    RETURN_IF_ERROR(internal::GenPredictionRF(
-        *model_rf, stats, internal_options, options, &header));
-  } else {
-    return absl::InvalidArgumentError("The model type is not supported.");
+  // Model data
+  if (options.algorithm() == proto::Algorithm::ROUTING) {
+    RETURN_IF_ERROR(internal::GenRoutingModelData(
+        stats, specialized_conversion, options, internal_options, &header));
   }
 
-  absl::StrAppend(&header, "}\n");
+  // Predict method
+  std::string predict_body;
+  RETURN_IF_ERROR(internal::CorePredict(
+      model.data_spec(), *df_interface, specialized_conversion, stats,
+      internal_options, options, &predict_body));
+  STATUS_CHECK(!predict_body.empty());
+
+  std::string predict_output_type;
+  if (options.classification_output() != proto::ClassificationOutput::SCORE) {
+    // The prediction type is defined by the task, and independent of the model
+    // implementation..
+    predict_output_type = internal_options.output_type;
+  } else {
+    // The prediction type is determined by the specific decision forest model
+    // implementation.
+    predict_output_type = specialized_conversion.accumulator_type;
+  }
+  STATUS_CHECK(!predict_output_type.empty());
+
+  absl::SubstituteAndAppend(&header, R"(
+inline $0 Predict(const Instance& instance) {
+$1}
+)",
+                            predict_output_type, predict_body);
 
   // Close define and namespace.
   absl::SubstituteAndAppend(&header, R"(
@@ -211,164 +251,55 @@ inline $0 Predict(const Instance& instance) {
 
 namespace internal {
 
-AccumulatorDef GenAccumulatorDef(const proto::Options& options,
-                                 const ModelStatistics& stats) {
-  AccumulatorDef accumulator_def;
-  // Base type.
-  if (options.integerize_output()) {
-    if (stats.leaf_output_is_signed) {
-      accumulator_def.base_type =
-          SignedInteger(options.accumulator_precision_bytes());
-    } else {
-      accumulator_def.base_type =
-          UnsignedInteger(options.accumulator_precision_bytes());
-    }
-  } else {
-    // TODO: Make sure a winner-take-all multi-class random forest uses
-    // integer accumulators.
-    accumulator_def.base_type = "float";
-  }
-
-  DCHECK_GE(stats.internal_output_dim, 1);
-  if (stats.internal_output_dim == 1) {
-    accumulator_def.type = accumulator_def.base_type;
-  } else {
-    accumulator_def.use_array = true;
-    accumulator_def.type =
-        absl::StrCat("std::array<", accumulator_def.base_type, ", ",
-                     stats.internal_output_dim, ">");
-  }
-
-  // TODO: Compute coefficient.
-  return accumulator_def;
-}
-
-absl::Status GenPredictionGBT(
-    const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
-    const ModelStatistics& stats, const InternalOptions& internal_options,
-    const proto::Options& options, std::string* content) {
-  const auto acc_def = GenAccumulatorDef(options, stats);
-
+absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
+                         const model::DecisionForestInterface& df_interface,
+                         const SpecializedConversion& specialized_conversion,
+                         const ModelStatistics& stats,
+                         const InternalOptions& internal_options,
+                         const proto::Options& options, std::string* content) {
   // Accumulator
-  const auto& initial_predictions = model.initial_predictions();
-  std::string accumulator_initial_value;
-  // TODO: Handle coefficient.
-  accumulator_initial_value = absl::StrJoin(initial_predictions, ", ");
-  absl::SubstituteAndAppend(content, "  $0 accumulator {$1};\n", acc_def.type,
-                            accumulator_initial_value);
-
-  // Task / loss specifics.
-  std::string return_accumulator;
-  IfElseSetNodeFn set_node_fn;
-
-  switch (model.task()) {
-    case model::proto::Task::CLASSIFICATION: {
-      // Leaf setter
-      if (stats.internal_output_dim == 1) {
-        set_node_fn =
-            [](const model::decision_tree::proto::Node& node, const int depth,
-               const int tree_idx,
-               absl::string_view prefix) -> absl::StatusOr<std::string> {
-          const float node_value = node.regressor().top_value();
-          return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
-        };
-      } else {
-        set_node_fn =
-            [&](const model::decision_tree::proto::Node& node, const int depth,
-                const int tree_idx,
-                absl::string_view prefix) -> absl::StatusOr<std::string> {
-          const float node_value = node.regressor().top_value();
-          const int output_dim_idx = tree_idx % stats.internal_output_dim;
-          return absl::StrCat(prefix, "accumulator[", output_dim_idx,
-                              "] += ", node_value, ";\n");
-        };
-      }
-      // Return accumulator
-      switch (options.classification_output()) {
-        case proto::ClassificationOutput::CLASS:
-          if (acc_def.use_array) {
-            absl::StrAppend(
-                &return_accumulator,
-                "  return std::distance(accumulator.begin(), "
-                "std::max_element(accumulator.begin(), accumulator.end()));\n");
-          } else {
-            absl::StrAppend(&return_accumulator,
-                            "  return accumulator >= 0;\n");
-          }
-          break;
-        case proto::ClassificationOutput::SCORE:
-          absl::StrAppend(&return_accumulator, "  return accumulator;\n");
-          break;
-        case proto::ClassificationOutput::PROBABILITY:
-          if (acc_def.use_array) {
-            absl::SubstituteAndAppend(&return_accumulator, R"(
-  // Softmax
-  std::array<float,$0> probas;
-  const float max_logit = *std::max_element(accumulator.begin(), accumulator.end());
-  float sum_exps = 0.f;
-  for(int i=0;i<$0;i++){ probas[i] = std::exp(accumulator[i] - max_logit); sum_exps += probas[i];}
-  for(int i=0;i<$0;i++){ probas[i] /= sum_exps; }
-  return probas;
-)",
-                                      stats.internal_output_dim);
-          } else {
-            absl::StrAppend(&return_accumulator, R"(
-  // Sigmoid
-  return 1.f / (1.f + std::exp(-accumulator));
-)");
-          }
-          break;
-      }
-    } break;
-
-    case model::proto::Task::REGRESSION:
-      absl::StrAppend(&return_accumulator, "  return accumulator;\n");
-      set_node_fn =
-          [](const model::decision_tree::proto::Node& node, const int depth,
-             const int tree_idx,
-             absl::string_view prefix) -> absl::StatusOr<std::string> {
-        const float node_value = node.regressor().top_value();
-        return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
-      };
-      break;
-
-    default:
-      return absl::InvalidArgumentError(absl::StrCat(
-          "Non supported task: ", model::proto::Task_Name(model.task())));
-  }
+  absl::SubstituteAndAppend(content, "  $0 accumulator {$1};\n",
+                            specialized_conversion.accumulator_type,
+                            specialized_conversion.accumulator_initial_value);
 
   // Accumulate leaf values
-  DCHECK_EQ(options.algorithm(), proto::Algorithm::IF_ELSE);
-  RETURN_IF_ERROR(GenerateTreeInferenceIfElse(model.data_spec(), model, options,
-                                              internal_options, set_node_fn,
-                                              content));
+  switch (options.algorithm()) {
+    case proto::Algorithm::IF_ELSE:
+      RETURN_IF_ERROR(GenerateTreeInferenceIfElse(
+          dataspec, df_interface, options, internal_options,
+          specialized_conversion.set_node_ifelse_fn, content));
+      break;
+    case proto::Algorithm::ROUTING:
+      RETURN_IF_ERROR(GenerateTreeInferenceRouting(
+          dataspec, df_interface, options, internal_options,
+          specialized_conversion.set_node_ifelse_fn, content));
+      break;
+    default:
+      return absl::InvalidArgumentError("Non supported algorithm.");
+  }
 
   // Accumulator to predictions.
-  absl::StrAppend(content, return_accumulator);
-
+  absl::StrAppend(content, specialized_conversion.return_prediction);
   return absl::OkStatus();
 }
 
-absl::Status GenPredictionRF(
+absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
     const model::random_forest::RandomForestModel& model,
-    const ModelStatistics& stats, const InternalOptions& internal_options,
-    const proto::Options& options, std::string* content) {
-  const auto acc_def = GenAccumulatorDef(options, stats);
+    const internal::ModelStatistics& stats,
+    const internal::InternalOptions& internal_options,
+    const proto::Options& options) {
+  SpecializedConversion spec;
 
-  // Accumulator
-  // TODO: Handle coefficient.
-  absl::SubstituteAndAppend(content, "  $0 accumulator {0};\n", acc_def.type);
-
-  // Task / loss specifics.
-  std::string return_accumulator;
-  IfElseSetNodeFn set_node_fn;
-
-  switch (model.task()) {
+  switch (stats.task) {
     case model::proto::Task::CLASSIFICATION: {
       // Leaf setter
-      if (stats.internal_output_dim == 1) {
+      if (stats.is_binary_classification()) {
         if (model.winner_take_all_inference()) {
-          set_node_fn =
+          // We accumulate the count of votes for the positive class.
+          spec.accumulator_type =
+              UnsignedInteger(MaxUnsignedValueToNumBytes(stats.num_trees));
+          spec.leaf_value_spec = {.dtype = proto::DType::BOOL, .dims = 1};
+          spec.set_node_ifelse_fn =
               [](const model::decision_tree::proto::Node& node, const int depth,
                  const int tree_idx,
                  absl::string_view prefix) -> absl::StatusOr<std::string> {
@@ -380,13 +311,16 @@ absl::Status GenPredictionRF(
             }
           };
         } else {
-          set_node_fn =
+          // We accumulate the probability vote for the positive class.
+          spec.accumulator_type = "float";
+          spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
+          spec.set_node_ifelse_fn =
               [&](const model::decision_tree::proto::Node& node,
                   const int depth, const int tree_idx,
                   absl::string_view prefix) -> absl::StatusOr<std::string> {
             const float node_value =
                 node.classifier().distribution().counts(2) /
-                (node.classifier().distribution().sum() * model.NumTrees());
+                (node.classifier().distribution().sum() * stats.num_trees);
             if (node_value == 0) {
               return "";
             } else {
@@ -396,7 +330,16 @@ absl::Status GenPredictionRF(
         }
       } else {
         if (model.winner_take_all_inference()) {
-          set_node_fn =
+          // We accumulate the count of votes for each class.
+          spec.accumulator_type = absl::StrCat(
+              "std::array<",
+              UnsignedInteger(MaxUnsignedValueToNumBytes(stats.num_trees)),
+              ", ", stats.num_classification_classes, ">");
+          spec.leaf_value_spec = {
+              .dtype = UnsignedIntegerToDtype(
+                  MaxUnsignedValueToNumBytes(stats.num_classification_classes)),
+              .dims = 1};
+          spec.set_node_ifelse_fn =
               [&](const model::decision_tree::proto::Node& node,
                   const int depth, const int tree_idx,
                   absl::string_view prefix) -> absl::StatusOr<std::string> {
@@ -404,16 +347,21 @@ absl::Status GenPredictionRF(
             return absl::StrCat(prefix, "accumulator[", node_value, "]++;\n");
           };
         } else {
-          set_node_fn =
+          // We accumulate the probability for each class.
+          spec.accumulator_type = absl::StrCat(
+              "std::array<float, ", stats.num_classification_classes, ">");
+          spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32,
+                                  .dims = stats.num_classification_classes};
+          spec.set_node_ifelse_fn =
               [&](const model::decision_tree::proto::Node& node,
                   const int depth, const int tree_idx,
                   absl::string_view prefix) -> absl::StatusOr<std::string> {
             std::string content;
-            for (int output_idx = 0; output_idx < stats.internal_output_dim;
-                 output_idx++) {
+            for (int output_idx = 0;
+                 output_idx < stats.num_classification_classes; output_idx++) {
               const float node_value =
                   node.classifier().distribution().counts(output_idx + 1) /
-                  (node.classifier().distribution().sum() * model.NumTrees());
+                  (node.classifier().distribution().sum() * stats.num_trees);
               if (node_value != 0) {
                 absl::SubstituteAndAppend(&content,
                                           "$0accumulator[$1] += $2;\n", prefix,
@@ -424,74 +372,160 @@ absl::Status GenPredictionRF(
           };
         }
       }
+
       // Return accumulator
       switch (options.classification_output()) {
         case proto::ClassificationOutput::CLASS:
-          if (acc_def.use_array) {
-            absl::StrAppend(
-                &return_accumulator,
-                "  return std::distance(accumulator.begin(), "
-                "std::max_element(accumulator.begin(), accumulator.end()));\n");
+          if (stats.is_binary_classification()) {
+            spec.return_prediction = absl::Substitute(
+                "  return accumulator >= $0;\n", stats.num_trees / 2);
           } else {
-            absl::SubstituteAndAppend(&return_accumulator,
-                                      "  return accumulator >= $0;\n",
-                                      model.NumTrees() / 2);
+            absl::StrAppend(&spec.return_prediction,
+                            "  return std::distance(accumulator.begin(), "
+                            "std::max_element(accumulator.begin(), "
+                            "accumulator.end()));\n");
           }
           break;
         case proto::ClassificationOutput::SCORE:
-          absl::StrAppend(&return_accumulator, "  return accumulator;\n");
+          spec.return_prediction = "  return accumulator;\n";
           break;
         case proto::ClassificationOutput::PROBABILITY:
           if (model.winner_take_all_inference()) {
-            if (stats.internal_output_dim == 1) {
+            if (stats.is_binary_classification()) {
               absl::SubstituteAndAppend(
-                  &return_accumulator,
+                  &spec.return_prediction,
                   "return static_cast<float>(accumulator) / $0;\n",
-                  model.NumTrees());
+                  stats.num_trees);
             } else {
-              absl::SubstituteAndAppend(&return_accumulator,
-                                        R"(
-  std::array<float,$0> probas;
-  for(int i=0;i<$0;i++){ probas[i] = static_cast<float>(accumulator[i]) / $1; }
-  return probas;
-)",
-                                        stats.internal_output_dim,
-                                        model.NumTrees());
+              spec.return_prediction = absl::Substitute(
+                  R"(
+          std::array<float,$0> probas;
+          for(int i=0;i<$0;i++){ probas[i] = static_cast<float>(accumulator[i]) / $1; }
+          return probas;
+        )",
+                  stats.num_classification_classes, stats.num_trees);
             }
           } else {
-            absl::StrAppend(&return_accumulator, "return accumulator;\n");
+            spec.return_prediction = "return accumulator;\n";
           }
           break;
       }
     } break;
 
     case model::proto::Task::REGRESSION:
-      absl::StrAppend(&return_accumulator, "  return accumulator;\n");
-      set_node_fn =
+      spec.accumulator_type = "float";
+      spec.return_prediction = "  return accumulator;\n";
+      spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
+      spec.set_node_ifelse_fn =
           [&](const model::decision_tree::proto::Node& node, const int depth,
               const int tree_idx,
               absl::string_view prefix) -> absl::StatusOr<std::string> {
-        const float node_value =
-            node.regressor().top_value() / model.NumTrees();
+        const float node_value = node.regressor().top_value() / stats.num_trees;
         return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
       };
       break;
 
     default:
       return absl::InvalidArgumentError(absl::StrCat(
-          "Non supported task: ", model::proto::Task_Name(model.task())));
+          "Non supported task: ", model::proto::Task_Name(stats.task)));
   }
 
-  // Accumulate leaf values
-  DCHECK_EQ(options.algorithm(), proto::Algorithm::IF_ELSE);
-  RETURN_IF_ERROR(GenerateTreeInferenceIfElse(model.data_spec(), model, options,
-                                              internal_options, set_node_fn,
-                                              content));
+  spec.accumulator_initial_value = "0";
+  return spec;
+}
 
-  // Accumulator to predictions.
-  absl::StrAppend(content, return_accumulator);
+absl::StatusOr<internal::SpecializedConversion>
+SpecializedConversionGradientBoostedTrees(
+    const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
+    const internal::ModelStatistics& stats,
+    const internal::InternalOptions& internal_options,
+    const proto::Options& options) {
+  SpecializedConversion spec;
+  switch (stats.task) {
+    case model::proto::Task::CLASSIFICATION: {
+      // Leaf setter
+      if (stats.is_binary_classification()) {
+        spec.accumulator_type = "float";
+        spec.set_node_ifelse_fn =
+            [](const model::decision_tree::proto::Node& node, const int depth,
+               const int tree_idx,
+               absl::string_view prefix) -> absl::StatusOr<std::string> {
+          const float node_value = node.regressor().top_value();
+          return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+        };
+      } else {
+        spec.accumulator_type = absl::StrCat(
+            "std::array<float, ", stats.num_classification_classes, ">");
+        spec.set_node_ifelse_fn =
+            [&](const model::decision_tree::proto::Node& node, const int depth,
+                const int tree_idx,
+                absl::string_view prefix) -> absl::StatusOr<std::string> {
+          const float node_value = node.regressor().top_value();
+          const int output_dim_idx =
+              tree_idx % stats.num_classification_classes;
+          return absl::StrCat(prefix, "accumulator[", output_dim_idx,
+                              "] += ", node_value, ";\n");
+        };
+      }
+      // Return accumulator
+      switch (options.classification_output()) {
+        case proto::ClassificationOutput::CLASS:
+          if (stats.is_binary_classification()) {
+            spec.return_prediction = "  return accumulator >= 0;\n";
+          } else {
+            spec.return_prediction =
+                ("  return std::distance(accumulator.begin(), "
+                 "std::max_element(accumulator.begin(), "
+                 "accumulator.end()));\n");
+          }
+          break;
+        case proto::ClassificationOutput::SCORE:
+          spec.return_prediction = "  return accumulator;\n";
+          break;
+        case proto::ClassificationOutput::PROBABILITY:
+          if (stats.is_binary_classification()) {
+            spec.return_prediction = R"(  // Sigmoid
+  return 1.f / (1.f + std::exp(-accumulator));
+)";
+          } else {
+            spec.return_prediction =
+                absl::Substitute(R"(  // Softmax
+  std::array<float,$0> probas;
+  const float max_logit = *std::max_element(accumulator.begin(), accumulator.end());
+  float sum_exps = 0.f;
+  for(int i=0;i<$0;i++){ probas[i] = std::exp(accumulator[i] - max_logit); sum_exps += probas[i];}
+  for(int i=0;i<$0;i++){ probas[i] /= sum_exps; }
+  return probas;
+)",
+                                 stats.num_classification_classes);
+          }
+          break;
+      }
+    } break;
 
-  return absl::OkStatus();
+    case model::proto::Task::REGRESSION:
+      spec.accumulator_type = "float";
+      spec.return_prediction = "  return accumulator;\n";
+      spec.set_node_ifelse_fn =
+          [](const model::decision_tree::proto::Node& node, const int depth,
+             const int tree_idx,
+             absl::string_view prefix) -> absl::StatusOr<std::string> {
+        const float node_value = node.regressor().top_value();
+        return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+      };
+      break;
+
+    default:
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Non supported task: ", model::proto::Task_Name(stats.task)));
+  }
+
+  // TODO: Integer optimization of leaf values.
+  spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
+
+  spec.accumulator_initial_value =
+      absl::StrJoin(model.initial_predictions(), ", ");
+  return spec;
 }
 
 absl::StatusOr<ModelStatistics> ComputeStatistics(
@@ -500,81 +534,31 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
   ModelStatistics stats{
       .num_trees = df_interface.num_trees(),
       .num_features = static_cast<int>(model.input_features().size()),
+      .task = model.task(),
   };
 
-  const bool is_classification =
-      model.task() == model::proto::Task::CLASSIFICATION;
-  const int num_classification_classes =
-      model.LabelColumnSpec().categorical().number_of_unique_values() - 1;
-  const bool is_binary_classification =
-      is_classification && num_classification_classes == 2;
-
-  // Model specific statistics.
-  const auto model_gbt = dynamic_cast<
-      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(&model);
-  const auto model_rf =
-      dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
-
-  // TODO: Handle integerized leaf values.
-  std::optional<
-      std::function<double(const model::decision_tree::proto::Node& node)>>
-      get_max_abs_output;
-
-  if (model_gbt) {
-    stats.multi_dim_tree = false;  // GBT trees are single dimensional.
-    get_max_abs_output =
-        [](const model::decision_tree::proto::Node& node) -> double {
-      return std::abs(node.regressor().top_value());
-    };
-  } else if (model_rf) {
-    stats.multi_dim_tree = true;  // RF trees are multidimensional.
-    if (model.task() == model::proto::Task::REGRESSION) {
-      get_max_abs_output =
-          [](const model::decision_tree::proto::Node& node) -> double {
-        return std::abs(node.regressor().top_value());
-      };
-    }
-  } else {
-    return absl::InvalidArgumentError("The model type is not supported.");
-  }
-
-  if (is_classification) {
-    DCHECK_GE(num_classification_classes, 2);
-    if (is_binary_classification) {
-      stats.internal_output_dim = 1;
-    } else {
-      stats.internal_output_dim = num_classification_classes;
-    }
-  } else {
-    stats.internal_output_dim = 1;
+  if (stats.is_classification()) {
+    stats.num_classification_classes = static_cast<int>(
+        model.LabelColumnSpec().categorical().number_of_unique_values() - 1);
   }
 
   // Scan the trees
   for (const auto& tree : df_interface.decision_trees()) {
     int64_t num_leaves_in_tree = 0;
-    double max_abs_output_in_tree = 0;
     tree->IterateOnNodes([&](const model::decision_tree::NodeWithChildren& node,
                              int depth) {
       stats.max_depth = std::max(stats.max_depth, static_cast<int64_t>(depth));
       if (node.IsLeaf()) {
         num_leaves_in_tree++;
         stats.num_leaves++;
-        if (get_max_abs_output.has_value()) {
-          const auto node_max_abs_output =
-              get_max_abs_output.value()(node.node());
-          stats.max_abs_output =
-              std::max(stats.max_abs_output, node_max_abs_output);
-          max_abs_output_in_tree =
-              std::max(max_abs_output_in_tree, node_max_abs_output);
-        }
       } else {
+        stats.num_conditions++;
         stats.has_conditions[node.node().condition().condition().type_case()] =
             true;
       }
     });
     stats.max_num_leaves_per_tree =
         std::max(stats.max_num_leaves_per_tree, num_leaves_in_tree);
-    stats.sum_max_abs_output += max_abs_output_in_tree;
   }
   return stats;
 }
@@ -585,19 +569,31 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
     const ModelStatistics& stats, const proto::Options& options) {
   InternalOptions internal_options;
   RETURN_IF_ERROR(
-      ComputeInternalOptionsFeature(model, options, &internal_options));
+      ComputeInternalOptionsFeature(stats, model, options, &internal_options));
   RETURN_IF_ERROR(
-      ComputeInternalOptionsOutput(model, stats, options, &internal_options));
+      ComputeInternalOptionsOutput(stats, options, &internal_options));
   RETURN_IF_ERROR(ComputeInternalOptionsCategoricalDictionaries(
       model, stats, options, &internal_options));
   return internal_options;
 }
 
-absl::Status ComputeInternalOptionsFeature(const model::AbstractModel& model,
+absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
+                                           const model::AbstractModel& model,
                                            const proto::Options& options,
                                            InternalOptions* out) {
   out->feature_value_bytes = 1;
   out->numerical_feature_is_float = false;
+
+  out->feature_index_bytes = MaxUnsignedValueToNumBytes(stats.num_features);
+  out->tree_index_bytes = MaxUnsignedValueToNumBytes(stats.num_trees);
+  out->node_index_bytes =
+      MaxUnsignedValueToNumBytes(stats.num_leaves + stats.num_conditions);
+
+  // This is the number of bytes to encode a node index in a tree. The precision
+  // for an offset is in average 50% smaller.
+  // TODO: Optimize node_offset_bytes.
+  out->node_offset_bytes = MaxUnsignedValueToNumBytes(
+      NumLeavesToNumNodes(stats.max_num_leaves_per_tree));
 
   // Feature encoding.
   for (const auto input_feature : model.input_features()) {
@@ -649,51 +645,48 @@ absl::Status ComputeInternalOptionsFeature(const model::AbstractModel& model,
   return absl::OkStatus();
 }
 
-absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
-                                          const ModelStatistics& stats,
+absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
                                           const proto::Options& options,
                                           InternalOptions* out) {
   if (stats.has_conditions
           [model::decision_tree::proto::Condition::kContainsBitmapCondition] ||
       stats.has_conditions
           [model::decision_tree::proto::Condition::kContainsCondition]) {
-    out->include_algorithm = true;
-    out->include_array = true;
+    out->includes.algorithm = true;
+    out->includes.array = true;
   }
 
-  switch (model.task()) {
+  switch (stats.task) {
     case model::proto::Task::CLASSIFICATION: {
-      const int num_classes =
-          model.LabelColumnSpec().categorical().number_of_unique_values() - 1;
       switch (options.classification_output()) {
         case proto::ClassificationOutput::CLASS:
-          if (num_classes == 2) {
+          if (stats.is_binary_classification()) {
             out->output_type = "bool";
           } else {
-            out->output_type =
-                UnsignedInteger(MaxUnsignedValueToNumBytes(num_classes));
-            out->include_algorithm = true;
-            out->include_array = true;
-            out->include_algorithm = true;
+            out->output_type = UnsignedInteger(
+                MaxUnsignedValueToNumBytes(stats.num_classification_classes));
+            out->includes.algorithm = true;
+            out->includes.array = true;
+            out->includes.algorithm = true;
           }
           break;
-        case proto::ClassificationOutput::SCORE: {
-          const auto acc_def = GenAccumulatorDef(options, stats);
-          out->output_type = acc_def.type;
-          if (acc_def.use_array) {
-            out->include_array = true;
+        case proto::ClassificationOutput::SCORE:
+          // The output type is determined by the model specific conversion
+          // code.
+          if (!stats.is_binary_classification()) {
+            out->includes.array = true;
           }
-        } break;
+          break;
         case proto::ClassificationOutput::PROBABILITY:
-          if (num_classes == 2) {
+          if (stats.is_binary_classification()) {
             out->output_type = "float";
           } else {
-            out->include_array = true;
-            out->include_algorithm = true;
-            out->output_type =
-                absl::StrCat("std::array<float, ", num_classes, ">");
+            out->includes.array = true;
+            out->includes.algorithm = true;
+            out->output_type = absl::StrCat(
+                "std::array<float, ", stats.num_classification_classes, ">");
           }
-          out->include_cmath = true;
+          out->includes.cmath = true;
           break;
       }
     } break;
@@ -706,7 +699,7 @@ absl::Status ComputeInternalOptionsOutput(const model::AbstractModel& model,
       break;
     default:
       return absl::InvalidArgumentError(absl::StrCat(
-          "Non supported task: ", model::proto::Task_Name(model.task())));
+          "Non supported task: ", model::proto::Task_Name(stats.task)));
   }
   return absl::OkStatus();
 }
@@ -800,14 +793,14 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
 absl::Status GenerateTreeInferenceIfElseNode(
     const dataset::proto::DataSpecification& dataspec,
     const model::decision_tree::NodeWithChildren& node, const int depth,
-    const IfElseSetNodeFn& set_node_fn, const int tree_idx,
+    const IfElseSetNodeFn& set_node_ifelse_fn, const int tree_idx,
     std::string* content) {
   std::string prefix(depth * 2 + 2, ' ');
 
   if (node.IsLeaf()) {
     // The leaf value
     ASSIGN_OR_RETURN(const auto leaf,
-                     set_node_fn(node.node(), depth, tree_idx, prefix));
+                     set_node_ifelse_fn(node.node(), depth, tree_idx, prefix));
     absl::StrAppend(content, leaf);
     return absl::OkStatus();
   }
@@ -895,11 +888,13 @@ absl::Status GenerateTreeInferenceIfElseNode(
 
   // Branching
   absl::SubstituteAndAppend(content, "$0if ($1) {\n", prefix, condition);
-  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
-      dataspec, *node.pos_child(), depth + 1, set_node_fn, tree_idx, content));
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(dataspec, *node.pos_child(),
+                                                  depth + 1, set_node_ifelse_fn,
+                                                  tree_idx, content));
   absl::StrAppend(content, prefix, "} else {\n");
-  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
-      dataspec, *node.neg_child(), depth + 1, set_node_fn, tree_idx, content));
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(dataspec, *node.neg_child(),
+                                                  depth + 1, set_node_ifelse_fn,
+                                                  tree_idx, content));
   absl::StrAppend(content, prefix, "}\n");
   return absl::OkStatus();
 };
@@ -908,14 +903,94 @@ absl::Status GenerateTreeInferenceIfElse(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
     const proto::Options& options, const InternalOptions& internal_options,
-    const IfElseSetNodeFn& set_node_fn, std::string* content) {
+    const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content) {
   for (int tree_idx = 0; tree_idx < df_interface.num_trees(); tree_idx++) {
     absl::StrAppend(content, "  // Tree #", tree_idx, "\n");
     const auto& tree = df_interface.decision_trees()[tree_idx];
     RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
-        dataspec, tree->root(), 0, set_node_fn, tree_idx, content));
+        dataspec, tree->root(), 0, set_node_ifelse_fn, tree_idx, content));
     absl::StrAppend(content, "\n");
   }
+  return absl::OkStatus();
+}
+
+absl::Status GenerateTreeInferenceRouting(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const proto::Options& options, const InternalOptions& internal_options,
+    const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content) {
+  // TODO: Implement.
+  return absl::OkStatus();
+}
+
+absl::Status GenRoutingModelData(
+    const ModelStatistics& stats,
+    const SpecializedConversion& specialized_conversion,
+    const proto::Options& options, const InternalOptions& internal_options,
+    std::string* content) {
+  std::string is_greather_threshold_type;
+  if (internal_options.numerical_feature_is_float) {
+    is_greather_threshold_type = "float";
+    STATUS_CHECK_EQ(internal_options.feature_value_bytes, 4);
+  } else {
+    is_greather_threshold_type =
+        SignedInteger(internal_options.feature_value_bytes);
+  }
+
+  const std::string feature_index_type =
+      UnsignedInteger(internal_options.feature_index_bytes);
+
+  const std::string node_offset_type =
+      UnsignedInteger(internal_options.node_offset_bytes);
+
+  const std::string node_index_type =
+      UnsignedInteger(internal_options.node_index_bytes);
+
+  std::string node_value_type;
+  if (specialized_conversion.leaf_value_spec.dims == 1) {
+    // The leaf value is stored in the node struct.
+    node_value_type =
+        DTypeToCCType(specialized_conversion.leaf_value_spec.dtype);
+  } else {
+    // The leaf values are stored in a separate buffer. The node struct contains
+    // an index to this buffer.
+    node_value_type =
+        UnsignedInteger(MaxUnsignedValueToNumBytes(stats.num_leaves));
+  }
+
+  // TODO: Add categorical and boolean condition support.
+
+  absl::SubstituteAndAppend(content, R"(
+struct __attribute__((packed)) Node {
+  $1 feature;
+  union {
+    struct {
+      $0 threshold;
+      $2 pos_child_offset;
+    } cond;
+    struct {
+      $3 value;
+    } leaf;
+  };
+};
+)",
+                            is_greather_threshold_type,  // $0
+                            feature_index_type,          // $1
+                            node_offset_type,            // $2
+                            node_value_type              // $3
+  );
+
+  // TODO: Implement.
+  absl::StrAppend(content, R"(
+static const uint8_t nodes[] = {};
+)");
+
+  // TODO: Implement.
+  absl::SubstituteAndAppend(content, R"(
+static const $0 roots[] = {};
+)",
+                            node_index_type);
+
   return absl::OkStatus();
 }
 

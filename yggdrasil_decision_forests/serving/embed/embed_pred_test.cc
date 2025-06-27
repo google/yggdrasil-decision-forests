@@ -31,6 +31,7 @@ print(model.predict(ds[:1]))
 */
 
 #include <array>
+#include <cstdint>
 
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_abalone_regression_gbdt_v2.h"
@@ -232,10 +233,10 @@ TEST(Embed, test_model_iris_multi_class_rf_wta_small_class) {
 
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_score) {
   using namespace test_model_iris_multi_class_rf_wta_small_score;
-  const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
-  EXPECT_NEAR(pred[Label::kSetosa], 10., eps);
-  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
-  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+  const std::array<uint8_t, 3> pred = Predict(IRIS_EXAMPLE);
+  EXPECT_EQ(pred[Label::kSetosa], 10);
+  EXPECT_EQ(pred[Label::kVersicolor], 0);
+  EXPECT_EQ(pred[Label::kVirginica], 0);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_proba) {

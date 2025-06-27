@@ -4,10 +4,12 @@
 #include <stdint.h>
 #include <array>
 #include <algorithm>
+#include <cmath>
 
 namespace my_model {
 
 constexpr const int kNumFeatures = 14;
+constexpr const int kNumTrees = 3;
 
 struct Instance {
   int32_t age;
@@ -603,7 +605,8 @@ inline float Predict(const Instance& instance) {
     }
   }
 
-  return accumulator;
+  // Sigmoid
+  return 1.f / (1.f + std::exp(-accumulator));
 }
 
 }  // namespace my_model

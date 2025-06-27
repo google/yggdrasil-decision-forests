@@ -88,24 +88,39 @@ void ExpectEqualGolden(
     }
 
     static int actual_idx = 0;
+
     const std::string output_dir = file::JoinPath(TmpDirectory(), "golden");
     ASSERT_OK(file::RecursivelyCreateDir(output_dir, file::Defaults()));
     const std::string output_path = file::JoinPath(
         output_dir, absl::StrCat("actual_", actual_idx, ".html"));
     const std::string expected_output_path = file::JoinPath(
-        output_dir, absl::StrCat("expected_", actual_idx++, ".html"));
+        output_dir, absl::StrCat("expected_", actual_idx, ".html"));
+    const std::string all_commands_path =
+        file::JoinPath(output_dir, absl::StrCat("all_commands.txt"));
+
     LOG(INFO) << "Content saved to " << output_path;
     LOG(INFO) << "";
-    LOG(INFO) << "Update the golden file with:\ncp " << output_path << " "
-              << path;
+    const std::string cp_command = absl::StrCat("cp ", output_path, " ", path);
+    LOG(INFO) << "Update the golden file with:\n" << cp_command;
     LOG(INFO) << "";
     LOG(INFO) << "Look at the difference between the fields with:\ndiff "
               << output_path << " " << path;
     LOG(INFO) << "";
+    LOG(INFO) << "All the golden cp commands are here:\n" << all_commands_path;
+    LOG(INFO) << "";
     LOG(INFO) << "Expected: " << expected_output_path;
     ASSERT_OK(file::SetContent(expected_output_path, expected_content));
     ASSERT_OK(file::SetContent(output_path, content));
+
+    std::string all_commands;
+    if (actual_idx > 0) {
+      ASSERT_OK_AND_ASSIGN(all_commands, file::GetContent(all_commands_path));
+    }
+    absl::StrAppend(&all_commands, cp_command, "\n");
+    ASSERT_OK(file::SetContent(all_commands_path, all_commands));
+
     EXPECT_TRUE(false);
+    actual_idx++;
   }
 }
 

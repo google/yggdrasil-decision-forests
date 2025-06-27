@@ -53,9 +53,16 @@ int MaxSignedValueToNumBytes(int32_t value);
 // Convert a proto dtype to the corresponding c++ class.
 std::string DTypeToCCType(proto::DType::Enum value);
 
+// Integer representation to dtype.
+proto::DType::Enum UnsignedIntegerToDtype(int bytes);
+
 // Integer representation e.g. uint16_t.
 std::string UnsignedInteger(int bytes);
 std::string SignedInteger(int bytes);
+
+// Computes the number of nodes (leaves and non-leaves) in a tree given the
+// number of leaves. Note: The trees are binary trees.
+int NumLeavesToNumNodes(int num_leaves);
 
 }  // namespace yggdrasil_decision_forests::serving::embed
 

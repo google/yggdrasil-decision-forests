@@ -70,10 +70,19 @@ message ClassificationOutput {
 
 message DType {
   enum Enum {
-    INT8 = 0;
-    INT16 = 1;
-    INT32 = 2;
-    FLOAT32 = 3;
+    UNDEFINED = 0;
+
+    INT8 = 1;
+    INT16 = 2;
+    INT32 = 3;
+
+    UINT8 = 4;
+    UINT16 = 5;
+    UINT32 = 6;
+
+    FLOAT32 = 7;
+
+    BOOL = 8;
   }
 }
 
@@ -84,5 +93,9 @@ message Algorithm {
     // This solution is slow, consumes a lot of memory, and is mostly
     // implemented for experimentation.
     IF_ELSE = 1;
+    // Compute the prediction with the routing algorithm. This solution has the
+    // best overall complexity, size and speed (though some other methods might
+    // sometime be faster).
+    ROUTING = 2;
   }
 }
