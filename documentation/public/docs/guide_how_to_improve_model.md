@@ -6,15 +6,15 @@ some cases, the changes will be minor, while in others, they may be significant.
 It is not possible to know in advance how much a given change will improve a
 model.
 
-This guide is divided into two sections: Optimizing Model Quality and Optimizing
-Model Speed and Size. In most cases, improving model quality will also make it
-larger and slower, and the other way around. In other words, a model's
-predictive quality is generally tied to its size and complexity.
+This guide is divided into two sections: **Optimizing Model Quality** and
+**Optimizing Model Speed and Size**. In most cases, improving model quality will
+also make it larger and slower, and the other way around. In other words, a
+model's predictive quality is generally tied to its size and complexity.
 
 Having a basic understanding of how decision forests work is helpful for
 optimizing them. For more information, please refer to Google's Decision Forests
-class. The [hyper-parameter page](hyperparameters) also lists and explains all
-available options.
+class. The [hyper-parameter page](../hyperparameters) also lists and explains
+all available options.
 
 ## Random Forest or Gradient Boosted Trees?
 
@@ -30,7 +30,8 @@ When optimizing for speed, use GBT.
 
 When optimizing for quality, both algorithms should be tested.
 
-.. warning:: 
+!!! warning
+
     Both algorithms share some hyperparameter names, such as num_trees and
     max_depth. However, these hyperparameters play a different role in each
     algorithm and must be tuned accordingly. For example, the max_depth of a GBT is
@@ -57,7 +58,7 @@ To benefit from YDF's latest algorithmic improvements without deep-diving into
 every hyperparameter, you can use pre-configured hyperparameter templates.
 
 You can list the available templates by calling
-[hyperparameter_templates](py_api/GradientBoostedTreesLearner/#ydf.GradientBoostedTreesLearner.hyperparameter_templates)
+[hyperparameter_templates](../py_api/GradientBoostedTreesLearner/#ydf.GradientBoostedTreesLearner.hyperparameter_templates)
 on a learner.
 
 ```python
@@ -79,7 +80,8 @@ The num_trees parameter controls the number of trees in the model. Increasing
 this number often improves model quality. By default, YDF trains models with 300
 trees, but for high-quality models, using 1000 or even more can be valuable.
 
-.. note:: 
+!!! note
+
     When training a GBT model with early stopping (the default behavior), the
     final model may contain fewer trees than specified by num_trees if performance
     on the validation set stops improving.
@@ -133,7 +135,8 @@ GBTs:
 *   `min_examples` (default: `5`): Try a larger value like `10`.
 *   `growing_strategy` (default: `"LOCAL"`): Try `"BEST_FIRST_GLOBAL"`.
 
-.. note:: 
+!!! note
+
     When using `growing_strategy="LOCAL"` (the default), it is often beneficial
     to tune `max_depth`. When using `growing_strategy="BEST_FIRST_GLOBAL"`, it is
     better to leave `max_depth` unconstrained (the default value of -1 does this)
@@ -154,7 +157,8 @@ parameter should be carefully tuned.
 learner = ydf.GradientBoostedTreesLearner(validation_ratio=0.0, label="my_label")
 ```
 
-.. warning:: 
+!!! warning
+
     Disabling early stopping can lead to overfitting. Before disabling
     it, train with early stopping enabled and observe when it triggers. If it rarely
     triggers, or always triggers near a specific number of trees, disabling it might
@@ -167,7 +171,7 @@ The inference speed and size of a model are constrained by the number of input
 features, the number of trees, and the average depth of the trees.
 
 You can measure the inference speed of a model with the
-[benchmark()](py_api/GradientBoostedTreesModel/#ydf.GradientBoostedTreesModel.benchmark)
+[benchmark()](../py_api/GradientBoostedTreesModel/#ydf.GradientBoostedTreesModel.benchmark)
 method.
 
 ```python
