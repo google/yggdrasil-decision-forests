@@ -24,6 +24,7 @@ learner: "RANDOM_FOREST"
   num_trees: 1000
 }
 ```
+
 ## GRADIENT_BOOSTED_TREES
 
 A [Gradient Boosted Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf)
@@ -98,6 +99,15 @@ reasonable time.
     RANDOM
 
 -   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
+
+#### [categorical_set_split_greedy_maximum_mask_size](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** -1 **Possible values:** min:-1
+
+-   For categorical set splits e.g. texts. Maximum number of attribute values on
+    the positive side of the split mask. Smaller values might improve training
+    speed but lead to worse models. Setting this parameter to 1 is equal to
+    one-hot encoding the attribute values. Set to -1 for no maximum (default).
 
 #### [categorical_set_split_greedy_sampling](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -546,6 +556,18 @@ reasonable time.
     is implicitly set to \"RANDOM\". In other words, to enable random
     subsampling, you only need to set "\"subsample\".
 
+#### [total_max_num_nodes](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
+
+-   **Type:** Integer **Default:** -1 **Possible values:** min:-1
+
+-   Limit the total number of nodes in the model over all trees. This limit is
+    an upper bound that may not be reached exactly. If the value is smaller than
+    the number of nodes of a single tree according to other hyperparameter, the
+    learner may return an empty model. This hyperparameter is useful for
+    hyperparameter tuning models with very few nodes for small model size and
+    fast inference. For training individual models, prefer adapting
+    max_num_nodes / max_depth and num_trees. Set to -1 (default) for no limit.
+
 #### [uplift_min_examples_in_treatment](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:0
@@ -563,7 +585,6 @@ reasonable time.
 #### [use_goss](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
 -   **Type:** Categorical **Default:** false **Possible values:** true, false
-
 
 #### [use_hessian_gain](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
@@ -685,6 +706,15 @@ reasonable time.
     RANDOM
 
 -   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
+
+#### [categorical_set_split_greedy_maximum_mask_size](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** -1 **Possible values:** min:-1
+
+-   For categorical set splits e.g. texts. Maximum number of attribute values on
+    the positive side of the split mask. Smaller values might improve training
+    speed but lead to worse models. Setting this parameter to 1 is equal to
+    one-hot encoding the attribute values. Set to -1 for no maximum (default).
 
 #### [categorical_set_split_greedy_sampling](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1057,6 +1087,15 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
     RANDOM
 
 -   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
+
+#### [categorical_set_split_greedy_maximum_mask_size](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Integer **Default:** -1 **Possible values:** min:-1
+
+-   For categorical set splits e.g. texts. Maximum number of attribute values on
+    the positive side of the split mask. Smaller values might improve training
+    speed but lead to worse models. Setting this parameter to 1 is equal to
+    one-hot encoding the attribute values. Set to -1 for no maximum (default).
 
 #### [categorical_set_split_greedy_sampling](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
