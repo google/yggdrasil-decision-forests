@@ -13,6 +13,9 @@
 ### Feature
 
 -   Expose Mean Average Precision for Ranking tasks.
+-   Add hyperparameters
+    `numerical_vector_sequence_enable_closer_than_conditions` and
+    `numerical_vector_sequence_enable_projected_more_than_conditions`.
 -   Clear error messages when attempting to evaluate models without label.
 
 ## 0.12.0 - 2025-05-20

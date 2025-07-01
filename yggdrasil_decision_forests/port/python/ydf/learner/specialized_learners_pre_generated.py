@@ -303,6 +303,16 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
     num_trees: Number of individual decision trees. Increasing the number of
       trees can increase the quality of the model at the expense of size,
       training speed, and inference latency. Default: 300.
+    numerical_vector_sequence_enable_closer_than_conditions: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). If true, enable conditions of type |x-A|^2 <= T for learned
+      anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
+    numerical_vector_sequence_enable_projected_more_than_conditions: For
+      datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+      fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+      for learned anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
     numerical_vector_sequence_num_examples: For datasets with
       NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
       vectors). Maximum number of examples to use to find splits. A larger value
@@ -505,6 +515,8 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       num_candidate_attributes_ratio: Optional[float] = None,
       num_oob_variable_importances_permutations: int = 1,
       num_trees: int = 300,
+      numerical_vector_sequence_enable_closer_than_conditions: bool = True,
+      numerical_vector_sequence_enable_projected_more_than_conditions: bool = True,
       numerical_vector_sequence_num_examples: int = 1000,
       numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
@@ -578,6 +590,12 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             num_oob_variable_importances_permutations
         ),
         "num_trees": num_trees,
+        "numerical_vector_sequence_enable_closer_than_conditions": (
+            numerical_vector_sequence_enable_closer_than_conditions
+        ),
+        "numerical_vector_sequence_enable_projected_more_than_conditions": (
+            numerical_vector_sequence_enable_projected_more_than_conditions
+        ),
         "numerical_vector_sequence_num_examples": (
             numerical_vector_sequence_num_examples
         ),
@@ -1465,6 +1483,16 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       tree can be smaller if early stopping is enabled. For multi-class
       classification problems, the number of decision trees is at most this
       parameter times the number of classes. Default: 300.
+    numerical_vector_sequence_enable_closer_than_conditions: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). If true, enable conditions of type |x-A|^2 <= T for learned
+      anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
+    numerical_vector_sequence_enable_projected_more_than_conditions: For
+      datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+      fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+      for learned anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
     numerical_vector_sequence_num_examples: For datasets with
       NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
       vectors). Maximum number of examples to use to find splits. A larger value
@@ -1730,6 +1758,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
       num_trees: int = 300,
+      numerical_vector_sequence_enable_closer_than_conditions: bool = True,
+      numerical_vector_sequence_enable_projected_more_than_conditions: bool = True,
       numerical_vector_sequence_num_examples: int = 1000,
       numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
@@ -1827,6 +1857,12 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
         "num_trees": num_trees,
+        "numerical_vector_sequence_enable_closer_than_conditions": (
+            numerical_vector_sequence_enable_closer_than_conditions
+        ),
+        "numerical_vector_sequence_enable_projected_more_than_conditions": (
+            numerical_vector_sequence_enable_projected_more_than_conditions
+        ),
         "numerical_vector_sequence_num_examples": (
             numerical_vector_sequence_num_examples
         ),
@@ -2647,6 +2683,16 @@ class CartLearner(generic_learner.GenericCCLearner):
       number_of_input_features x num_candidate_attributes_ratio`. The possible
       values are between ]0, and 1] as well as -1. If not set or equal to -1,
       the `num_candidate_attributes` is used. Default: None.
+    numerical_vector_sequence_enable_closer_than_conditions: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). If true, enable conditions of type |x-A|^2 <= T for learned
+      anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
+    numerical_vector_sequence_enable_projected_more_than_conditions: For
+      datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+      fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+      for learned anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
     numerical_vector_sequence_num_examples: For datasets with
       NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
       vectors). Maximum number of examples to use to find splits. A larger value
@@ -2835,6 +2881,8 @@ class CartLearner(generic_learner.GenericCCLearner):
       missing_value_policy: str = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
+      numerical_vector_sequence_enable_closer_than_conditions: bool = True,
+      numerical_vector_sequence_enable_projected_more_than_conditions: bool = True,
       numerical_vector_sequence_num_examples: int = 1000,
       numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
@@ -2896,6 +2944,12 @@ class CartLearner(generic_learner.GenericCCLearner):
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
+        "numerical_vector_sequence_enable_closer_than_conditions": (
+            numerical_vector_sequence_enable_closer_than_conditions
+        ),
+        "numerical_vector_sequence_enable_projected_more_than_conditions": (
+            numerical_vector_sequence_enable_projected_more_than_conditions
+        ),
         "numerical_vector_sequence_num_examples": (
             numerical_vector_sequence_num_examples
         ),

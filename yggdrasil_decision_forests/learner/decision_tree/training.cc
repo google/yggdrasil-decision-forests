@@ -4451,6 +4451,15 @@ absl::Status DecisionTreeTrain(
                                      selected_examples.end());
   }
 
+  if (!(dt_config.numerical_vector_sequence()
+            .enable_projected_more_than_conditions() ||
+        dt_config.numerical_vector_sequence()
+            .enable_closer_than_conditions())) {
+    return absl::InvalidArgumentError(
+        "No condition types for vector sequences are enabled. Enable "
+        "projected-more-than conditions, closer-than conditions or both.");
+  }
+
   auto leaf_example_span = leaf_examples.has_value()
                                ? std::optional<absl::Span<UnsignedExampleIdx>>(
                                      absl::MakeSpan(leaf_examples.value()))

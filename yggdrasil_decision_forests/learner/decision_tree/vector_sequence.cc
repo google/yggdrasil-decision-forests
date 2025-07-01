@@ -175,6 +175,15 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
     SplitterPerThreadCache* cache) {
   STATUS_CHECK(!selected_examples.empty());
 
+  bool enable_closer_than_conditions =
+      dt_config.numerical_vector_sequence().enable_closer_than_conditions();
+  bool enable_projected_more_than_conditions =
+      dt_config.numerical_vector_sequence()
+          .enable_projected_more_than_conditions();
+
+  STATUS_CHECK(enable_closer_than_conditions ||
+               enable_projected_more_than_conditions);
+
   const bool subsampling =
       selected_examples.size() >
       dt_config.numerical_vector_sequence().max_num_test_examples();
@@ -280,35 +289,40 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
         std::min(num_anchors_per_round, num_anchors - anchor_idx);
     anchors.resize(local_num_anchors * attribute.vector_length());
 
-    for (int i = 0; i < local_num_anchors; i++) {
-      // The anchor is the difference between two random values in the dataset.
-      ASSIGN_OR_RETURN(const auto vector_1, sample_vector_forced());
-      if (!vector_1.has_value()) {
-        break;
+    if (enable_projected_more_than_conditions) {
+      for (int i = 0; i < local_num_anchors; i++) {
+        // The anchor is the difference between two random values in the
+        // dataset.
+        ASSIGN_OR_RETURN(const auto vector_1, sample_vector_forced());
+        if (!vector_1.has_value()) {
+          break;
+        }
+        ASSIGN_OR_RETURN(const auto vector_2, sample_vector_forced());
+        if (!vector_2.has_value()) {
+          break;
+        }
+        for (size_t j = 0; j < vector_1.value().size(); j++) {
+          anchors[i * attribute.vector_length() + j] =
+              vector_1.value()[j] - vector_2.value()[j];
+        }
       }
-      ASSIGN_OR_RETURN(const auto vector_2, sample_vector_forced());
-      if (!vector_2.has_value()) {
-        break;
-      }
-      for (size_t j = 0; j < vector_1.value().size(); j++) {
-        anchors[i * attribute.vector_length() + j] =
-            vector_1.value()[j] - vector_2.value()[j];
-      }
+      RETURN_IF_ERROR(try_projected_more_than(anchors, local_num_anchors));
     }
-    RETURN_IF_ERROR(try_projected_more_than(anchors, local_num_anchors));
 
-    for (int i = 0; i < local_num_anchors; i++) {
-      // The anchor is a random value in the dataset.
-      ASSIGN_OR_RETURN(const auto vector, sample_vector_forced());
-      if (!vector.has_value()) {
-        break;
+    if (enable_closer_than_conditions) {
+      for (int i = 0; i < local_num_anchors; i++) {
+        // The anchor is a random value in the dataset.
+        ASSIGN_OR_RETURN(const auto vector, sample_vector_forced());
+        if (!vector.has_value()) {
+          break;
+        }
+        // TODO: Better copy.
+        for (size_t j = 0; j < vector.value().size(); j++) {
+          anchors[i * attribute.vector_length() + j] = vector.value()[j];
+        }
       }
-      // TODO: Better copy.
-      for (size_t j = 0; j < vector.value().size(); j++) {
-        anchors[i * attribute.vector_length() + j] = vector.value()[j];
-      }
+      RETURN_IF_ERROR(try_closer_that(anchors, local_num_anchors));
     }
-    RETURN_IF_ERROR(try_closer_that(anchors, local_num_anchors));
   }
 
   if (effective_result_flag == SplitSearchResult::kBetterSplitFound) {

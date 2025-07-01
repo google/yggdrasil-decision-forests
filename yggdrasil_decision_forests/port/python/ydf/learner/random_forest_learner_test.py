@@ -17,7 +17,7 @@
 import os
 import random
 import signal
-from typing import Dict
+from typing import Any, Dict, Type
 
 from absl import logging
 from absl.testing import absltest
@@ -33,6 +33,8 @@ from ydf.learner import generic_learner
 from ydf.learner import learner_test_utils
 from ydf.learner import specialized_learners
 from ydf.model.decision_forest_model import decision_forest_model
+from ydf.model.tree import condition as condition_lib
+from ydf.model.tree import node as node_lib
 from ydf.utils import test_utils
 
 
@@ -828,6 +830,121 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     _ = model.analyze(test_ds)
     _ = model.get_tree(0)
     model.print_tree()
+
+  @parameterized.parameters(
+      {
+          "enable_closer_than_conditions": True,
+          "enable_projected_more_than_conditions": True,
+          "expect_closer_than": True,
+          "expect_projected_more_than": True,
+          "expect_training_failure": False,
+      },
+      {
+          "enable_closer_than_conditions": False,
+          "enable_projected_more_than_conditions": True,
+          "expect_closer_than": False,
+          "expect_projected_more_than": True,
+          "expect_training_failure": False,
+      },
+      {
+          "enable_closer_than_conditions": True,
+          "enable_projected_more_than_conditions": False,
+          "expect_closer_than": True,
+          "expect_projected_more_than": False,
+          "expect_training_failure": False,
+      },
+      {
+          "enable_closer_than_conditions": False,
+          "enable_projected_more_than_conditions": False,
+          "expect_closer_than": False,
+          "expect_projected_more_than": False,
+          "expect_training_failure": True,
+      },
+  )
+  def test_numerical_vector_sequence_condition_types(
+      self,
+      enable_closer_than_conditions: bool,
+      enable_projected_more_than_conditions: bool,
+      expect_closer_than: bool,
+      expect_projected_more_than: bool,
+      expect_training_failure: bool,
+  ):
+    def tree_contains_condition_type(
+        node: node_lib.AbstractNode,
+        condition_type: Type[Any],
+    ) -> bool:
+      """Checks if a tree contains a given condition type."""
+      if node.is_leaf:
+        return False
+      assert isinstance(node, node_lib.NonLeaf)
+
+      if isinstance(node.condition, condition_type):
+        return True
+      return tree_contains_condition_type(
+          node.neg_child, condition_type
+      ) or tree_contains_condition_type(node.pos_child, condition_type)
+
+    def model_contains_condition_type(
+        model: decision_forest_model.DecisionForestModel,
+        condition_type: Type[Any],
+    ):
+      for tree_idx in range(model.num_trees()):
+        tree = model.get_tree(tree_idx)
+        if tree_contains_condition_type(tree.root, condition_type):
+          return True
+      return False
+
+    features = []
+    labels = []
+    num_examples = 1_000
+    num_dims = 2
+    distance_limit = 0.2
+    for _ in range(num_examples):
+      num_vectors = random.randint(0, 5)
+      vectors = np.random.uniform(
+          size=(num_vectors, num_dims), low=0.0, high=1.0
+      )
+      label = np.any(
+          np.sum((vectors - np.array([[0.5, 0.5]])) ** 2, axis=1)
+          < distance_limit * distance_limit
+      )
+      features.append(vectors)
+      labels.append(label)
+
+    train_ds = {"label": np.array(labels), "features": features}
+
+    learner = specialized_learners.RandomForestLearner(
+        label="label",
+        num_trees=50,
+        numerical_vector_sequence_num_examples=2000,
+        numerical_vector_sequence_enable_closer_than_conditions=enable_closer_than_conditions,
+        numerical_vector_sequence_enable_projected_more_than_conditions=enable_projected_more_than_conditions,
+    )
+
+    if expect_training_failure:
+      with self.assertRaisesRegex(
+          test_utils.AbslInvalidArgumentError,
+          "No condition types for vector sequences are enabled. Enable"
+          " projected-more-than conditions, closer-than conditions or both.",
+      ):
+        _ = learner.train(train_ds)
+      return
+
+    model = learner.train(train_ds)
+
+    self.assertEqual(
+        model_contains_condition_type(
+            model, condition_lib.NumericalVectorSequenceCloserThanCondition
+        ),
+        expect_closer_than,
+    )
+    self.assertEqual(
+        model_contains_condition_type(
+            model,
+            condition_lib.NumericalVectorSequenceProjectedMoreThanCondition,
+        ),
+        expect_projected_more_than,
+    )
 
   def test_predict_iris(self):
     dataset_path = os.path.join(

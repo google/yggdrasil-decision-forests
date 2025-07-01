@@ -811,6 +811,9 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamHonestFixedSeparation,
       decision_tree::kHParamNumericalVectorSequenceNumExamples,
       decision_tree::kHParamNumericalVectorSequenceNumRandomAnchors,
+      decision_tree::kHParamNumericalVectorSequenceEnableCloserThanConditions,
+      decision_tree::
+          kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
   };
 
   ASSIGN_OR_RETURN(auto hparam_def,

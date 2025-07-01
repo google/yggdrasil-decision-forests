@@ -718,7 +718,6 @@ TEST(VectorSequenceCondition, Classification) {
                                       &condition, &random, &cache)
           .value();
 
-  LOG(INFO) << "condition:\n" << condition.DebugString();
   const proto::NodeCondition expected_condition = PARSE_TEST_PROTO(R"pb(
     na_value: true
     attribute: 1
@@ -738,6 +737,88 @@ TEST(VectorSequenceCondition, Classification) {
   )pb");
   EXPECT_EQ(found_condition, SplitSearchResult::kBetterSplitFound);
   EXPECT_THAT(condition, EqualsProto(expected_condition));
+
+  ASSERT_OK(vector_sequence_computer->Release());
+}
+
+TEST(VectorSequenceCondition, ClassificationForceProjectedMoreThanCondition) {
+  const model::proto::TrainingConfig config;
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(0);
+  config_link.add_features(1);
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.set_min_examples(1);
+  dt_config.mutable_numerical_vector_sequence()
+      ->set_enable_closer_than_conditions(false);
+
+  dataset::VerticalDataset dataset;
+  auto* label_spec =
+      dataset::AddColumn("l", dataset::proto::ColumnType::CATEGORICAL,
+                         dataset.mutable_data_spec());
+  label_spec->mutable_categorical()->set_is_already_integerized(true);
+  label_spec->mutable_categorical()->set_number_of_unique_values(3);
+  auto* feature_spec = dataset::AddColumn(
+      "f1", dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE,
+      dataset.mutable_data_spec());
+  feature_spec->mutable_numerical_vector_sequence()->set_vector_length(2);
+
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+
+  ASSERT_OK_AND_ASSIGN(auto* label_col,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(0));
+  ASSERT_OK_AND_ASSIGN(
+      auto* feature_col,
+      dataset.MutableColumnWithCastWithStatus<
+          dataset::VerticalDataset::NumericalVectorSequenceColumn>(1));
+
+  label_col->Add(1);
+  label_col->Add(1);
+  label_col->Add(2);
+  label_col->Add(2);
+
+  feature_col->Add({0.f, 0.f});
+  feature_col->Add({0.f, 0.f, 1.f, 1.f});
+  feature_col->Add({0.f, 0.f, 0.5f, 0.5f});
+  feature_col->Add({1.f, 1.f, 0.6f, 0.6f});
+
+  dataset.set_nrow(4);
+
+  std::vector<UnsignedExampleIdx> selected_examples(dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(selected_examples.size(), 1.f);
+
+  ClassificationLabelStats label_stats(label_col->values());
+  label_stats.num_label_classes = 3;
+  label_stats.label_distribution.SetNumClasses(3);
+  for (const auto example_idx : selected_examples) {
+    label_stats.label_distribution.Add(label_col->values()[example_idx],
+                                       weights[example_idx]);
+  }
+
+  ASSERT_OK_AND_ASSIGN(auto vector_sequence_computer,
+                       decision_tree::gpu::VectorSequenceComputer::Create(
+                           {nullptr, feature_col}, /*use_gpu=*/false));
+
+  proto::Node parent;
+  InternalTrainConfig internal_config;
+  internal_config.vector_sequence_computer = vector_sequence_computer.get();
+  proto::NodeCondition condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  const auto found_condition =
+      FindBestConditionClassification(dataset, selected_examples, weights,
+                                      config, config_link, dt_config, parent,
+                                      internal_config, label_stats, 1, {},
+                                      &condition, &random, &cache)
+          .value();
+
+  EXPECT_EQ(found_condition, SplitSearchResult::kBetterSplitFound);
+  EXPECT_TRUE(condition.condition()
+                  .numerical_vector_sequence()
+                  .has_projected_more_than());
 
   ASSERT_OK(vector_sequence_computer->Release());
 }

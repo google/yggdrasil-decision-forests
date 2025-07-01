@@ -301,6 +301,8 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/model/decision_forest_model",
+        "//ydf/model/tree:condition",
+        "//ydf/model/tree:node",
         "//ydf/utils:test_utils",
     ],
 )
