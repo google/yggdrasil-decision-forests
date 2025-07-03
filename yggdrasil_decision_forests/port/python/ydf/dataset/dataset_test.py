@@ -3088,7 +3088,7 @@ class ReservoirSamplingTest(parameterized.TestCase):
   def test_cache1(self):
     rng = np.random.default_rng()
     samples = []
-    for _ in range(100):
+    for _ in range(1000):
       sampler = dataset_lib.BatchReservoirSampling(rng=rng, cache_size=1)
       sampler.add(np.array([0]))
       sampler.add(np.array([1]))
