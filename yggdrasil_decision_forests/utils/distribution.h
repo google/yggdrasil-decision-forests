@@ -766,7 +766,7 @@ void IntegerDistribution<T>::Normalize() {
     w /= sum;
   }
 
-  sum_ = 1;  // 可选：如果你后面依赖 sum_ == 1 来判断已归一化
+  sum_ = 1;  
 }
 
 template <typename T>
