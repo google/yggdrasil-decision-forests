@@ -127,6 +127,19 @@ class BenchmarkInferenceCCResult:
   batch_size: int
   num_threads: int
 
+class GBTCCTrainingLogEntry:
+  """Training logs for a GBT model.
+
+  Attributes:
+      iteration: The iteration number for this log entry.
+      validation_evaluation: Evaluation proto for the validation dataset.
+      training_evaluation: Evaluation proto for the training dataset.
+  """
+
+  iteration: int
+  validation_evaluation: metric_pb2.EvaluationResults
+  training_evaluation: metric_pb2.EvaluationResults
+
 class GenericCCModel:
   def Predict(
       self,
@@ -254,6 +267,7 @@ class GradientBoostedTreesCCModel(DecisionForestCCModel):
   def set_initial_predictions(self, values: npt.NDArray[float]): ...
   def num_trees_per_iter(self) -> int: ...
   def loss(self) -> gradient_boosted_trees_pb2.Loss: ...
+  def training_logs(self) -> List[GBTCCTrainingLogEntry]: ...
 
 ModelCCType = TypeVar('ModelCCType', bound=GenericCCModel)
 

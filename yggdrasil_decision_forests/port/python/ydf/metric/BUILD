@@ -31,6 +31,7 @@ py_library(
     deps = [
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset:dataspec",
         "//ydf/utils:documentation",

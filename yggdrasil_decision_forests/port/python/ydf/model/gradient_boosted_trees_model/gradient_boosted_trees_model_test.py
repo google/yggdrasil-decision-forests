@@ -68,6 +68,36 @@ class GradientBoostedTreesTest(parameterized.TestCase):
     self.synthetic_ranking_gbdt = load_model("synthetic_ranking_gbdt")
     self.abalone_regression_gbdt = load_model("abalone_regression_gbdt")
 
+  def test_training_logs(self):
+    training_logs = self.gbt_adult_base_with_na.training_logs()
+
+    self.assertLen(training_logs, 100)
+    for idx, log_entry in enumerate(training_logs):
+      iteration = log_entry.iteration
+      evaluation = log_entry.evaluation
+      training_evaluation = log_entry.training_evaluation
+
+      self.assertEqual(iteration, idx + 1)
+      self.assertIsNotNone(training_evaluation)
+
+      if idx == 0:
+        self.assertAlmostEqual(evaluation.loss, 1.0824289)
+        self.assertAlmostEqual(training_evaluation.loss, 1.062329, places=6)
+      elif idx == 49:
+        self.assertAlmostEqual(evaluation.loss, 0.677054)
+        self.assertAlmostEqual(evaluation.accuracy, 0.8434505)
+        self.assertAlmostEqual(training_evaluation.loss, 0.57730037)
+      elif idx == 99:
+        self.assertAlmostEqual(evaluation.loss, 0.6498283)
+        self.assertAlmostEqual(training_evaluation.loss, 0.5057407)
+        self.assertAlmostEqual(training_evaluation.accuracy, 0.89436144)
+
+  def test_empty_training_logs(self):
+    # This model has no training logs.
+    training_logs = self.adult_binary_class_gbdt.training_logs()
+
+    self.assertEmpty(training_logs)
+
   def test_input_feature_names(self):
     self.assertEqual(
         self.adult_binary_class_gbdt.input_feature_names(),
@@ -601,7 +631,6 @@ class EditModelTest(absltest.TestCase):
     model.remove_tree(0)
     self.assertEqual(model.num_trees(), 0)
     self.assertSequenceEqual(model.input_feature_names(), ["x1", "x2", "x3"])
-
 
 if __name__ == "__main__":
   absltest.main()

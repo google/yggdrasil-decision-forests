@@ -96,7 +96,7 @@ message TrainingLogs {
 
   message Entry {
     // Number of trees. In the case of multi-dimensional gradients,
-    // "number_of_trees" is the number of training step.
+    // `number_of_trees` is the number of training steps.
     optional int32 number_of_trees = 1;
     // Performance of the model on the training dataset.
     optional float training_loss = 2;

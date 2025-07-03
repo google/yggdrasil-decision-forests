@@ -348,8 +348,15 @@ class Evaluation:
 
   @property
   def accuracy(self) -> Optional[float]:
+    """Returns the accuracy for classification tasks and None otherwise."""
     if self._evaluation_proto.HasField("classification"):
       clas = self._evaluation_proto.classification
+      # If the accuracy is stored in the proto, just return it
+      if clas.HasField("accuracy"):
+        return clas.accuracy
+
+      # If the accuracy is not stored in the proto, try to compute it from the
+      # confusion table.
       classes = dataspec.categorical_column_dictionary_to_list(
           self._evaluation_proto.label_column
       )

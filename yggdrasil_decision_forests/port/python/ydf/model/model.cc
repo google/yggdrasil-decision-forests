@@ -190,6 +190,13 @@ void init_model(py::module_& m) {
         the examples of the dataset. Warmup runs are not included.
       batch_size: Number of examples per batch used when benchmarking.)";
 
+  py::class_<GBTCCTrainingLogEntry>(m, "GBTCCTrainingLogEntry")
+      .def_readonly("iteration", &GBTCCTrainingLogEntry::iteration)
+      .def_readonly("validation_evaluation",
+                    &GBTCCTrainingLogEntry::validation_evaluation)
+      .def_readonly("training_evaluation",
+                    &GBTCCTrainingLogEntry::training_evaluation);
+
   py::class_<DecisionForestCCModel,
              /*parent class*/ GenericCCModel>(m, "DecisionForestCCModel")
       .def("__repr__",
@@ -261,6 +268,7 @@ void init_model(py::module_& m) {
            &GradientBoostedTreesCCModel::set_initial_predictions)
       .def("validation_evaluation",
            &GradientBoostedTreesCCModel::validation_evaluation)
+      .def("training_logs", &GradientBoostedTreesCCModel::training_logs)
       .def("loss", &GradientBoostedTreesCCModel::loss)
       .def("num_trees_per_iter",
            &GradientBoostedTreesCCModel::num_trees_per_iter)

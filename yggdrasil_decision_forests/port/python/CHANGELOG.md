@@ -4,14 +4,19 @@
 
 ### API Changes
 
+-   For Random Forest models, `.out_of_bag_evaluations()` now returns a
+    TrainingLogs object. The content is identical to the object previously
+    returned, but the `number_of_trees` property has been renamed to
+    `iteration` for consistency with Gradient Boosted Trees Training Logs.
 -   `mode="tf"` is now the default on `model.to_tensorflow_saved_model()`. The
     previous default is still available by setting `mode="keras"`.
 -   `model.label()` returns None for models trained without label.
--   Remove deprecated `evaluation_task` argument for `model.evaluate()`. Use 
+-   Remove deprecated `evaluation_task` argument for `model.evaluate()`. Use
     `task` instead.
 
 ### Feature
 
+-   Add `model.training_logs()` method to return the training logs of the model.
 -   Expose Mean Average Precision for Ranking tasks.
 -   Add hyperparameters
     `numerical_vector_sequence_enable_closer_than_conditions` and

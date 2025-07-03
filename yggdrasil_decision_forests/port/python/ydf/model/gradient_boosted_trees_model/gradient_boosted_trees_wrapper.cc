@@ -25,6 +25,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 
 namespace yggdrasil_decision_forests::port::python {
 
@@ -64,6 +65,32 @@ void GradientBoostedTreesCCModel::set_initial_predictions(
     std_values[i] = values.at(i);
   }
   gbt_model_->set_initial_predictions(std::move(std_values));
+}
+
+std::vector<GBTCCTrainingLogEntry> GradientBoostedTreesCCModel::training_logs()
+    const {
+  std::vector<GBTCCTrainingLogEntry> logs;
+  const auto& training_logs = gbt_model_->training_logs();
+  const auto& label_col_spec = gbt_model_->label_col_spec();
+  logs.reserve(training_logs.entries_size());
+  for (const auto& entry : training_logs.entries()) {
+    const auto& validation_evaluation =
+        model::gradient_boosted_trees::internal::TrainingLogToEvaluationResults(
+            entry, training_logs, gbt_model_->task(), label_col_spec,
+            gbt_model_->loss_config(), gbt_model_->GetLossName(),
+            model::gradient_boosted_trees::internal::TrainingLogEvaluationSet::
+                kValidation);
+    const auto& training_evaluation =
+        model::gradient_boosted_trees::internal::TrainingLogToEvaluationResults(
+            entry, training_logs, gbt_model_->task(), label_col_spec,
+            gbt_model_->loss_config(), gbt_model_->GetLossName(),
+            model::gradient_boosted_trees::internal::TrainingLogEvaluationSet::
+                kTraining);
+    logs.push_back({.iteration = entry.number_of_trees(),
+                    .validation_evaluation = validation_evaluation,
+                    .training_evaluation = training_evaluation});
+  }
+  return logs;
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

@@ -125,7 +125,7 @@ message GradientBoostedTreesTrainingConfig {
   // Evaluate the model on the validation set every
   // "validation_interval_in_trees" trees.
   //
-  // Impact the early stopping policy.
+  // Impacts the early stopping policy.
   optional int32 validation_interval_in_trees = 7 [default = 1];
 
   // If set and >0, export the training logs every

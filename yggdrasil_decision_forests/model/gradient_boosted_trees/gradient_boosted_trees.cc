@@ -597,10 +597,6 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
                     "for training (i.e. validation_set_ratio == 0).";
     return {};
   }
-  metric::proto::EvaluationResults validation_evaluation;
-  validation_evaluation.set_task(task_);
-  validation_evaluation.set_loss_value(validation_loss_);
-  validation_evaluation.set_loss_name(GetLossName());
 
   for (const auto& log : training_logs_.entries()) {
     // The log entry corresponding to the final model is identified with the
@@ -609,37 +605,18 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
         training_logs_.number_of_trees_in_final_model()) {
       continue;
     }
-    // `log` is the training log that corresponds to the final model.
-    for (int metrix_idx = 0;
-         metrix_idx < training_logs_.secondary_metric_names_size();
-         metrix_idx++) {
-      const auto& metric_name =
-          training_logs_.secondary_metric_names(metrix_idx);
-      const auto metric_value = log.validation_secondary_metrics(metrix_idx);
-      // Some classical metric names.
-      if (metric_name == "accuracy") {
-        validation_evaluation.mutable_classification()->set_accuracy(
-            metric_value);
-      } else if (metric_name == "rmse") {
-        validation_evaluation.mutable_regression()->set_sum_square_error(
-            metric_value);
-        validation_evaluation.set_count_predictions(1.f);
-      } else if (absl::StartsWith(metric_name, "NDCG@")) {
-        validation_evaluation.mutable_ranking()->mutable_ndcg()->set_value(
-            metric_value);
-        validation_evaluation.mutable_ranking()->set_ndcg_truncation(
-            loss_config_.lambda_mart_ndcg().ndcg_truncation());
-      } else {
-        LOG(WARNING) << "Unknown metric name:" << metric_name;
-      }
-    }
-    if (task_ == model::proto::Task::CLASSIFICATION &&
-        log.has_validation_confusion_matrix()) {
-      *validation_evaluation.mutable_label_column() = label_col_spec();
-      *validation_evaluation.mutable_classification()->mutable_confusion() =
-          log.validation_confusion_matrix();
-    }
+    // `log` is the training log that corresponds to the final model. Return it.
+    return internal::TrainingLogToEvaluationResults(
+        log, training_logs_, task_, label_col_spec(), loss_config_,
+        GetLossName(), internal::TrainingLogEvaluationSet::kValidation);
   }
+
+  // No training logs available, but it might still be possibly to report the
+  // validation loss.
+  metric::proto::EvaluationResults validation_evaluation;
+  validation_evaluation.set_task(task_);
+  validation_evaluation.set_loss_value(validation_loss_);
+  validation_evaluation.set_loss_name(GetLossName());
 
   return validation_evaluation;
 }
@@ -934,6 +911,51 @@ float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree& tree) {
   } else {
     return 0;
   }
+}
+
+metric::proto::EvaluationResults TrainingLogToEvaluationResults(
+    const proto::TrainingLogs::Entry& log_entry,
+    const proto::TrainingLogs& training_logs, const model::proto::Task& task,
+    const dataset::proto::Column& label_col_spec,
+    const proto::LossConfiguration& loss_config,
+    const absl::string_view loss_name,
+    const TrainingLogEvaluationSet eval_set) {
+  metric::proto::EvaluationResults evaluation;
+  evaluation.set_task(task);
+  evaluation.set_loss_name(loss_name);
+  evaluation.set_loss_value(eval_set == TrainingLogEvaluationSet::kValidation
+                                ? log_entry.validation_loss()
+                                : log_entry.training_loss());
+
+  for (int metrix_idx = 0;
+       metrix_idx < training_logs.secondary_metric_names_size(); metrix_idx++) {
+    const auto& metric_name = training_logs.secondary_metric_names(metrix_idx);
+    const auto metric_value =
+        eval_set == TrainingLogEvaluationSet::kValidation
+            ? log_entry.validation_secondary_metrics(metrix_idx)
+            : log_entry.training_secondary_metrics(metrix_idx);
+    // Some classical metric names.
+    if (metric_name == "accuracy") {
+      evaluation.mutable_classification()->set_accuracy(metric_value);
+    } else if (metric_name == "rmse") {
+      evaluation.mutable_regression()->set_sum_square_error(metric_value);
+      evaluation.set_count_predictions(1.f);
+    } else if (absl::StartsWith(metric_name, "NDCG@")) {
+      evaluation.mutable_ranking()->mutable_ndcg()->set_value(metric_value);
+      evaluation.mutable_ranking()->set_ndcg_truncation(
+          loss_config.lambda_mart_ndcg().ndcg_truncation());
+    } else {
+      LOG(WARNING) << "Unknown metric name:" << metric_name;
+    }
+  }
+  if (task == model::proto::Task::CLASSIFICATION &&
+      log_entry.has_validation_confusion_matrix() &&
+      eval_set == TrainingLogEvaluationSet::kValidation) {
+    *evaluation.mutable_label_column() = label_col_spec;
+    *evaluation.mutable_classification()->mutable_confusion() =
+        log_entry.validation_confusion_matrix();
+  }
+  return evaluation;
 }
 
 }  // namespace internal
