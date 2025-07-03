@@ -1,0 +1,104 @@
+#ifndef YDF_MODEL_MY_MODEL_H_
+#define YDF_MODEL_MY_MODEL_H_
+
+#include <stdint.h>
+#include <array>
+#include <algorithm>
+#include <bitset>
+#include <cassert>
+
+namespace my_model {
+
+constexpr const int kNumFeatures = 4;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  float sepal_length;
+  float sepal_width;
+  float petal_length;
+  float petal_width;
+};
+
+struct Label {
+  enum {
+    kSetosa = 0,
+    kVersicolor = 1,
+    kVirginica = 2,
+  };
+};
+
+struct __attribute__((packed)) Node {
+  uint8_t pos = 0;
+  union {
+    struct {
+      uint8_t feature;
+      union {
+        float threshold;
+      };
+    } cond;
+    struct {
+      float value;
+    } leaf;
+  };
+};
+
+static const uint8_t root_deltas[] = {5,15,11};
+
+static const Node nodes[] = {
+{.pos=1,.cond={.feature=3,.threshold=0.8}},
+{.leaf={.value=0.3}},
+{.pos=1,.cond={.feature=2,.threshold=3.65}},
+{.leaf={.value=-0.15}},
+{.leaf={.value=-0.15}},
+{.pos=3,.cond={.feature=3,.threshold=0.8}},
+{.pos=1,.cond={.feature=2,.threshold=1.45}},
+{.leaf={.value=-0.15}},
+{.leaf={.value=-0.15}},
+{.pos=5,.cond={.feature=3,.threshold=1.75}},
+{.pos=3,.cond={.feature=2,.threshold=4.95}},
+{.pos=1,.cond={.feature=0,.threshold=5.3}},
+{.leaf={.value=0.21}},
+{.leaf={.value=0.3}},
+{.leaf={.value=0.03}},
+{.pos=1,.cond={.feature=2,.threshold=4.95}},
+{.leaf={.value=-0.06}},
+{.pos=1,.cond={.feature=0,.threshold=7.25}},
+{.leaf={.value=-0.15}},
+{.leaf={.value=-0.15}},
+{.pos=7,.cond={.feature=3,.threshold=1.65}},
+{.pos=5,.cond={.feature=2,.threshold=4.85}},
+{.pos=3,.cond={.feature=3,.threshold=0.35}},
+{.pos=1,.cond={.feature=1,.threshold=3.45}},
+{.leaf={.value=-0.15}},
+{.leaf={.value=-0.15}},
+{.leaf={.value=-0.15}},
+{.leaf={.value=0.075}},
+{.pos=1,.cond={.feature=2,.threshold=5.05}},
+{.leaf={.value=0.2}},
+{.leaf={.value=0.3}},
+};
+
+inline uint8_t Predict(const Instance& instance) {
+  std::array<float, 3> accumulator {0, 0, 0};
+
+  const Node* root = nodes;
+  const Node* node;
+  const auto* raw_numerical = reinterpret_cast<const float*>(&instance);
+  (void) raw_numerical;
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+        eval = raw_numerical[node->cond.feature] >= node->cond.threshold;
+
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator[tree_idx % 3] += node->leaf.value;
+    root += root_deltas[tree_idx];
+  }
+
+  return std::distance(accumulator.begin(), std::max_element(accumulator.begin(), accumulator.end()));
+}
+
+}  // namespace my_model
+#endif

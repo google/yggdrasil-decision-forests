@@ -422,10 +422,14 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
             return values;
           };
 
-          // TODO: Implement.
-          spec.routing_node = R"(
-    assert(false); // This leaf is not implemented.
-)";
+          spec.routing_node =
+              absl::Substitute(R"(
+    const size_t offset = node->leaf.value * $0;
+    for(int dim=0; dim!=$0; dim++) {
+      accumulator[dim] += leaf_value_bank[offset + dim];
+    }
+)",
+                               stats.num_classification_classes);
         }
       }
 
@@ -1182,16 +1186,39 @@ absl::Status GenRoutingModelDataNode(
     const proto::Options& options, const InternalOptions& internal_options,
     const model::decision_tree::NodeWithChildren& node, const int depth,
     std::string* serialized_nodes, int* node_idx,
-    std::vector<bool>* categorical_bank) {
+    std::vector<bool>* categorical_bank, std::vector<float>* leaf_value_bank) {
   if (node.IsLeaf()) {
     absl::StrAppend(serialized_nodes, "{.leaf={.value=");
 
     // Unroll the leaf values.
     const auto leaf_value = specialized_conversion.leaf_value_fn(node.node());
     if (specialized_conversion.leaf_value_spec.dims > 1) {
-      // TODO: Implement multi-dimensional leaf values.
-      return absl::UnimplementedError("Multi-dimensional leaf values");
+      // The leaf value is an index into the "leaf_value_bank" array divided by
+      // the output node dimension. Since all the leaves have the same
+      // dimension, this last division allows to store smaller integers,
+      // possibly requiring a smaller integer representation.
+      STATUS_CHECK_EQ(
+          leaf_value_bank->size() % specialized_conversion.leaf_value_spec.dims,
+          0);
+      const auto encoded_leaf_value =
+          leaf_value_bank->size() / specialized_conversion.leaf_value_spec.dims;
+      absl::StrAppend(serialized_nodes, encoded_leaf_value);
+
+      // Add the leaf values to the bank.
+      if (std::holds_alternative<std::vector<float>>(leaf_value)) {
+        const auto& typed_values = std::get<std::vector<float>>(leaf_value);
+        STATUS_CHECK_EQ(typed_values.size(),
+                        specialized_conversion.leaf_value_spec.dims);
+        leaf_value_bank->insert(leaf_value_bank->end(), typed_values.begin(),
+                                typed_values.end());
+      } else {
+        // Note: We don't implement the int32 and bool version as they are not
+        // used (yet?).
+        return absl::InvalidArgumentError("Non supported leaf type");
+      }
     } else {
+      // TODO: The use of variates is verbose. Make this block simpler &
+      // more readable.
       if (std::holds_alternative<std::vector<bool>>(leaf_value)) {
         absl::StrAppend(serialized_nodes,
                         std::get<std::vector<bool>>(leaf_value).front());
@@ -1222,7 +1249,7 @@ absl::Status GenRoutingModelDataNode(
   RETURN_IF_ERROR(GenRoutingModelDataNode(
       model, dataspec, stats, specialized_conversion, options, internal_options,
       *node.neg_child(), depth + 1, &serialized_neg_nodes, node_idx,
-      categorical_bank));
+      categorical_bank, leaf_value_bank));
 
   // This is the node offset between a parent node and the positive node. Note
   // that the offset to the negative node is 1 and does not need to be encoded.
@@ -1315,7 +1342,7 @@ absl::Status GenRoutingModelDataNode(
   RETURN_IF_ERROR(GenRoutingModelDataNode(
       model, dataspec, stats, specialized_conversion, options, internal_options,
       *node.pos_child(), depth + 1, serialized_nodes, node_idx,
-      categorical_bank));
+      categorical_bank, leaf_value_bank));
 
   return absl::OkStatus();
 }
@@ -1360,8 +1387,8 @@ absl::Status GenRoutingModelData(
   } else {
     // The leaf values are stored in a separate buffer. The node struct contains
     // an index to this buffer.
-    node_value_type =
-        UnsignedInteger(MaxUnsignedValueToNumBytes(stats.num_leaves));
+    node_value_type = UnsignedInteger(MaxUnsignedValueToNumBytes(
+        stats.num_leaves / specialized_conversion.leaf_value_spec.dims));
   }
 
   // TODO: Add boolean condition support.
@@ -1402,6 +1429,9 @@ struct __attribute__((packed)) Node {
 
   std::vector<bool> categorical_bank;
 
+  // Values of leaf nodes that are stored outside of the node.
+  std::vector<float> leaf_value_bank;
+
   // The "root_deltas" contains the number of nodes in each tree. The node index
   // of the root of each tree can be computed by running a cumulative sum.
   std::vector<int> root_deltas;
@@ -1415,7 +1445,7 @@ struct __attribute__((packed)) Node {
     RETURN_IF_ERROR(GenRoutingModelDataNode(
         model, dataspec, stats, specialized_conversion, options,
         internal_options, tree->root(), 0, &serialized_nodes, &node_idx,
-        &categorical_bank));
+        &categorical_bank, &leaf_value_bank));
     root_deltas.push_back(node_idx - begin_node_idx);
   }
 
@@ -1480,6 +1510,15 @@ static const $0 root_deltas[] = {$1};
         categorical_bank.size(),
         absl::StrJoin(categorical_bank.rbegin(), categorical_bank.rend(), ""));
   }
+
+  // Record the leaf value bank.
+  if (!leaf_value_bank.empty()) {
+    absl::SubstituteAndAppend(content, R"(
+static const float leaf_value_bank[] = {$0};
+)",
+                              absl::StrJoin(leaf_value_bank, ","));
+  }
+
   return absl::OkStatus();
 }
 

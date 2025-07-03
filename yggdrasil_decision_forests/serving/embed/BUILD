@@ -160,9 +160,11 @@ cc_test(
         ":test_model_iris_multi_class_gbdt_v2_score",
         ":test_model_iris_multi_class_rf_nwta_small_class",
         ":test_model_iris_multi_class_rf_nwta_small_proba",
+        ":test_model_iris_multi_class_rf_nwta_small_proba_routing",
         ":test_model_iris_multi_class_rf_nwta_small_score",
         ":test_model_iris_multi_class_rf_wta_small_class",
         ":test_model_iris_multi_class_rf_wta_small_proba",
+        ":test_model_iris_multi_class_rf_wta_small_proba_routing",
         ":test_model_iris_multi_class_rf_wta_small_score",
         "@com_google_googletest//:gtest_main",
     ],
@@ -345,7 +347,13 @@ cc_ydf_embedded_model(
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
 )
 
-# TODO: Add test for routing version.
+cc_ydf_embedded_model(
+    name = "test_model_iris_multi_class_rf_nwta_small_proba_routing",
+    algorithm = "ROUTING",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
+)
 
 cc_ydf_embedded_model(
     name = "test_model_iris_multi_class_rf_wta_small_class",
@@ -368,4 +376,10 @@ cc_ydf_embedded_model(
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
 )
 
-# TODO: Add test for routing version.
+cc_ydf_embedded_model(
+    name = "test_model_iris_multi_class_rf_wta_small_proba_routing",
+    algorithm = "ROUTING",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
+)

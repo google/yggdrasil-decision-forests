@@ -18,6 +18,7 @@
 #include "yggdrasil_decision_forests/serving/embed/embed.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -98,85 +99,138 @@ TestData BuildToyTestData() {
   return TestData{.model = std::move(model)};
 };
 
-TEST(Embed, AdultBinaryGBTClass) {
+struct GoldenGeneratedHCase {
+  std::string model_filename;
+  std::string golden_filename;
+  proto::Algorithm::Enum algorithm;
+  std::optional<proto::ClassificationOutput::Enum> output;
+  int crop_num_trees = 3;
+};
+
+// Compare the generated .h files against golden files.
+SIMPLE_PARAMETERIZED_TEST(
+    GoldenGeneratedH, GoldenGeneratedHCase,
+    {
+        // GBT
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_class.h.golden",
+            proto::Algorithm::IF_ELSE,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_score.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_probability.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_probability_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "iris_multi_class_gbdt_v2",
+            "iris_multi_class_gbdt_v2_probability_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+        },
+        {
+            "iris_multi_class_gbdt_v2",
+            "iris_multi_class_gbdt_v2_probability_routing.h.golden",
+            proto::Algorithm::ROUTING,
+        },
+        {
+            "abalone_regression_gbdt_v2",
+            "abalone_regression_gbdt_v2_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+        },
+        {
+            "abalone_regression_gbdt_v2",
+            "abalone_regression_gbdt_v2_routing.h.golden",
+            proto::Algorithm::ROUTING,
+        },
+        // RF
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_class_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+        },
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_proba_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_proba_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "abalone_regression_rf_small",
+            "abalone_regression_rf_small_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+        },
+        {
+            "abalone_regression_rf_small",
+            "abalone_regression_rf_small_routing.h.golden",
+            proto::Algorithm::ROUTING,
+        },
+        {
+            "iris_multi_class_rf_nwta_small",
+            "iris_multi_class_rf_nwta_small_class_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+        },
+        {
+            "iris_multi_class_rf_nwta_small",
+            "iris_multi_class_rf_nwta_small_score_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "iris_multi_class_rf_nwta_small",
+            "iris_multi_class_rf_nwta_small_proba_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "iris_multi_class_rf_nwta_small",
+            "iris_multi_class_rf_nwta_small_proba_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+    }) {
+  const auto& test_case = GetParam();
+
   ASSERT_OK_AND_ASSIGN(
-      auto model, model::LoadModel(file::JoinPath(
-                      TestDataDir(), "model", "adult_binary_class_gbdt_v2")));
-  auto model_gbt =
-      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
-          model.get());
-  model_gbt->mutable_decision_trees()->resize(3);
-
-  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model));
-  EXPECT_EQ(embed.size(), 1);
-  EXPECT_TRUE(embed.contains("my_model.h"));
-
-  test::ExpectEqualGolden(
-      embed.at("my_model.h"),
-      "yggdrasil_decision_forests/test_data/"
-      "golden/embed/adult_binary_class_gbdt_v2_class.h.golden");
-}
-
-TEST(Embed, AdultBinaryGBTScore) {
-  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
-                                             TestDataDir(), "model",
-                                             "adult_binary_class_gbdt_v2")));
-  auto model_gbt =
-      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
-          model.get());
-  model_gbt->mutable_decision_trees()->resize(3);
+      auto model, model::LoadModel(file::JoinPath(TestDataDir(), "model",
+                                                  test_case.model_filename)));
+  auto df = dynamic_cast<model::DecisionForestInterface*>(model.get());
+  if (df) {
+    df->mutable_decision_trees()->resize(test_case.crop_num_trees);
+  }
 
   proto::Options options;
-  options.set_classification_output(proto::ClassificationOutput::SCORE);
+  options.set_algorithm(test_case.algorithm);
+  if (test_case.output.has_value()) {
+    options.set_classification_output(*test_case.output);
+  }
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
   EXPECT_EQ(embed.size(), 1);
   EXPECT_TRUE(embed.contains("my_model.h"));
 
   test::ExpectEqualGolden(
       embed.at("my_model.h"),
-      "yggdrasil_decision_forests/test_data/"
-      "golden/embed/adult_binary_class_gbdt_v2_score.h.golden");
-}
-
-TEST(Embed, AdultBinaryGBTProbability) {
-  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
-                                             TestDataDir(), "model",
-                                             "adult_binary_class_gbdt_v2")));
-  auto model_gbt =
-      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
-          model.get());
-  model_gbt->mutable_decision_trees()->resize(3);
-  proto::Options options;
-  options.set_classification_output(proto::ClassificationOutput::PROBABILITY);
-  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
-  EXPECT_EQ(embed.size(), 1);
-  EXPECT_TRUE(embed.contains("my_model.h"));
-
-  test::ExpectEqualGolden(
-      embed.at("my_model.h"),
-      "yggdrasil_decision_forests/test_data/"
-      "golden/embed/adult_binary_class_gbdt_v2_probability.h.golden");
-}
-
-TEST(Embed, AdultBinaryGBTProbabilityRouting) {
-  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(file::JoinPath(
-                                             TestDataDir(), "model",
-                                             "adult_binary_class_gbdt_v2")));
-  auto model_gbt =
-      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
-          model.get());
-  model_gbt->mutable_decision_trees()->resize(3);
-  proto::Options options;
-  options.set_classification_output(proto::ClassificationOutput::PROBABILITY);
-  options.set_algorithm(proto::Algorithm::ROUTING);
-  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
-  EXPECT_EQ(embed.size(), 1);
-  EXPECT_TRUE(embed.contains("my_model.h"));
-
-  test::ExpectEqualGolden(
-      embed.at("my_model.h"),
-      "yggdrasil_decision_forests/test_data/"
-      "golden/embed/adult_binary_class_gbdt_v2_probability_routing.h.golden");
+      file::JoinPath("yggdrasil_decision_forests/test_data/"
+                     "golden/embed",
+                     test_case.golden_filename));
 }
 
 TEST(Process, ManualBinaryGBT) {

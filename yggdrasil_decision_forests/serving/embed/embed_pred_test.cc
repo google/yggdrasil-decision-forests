@@ -57,9 +57,11 @@ print(model.predict(ds[:1]))
 #include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_gbdt_v2_score.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_nwta_small_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_nwta_small_proba.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_nwta_small_proba_routing.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_nwta_small_score.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_wta_small_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_wta_small_proba.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_wta_small_proba_routing.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_iris_multi_class_rf_wta_small_score.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
@@ -269,6 +271,14 @@ TEST(Embed, test_model_iris_multi_class_rf_nwta_small_proba) {
   EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
 }
 
+TEST(Embed, test_model_iris_multi_class_rf_nwta_small_proba_routing) {
+  using namespace test_model_iris_multi_class_rf_nwta_small_proba_routing;
+  const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
+  EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
+  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
+  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+}
+
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_class) {
   using namespace test_model_iris_multi_class_rf_wta_small_class;
   const int pred = Predict(IRIS_EXAMPLE);
@@ -285,6 +295,14 @@ TEST(Embed, test_model_iris_multi_class_rf_wta_small_score) {
 
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_proba) {
   using namespace test_model_iris_multi_class_rf_wta_small_proba;
+  const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
+  EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
+  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
+  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+}
+
+TEST(Embed, test_model_iris_multi_class_rf_wta_small_proba_routing) {
+  using namespace test_model_iris_multi_class_rf_wta_small_proba_routing;
   const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
   EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
   EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);

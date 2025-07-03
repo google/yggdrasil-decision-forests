@@ -1,0 +1,108 @@
+#ifndef YDF_MODEL_MY_MODEL_H_
+#define YDF_MODEL_MY_MODEL_H_
+
+#include <stdint.h>
+#include <array>
+#include <algorithm>
+#include <cmath>
+#include <bitset>
+#include <cassert>
+
+namespace my_model {
+
+constexpr const int kNumFeatures = 4;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  float sepal_length;
+  float sepal_width;
+  float petal_length;
+  float petal_width;
+};
+
+struct Label {
+  enum {
+    kSetosa = 0,
+    kVersicolor = 1,
+    kVirginica = 2,
+  };
+};
+
+struct __attribute__((packed)) Node {
+  uint8_t pos = 0;
+  union {
+    struct {
+      uint8_t feature;
+      union {
+        float threshold;
+      };
+    } cond;
+    struct {
+      uint8_t value;
+    } leaf;
+  };
+};
+
+static const uint8_t root_deltas[] = {13,9,7};
+
+static const Node nodes[] = {
+{.pos=1,.cond={.feature=3,.threshold=0.75}},
+{.leaf={.value=0}},
+{.pos=7,.cond={.feature=3,.threshold=1.65}},
+{.pos=1,.cond={.feature=3,.threshold=1.35}},
+{.leaf={.value=1}},
+{.pos=1,.cond={.feature=1,.threshold=2.65}},
+{.leaf={.value=2}},
+{.pos=1,.cond={.feature=0,.threshold=6.65}},
+{.leaf={.value=3}},
+{.leaf={.value=4}},
+{.pos=1,.cond={.feature=2,.threshold=4.85}},
+{.leaf={.value=5}},
+{.leaf={.value=6}},
+{.pos=1,.cond={.feature=3,.threshold=0.8}},
+{.leaf={.value=7}},
+{.pos=3,.cond={.feature=2,.threshold=4.95}},
+{.pos=1,.cond={.feature=3,.threshold=1.65}},
+{.leaf={.value=8}},
+{.leaf={.value=9}},
+{.pos=1,.cond={.feature=3,.threshold=1.75}},
+{.leaf={.value=10}},
+{.leaf={.value=11}},
+{.pos=1,.cond={.feature=2,.threshold=2.6}},
+{.leaf={.value=12}},
+{.pos=3,.cond={.feature=3,.threshold=1.75}},
+{.pos=1,.cond={.feature=3,.threshold=1.55}},
+{.leaf={.value=13}},
+{.leaf={.value=14}},
+{.leaf={.value=15}},
+};
+
+static const float leaf_value_bank[] = {0.333333,0,0,0,0.333333,0,0,0.2,0.133333,0,0.333333,0,0,0.266667,0.0666667,0,0.166667,0.166667,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.125,0.208333,0,0.133333,0.2,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.266667,0.0666667,0,0,0.333333};
+
+inline std::array<float, 3> Predict(const Instance& instance) {
+  std::array<float, 3> accumulator {0};
+
+  const Node* root = nodes;
+  const Node* node;
+  const auto* raw_numerical = reinterpret_cast<const float*>(&instance);
+  (void) raw_numerical;
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+        eval = raw_numerical[node->cond.feature] >= node->cond.threshold;
+
+      node += (node->pos & -eval) + 1;
+    }
+    const size_t offset = node->leaf.value * 3;
+    for(int dim=0; dim!=3; dim++) {
+      accumulator[dim] += leaf_value_bank[offset + dim];
+    }
+    root += root_deltas[tree_idx];
+  }
+
+return accumulator;
+}
+
+}  // namespace my_model
+#endif
