@@ -1330,8 +1330,8 @@ Use `model.describe()` for more details
   def training_logs(self) -> List[TrainingLogEntry]:
     """Returns the model's training logs.
 
-    The training logs contain the evaluation of the model at different points
-    during training.
+    The training logs contain performance metrics calculated periodically during
+    the model's training. The content of the logs depends on the model type.
 
     The method used for evaluation depends on the model type and
     hyperparameters. Notably, Random Forests use OOB evaluation and Gradient
@@ -1355,8 +1355,10 @@ Use `model.describe()` for more details
     logs = model.training_logs()
 
     # Plot the accuracy
-    plt.plot([log.iteration for log in logs], [log.evaluation.accuracy for
-    log in logs])
+    plt.plot(
+        [log.iteration for log in logs],
+        [log.evaluation.accuracy for log in logs]
+    )
     ```
     """
     raise NotImplementedError(

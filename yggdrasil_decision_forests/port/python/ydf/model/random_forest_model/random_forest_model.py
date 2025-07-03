@@ -15,25 +15,12 @@
 """Definitions for Random Forest models."""
 
 import dataclasses
-from typing import Optional, Sequence
-from yggdrasil_decision_forests.metric import metric_pb2
+from typing import List, Optional, Sequence, Tuple
 from yggdrasil_decision_forests.model.random_forest import random_forest_pb2
 from ydf.cc import ydf
 from ydf.metric import metric
+from ydf.model import generic_model
 from ydf.model.decision_forest_model import decision_forest_model
-
-
-@dataclasses.dataclass(frozen=True)
-class OutOfBagEvaluation:
-  """A collection of out-of-bag metrics.
-
-  Attributes:
-    number_of_trees: Number of trees when the evaluation was created.
-    evaluation: Rich evaluation object containing the OOB evaluation metrics.
-  """
-
-  number_of_trees: int
-  evaluation: metric.Evaluation
 
 
 class RandomForestModel(decision_forest_model.DecisionForestModel):
@@ -41,48 +28,78 @@ class RandomForestModel(decision_forest_model.DecisionForestModel):
 
   _model: ydf.RandomForestCCModel
 
-  def out_of_bag_evaluations(self) -> Sequence[OutOfBagEvaluation]:
-    """Returns the Out-Of-Bag evaluations of the model, if available.
+  def out_of_bag_evaluations(self) -> Sequence[generic_model.TrainingLogEntry]:
+    """Alias for `training_logs()` for Random Forest models."""
+    return self.training_logs()
 
-    Each tree in a random forest is only trained on a fraction of the training
-    examples. Out-of-bag (OOB) evaluations evaluate each training example on the
-    trees that have not seen it in training. This creates a self-evaluation
-    method that does not require a training dataset. See
-    https://developers.google.com/machine-learning/decision-forests/out-of-bag
-    for details.
+  def training_logs(self) -> List[generic_model.TrainingLogEntry]:
+    """Returns the Out-of-Bag evaluation logs for the Random Forest model.
 
-    Computing OOB metrics slows down training and requires hyperparameter
-    `compute_oob_performances` to be set. The learner then computes the OOB
-    evaluation at regular intervals during the training. The returned list of
-    evaluations is sorted by the number of trees and its last element is the OOB
-    evaluation of the full model.
+      For Random Forests, the training logs contain performance metrics
+      calculated periodically during training using the Out-of-Bag (OOB) data.
+      Each tree in a random forest is trained on a bootstrap sample of the
+      training data. The OOB evaluation uses each training example as a test
+      case for the subset of trees that were not trained on it. This method
+      provides an unbiased estimate of the model's performance without requiring
+      a separate validation set.
 
-    If no OOB evaluations have been computed, an empty list is returned.
+      To generate these logs, the `compute_oob_performances` hyperparameter must
+      be set to `True` (which is the default). Please note that enabling this
+      can slightly slow down training.
 
-    Usage example:
+      The OOB evaluation is not computed after every single tree. Instead, the
+      learner calculates it periodically when one of the following is true:
+        - The most recently trained tree is the final tree of the model.
+        - More than 10 seconds have passed since the last OOB evaluation.
+        - More than 10 trees have been trained since the last OOB evaluation.
 
-    ```python
-    import pandas as pd
-    import ydf
+      The returned list of `TrainingLogEntry` objects is sorted by iteration,
+      allowing you to easily plot the model's learning curve. The training
+      iteration is equal to the number of trees when the model was trained. The
+      last entry in the list represents the final OOB evaluation for the fully
+      trained model.
 
-    # Train model
-    train_ds = pd.read_csv("train.csv")
-    learner = ydf.RandomForestLearner(label="label",
-                                      compute_oob_performances=True)
-    model = learner.train(train_ds)
+      For more details, see the [explanation of OOB
+      evaluation](https://developers.google.com/machine-learning/decision-forests/out-of-bag).
 
-    oob_evaluations = model.out_of_bag_evaluations()
-    # In an interactive Python environment, print a rich evaluation report.
-    oob_evaluations[-1].evaluation
-    ```
+      Random Forest models do not return a `training_evalution`.
+
+      For CART models, the training logs have a single entry, containing the
+      evaluation on the validation dataset.
+
+      Usage example:
+
+      ```python
+      import pandas as pd
+      import ydf
+
+      # Train model
+      train_ds = pd.read_csv("train.csv")
+      model = ydf.RandomForestLearner(label="label").train(train_ds)
+
+      # Get the training logs
+      logs = model.training_logs()
+
+      # Plot the accuracy.
+      plt.plot(
+          [log.iteration for log in logs],
+          [log.evaluation.accuracy for log in logs]
+      )
+      ```
+
+    Returns:
+      A list of `TrainingLogEntry` objects, each containing the OOB evaluation
+      metrics and the number of trees in the model at that point in training.
+      Returns an empty list if logs were not generated.
     """
     raw_evaluations: Sequence[random_forest_pb2.OutOfBagTrainingEvaluations] = (
         self._model.out_of_bag_evaluations()
     )
     return [
-        OutOfBagEvaluation(
-            number_of_trees=evaluation_proto.number_of_trees,
+        generic_model.TrainingLogEntry(
+            iteration=evaluation_proto.number_of_trees,
             evaluation=metric.Evaluation(evaluation_proto.evaluation),
+            training_evaluation=None,
         )
         for evaluation_proto in raw_evaluations
     ]

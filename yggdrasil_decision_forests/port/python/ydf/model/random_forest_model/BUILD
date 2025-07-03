@@ -30,8 +30,8 @@ py_library(
     deps = [
         "//ydf/cc:ydf",
         "//ydf/metric",
+        "//ydf/model:generic_model",
         "//ydf/model/decision_forest_model",
-        "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
     ],
 )
