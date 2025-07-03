@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "absl/container/btree_map.h"
@@ -72,9 +73,17 @@ struct ModelStatistics {
   // Number of label classes in the case of classification.
   int num_classification_classes = -1;
 
+  // Sum of the sizes of all bitmap masks for categorical conditions.
+  // Note: If the categorical mask bank is compressed, this value is smaller.
+  int sum_size_categorical_bitmap_masks = 0;
+
   // Which conditions are used by the model.
   std::array<bool, model::decision_tree::kNumConditionTypes + 1> has_conditions{
       false};
+
+  // True if "has_conditions" contains more than one true value i.e. the model
+  // has more than one type of condition.
+  bool has_multiple_condition_types;
 
   bool is_classification() const {
     return task == model::proto::Task::CLASSIFICATION;
@@ -124,11 +133,21 @@ struct InternalOptions {
   // Number of bytes to encode a node index withing a tree.
   int node_offset_bytes;
 
+  // Number of bytes to encode an index in the categorical mask bank.
+  // Note: This value is currently inferred from
+  // "sum_size_categorical_bitmap_masks", which assume the bank is not
+  // compressed / optimized in any way.
+  int categorical_idx_bytes;
+
   // The type returned by the prediction function.
   std::string output_type;
 
   // C++ includes.
   Includes includes;
+
+  // Mapping from a column idx to a dense index of the model input features. If
+  // a column is not a feature, the corresponding value is -1.
+  std::vector<int> column_idx_to_feature_idx;
 
   // Mapping between column idx of a categorical-string column, to the sanitized
   // dictionary of possible values.
@@ -143,17 +162,27 @@ struct InternalOptions {
   absl::btree_map<int, CategoricalDict> categorical_dicts;
 };
 
-// Generates the tree inference code using the if-else algorithm.
+// Function signature to generate the tree inference code using the if-else
+// algorithm.
 typedef std::function<absl::StatusOr<std::string>(
-    const model::decision_tree::proto::Node& noden, int depth, int tree_idx,
+    const model::decision_tree::proto::Node& node, int depth, int tree_idx,
     absl::string_view prefix)>
     IfElseSetNodeFn;
 
-// Specification of the leaf values.
+// Specification of the type and shape of a leaf value.
 struct LeafValueSpec {
   proto::DType::Enum dtype = proto::DType::UNDEFINED;
   int dims = 0;
 };
+
+// Generic leaf value.
+typedef std::variant<std::vector<int32_t>, std::vector<float>,
+                     std::vector<bool>>
+    LeafValue;
+
+// Function signature that returns leaf values.
+typedef std::function<LeafValue(const model::decision_tree::proto::Node& leaf)>
+    LeafValueFn;
 
 // Constants and functions specific to certain decision forest models.
 struct SpecializedConversion {
@@ -162,6 +191,11 @@ struct SpecializedConversion {
   std::string return_prediction;
   LeafValueSpec leaf_value_spec;
   IfElseSetNodeFn set_node_ifelse_fn;
+  LeafValueFn leaf_value_fn;
+  std::string routing_node;
+
+  // Validate the object.
+  absl::Status Validate() const;
 };
 
 absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
@@ -235,13 +269,23 @@ absl::Status GenerateTreeInferenceIfElse(
     const proto::Options& options, const InternalOptions& internal_options,
     const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content);
 
+// Index of the condition types supported by the routing algorithm.
+enum class RoutingConditionType {
+  HIGHER_CONDITION = 0,
+  CONTAINS_CONDITION_BUFFER_BITMAP = 1,
+};
+
 absl::Status GenerateTreeInferenceRouting(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
     const proto::Options& options, const InternalOptions& internal_options,
-    const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content);
+    const SpecializedConversion& specialized_conversion,
+    const ModelStatistics& stats, std::string* content);
 
 absl::Status GenRoutingModelData(
+    const model::AbstractModel& model,
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
     const proto::Options& options, const InternalOptions& internal_options,

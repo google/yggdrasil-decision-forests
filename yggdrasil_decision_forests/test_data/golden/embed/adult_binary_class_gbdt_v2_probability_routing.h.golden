@@ -5,6 +5,8 @@
 #include <array>
 #include <algorithm>
 #include <cmath>
+#include <bitset>
+#include <cassert>
 
 namespace my_model {
 
@@ -180,11 +182,14 @@ struct FeatureNativeCountry {
 };
 
 struct __attribute__((packed)) Node {
-  uint8_t feature;
+  uint8_t pos = 0;
   union {
     struct {
-      int32_t threshold;
-      uint8_t pos_child_offset;
+      uint8_t feature;
+      union {
+        int32_t threshold;
+        uint16_t categorical;
+      };
     } cond;
     struct {
       float value;
@@ -192,12 +197,211 @@ struct __attribute__((packed)) Node {
   };
 };
 
-static const uint8_t nodes[] = {};
+static const uint8_t condition_types[] = {0,1,0,1,0,1,1,1,1,1,0,0,0,1};
 
-static const uint8_t roots[] = {};
 
+static const uint8_t root_deltas[] = {55,57,57};
+
+static const Node nodes[] = {
+{.pos=25,.cond={.feature=7,.categorical=17}},
+{.pos=15,.cond={.feature=10,.threshold=7074}},
+{.pos=7,.cond={.feature=4,.threshold=13}},
+{.pos=3,.cond={.feature=11,.threshold=2219}},
+{.pos=1,.cond={.feature=12,.threshold=41}},
+{.leaf={.value=-0.123347}},
+{.leaf={.value=-0.0927111}},
+{.pos=1,.cond={.feature=2,.threshold=125451}},
+{.leaf={.value=0.292776}},
+{.leaf={.value=-0.0328167}},
+{.pos=3,.cond={.feature=0,.threshold=32}},
+{.pos=1,.cond={.feature=11,.threshold=1977}},
+{.leaf={.value=-0.106976}},
+{.leaf={.value=0.19949}},
+{.pos=1,.cond={.feature=4,.threshold=15}},
+{.leaf={.value=-0.0295298}},
+{.leaf={.value=0.16421}},
+{.pos=1,.cond={.feature=0,.threshold=22}},
+{.leaf={.value=0.0892425}},
+{.pos=3,.cond={.feature=10,.threshold=7566}},
+{.pos=1,.cond={.feature=3,.categorical=0}},
+{.leaf={.value=-0.0210046}},
+{.leaf={.value=0.419984}},
+{.pos=1,.cond={.feature=10,.threshold=30962}},
+{.leaf={.value=0.419984}},
+{.leaf={.value=0.392422}},
+{.pos=15,.cond={.feature=3,.categorical=52}},
+{.pos=7,.cond={.feature=10,.threshold=5096}},
+{.pos=3,.cond={.feature=6,.categorical=24}},
+{.pos=1,.cond={.feature=4,.threshold=9}},
+{.leaf={.value=-0.0813718}},
+{.leaf={.value=0.00969668}},
+{.pos=1,.cond={.feature=0,.threshold=34}},
+{.leaf={.value=0.00826457}},
+{.leaf={.value=0.132992}},
+{.pos=3,.cond={.feature=0,.threshold=61}},
+{.pos=1,.cond={.feature=2,.threshold=36213}},
+{.leaf={.value=0.419984}},
+{.leaf={.value=0.419984}},
+{.pos=1,.cond={.feature=6,.categorical=38}},
+{.leaf={.value=0.205614}},
+{.leaf={.value=0.397934}},
+{.pos=7,.cond={.feature=10,.threshold=5096}},
+{.pos=3,.cond={.feature=11,.threshold=1783}},
+{.pos=1,.cond={.feature=6,.categorical=69}},
+{.leaf={.value=0.11557}},
+{.leaf={.value=0.253437}},
+{.pos=1,.cond={.feature=11,.threshold=1990}},
+{.leaf={.value=0.417359}},
+{.leaf={.value=0.349312}},
+{.pos=1,.cond={.feature=6,.categorical=83}},
+{.leaf={.value=0.309737}},
+{.pos=1,.cond={.feature=0,.threshold=80}},
+{.leaf={.value=0.418684}},
+{.leaf={.value=0.309737}},
+{.pos=25,.cond={.feature=7,.categorical=114}},
+{.pos=15,.cond={.feature=10,.threshold=7074}},
+{.pos=7,.cond={.feature=3,.categorical=97}},
+{.pos=3,.cond={.feature=11,.threshold=2219}},
+{.pos=1,.cond={.feature=12,.threshold=41}},
+{.leaf={.value=-0.11917}},
+{.leaf={.value=-0.0879641}},
+{.pos=1,.cond={.feature=2,.threshold=125451}},
+{.leaf={.value=0.227849}},
+{.leaf={.value=-0.0300817}},
+{.pos=3,.cond={.feature=0,.threshold=32}},
+{.pos=1,.cond={.feature=12,.threshold=45}},
+{.leaf={.value=-0.114477}},
+{.leaf={.value=-0.0633502}},
+{.pos=1,.cond={.feature=4,.threshold=15}},
+{.leaf={.value=-0.0270186}},
+{.leaf={.value=0.13565}},
+{.pos=1,.cond={.feature=0,.threshold=22}},
+{.leaf={.value=0.0765646}},
+{.pos=3,.cond={.feature=10,.threshold=7566}},
+{.pos=1,.cond={.feature=4,.threshold=11}},
+{.leaf={.value=-0.0191264}},
+{.leaf={.value=0.310248}},
+{.pos=1,.cond={.feature=10,.threshold=30962}},
+{.leaf={.value=0.310248}},
+{.leaf={.value=0.293003}},
+{.pos=15,.cond={.feature=3,.categorical=149}},
+{.pos=7,.cond={.feature=10,.threshold=5096}},
+{.pos=3,.cond={.feature=6,.categorical=121}},
+{.pos=1,.cond={.feature=11,.threshold=1794}},
+{.leaf={.value=-0.0159635}},
+{.leaf={.value=0.192961}},
+{.pos=1,.cond={.feature=11,.threshold=1783}},
+{.leaf={.value=0.0773945}},
+{.leaf={.value=0.291468}},
+{.pos=3,.cond={.feature=0,.threshold=61}},
+{.pos=1,.cond={.feature=2,.threshold=45794}},
+{.leaf={.value=0.310248}},
+{.leaf={.value=0.310248}},
+{.pos=1,.cond={.feature=6,.categorical=135}},
+{.leaf={.value=0.166497}},
+{.leaf={.value=0.296477}},
+{.pos=7,.cond={.feature=10,.threshold=5096}},
+{.pos=3,.cond={.feature=6,.categorical=207}},
+{.pos=1,.cond={.feature=13,.categorical=166}},
+{.leaf={.value=0.0771326}},
+{.leaf={.value=0.38506}},
+{.pos=1,.cond={.feature=11,.threshold=1783}},
+{.leaf={.value=0.198242}},
+{.leaf={.value=0.303271}},
+{.pos=3,.cond={.feature=0,.threshold=63}},
+{.pos=1,.cond={.feature=6,.categorical=221}},
+{.leaf={.value=0.310521}},
+{.leaf={.value=0.318377}},
+{.pos=1,.cond={.feature=1,.categorical=235}},
+{.leaf={.value=0.222857}},
+{.leaf={.value=0.300409}},
+{.pos=25,.cond={.feature=7,.categorical=282}},
+{.pos=15,.cond={.feature=10,.threshold=7074}},
+{.pos=7,.cond={.feature=6,.categorical=243}},
+{.pos=3,.cond={.feature=12,.threshold=41}},
+{.pos=1,.cond={.feature=10,.threshold=4669}},
+{.leaf={.value=-0.116423}},
+{.leaf={.value=-0.0101649}},
+{.pos=1,.cond={.feature=4,.threshold=14}},
+{.leaf={.value=-0.081978}},
+{.leaf={.value=0.101877}},
+{.pos=3,.cond={.feature=0,.threshold=33}},
+{.pos=1,.cond={.feature=12,.threshold=45}},
+{.leaf={.value=-0.110506}},
+{.leaf={.value=-0.0519256}},
+{.pos=1,.cond={.feature=3,.categorical=257}},
+{.leaf={.value=-0.0303353}},
+{.leaf={.value=0.123551}},
+{.pos=1,.cond={.feature=0,.threshold=22}},
+{.leaf={.value=0.0663047}},
+{.pos=3,.cond={.feature=10,.threshold=7566}},
+{.pos=1,.cond={.feature=4,.threshold=11}},
+{.leaf={.value=-0.0174006}},
+{.leaf={.value=0.254167}},
+{.pos=1,.cond={.feature=1,.categorical=274}},
+{.leaf={.value=0.238989}},
+{.leaf={.value=0.254692}},
+{.pos=15,.cond={.feature=4,.threshold=13}},
+{.pos=7,.cond={.feature=10,.threshold=5096}},
+{.pos=3,.cond={.feature=6,.categorical=289}},
+{.pos=1,.cond={.feature=11,.threshold=1794}},
+{.leaf={.value=-0.048394}},
+{.leaf={.value=0.162805}},
+{.pos=1,.cond={.feature=0,.threshold=36}},
+{.leaf={.value=-0.00694594}},
+{.leaf={.value=0.078723}},
+{.pos=3,.cond={.feature=0,.threshold=61}},
+{.pos=1,.cond={.feature=2,.threshold=95258}},
+{.leaf={.value=0.254167}},
+{.leaf={.value=0.254167}},
+{.pos=1,.cond={.feature=6,.categorical=303}},
+{.leaf={.value=0.139375}},
+{.leaf={.value=0.242895}},
+{.pos=7,.cond={.feature=10,.threshold=5096}},
+{.pos=3,.cond={.feature=6,.categorical=317}},
+{.pos=1,.cond={.feature=0,.threshold=68}},
+{.leaf={.value=0.0869682}},
+{.leaf={.value=-0.0922758}},
+{.pos=1,.cond={.feature=11,.threshold=1783}},
+{.leaf={.value=0.164478}},
+{.leaf={.value=0.248387}},
+{.pos=3,.cond={.feature=6,.categorical=331}},
+{.pos=1,.cond={.feature=2,.threshold=197569}},
+{.leaf={.value=0.260133}},
+{.leaf={.value=0.168122}},
+{.pos=1,.cond={.feature=0,.threshold=76}},
+{.leaf={.value=0.254644}},
+{.leaf={.value=0.186707}},
+};
+
+  static const std::bitset<345> categorical_bank {"011011111111100110000011011000001110110110011001001111100100011011110110001001010000000001000000000110001110110101000000000001100000110110000000000100000001110000010000000000100000001001000001100000001110110110011000001101100100011000100100000110010110111111111101100000100110000100100000110000000111011011001100000110110010001100000010000111000"};
+  
 inline float Predict(const Instance& instance) {
   float accumulator {-1.1631};
+
+  const Node* root = nodes;
+  const Node* node;
+  const auto* raw_numerical = reinterpret_cast<const int32_t*>(&instance);
+  (void) raw_numerical;
+  const auto* raw_categorical = reinterpret_cast<const uint32_t*>(&instance);
+  (void) raw_categorical;
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+      if (condition_types[node->cond.feature] == 0) {
+        eval = raw_numerical[node->cond.feature] >= node->cond.threshold;
+      } else if (condition_types[node->cond.feature] == 1) {
+        eval = categorical_bank[raw_categorical[node->cond.feature] + node->cond.categorical];
+      } else {
+        assert(false);
+      }
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator += node->leaf.value;
+    root += root_deltas[tree_idx];
+  }
+
   // Sigmoid
   return 1.f / (1.f + std::exp(-accumulator));
 }

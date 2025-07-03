@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <array>
 #include <algorithm>
+#include <bitset>
+#include <cassert>
 
 namespace my_model {
 

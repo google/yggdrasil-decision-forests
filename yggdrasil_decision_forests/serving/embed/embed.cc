@@ -16,10 +16,13 @@
 #include "yggdrasil_decision_forests/serving/embed/embed.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "absl/container/node_hash_map.h"
@@ -36,6 +39,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
@@ -160,13 +164,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
     } else {
       return absl::InvalidArgumentError("The model type is not supported.");
     }
-    STATUS_CHECK(!specialized_conversion.accumulator_type.empty());
-    STATUS_CHECK(!specialized_conversion.accumulator_initial_value.empty());
-    STATUS_CHECK(!specialized_conversion.return_prediction.empty());
-    STATUS_CHECK(!specialized_conversion.accumulator_type.empty());
-    STATUS_CHECK_GT(specialized_conversion.leaf_value_spec.dims, 0);
-    STATUS_CHECK_NE(specialized_conversion.leaf_value_spec.dtype,
-                    proto::DType::UNDEFINED);
+    RETURN_IF_ERROR(specialized_conversion.Validate());
   }
 
   // Generate the code.
@@ -190,6 +188,9 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   if (internal_options.includes.cmath) {
     absl::StrAppend(&header, "#include <cmath>\n");
   }
+  // TODO: Only include if necessary.
+  absl::StrAppend(&header, "#include <bitset>\n");
+  absl::StrAppend(&header, "#include <cassert>\n");
 
   absl::SubstituteAndAppend(&header, R"(
 namespace $0 {
@@ -210,7 +211,8 @@ namespace $0 {
   // Model data
   if (options.algorithm() == proto::Algorithm::ROUTING) {
     RETURN_IF_ERROR(internal::GenRoutingModelData(
-        stats, specialized_conversion, options, internal_options, &header));
+        model, model.data_spec(), *df_interface, stats, specialized_conversion,
+        options, internal_options, &header));
   }
 
   // Predict method
@@ -272,7 +274,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
     case proto::Algorithm::ROUTING:
       RETURN_IF_ERROR(GenerateTreeInferenceRouting(
           dataspec, df_interface, options, internal_options,
-          specialized_conversion.set_node_ifelse_fn, content));
+          specialized_conversion, stats, content));
       break;
     default:
       return absl::InvalidArgumentError("Non supported algorithm.");
@@ -299,6 +301,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
           spec.accumulator_type =
               UnsignedInteger(MaxUnsignedValueToNumBytes(stats.num_trees));
           spec.leaf_value_spec = {.dtype = proto::DType::BOOL, .dims = 1};
+
           spec.set_node_ifelse_fn =
               [](const model::decision_tree::proto::Node& node, const int depth,
                  const int tree_idx,
@@ -310,10 +313,21 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
               return "";
             }
           };
+
+          spec.leaf_value_fn =
+              [](const model::decision_tree::proto::Node& node) -> LeafValue {
+            const int node_value = node.classifier().top_value();
+            return std::vector<bool>{node_value == 2};
+          };
+
+          spec.routing_node = R"(
+    accumulator += node->leaf.value;
+)";
         } else {
           // We accumulate the probability vote for the positive class.
           spec.accumulator_type = "float";
           spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
+
           spec.set_node_ifelse_fn =
               [&](const model::decision_tree::proto::Node& node,
                   const int depth, const int tree_idx,
@@ -327,6 +341,18 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
               return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
             }
           };
+
+          spec.leaf_value_fn =
+              [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+            const float node_value =
+                node.classifier().distribution().counts(2) /
+                (node.classifier().distribution().sum() * stats.num_trees);
+            return std::vector<float>{node_value};
+          };
+
+          spec.routing_node = R"(
+    accumulator += node->leaf.value;
+)";
         }
       } else {
         if (model.winner_take_all_inference()) {
@@ -339,6 +365,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
               .dtype = UnsignedIntegerToDtype(
                   MaxUnsignedValueToNumBytes(stats.num_classification_classes)),
               .dims = 1};
+
           spec.set_node_ifelse_fn =
               [&](const model::decision_tree::proto::Node& node,
                   const int depth, const int tree_idx,
@@ -346,12 +373,23 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
             const int node_value = node.classifier().top_value() - 1;
             return absl::StrCat(prefix, "accumulator[", node_value, "]++;\n");
           };
+
+          spec.leaf_value_fn =
+              [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+            const int32_t node_value = node.classifier().top_value() - 1;
+            return std::vector<int32_t>{node_value};
+          };
+
+          spec.routing_node = R"(
+    accumulator[node->leaf.value]++;
+)";
         } else {
           // We accumulate the probability for each class.
           spec.accumulator_type = absl::StrCat(
               "std::array<float, ", stats.num_classification_classes, ">");
           spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32,
                                   .dims = stats.num_classification_classes};
+
           spec.set_node_ifelse_fn =
               [&](const model::decision_tree::proto::Node& node,
                   const int depth, const int tree_idx,
@@ -370,6 +408,24 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
             }
             return content;
           };
+
+          spec.leaf_value_fn =
+              [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+            std::vector<float> values;
+            for (int output_idx = 0;
+                 output_idx < stats.num_classification_classes; output_idx++) {
+              const float node_value =
+                  node.classifier().distribution().counts(output_idx + 1) /
+                  (node.classifier().distribution().sum() * stats.num_trees);
+              values.push_back(node_value);
+            }
+            return values;
+          };
+
+          // TODO: Implement.
+          spec.routing_node = R"(
+    assert(false); // This leaf is not implemented.
+)";
         }
       }
 
@@ -416,6 +472,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
       spec.accumulator_type = "float";
       spec.return_prediction = "  return accumulator;\n";
       spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
+
       spec.set_node_ifelse_fn =
           [&](const model::decision_tree::proto::Node& node, const int depth,
               const int tree_idx,
@@ -423,6 +480,16 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
         const float node_value = node.regressor().top_value() / stats.num_trees;
         return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
       };
+
+      spec.leaf_value_fn =
+          [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+        const float node_value = node.regressor().top_value() / stats.num_trees;
+        return std::vector<float>{node_value};
+      };
+
+      spec.routing_node = R"(
+    accumulator += node->leaf.value;
+)";
       break;
 
     default:
@@ -446,6 +513,7 @@ SpecializedConversionGradientBoostedTrees(
       // Leaf setter
       if (stats.is_binary_classification()) {
         spec.accumulator_type = "float";
+
         spec.set_node_ifelse_fn =
             [](const model::decision_tree::proto::Node& node, const int depth,
                const int tree_idx,
@@ -453,9 +521,21 @@ SpecializedConversionGradientBoostedTrees(
           const float node_value = node.regressor().top_value();
           return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
         };
+
+        spec.leaf_value_fn =
+            [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+          const float node_value = node.regressor().top_value();
+          return std::vector<float>{node_value};
+        };
+
+        spec.routing_node = R"(
+    accumulator += node->leaf.value;
+)";
+
       } else {
         spec.accumulator_type = absl::StrCat(
             "std::array<float, ", stats.num_classification_classes, ">");
+
         spec.set_node_ifelse_fn =
             [&](const model::decision_tree::proto::Node& node, const int depth,
                 const int tree_idx,
@@ -466,6 +546,17 @@ SpecializedConversionGradientBoostedTrees(
           return absl::StrCat(prefix, "accumulator[", output_dim_idx,
                               "] += ", node_value, ";\n");
         };
+
+        spec.leaf_value_fn =
+            [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+          const float node_value = node.regressor().top_value();
+          return std::vector<float>{node_value};
+        };
+
+        spec.routing_node = absl::Substitute(R"(
+    accumulator[tree_idx % $0] += node->leaf.value;
+)",
+                                             stats.num_classification_classes);
       }
       // Return accumulator
       switch (options.classification_output()) {
@@ -506,6 +597,7 @@ SpecializedConversionGradientBoostedTrees(
     case model::proto::Task::REGRESSION:
       spec.accumulator_type = "float";
       spec.return_prediction = "  return accumulator;\n";
+
       spec.set_node_ifelse_fn =
           [](const model::decision_tree::proto::Node& node, const int depth,
              const int tree_idx,
@@ -513,6 +605,16 @@ SpecializedConversionGradientBoostedTrees(
         const float node_value = node.regressor().top_value();
         return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
       };
+
+      spec.leaf_value_fn =
+          [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+        const float node_value = node.regressor().top_value();
+        return std::vector<float>{node_value};
+      };
+
+      spec.routing_node = R"(
+    accumulator += node->leaf.value;
+)";
       break;
 
     default:
@@ -555,11 +657,28 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
         stats.num_conditions++;
         stats.has_conditions[node.node().condition().condition().type_case()] =
             true;
+
+        if (node.node()
+                .condition()
+                .condition()
+                .has_contains_bitmap_condition() ||
+            node.node().condition().condition().has_contains_condition()) {
+          const int attribute_idx = node.node().condition().attribute();
+          const auto num_unique_values = model.data_spec()
+                                             .columns(attribute_idx)
+                                             .categorical()
+                                             .number_of_unique_values();
+          stats.sum_size_categorical_bitmap_masks += num_unique_values;
+        }
       }
     });
     stats.max_num_leaves_per_tree =
         std::max(stats.max_num_leaves_per_tree, num_leaves_in_tree);
   }
+
+  stats.has_multiple_condition_types =
+      std::count(stats.has_conditions.begin(), stats.has_conditions.end(),
+                 true) > 1;
   return stats;
 }
 
@@ -589,15 +708,30 @@ absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
   out->node_index_bytes =
       MaxUnsignedValueToNumBytes(stats.num_leaves + stats.num_conditions);
 
+  if (stats.sum_size_categorical_bitmap_masks == 0) {
+    out->categorical_idx_bytes = 0;
+  } else {
+    out->categorical_idx_bytes =
+        MaxUnsignedValueToNumBytes(stats.sum_size_categorical_bitmap_masks);
+  }
+
   // This is the number of bytes to encode a node index in a tree. The precision
   // for an offset is in average 50% smaller.
   // TODO: Optimize node_offset_bytes.
   out->node_offset_bytes = MaxUnsignedValueToNumBytes(
       NumLeavesToNumNodes(stats.max_num_leaves_per_tree));
 
+  out->column_idx_to_feature_idx.assign(model.data_spec().columns_size(), -1);
+
   // Feature encoding.
-  for (const auto input_feature : model.input_features()) {
-    const auto& col_spec = model.data_spec().columns(input_feature);
+  for (size_t feature_idx = 0; feature_idx < model.input_features().size();
+       feature_idx++) {
+    const auto& column_idx = model.input_features()[feature_idx];
+    const auto& col_spec = model.data_spec().columns(column_idx);
+
+    // Index the input feature.
+    out->column_idx_to_feature_idx[column_idx] = feature_idx;
+
     switch (col_spec.type()) {
       case dataset::proto::ColumnType::NUMERICAL: {
         switch (col_spec.dtype()) {
@@ -763,7 +897,6 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
     const internal::InternalOptions& internal_options) {
   // TODO: Add support for default values.
-  // TODO: Add support for string categorical features.
   // TODO: For integer numericals, use the min/max to possibly reduce the
   // required precision.
   switch (col.type()) {
@@ -918,12 +1051,279 @@ absl::Status GenerateTreeInferenceRouting(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
     const proto::Options& options, const InternalOptions& internal_options,
-    const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content) {
-  // TODO: Implement.
+    const SpecializedConversion& specialized_conversion,
+    const ModelStatistics& stats, std::string* content) {
+  const std::string node_offset_type =
+      UnsignedInteger(internal_options.node_offset_bytes);
+  const std::string tree_index_type =
+      UnsignedInteger(internal_options.tree_index_bytes);
+
+  std::string is_greather_threshold_type;
+  if (internal_options.numerical_feature_is_float) {
+    is_greather_threshold_type = "float";
+    STATUS_CHECK_EQ(internal_options.feature_value_bytes, 4);
+  } else {
+    is_greather_threshold_type =
+        SignedInteger(internal_options.feature_value_bytes);
+  }
+
+  std::string categorical_idx_type;
+  if (internal_options.categorical_idx_bytes > 0) {
+    categorical_idx_type =
+        UnsignedInteger(internal_options.feature_value_bytes);
+  }
+
+  // Top of the loop: For-loop on trees & while-loop on nodes.
+  absl::SubstituteAndAppend(content, R"(
+  const Node* root = nodes;
+  const Node* node;
+  const auto* raw_numerical = reinterpret_cast<const $0*>(&instance);
+  (void) raw_numerical;)",
+                            is_greather_threshold_type  // $0
+  );
+
+  if (!categorical_idx_type.empty()) {
+    absl::SubstituteAndAppend(content, R"(
+  const auto* raw_categorical = reinterpret_cast<const $0*>(&instance);
+  (void) raw_categorical;)",
+                              categorical_idx_type  // $0
+    );
+  }
+
+  absl::SubstituteAndAppend(content, R"(
+  $0 eval;
+  for ($1 tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {)",
+                            node_offset_type,  // $0
+                            tree_index_type    // $1
+
+  );
+
+  // Condition
+
+  // Add the code of a condition. If there are multiple types of supported
+  // conditions, wraps the condition in an "if" block that checks "type".
+  const auto add_condition_code =
+      [&](absl::Span<const model::decision_tree::proto::Condition::TypeCase>
+              ydf_condition_types,
+          const RoutingConditionType routing_cond_type,
+          const absl::string_view code) {
+        const int int_routing_cond_type = static_cast<int>(routing_cond_type);
+
+        bool model_has_condition = false;
+        for (const auto ydf_condition_type : ydf_condition_types) {
+          if (stats.has_conditions[ydf_condition_type]) {
+            model_has_condition = true;
+          }
+        }
+        if (!model_has_condition) {
+          // The model does need this condition code.
+          return;
+        }
+
+        if (stats.has_multiple_condition_types) {
+          if (int_routing_cond_type != 0) {
+            absl::StrAppend(content, " else ");
+          } else {
+            absl::StrAppend(content, "\n      ");
+          }
+          absl::SubstituteAndAppend(
+              content, "if (condition_types[node->cond.feature] == $0) {\n",
+              routing_cond_type);
+        } else {
+          absl::StrAppend(content, "\n");
+        }
+        absl::StrAppend(content, code);
+        if (stats.has_multiple_condition_types) {
+          absl::StrAppend(content, "      }");
+        }
+      };
+  add_condition_code({model::decision_tree::proto::Condition::kHigherCondition},
+                     RoutingConditionType::HIGHER_CONDITION,
+                     "        eval = raw_numerical[node->cond.feature] >= "
+                     "node->cond.threshold;\n");
+  add_condition_code(
+      {model::decision_tree::proto::Condition::kContainsCondition,
+       model::decision_tree::proto::Condition::kContainsBitmapCondition},
+      RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP,
+      "        eval = categorical_bank[raw_categorical[node->cond.feature] + "
+      "node->cond.categorical];\n");
+
+  if (stats.has_multiple_condition_types) {
+    absl::StrAppend(content, R"( else {
+        assert(false);
+      })");
+  }
+
+  // Middle of the loop: Select the next node.
+  absl::SubstituteAndAppend(content, R"(
+      node += (node->pos & -eval) + 1;
+    })");
+
+  // Add the leaf value to the accumulator.
+  absl::StrAppend(content, specialized_conversion.routing_node);
+
+  // Bottom of the loop: Go to the next tree.
+  absl::SubstituteAndAppend(content, R"(    root += root_deltas[tree_idx];
+  }
+
+)");
+  return absl::OkStatus();
+}
+
+// Generate the static data of a single Node needed for the routing algorithm.
+// This function is called by "GenRoutingModelData" on each of the tree nodes.
+absl::Status GenRoutingModelDataNode(
+    const model::AbstractModel& model,
+    const dataset::proto::DataSpecification& dataspec,
+    const ModelStatistics& stats,
+    const SpecializedConversion& specialized_conversion,
+    const proto::Options& options, const InternalOptions& internal_options,
+    const model::decision_tree::NodeWithChildren& node, const int depth,
+    std::string* serialized_nodes, int* node_idx,
+    std::vector<bool>* categorical_bank) {
+  if (node.IsLeaf()) {
+    absl::StrAppend(serialized_nodes, "{.leaf={.value=");
+
+    // Unroll the leaf values.
+    const auto leaf_value = specialized_conversion.leaf_value_fn(node.node());
+    if (specialized_conversion.leaf_value_spec.dims > 1) {
+      // TODO: Implement multi-dimensional leaf values.
+      return absl::UnimplementedError("Multi-dimensional leaf values");
+    } else {
+      if (std::holds_alternative<std::vector<bool>>(leaf_value)) {
+        absl::StrAppend(serialized_nodes,
+                        std::get<std::vector<bool>>(leaf_value).front());
+      } else if (std::holds_alternative<std::vector<int32_t>>(leaf_value)) {
+        absl::StrAppend(serialized_nodes,
+                        std::get<std::vector<int32_t>>(leaf_value).front());
+      } else if (std::holds_alternative<std::vector<float>>(leaf_value)) {
+        absl::StrAppend(serialized_nodes,
+                        std::get<std::vector<float>>(leaf_value).front());
+      } else {
+        return absl::InvalidArgumentError("Non supported leaf type");
+      }
+    }
+    absl::StrAppend(serialized_nodes, "}},\n");
+    (*node_idx)++;
+    return absl::OkStatus();
+  }
+
+  // Reserve the node idx.
+  (*node_idx)++;
+
+  // The negative child.
+  // Note: We don't print the negative child data yet as we don't know how many
+  // nodes it will require, and the number of node in the negative child is
+  // needed in the data of the parent node that should be written before.
+  const auto save_node_idx = *node_idx;
+  std::string serialized_neg_nodes;  // Temporary storage for the negative node.
+  RETURN_IF_ERROR(GenRoutingModelDataNode(
+      model, dataspec, stats, specialized_conversion, options, internal_options,
+      *node.neg_child(), depth + 1, &serialized_neg_nodes, node_idx,
+      categorical_bank));
+
+  // This is the node offset between a parent node and the positive node. Note
+  // that the offset to the negative node is 1 and does not need to be encoded.
+  const auto delta_pos_node = *node_idx - save_node_idx;
+
+  // Get the dense feature index.
+  const int attribute_idx = node.node().condition().attribute();
+  const int feature_idx =
+      internal_options.column_idx_to_feature_idx.at(attribute_idx);
+
+  // Create a contains condition node.
+  const auto categorical_contains_condition =
+      [&](const std::vector<bool>& bitmap) {
+        // TODO: For bitmap requiring less bits than a bitmap bank index,
+        // store the mask in the node directly (instead of using the bank).
+        // TODO: Search if the bitmap bank already contains the current
+        // bitmap. If so, use the existing bitmap segment instead.
+        absl::SubstituteAndAppend(
+            serialized_nodes,
+            "{.pos=$0,.cond={.feature=$1,.categorical=$2}},\n",
+            delta_pos_node,           // $0
+            feature_idx,              // $1
+            categorical_bank->size()  // $2
+        );
+        categorical_bank->insert(categorical_bank->end(), bitmap.begin(),
+                                 bitmap.end());
+      };
+
+  // Encode all the possible condition nodes.
+  switch (node.node().condition().condition().type_case()) {
+    case model::decision_tree::proto::Condition::TypeCase::kHigherCondition: {
+      // Condition of the type "a >= threhsold".
+      const auto& typed_condition =
+          node.node().condition().condition().higher_condition();
+      float threshold = typed_condition.threshold();
+      if (!internal_options.numerical_feature_is_float) {
+        threshold = std::ceil(threshold);
+      }
+      absl::SubstituteAndAppend(
+          serialized_nodes, "{.pos=$0,.cond={.feature=$1,.threshold=$2}},\n",
+          delta_pos_node,  // $0
+          feature_idx,     // $1
+          threshold        // $2
+      );
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::kContainsCondition: {
+      // Condition of the type "a in Mask" where mask is represented by a list
+      // of integers.
+      const auto& typed_condition =
+          node.node().condition().condition().contains_condition();
+      std::vector<bool> bitmap(dataspec.columns(attribute_idx)
+                                   .categorical()
+                                   .number_of_unique_values(),
+                               false);
+      for (const auto item_idx : typed_condition.elements()) {
+        bitmap[item_idx] = true;
+      }
+      categorical_contains_condition(bitmap);
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::
+        kContainsBitmapCondition: {
+      // Condition of the type "a in Mask" where mask is represented by a
+      // bitmap.
+      const auto& typed_condition =
+          node.node().condition().condition().contains_bitmap_condition();
+      std::vector<bool> bitmap(dataspec.columns(attribute_idx)
+                                   .categorical()
+                                   .number_of_unique_values(),
+                               false);
+      for (size_t item_idx = 0; item_idx < bitmap.size(); item_idx++) {
+        if (utils::bitmap::GetValueBit(typed_condition.elements_bitmap(),
+                                       item_idx)) {
+          bitmap[item_idx] = true;
+        }
+      }
+      categorical_contains_condition(bitmap);
+    } break;
+
+    default:
+      return absl::InvalidArgumentError(
+          absl::StrCat("Non supported condition type ",
+                       node.node().condition().condition().type_case()));
+  }
+
+  absl::StrAppend(serialized_nodes, serialized_neg_nodes);
+  serialized_neg_nodes.clear();
+
+  RETURN_IF_ERROR(GenRoutingModelDataNode(
+      model, dataspec, stats, specialized_conversion, options, internal_options,
+      *node.pos_child(), depth + 1, serialized_nodes, node_idx,
+      categorical_bank));
+
   return absl::OkStatus();
 }
 
 absl::Status GenRoutingModelData(
+    const model::AbstractModel& model,
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
     const proto::Options& options, const InternalOptions& internal_options,
@@ -946,6 +1346,12 @@ absl::Status GenRoutingModelData(
   const std::string node_index_type =
       UnsignedInteger(internal_options.node_index_bytes);
 
+  std::string categorical_idx_type;
+  if (internal_options.categorical_idx_bytes > 0) {
+    categorical_idx_type =
+        UnsignedInteger(internal_options.categorical_idx_bytes);
+  }
+
   std::string node_value_type;
   if (specialized_conversion.leaf_value_spec.dims == 1) {
     // The leaf value is stored in the node struct.
@@ -958,39 +1364,136 @@ absl::Status GenRoutingModelData(
         UnsignedInteger(MaxUnsignedValueToNumBytes(stats.num_leaves));
   }
 
-  // TODO: Add categorical and boolean condition support.
+  // TODO: Add boolean condition support.
 
   absl::SubstituteAndAppend(content, R"(
 struct __attribute__((packed)) Node {
-  $1 feature;
+  $2 pos = 0;
   union {
     struct {
-      $0 threshold;
-      $2 pos_child_offset;
+      $1 feature;
+      union {
+        $0 threshold;)",
+                            is_greather_threshold_type,  // $0
+                            feature_index_type,          // $1
+                            node_offset_type             // $2
+  );
+
+  if (!categorical_idx_type.empty()) {
+    absl::SubstituteAndAppend(content, R"(
+        $0 categorical;)",
+                              categorical_idx_type  // $0
+    );
+  }
+
+  absl::SubstituteAndAppend(content, R"(
+      };
     } cond;
     struct {
-      $3 value;
+      $0 value;
     } leaf;
   };
 };
 )",
-                            is_greather_threshold_type,  // $0
-                            feature_index_type,          // $1
-                            node_offset_type,            // $2
-                            node_value_type              // $3
+                            node_value_type  // $0
   );
 
-  // TODO: Implement.
-  absl::StrAppend(content, R"(
-static const uint8_t nodes[] = {};
-)");
+  std::string serialized_nodes;
 
-  // TODO: Implement.
-  absl::SubstituteAndAppend(content, R"(
-static const $0 roots[] = {};
+  std::vector<bool> categorical_bank;
+
+  // The "root_deltas" contains the number of nodes in each tree. The node index
+  // of the root of each tree can be computed by running a cumulative sum.
+  std::vector<int> root_deltas;
+  root_deltas.reserve(df_interface.num_trees());
+
+  // Encode the node data.
+  int node_idx = 0;
+  for (int tree_idx = 0; tree_idx < df_interface.num_trees(); tree_idx++) {
+    const auto begin_node_idx = node_idx;
+    const auto& tree = df_interface.decision_trees()[tree_idx];
+    RETURN_IF_ERROR(GenRoutingModelDataNode(
+        model, dataspec, stats, specialized_conversion, options,
+        internal_options, tree->root(), 0, &serialized_nodes, &node_idx,
+        &categorical_bank));
+    root_deltas.push_back(node_idx - begin_node_idx);
+  }
+
+  // Record a mapping from feature to condition type. This is possible because
+  // this implementation assumes that each feature is only used in one type of
+  // condition (which is not generally the case in YDF).
+
+  // TODO: Use a virtual feature index system to allow a same feature to be
+  // used with different condition types.
+
+  std::vector<uint8_t> condition_types(stats.num_features, 0);
+  for (int feature_idx = 0; feature_idx < model.input_features().size();
+       feature_idx++) {
+    const auto& column_idx = model.input_features()[feature_idx];
+    const auto& col_spec = model.data_spec().columns(column_idx);
+    switch (col_spec.type()) {
+      case dataset::proto::ColumnType::NUMERICAL:
+        condition_types[feature_idx] =
+            static_cast<uint8_t>(RoutingConditionType::HIGHER_CONDITION);
+        break;
+      case dataset::proto::ColumnType::CATEGORICAL:
+        condition_types[feature_idx] = static_cast<uint8_t>(
+            RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP);
+        break;
+      default:
+        return absl::InvalidArgumentError(
+            absl::StrCat("Non supported feature type: ",
+                         dataset::proto::ColumnType_Name(col_spec.type())));
+    }
+  }
+
+  if (stats.has_multiple_condition_types) {
+    absl::SubstituteAndAppend(content, R"(
+static const uint8_t condition_types[] = {$0};
+
 )",
-                            node_index_type);
+                              absl::StrJoin(condition_types, ","));
+  }
 
+  absl::SubstituteAndAppend(content, R"(
+static const $0 root_deltas[] = {$1};
+
+)",
+                            node_offset_type, absl::StrJoin(root_deltas, ","));
+
+  if (!categorical_bank.empty()) {
+    STATUS_CHECK_LE(MaxUnsignedValueToNumBytes(categorical_bank.size()),
+                    internal_options.categorical_idx_bytes);
+  }
+
+  // TODO: Add option to encode the node data by a string of bytes (more
+  // compact and faster to compile, but less readable).
+  absl::StrAppend(content, "static const Node nodes[] = {\n", serialized_nodes,
+                  "};\n");
+
+  // Record the categorical mask bank.
+  if (internal_options.categorical_idx_bytes > 0) {
+    absl::SubstituteAndAppend(
+        content, R"(
+  static const std::bitset<$0> categorical_bank {"$1"};
+  )",
+        categorical_bank.size(),
+        absl::StrJoin(categorical_bank.rbegin(), categorical_bank.rend(), ""));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status SpecializedConversion::Validate() const {
+  STATUS_CHECK(!accumulator_type.empty());
+  STATUS_CHECK(!accumulator_initial_value.empty());
+  STATUS_CHECK(!return_prediction.empty());
+  STATUS_CHECK(!accumulator_type.empty());
+  STATUS_CHECK_GT(leaf_value_spec.dims, 0);
+  STATUS_CHECK_NE(leaf_value_spec.dtype, proto::DType::UNDEFINED);
+
+  STATUS_CHECK(set_node_ifelse_fn);
+  STATUS_CHECK(leaf_value_fn);
+  STATUS_CHECK(!routing_node.empty());
   return absl::OkStatus();
 }
 

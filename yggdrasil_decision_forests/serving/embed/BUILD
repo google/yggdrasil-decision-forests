@@ -22,6 +22,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/utils:bitmap",
@@ -137,19 +138,25 @@ cc_test(
     srcs = ["embed_pred_test.cc"],
     deps = [
         ":test_model_abalone_regression_gbdt_v2",
+        ":test_model_abalone_regression_gbdt_v2_routing",
         ":test_model_abalone_regression_rf_small",
+        ":test_model_abalone_regression_rf_small_routing",
         ":test_model_adult_binary_class_gbdt_filegroup_filegroup",
         ":test_model_adult_binary_class_gbdt_v2_class",
         ":test_model_adult_binary_class_gbdt_v2_proba",
+        ":test_model_adult_binary_class_gbdt_v2_proba_routing",
         ":test_model_adult_binary_class_gbdt_v2_score",
         ":test_model_adult_binary_class_rf_nwta_small_class",
         ":test_model_adult_binary_class_rf_nwta_small_proba",
+        ":test_model_adult_binary_class_rf_nwta_small_proba_routing",
         ":test_model_adult_binary_class_rf_nwta_small_score",
         ":test_model_adult_binary_class_rf_wta_small_class",
         ":test_model_adult_binary_class_rf_wta_small_proba",
+        ":test_model_adult_binary_class_rf_wta_small_proba_routing",
         ":test_model_adult_binary_class_rf_wta_small_score",
         ":test_model_iris_multi_class_gbdt_v2_class",
         ":test_model_iris_multi_class_gbdt_v2_proba",
+        ":test_model_iris_multi_class_gbdt_v2_proba_routing",
         ":test_model_iris_multi_class_gbdt_v2_score",
         ":test_model_iris_multi_class_rf_nwta_small_class",
         ":test_model_iris_multi_class_rf_nwta_small_proba",
@@ -190,6 +197,14 @@ cc_ydf_embedded_model(
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
 )
 
+cc_ydf_embedded_model(
+    name = "test_model_adult_binary_class_gbdt_v2_proba_routing",
+    algorithm = "ROUTING",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
+)
+
 # RF binary class
 
 cc_ydf_embedded_model(
@@ -208,6 +223,14 @@ cc_ydf_embedded_model(
 
 cc_ydf_embedded_model(
     name = "test_model_adult_binary_class_rf_wta_small_proba",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
+)
+
+cc_ydf_embedded_model(
+    name = "test_model_adult_binary_class_rf_wta_small_proba_routing",
+    algorithm = "ROUTING",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
@@ -234,6 +257,14 @@ cc_ydf_embedded_model(
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
 )
 
+cc_ydf_embedded_model(
+    name = "test_model_adult_binary_class_rf_nwta_small_proba_routing",
+    algorithm = "ROUTING",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
+)
+
 # Regression
 
 cc_ydf_embedded_model(
@@ -243,7 +274,21 @@ cc_ydf_embedded_model(
 )
 
 cc_ydf_embedded_model(
+    name = "test_model_abalone_regression_gbdt_v2_routing",
+    algorithm = "ROUTING",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/abalone_regression_gbdt_v2",
+)
+
+cc_ydf_embedded_model(
     name = "test_model_abalone_regression_rf_small",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/abalone_regression_rf_small",
+)
+
+cc_ydf_embedded_model(
+    name = "test_model_abalone_regression_rf_small_routing",
+    algorithm = "ROUTING",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/abalone_regression_rf_small",
 )
@@ -265,6 +310,14 @@ cc_ydf_embedded_model(
 
 cc_ydf_embedded_model(
     name = "test_model_iris_multi_class_gbdt_v2_proba",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
+)
+
+cc_ydf_embedded_model(
+    name = "test_model_iris_multi_class_gbdt_v2_proba_routing",
+    algorithm = "ROUTING",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
@@ -292,6 +345,8 @@ cc_ydf_embedded_model(
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
 )
 
+# TODO: Add test for routing version.
+
 cc_ydf_embedded_model(
     name = "test_model_iris_multi_class_rf_wta_small_class",
     classification_output = "CLASS",
@@ -312,3 +367,5 @@ cc_ydf_embedded_model(
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
 )
+
+# TODO: Add test for routing version.

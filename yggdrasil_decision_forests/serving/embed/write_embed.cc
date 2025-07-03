@@ -60,7 +60,7 @@ absl::Status WriteEmbeddedModel() {
   ASSIGN_OR_RETURN(const std::unique_ptr<model::AbstractModel> model,
                    model::LoadModel(input));
 
-  LOG(INFO) << "Embedding model";
+  LOG(INFO) << "Compiling model";
   proto::Options options;
   if (!options_text.empty()) {
     ASSIGN_OR_RETURN(options,
