@@ -154,6 +154,31 @@ class InputFeature:
   column_idx: int
 
 
+@dataclasses.dataclass(frozen=True)
+class TrainingLogEntry:
+  """Evaluation metrics computed during the training of the model.
+
+  This structure is returned by `model.training_logs()`. It contains the
+  evaluation metrics of the model at a specific point during the training (e.g.
+  after a given number of trees have been trained).
+
+  Attributes:
+    iteration: Training iteration when the evaluation was created. For many
+      models, the training iteration is equal to the number of trees.
+    evaluation: Evaluation metrics at `iteration` trees For Gradient Boosted
+      Trees, this is the evaluation on the validation dataset. For Random
+      Forests, this is the out-of-bag evaluation.
+    training_evaluation: Evaluation metrics computed on the training dataset at
+      `iteration` trees. The training evaluation is generally less insightful
+      than the main evaluation (which is computed on a validation or OOB
+      dataset), but it can be helpful for model debugging.
+  """
+
+  iteration: int
+  evaluation: metric.Evaluation
+  training_evaluation: Optional[metric.Evaluation]
+
+
 class GenericModel(abc.ABC):
   """Abstract superclass for all YDF models."""
 
@@ -1301,6 +1326,42 @@ Use `model.describe()` for more details
         the fastest engine.
     """
     raise NotImplementedError
+
+  def training_logs(self) -> List[TrainingLogEntry]:
+    """Returns the model's training logs.
+
+    The training logs contain the evaluation of the model at different points
+    during training.
+
+    The method used for evaluation depends on the model type and
+    hyperparameters. Notably, Random Forests use OOB evaluation and Gradient
+    Boosted Trees use evaluation on the validation dataset. Therefore,
+    training logs are not comparable between different model types.
+
+    For some model types, the training logs may also contain an evalution on the
+    training dataset.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.GradientBoostedTreesLearner(label="label").train(train_ds)
+
+    # Get the training logs
+    logs = model.training_logs()
+
+    # Plot the accuracy
+    plt.plot([log.iteration for log in logs], [log.evaluation.accuracy for
+    log in logs])
+    ```
+    """
+    raise NotImplementedError(
+        "Training logs are not available for this model type."
+    )
 
   def input_features(self) -> Sequence[InputFeature]:
     """Returns the input features of the model.

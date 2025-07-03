@@ -95,6 +95,13 @@ class IsolationForestModelTest(absltest.TestCase):
       out_dir = self.create_tempdir()
       _ = self.model_gaussians.to_tensorflow_saved_model(out_dir.full_path)
 
+  def test_training_logs(self):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        "Training logs are not available for this model type.",
+    ):
+      self.model_gaussians.training_logs()
+
 
 if __name__ == "__main__":
   absltest.main()
