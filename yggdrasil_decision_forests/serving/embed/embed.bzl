@@ -55,8 +55,8 @@ def cc_ydf_embedded_model(
     native.genrule(
         name = name + "_write_embed",
         outs = [name + ".h"],
-        cmd = "$(location write_embed) --input=$$(cat $(location " + name + "_create_path ) ) --options='" + options + "' --output='$@' --remove_output_filename --name=" + name + " --alsologtostderr",
-        tools = [":write_embed", name + "_create_path", data],
+        cmd = "$(location //yggdrasil_decision_forests/serving/embed:write_embed) --input=$$(cat $(location " + name + "_create_path ) ) --options='" + options + "' --output='$@' --remove_output_filename --name=" + name + " --alsologtostderr",
+        tools = ["//yggdrasil_decision_forests/serving/embed:write_embed", name + "_create_path", data],
     )
 
     # Creates a cc library with the model.
