@@ -788,12 +788,31 @@ void SampleProjection(const absl::Span<const int>& features,
     }
   };
 
+  #ifndef NDEBUG  // Keep DCHECK_EQ from for feature : features
   for (const auto feature : features) {
     DCHECK_EQ(data_spec.columns(feature).type(), dataset::proto::NUMERICAL);
-    if (unif01(*random) < projection_density) {
-      projection->push_back({feature, gen_weight(feature)});
-    }
   }
+  #endif
+
+  const size_t p = features.size();
+  std::binomial_distribution<size_t> binom(p, projection_density);
+
+  // Exp[Binomial(p,projection_density)] = k
+  const size_t k = binom(*random);
+
+  absl::btree_set<size_t> picked_idx;
+
+  // Floyd's sampler to select k indices uniformly
+  for (size_t j = p - k; j < p; ++j) {
+    size_t t = absl::Uniform<size_t>(*random, 0, j + 1);
+    if (!picked_idx.insert(t).second) picked_idx.insert(j);
+  }
+
+  // O(k) minimal pass to fill in those indices
+  for (size_t idx : picked_idx) {
+    projection->push_back({features[idx], gen_weight(features[idx])});
+  }
+
   if (projection->empty()) {
     std::uniform_int_distribution<int> unif_feature_idx(0, features.size() - 1);
     projection->push_back(
@@ -812,7 +831,7 @@ void SampleProjection(const absl::Span<const int>& features,
     // For a small number of features, a boolean vector is more efficient.
     // Re-evaluate if this becomes a bottleneck.
     absl::btree_set<size_t> sampled_features;
-    // Floyd's sampling algorithm.
+    // Floyd's sampling algorithm. TODO could reuse this
     for (size_t j = cur_num_projections - max_num_features;
          j < cur_num_projections; j++) {
       size_t t = absl::Uniform<size_t>(*random, 0, j + 1);
