@@ -50,6 +50,8 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
         "@ydf_cc//yggdrasil_decision_forests/serving:example_set",
         "@ydf_cc//yggdrasil_decision_forests/serving:fast_engine",
+        "@ydf_cc//yggdrasil_decision_forests/serving/embed",
+        "@ydf_cc//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:concurrency",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
@@ -112,6 +114,7 @@ py_library(
         "//ydf/utils:concurrency",
         "//ydf/utils:html",
         "//ydf/utils:log",
+        "@ydf_cc//yggdrasil_decision_forests/serving/embed:embed_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
     ],
 )

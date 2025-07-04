@@ -1,5 +1,5 @@
-#ifndef YDF_MODEL_MY_MODEL_H_
-#define YDF_MODEL_MY_MODEL_H_
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
 
 #include <stdint.h>
 #include <array>
@@ -7,7 +7,7 @@
 #include <bitset>
 #include <cassert>
 
-namespace my_model {
+namespace ydf_model {
 
 constexpr const int kNumFeatures = 8;
 constexpr const int kNumTrees = 3;
@@ -276,5 +276,5 @@ inline float Predict(const Instance& instance) {
   return accumulator;
 }
 
-}  // namespace my_model
+}  // namespace ydf_model
 #endif

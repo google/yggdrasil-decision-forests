@@ -14,7 +14,7 @@
  */
 
 // A binary that writes the result of an embedded model to disk.
-// This binary is used by the "cc_ydf_embedded_model" build rule.
+// This binary is used by the "cc_ydf_standalone_model " build rule.
 
 #include <memory>
 #include <string>

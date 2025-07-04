@@ -20,7 +20,7 @@ package yggdrasil_decision_forests.serving.embed.proto;
 // High level options to control the model embedding.
 message Options {
   // Name filename and namespace of the generated library.
-  optional string name = 1 [default = "my_model"];
+  optional string name = 1 [default = "ydf_model"];
 
   // What is the Predict function is returning in case of a classification
   // model.

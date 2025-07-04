@@ -49,6 +49,8 @@ class GenericModelTest(parameterized.TestCase):
     super().setUpClass()
     # Loading models needed in many unittests.
     model_dir = os.path.join(test_utils.ydf_test_data_path(), "model")
+    cls._model_dir = model_dir
+
     # This model is a Random Forest classification model without training logs.
     cls.adult_binary_class_rf = model_lib.load_model(
         os.path.join(model_dir, "adult_binary_class_rf")
@@ -837,6 +839,41 @@ Use `model.describe()` for more details
     deserialized_predictions = deserialized_model.predict(ds)
     npt.assert_almost_equal(
         original_predictions, deserialized_predictions, decimal=5
+    )
+
+  def test_model_embed(self):
+    model = model_lib.load_model(
+        os.path.join(self._model_dir, "adult_binary_class_gbdt_v2")
+    )
+    while model.num_trees() > 3:
+      model.remove_tree(model.num_trees() - 1)
+    embedded_model_if_else_class = model.to_standalone_cc(algorithm="IF_ELSE")
+    embedded_model_routing_proba = model.to_standalone_cc(
+        algorithm="ROUTING",
+        classification_output="PROBABILITY",
+    )
+    self.assertIsInstance(embedded_model_if_else_class, str)
+    self.assertIsInstance(embedded_model_routing_proba, str)
+
+    test_utils.golden_check_string(
+        self,
+        embedded_model_if_else_class,
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_class.h.golden",
+        ),
+    )
+    test_utils.golden_check_string(
+        self,
+        embedded_model_routing_proba,
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_probability_routing.h.golden",
+        ),
     )
 
   def test_model_pickling(self):

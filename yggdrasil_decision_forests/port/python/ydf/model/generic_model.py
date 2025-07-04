@@ -38,6 +38,7 @@ from ydf.model import template_cpp_export
 from ydf.utils import concurrency
 from ydf.utils import html
 from ydf.utils import log
+from yggdrasil_decision_forests.serving.embed import embed_pb2
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 
@@ -785,6 +786,17 @@ Use `model.describe()` for more details
   def to_cpp(self, key: str = "my_model") -> str:
     """Generates the code of a .h file to run the model in C++.
 
+    Relation to "to_standalone_cc": The "to_cpp" method is currently the
+    generally
+    recommended, fastest and most model compatible one to productionize models
+    in C++. The alternative function "to_standalone_cc" aims to replace it, but
+    it
+    currently slower and has worst compatbility. However, "to_standalone_cc"
+    produces already much smaller binaries (up to 1000x smaller for the same
+    model) and has zero dependencies make it suited for size-critical and
+    non-google3 develoment. See the "to_standalone_cc" documentation for a
+    comparison of both approach.
+
     How to use this function:
 
     1. Copy the output of this function in a new .h file.
@@ -815,6 +827,74 @@ Use `model.describe()` for more details
 
     Returns:
       String containing an example header for running the model in C++.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def to_standalone_cc(
+      self,
+      name: str = "ydf_model",
+      algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+  ) -> Union[str, Dict[str, str]]:
+    """Generates the standalone code of a .h file to run the model in C++.
+
+    How to use this function:
+
+    1. Copy the output of this function in a new .h file.
+    2. In your library, call the model as follows:
+      ```c++
+      using namespace <name>;
+      const auto pred = Prediction(Instance{.f1=5, f2=F2:kRed});
+      ```
+      Note: The function is thread safe.
+
+    Alternatively, instead of generating and copy/pasting the C++ code
+    manually, you can use the "cc_ydf_standalone_model " equivalent build rule.
+
+    1. Save the model with `model.save(...)` in a directory in Google3.
+    2. Create a BUILD file with a filegroup in the model directory e.g.:
+      ```
+      filegroup(
+        name = "model",
+        srcs = glob(["**"]),
+      )
+      ```
+    3. In your library's BUILD, create a "cc_ydf_standalone_model " build rule.
+      ```
+      load("//external/ydf_cc/yggdrasil_decision_forests/serving/embed:embed.bzl",
+        "cc_ydf_standalone_model ")
+      cc_ydf_standalone_model (
+        name = "my_model",
+        classification_output = "SCORE",
+        data = "<path to filegroup>",
+      )
+      ```
+    4. In your cc_binary or cc_library, add ":my_model" as a dependency.
+    5. In your C++ code, inlcude:
+      ```c++
+      #include "<path to BUILD>/my_model.h"
+      ```
+      Then call:
+      ```c++
+      using namespace <name>;
+      const auto pred = Prediction(Instance{.f1=5, f2=F2:kRed});
+      ```
+
+    Args:
+      name: Name of the model. Used to define the C++ namespace of the model.
+      algorithm: Underlying algorithm used to compute the predictions. Can be
+        "ROUTING" (default; faster and smaller binary) or "IF_ELSE" (redable
+        if-else conditions).
+      classification_output: Output of the model if the model is a
+        classification model. Can be "CLASS" (default; fast), "SCORE" (raw score
+        of all the classes, e.g. logits), "PROBABILITY" (probability of all the
+        classes; slower than other approaches as it requires the evaluation of a
+        soft-max or equivalent).
+
+    Returns:
+      Source code content (if there is only one file) or dictionary of filename
+      to source code content.
     """
     raise NotImplementedError
 
@@ -1873,6 +1953,25 @@ class GenericCCModel(GenericModel):
     return template_cpp_export.template(
         key, self._model.data_spec(), self._model.input_features()
     )
+
+  def to_standalone_cc(
+      self,
+      name: str = "ydf_model",
+      algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+  ) -> Union[str, Dict[str, str]]:
+    options = embed_pb2.Options(
+        name=name,
+        classification_output=embed_pb2.ClassificationOutput.Enum.Value(
+            classification_output
+        ),
+        algorithm=embed_pb2.Algorithm.Enum.Value(algorithm),
+    )
+    results = self._model.EmbedModel(options)
+    if len(results) == 1:
+      return list(results.values())[0]
+    else:
+      return results
 
   # TODO: Change default value of "mode" before 1.0 release.
   def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value

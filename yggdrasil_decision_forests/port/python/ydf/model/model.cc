@@ -169,7 +169,9 @@ void init_model(py::module_& m) {
       .def("weighted_training", &GenericCCModel::weighted_training)
       .def("set_feature_selection_logs",
            &GenericCCModel::set_feature_selection_logs)
-      .def("feature_selection_logs", &GenericCCModel::feature_selection_logs);
+      .def("feature_selection_logs", &GenericCCModel::feature_selection_logs)
+      .def("EmbedModel", WithStatusOr(&GenericCCModel::EmbedModel),
+           py::arg("options"));
 
   py::class_<BenchmarkInferenceCCResult>(m, "BenchmarkInferenceCCResult")
       .def_readwrite("duration_per_example",

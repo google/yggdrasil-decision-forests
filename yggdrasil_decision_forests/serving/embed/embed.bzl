@@ -1,6 +1,6 @@
 """Blaze / Bazel rule to embed YDF models in a binary."""
 
-def cc_ydf_embedded_model(
+def cc_ydf_standalone_model(
         name,
         data,
         path = None,

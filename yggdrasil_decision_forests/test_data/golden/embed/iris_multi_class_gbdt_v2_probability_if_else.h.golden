@@ -1,5 +1,5 @@
-#ifndef YDF_MODEL_MY_MODEL_H_
-#define YDF_MODEL_MY_MODEL_H_
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
 
 #include <stdint.h>
 #include <array>
@@ -7,7 +7,7 @@
 #include <bitset>
 #include <cassert>
 
-namespace my_model {
+namespace ydf_model {
 
 constexpr const int kNumFeatures = 4;
 constexpr const int kNumTrees = 3;
@@ -97,5 +97,5 @@ inline uint8_t Predict(const Instance& instance) {
   return std::distance(accumulator.begin(), std::max_element(accumulator.begin(), accumulator.end()));
 }
 
-}  // namespace my_model
+}  // namespace ydf_model
 #endif

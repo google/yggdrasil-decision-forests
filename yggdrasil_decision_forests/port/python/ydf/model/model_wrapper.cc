@@ -43,6 +43,8 @@
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/describe.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
@@ -403,6 +405,16 @@ absl::StatusOr<py::bytes> GenericCCModel::Serialize() const {
   ASSIGN_OR_RETURN(std::string serialized_model,
                    model::SerializeModel(*model_));
   return py::bytes(serialized_model);
+}
+
+absl::StatusOr<std::unordered_map<std::string, std::string>>
+GenericCCModel::EmbedModel(
+    const serving::embed::proto::Options& options) const {
+  std::unordered_map<std::string, std::string> std_result;
+  ASSIGN_OR_RETURN(const auto absl_result,
+                   serving::embed::EmbedModelCC(*model_, options));
+  std_result.insert(absl_result.begin(), absl_result.end());
+  return std_result;
 }
 
 model::proto::Metadata GenericCCModel::metadata() const {

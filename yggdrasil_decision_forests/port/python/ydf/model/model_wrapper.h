@@ -36,6 +36,7 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
@@ -105,6 +106,10 @@ class GenericCCModel {
 
   // Serializes a model to a sequence of bytes.
   absl::StatusOr<py::bytes> Serialize() const;
+
+  // Embedding of the model.
+  absl::StatusOr<std::unordered_map<std::string, std::string>> EmbedModel(
+      const serving::embed::proto::Options& options) const;
 
   // TODO: Allow passing the output array as a parameter to reduce heap
   // allocations.

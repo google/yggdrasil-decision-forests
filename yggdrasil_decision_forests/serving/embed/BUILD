@@ -1,5 +1,5 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
-load("//yggdrasil_decision_forests/serving/embed:embed.bzl", "cc_ydf_embedded_model")
+load("//yggdrasil_decision_forests/serving/embed:embed.bzl", "cc_ydf_standalone_model")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_binary_ydf", "cc_library_ydf")
 
 package(
@@ -172,34 +172,34 @@ cc_test(
 
 # Models to compile during the unit tests
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_filegroup_filegroup",
     data = "//yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_filegroup",
 )
 
 # GBT binary class
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_class",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_score",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_proba",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_proba_routing",
     algorithm = "ROUTING",
     classification_output = "PROBABILITY",
@@ -209,28 +209,28 @@ cc_ydf_embedded_model(
 
 # RF binary class
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_wta_small_class",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_wta_small_score",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_wta_small_proba",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_wta_small_proba_routing",
     algorithm = "ROUTING",
     classification_output = "PROBABILITY",
@@ -238,28 +238,28 @@ cc_ydf_embedded_model(
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_nwta_small_class",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_nwta_small_score",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_nwta_small_proba",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_nwta_small_proba_routing",
     algorithm = "ROUTING",
     classification_output = "PROBABILITY",
@@ -269,26 +269,26 @@ cc_ydf_embedded_model(
 
 # Regression
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_abalone_regression_gbdt_v2",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/abalone_regression_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_abalone_regression_gbdt_v2_routing",
     algorithm = "ROUTING",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/abalone_regression_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_abalone_regression_rf_small",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/abalone_regression_rf_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_abalone_regression_rf_small_routing",
     algorithm = "ROUTING",
     data = "//yggdrasil_decision_forests/test_data",
@@ -296,28 +296,28 @@ cc_ydf_embedded_model(
 )
 
 # GBT multi-class
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_gbdt_v2_class",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_gbdt_v2_score",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_gbdt_v2_proba",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_gbdt_v2_proba_routing",
     algorithm = "ROUTING",
     classification_output = "PROBABILITY",
@@ -326,28 +326,28 @@ cc_ydf_embedded_model(
 )
 
 # RF multi-class
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_nwta_small_class",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_nwta_small_score",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_nwta_small_proba",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_nwta_small_proba_routing",
     algorithm = "ROUTING",
     classification_output = "PROBABILITY",
@@ -355,28 +355,28 @@ cc_ydf_embedded_model(
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_wta_small_class",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_wta_small_score",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_wta_small_proba",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
 )
 
-cc_ydf_embedded_model(
+cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_wta_small_proba_routing",
     algorithm = "ROUTING",
     classification_output = "PROBABILITY",

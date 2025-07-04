@@ -224,10 +224,10 @@ SIMPLE_PARAMETERIZED_TEST(
   }
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
   EXPECT_EQ(embed.size(), 1);
-  EXPECT_TRUE(embed.contains("my_model.h"));
+  EXPECT_TRUE(embed.contains("ydf_model.h"));
 
   test::ExpectEqualGolden(
-      embed.at("my_model.h"),
+      embed.at("ydf_model.h"),
       file::JoinPath("yggdrasil_decision_forests/test_data/"
                      "golden/embed",
                      test_case.golden_filename));
