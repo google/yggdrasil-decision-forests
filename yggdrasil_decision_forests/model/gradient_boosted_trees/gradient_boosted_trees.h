@@ -275,7 +275,7 @@ class GradientBoostedTreesModel : public AbstractModel,
   proto::Header BuildHeaderProto() const;
   void ApplyHeaderProto(const proto::Header& header);
   // Loss used to train the model.
-  proto::Loss loss_;
+  proto::Loss loss_ = proto::Loss::DEFAULT;
   // Options of the loss.
   proto::LossConfiguration loss_config_;
 };

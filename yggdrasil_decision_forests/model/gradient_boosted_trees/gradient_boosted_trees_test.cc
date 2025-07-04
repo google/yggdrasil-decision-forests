@@ -269,7 +269,7 @@ TEST(GradientBoostedTrees, GetLossName) {
   GradientBoostedTreesModel model;
 
   // Default loss
-  EXPECT_EQ(model.GetLossName(), "");
+  EXPECT_EQ(model.GetLossName(), "DEFAULT");
 
   // Loss without configuration
   model.set_loss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD, {});
