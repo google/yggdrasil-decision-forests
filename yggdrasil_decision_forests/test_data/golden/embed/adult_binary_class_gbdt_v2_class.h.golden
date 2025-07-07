@@ -9,189 +9,173 @@
 
 namespace ydf_model {
 
+enum class Label : uint32_t {
+  kLt50K = 0,
+  kGt50K = 1,
+};
+
+enum class FeatureWorkclass : uint32_t {
+  kOutOfVocabulary = 0,
+  kPrivate = 1,
+  kSelfEmpNotInc = 2,
+  kLocalGov = 3,
+  kStateGov = 4,
+  kSelfEmpInc = 5,
+  kFederalGov = 6,
+  kWithoutPay = 7,
+};
+
+enum class FeatureEducation : uint32_t {
+  kOutOfVocabulary = 0,
+  kHsGrad = 1,
+  kSomeCollege = 2,
+  kBachelors = 3,
+  kMasters = 4,
+  kAssocVoc = 5,
+  k11th = 6,
+  kAssocAcdm = 7,
+  k10th = 8,
+  k7th8th = 9,
+  kProfSchool = 10,
+  k9th = 11,
+  k12th = 12,
+  kDoctorate = 13,
+  k5th6th = 14,
+  k1st4th = 15,
+  kPreschool = 16,
+};
+
+enum class FeatureMaritalStatus : uint32_t {
+  kOutOfVocabulary = 0,
+  kMarriedCivSpouse = 1,
+  kNeverMarried = 2,
+  kDivorced = 3,
+  kWidowed = 4,
+  kSeparated = 5,
+  kMarriedSpouseAbsent = 6,
+  kMarriedAfSpouse = 7,
+};
+
+enum class FeatureOccupation : uint32_t {
+  kOutOfVocabulary = 0,
+  kProfSpecialty = 1,
+  kExecManagerial = 2,
+  kCraftRepair = 3,
+  kAdmClerical = 4,
+  kSales = 5,
+  kOtherService = 6,
+  kMachineOpInspct = 7,
+  kTransportMoving = 8,
+  kHandlersCleaners = 9,
+  kFarmingFishing = 10,
+  kTechSupport = 11,
+  kProtectiveServ = 12,
+  kPrivHouseServ = 13,
+};
+
+enum class FeatureRelationship : uint32_t {
+  kOutOfVocabulary = 0,
+  kHusband = 1,
+  kNotInFamily = 2,
+  kOwnChild = 3,
+  kUnmarried = 4,
+  kWife = 5,
+  kOtherRelative = 6,
+};
+
+enum class FeatureRace : uint32_t {
+  kOutOfVocabulary = 0,
+  kWhite = 1,
+  kBlack = 2,
+  kAsianPacIslander = 3,
+  kAmerIndianEskimo = 4,
+  kOther = 5,
+};
+
+enum class FeatureSex : uint32_t {
+  kOutOfVocabulary = 0,
+  kMale = 1,
+  kFemale = 2,
+};
+
+enum class FeatureNativeCountry : uint32_t {
+  kOutOfVocabulary = 0,
+  kUnitedStates = 1,
+  kMexico = 2,
+  kPhilippines = 3,
+  kGermany = 4,
+  kCanada = 5,
+  kPuertoRico = 6,
+  kIndia = 7,
+  kElSalvador = 8,
+  kCuba = 9,
+  kEngland = 10,
+  kJamaica = 11,
+  kDominicanRepublic = 12,
+  kSouth = 13,
+  kChina = 14,
+  kItaly = 15,
+  kColumbia = 16,
+  kGuatemala = 17,
+  kJapan = 18,
+  kVietnam = 19,
+  kTaiwan = 20,
+  kIran = 21,
+  kPoland = 22,
+  kHaiti = 23,
+  kNicaragua = 24,
+  kGreece = 25,
+  kPortugal = 26,
+  kEcuador = 27,
+  kFrance = 28,
+  kPeru = 29,
+  kThailand = 30,
+  kCambodia = 31,
+  kIreland = 32,
+  kLaos = 33,
+  kYugoslavia = 34,
+  kTrinadadTobago = 35,
+  kHonduras = 36,
+  kHong = 37,
+  kHungary = 38,
+  kScotland = 39,
+  kOutlyingUsGuamUsviEtc = 40,
+};
+
 constexpr const int kNumFeatures = 14;
 constexpr const int kNumTrees = 3;
 
 struct Instance {
-  int32_t age;
-  uint32_t workclass;
-  int32_t fnlwgt;
-  uint32_t education;
-  int32_t education_num;
-  uint32_t marital_status;
-  uint32_t occupation;
-  uint32_t relationship;
-  uint32_t race;
-  uint32_t sex;
-  int32_t capital_gain;
-  int32_t capital_loss;
-  int32_t hours_per_week;
-  uint32_t native_country;
+  typedef int32_t Numerical;
+
+  Numerical age;
+  FeatureWorkclass workclass;
+  Numerical fnlwgt;
+  FeatureEducation education;
+  Numerical education_num;
+  FeatureMaritalStatus marital_status;
+  FeatureOccupation occupation;
+  FeatureRelationship relationship;
+  FeatureRace race;
+  FeatureSex sex;
+  Numerical capital_gain;
+  Numerical capital_loss;
+  Numerical hours_per_week;
+  FeatureNativeCountry native_country;
 };
 
-struct Label {
-  enum {
-    kLt50K = 0,
-    kGt50K = 1,
-  };
-};
-
-struct FeatureWorkclass {
-  enum {
-    kOutOfVocabulary = 0,
-    kPrivate = 1,
-    kSelfEmpNotInc = 2,
-    kLocalGov = 3,
-    kStateGov = 4,
-    kSelfEmpInc = 5,
-    kFederalGov = 6,
-    kWithoutPay = 7,
-  };
-};
-
-struct FeatureEducation {
-  enum {
-    kOutOfVocabulary = 0,
-    kHsGrad = 1,
-    kSomeCollege = 2,
-    kBachelors = 3,
-    kMasters = 4,
-    kAssocVoc = 5,
-    k11th = 6,
-    kAssocAcdm = 7,
-    k10th = 8,
-    k7th8th = 9,
-    kProfSchool = 10,
-    k9th = 11,
-    k12th = 12,
-    kDoctorate = 13,
-    k5th6th = 14,
-    k1st4th = 15,
-    kPreschool = 16,
-  };
-};
-
-struct FeatureMaritalStatus {
-  enum {
-    kOutOfVocabulary = 0,
-    kMarriedCivSpouse = 1,
-    kNeverMarried = 2,
-    kDivorced = 3,
-    kWidowed = 4,
-    kSeparated = 5,
-    kMarriedSpouseAbsent = 6,
-    kMarriedAfSpouse = 7,
-  };
-};
-
-struct FeatureOccupation {
-  enum {
-    kOutOfVocabulary = 0,
-    kProfSpecialty = 1,
-    kExecManagerial = 2,
-    kCraftRepair = 3,
-    kAdmClerical = 4,
-    kSales = 5,
-    kOtherService = 6,
-    kMachineOpInspct = 7,
-    kTransportMoving = 8,
-    kHandlersCleaners = 9,
-    kFarmingFishing = 10,
-    kTechSupport = 11,
-    kProtectiveServ = 12,
-    kPrivHouseServ = 13,
-  };
-};
-
-struct FeatureRelationship {
-  enum {
-    kOutOfVocabulary = 0,
-    kHusband = 1,
-    kNotInFamily = 2,
-    kOwnChild = 3,
-    kUnmarried = 4,
-    kWife = 5,
-    kOtherRelative = 6,
-  };
-};
-
-struct FeatureRace {
-  enum {
-    kOutOfVocabulary = 0,
-    kWhite = 1,
-    kBlack = 2,
-    kAsianPacIslander = 3,
-    kAmerIndianEskimo = 4,
-    kOther = 5,
-  };
-};
-
-struct FeatureSex {
-  enum {
-    kOutOfVocabulary = 0,
-    kMale = 1,
-    kFemale = 2,
-  };
-};
-
-struct FeatureNativeCountry {
-  enum {
-    kOutOfVocabulary = 0,
-    kUnitedStates = 1,
-    kMexico = 2,
-    kPhilippines = 3,
-    kGermany = 4,
-    kCanada = 5,
-    kPuertoRico = 6,
-    kIndia = 7,
-    kElSalvador = 8,
-    kCuba = 9,
-    kEngland = 10,
-    kJamaica = 11,
-    kDominicanRepublic = 12,
-    kSouth = 13,
-    kChina = 14,
-    kItaly = 15,
-    kColumbia = 16,
-    kGuatemala = 17,
-    kJapan = 18,
-    kVietnam = 19,
-    kTaiwan = 20,
-    kIran = 21,
-    kPoland = 22,
-    kHaiti = 23,
-    kNicaragua = 24,
-    kGreece = 25,
-    kPortugal = 26,
-    kEcuador = 27,
-    kFrance = 28,
-    kPeru = 29,
-    kThailand = 30,
-    kCambodia = 31,
-    kIreland = 32,
-    kLaos = 33,
-    kYugoslavia = 34,
-    kTrinadadTobago = 35,
-    kHonduras = 36,
-    kHong = 37,
-    kHungary = 38,
-    kScotland = 39,
-    kOutlyingUsGuamUsviEtc = 40,
-  };
-};
-
-inline bool Predict(const Instance& instance) {
+inline Label Predict(const Instance& instance) {
   float accumulator {-1.1631};
   // Tree #0
-  if (instance.relationship == 0 ||
-      instance.relationship == 1 ||
-      instance.relationship == 5) {
-    if (instance.education == 3 ||
-        instance.education == 4 ||
-        instance.education == 10 ||
-        instance.education == 13) {
+  if (instance.relationship == FeatureRelationship::kOutOfVocabulary ||
+      instance.relationship == FeatureRelationship::kHusband ||
+      instance.relationship == FeatureRelationship::kWife) {
+    if (instance.education == FeatureEducation::kBachelors ||
+        instance.education == FeatureEducation::kMasters ||
+        instance.education == FeatureEducation::kProfSchool ||
+        instance.education == FeatureEducation::kDoctorate) {
       if (instance.capital_gain >= 5095.5) {
-        if (std::array<uint32_t,12> mask = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12};
+        if (std::array<FeatureOccupation,12> mask = { FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
             std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
           if (instance.age >= 79.5) {
             accumulator += 0.309737;
@@ -209,11 +193,11 @@ inline bool Predict(const Instance& instance) {
             accumulator += 0.417359;
           }
         } else {
-          if (instance.occupation == 1 ||
-              instance.occupation == 2 ||
-              instance.occupation == 5 ||
-              instance.occupation == 11 ||
-              instance.occupation == 12) {
+          if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+              instance.occupation == FeatureOccupation::kExecManagerial ||
+              instance.occupation == FeatureOccupation::kSales ||
+              instance.occupation == FeatureOccupation::kTechSupport ||
+              instance.occupation == FeatureOccupation::kProtectiveServ) {
             accumulator += 0.253437;
           } else {
             accumulator += 0.11557;
@@ -223,13 +207,13 @@ inline bool Predict(const Instance& instance) {
     } else {
       if (instance.capital_gain >= 5095.5) {
         if (instance.age >= 60.5) {
-          if (instance.occupation == 1 ||
-              instance.occupation == 2 ||
-              instance.occupation == 4 ||
-              instance.occupation == 5 ||
-              instance.occupation == 7 ||
-              instance.occupation == 8 ||
-              instance.occupation == 9) {
+          if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+              instance.occupation == FeatureOccupation::kExecManagerial ||
+              instance.occupation == FeatureOccupation::kAdmClerical ||
+              instance.occupation == FeatureOccupation::kSales ||
+              instance.occupation == FeatureOccupation::kMachineOpInspct ||
+              instance.occupation == FeatureOccupation::kTransportMoving ||
+              instance.occupation == FeatureOccupation::kHandlersCleaners) {
             accumulator += 0.397934;
           } else {
             accumulator += 0.205614;
@@ -242,12 +226,12 @@ inline bool Predict(const Instance& instance) {
           }
         }
       } else {
-        if (instance.occupation == 1 ||
-            instance.occupation == 2 ||
-            instance.occupation == 4 ||
-            instance.occupation == 5 ||
-            instance.occupation == 11 ||
-            instance.occupation == 12) {
+        if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+            instance.occupation == FeatureOccupation::kExecManagerial ||
+            instance.occupation == FeatureOccupation::kAdmClerical ||
+            instance.occupation == FeatureOccupation::kSales ||
+            instance.occupation == FeatureOccupation::kTechSupport ||
+            instance.occupation == FeatureOccupation::kProtectiveServ) {
           if (instance.age >= 33.5) {
             accumulator += 0.132992;
           } else {
@@ -272,10 +256,10 @@ inline bool Predict(const Instance& instance) {
             accumulator += 0.419984;
           }
         } else {
-          if (instance.education == 3 ||
-              instance.education == 4 ||
-              instance.education == 5 ||
-              instance.education == 10) {
+          if (instance.education == FeatureEducation::kBachelors ||
+              instance.education == FeatureEducation::kMasters ||
+              instance.education == FeatureEducation::kAssocVoc ||
+              instance.education == FeatureEducation::kProfSchool) {
             accumulator += 0.419984;
           } else {
             accumulator += -0.0210046;
@@ -318,51 +302,51 @@ inline bool Predict(const Instance& instance) {
   }
 
   // Tree #1
-  if (instance.relationship == 0 ||
-      instance.relationship == 1 ||
-      instance.relationship == 5) {
-    if (instance.education == 3 ||
-        instance.education == 4 ||
-        instance.education == 10 ||
-        instance.education == 13) {
+  if (instance.relationship == FeatureRelationship::kOutOfVocabulary ||
+      instance.relationship == FeatureRelationship::kHusband ||
+      instance.relationship == FeatureRelationship::kWife) {
+    if (instance.education == FeatureEducation::kBachelors ||
+        instance.education == FeatureEducation::kMasters ||
+        instance.education == FeatureEducation::kProfSchool ||
+        instance.education == FeatureEducation::kDoctorate) {
       if (instance.capital_gain >= 5095.5) {
         if (instance.age >= 62.5) {
-          if (instance.workclass == 0 ||
-              instance.workclass == 1 ||
-              instance.workclass == 3 ||
-              instance.workclass == 4 ||
-              instance.workclass == 5) {
+          if (instance.workclass == FeatureWorkclass::kOutOfVocabulary ||
+              instance.workclass == FeatureWorkclass::kPrivate ||
+              instance.workclass == FeatureWorkclass::kLocalGov ||
+              instance.workclass == FeatureWorkclass::kStateGov ||
+              instance.workclass == FeatureWorkclass::kSelfEmpInc) {
             accumulator += 0.300409;
           } else {
             accumulator += 0.222857;
           }
         } else {
-          if (instance.occupation == 10 ||
-              instance.occupation == 12) {
+          if (instance.occupation == FeatureOccupation::kFarmingFishing ||
+              instance.occupation == FeatureOccupation::kProtectiveServ) {
             accumulator += 0.318377;
           } else {
             accumulator += 0.310521;
           }
         }
       } else {
-        if (instance.occupation == 1 ||
-            instance.occupation == 2 ||
-            instance.occupation == 4 ||
-            instance.occupation == 5 ||
-            instance.occupation == 11 ||
-            instance.occupation == 12) {
+        if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+            instance.occupation == FeatureOccupation::kExecManagerial ||
+            instance.occupation == FeatureOccupation::kAdmClerical ||
+            instance.occupation == FeatureOccupation::kSales ||
+            instance.occupation == FeatureOccupation::kTechSupport ||
+            instance.occupation == FeatureOccupation::kProtectiveServ) {
           if (instance.capital_loss >= 1782.5) {
             accumulator += 0.303271;
           } else {
             accumulator += 0.198242;
           }
         } else {
-          if (instance.native_country == 4 ||
-              instance.native_country == 15 ||
-              instance.native_country == 21 ||
-              instance.native_country == 22 ||
-              instance.native_country == 23 ||
-              instance.native_country == 31) {
+          if (instance.native_country == FeatureNativeCountry::kGermany ||
+              instance.native_country == FeatureNativeCountry::kItaly ||
+              instance.native_country == FeatureNativeCountry::kIran ||
+              instance.native_country == FeatureNativeCountry::kPoland ||
+              instance.native_country == FeatureNativeCountry::kHaiti ||
+              instance.native_country == FeatureNativeCountry::kCambodia) {
             accumulator += 0.38506;
           } else {
             accumulator += 0.0771326;
@@ -372,13 +356,13 @@ inline bool Predict(const Instance& instance) {
     } else {
       if (instance.capital_gain >= 5095.5) {
         if (instance.age >= 60.5) {
-          if (instance.occupation == 1 ||
-              instance.occupation == 2 ||
-              instance.occupation == 4 ||
-              instance.occupation == 5 ||
-              instance.occupation == 7 ||
-              instance.occupation == 8 ||
-              instance.occupation == 9) {
+          if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+              instance.occupation == FeatureOccupation::kExecManagerial ||
+              instance.occupation == FeatureOccupation::kAdmClerical ||
+              instance.occupation == FeatureOccupation::kSales ||
+              instance.occupation == FeatureOccupation::kMachineOpInspct ||
+              instance.occupation == FeatureOccupation::kTransportMoving ||
+              instance.occupation == FeatureOccupation::kHandlersCleaners) {
             accumulator += 0.296477;
           } else {
             accumulator += 0.166497;
@@ -391,12 +375,12 @@ inline bool Predict(const Instance& instance) {
           }
         }
       } else {
-        if (instance.occupation == 1 ||
-            instance.occupation == 2 ||
-            instance.occupation == 4 ||
-            instance.occupation == 5 ||
-            instance.occupation == 11 ||
-            instance.occupation == 12) {
+        if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+            instance.occupation == FeatureOccupation::kExecManagerial ||
+            instance.occupation == FeatureOccupation::kAdmClerical ||
+            instance.occupation == FeatureOccupation::kSales ||
+            instance.occupation == FeatureOccupation::kTechSupport ||
+            instance.occupation == FeatureOccupation::kProtectiveServ) {
           if (instance.capital_loss >= 1782.5) {
             accumulator += 0.291468;
           } else {
@@ -431,11 +415,11 @@ inline bool Predict(const Instance& instance) {
         accumulator += 0.0765646;
       }
     } else {
-      if (instance.education == 0 ||
-          instance.education == 3 ||
-          instance.education == 4 ||
-          instance.education == 10 ||
-          instance.education == 13) {
+      if (instance.education == FeatureEducation::kOutOfVocabulary ||
+          instance.education == FeatureEducation::kBachelors ||
+          instance.education == FeatureEducation::kMasters ||
+          instance.education == FeatureEducation::kProfSchool ||
+          instance.education == FeatureEducation::kDoctorate) {
         if (instance.age >= 31.5) {
           if (instance.education_num >= 14.5) {
             accumulator += 0.13565;
@@ -468,12 +452,12 @@ inline bool Predict(const Instance& instance) {
   }
 
   // Tree #2
-  if (instance.relationship == 0 ||
-      instance.relationship == 1 ||
-      instance.relationship == 5) {
+  if (instance.relationship == FeatureRelationship::kOutOfVocabulary ||
+      instance.relationship == FeatureRelationship::kHusband ||
+      instance.relationship == FeatureRelationship::kWife) {
     if (instance.education_num >= 12.5) {
       if (instance.capital_gain >= 5095.5) {
-        if (std::array<uint32_t,11> mask = {1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12};
+        if (std::array<FeatureOccupation,11> mask = { FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
             std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
           if (instance.age >= 75.5) {
             accumulator += 0.186707;
@@ -488,12 +472,12 @@ inline bool Predict(const Instance& instance) {
           }
         }
       } else {
-        if (instance.occupation == 1 ||
-            instance.occupation == 2 ||
-            instance.occupation == 4 ||
-            instance.occupation == 5 ||
-            instance.occupation == 11 ||
-            instance.occupation == 12) {
+        if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+            instance.occupation == FeatureOccupation::kExecManagerial ||
+            instance.occupation == FeatureOccupation::kAdmClerical ||
+            instance.occupation == FeatureOccupation::kSales ||
+            instance.occupation == FeatureOccupation::kTechSupport ||
+            instance.occupation == FeatureOccupation::kProtectiveServ) {
           if (instance.capital_loss >= 1782.5) {
             accumulator += 0.248387;
           } else {
@@ -510,13 +494,13 @@ inline bool Predict(const Instance& instance) {
     } else {
       if (instance.capital_gain >= 5095.5) {
         if (instance.age >= 60.5) {
-          if (instance.occupation == 1 ||
-              instance.occupation == 2 ||
-              instance.occupation == 4 ||
-              instance.occupation == 5 ||
-              instance.occupation == 7 ||
-              instance.occupation == 8 ||
-              instance.occupation == 9) {
+          if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+              instance.occupation == FeatureOccupation::kExecManagerial ||
+              instance.occupation == FeatureOccupation::kAdmClerical ||
+              instance.occupation == FeatureOccupation::kSales ||
+              instance.occupation == FeatureOccupation::kMachineOpInspct ||
+              instance.occupation == FeatureOccupation::kTransportMoving ||
+              instance.occupation == FeatureOccupation::kHandlersCleaners) {
             accumulator += 0.242895;
           } else {
             accumulator += 0.139375;
@@ -529,7 +513,7 @@ inline bool Predict(const Instance& instance) {
           }
         }
       } else {
-        if (std::array<uint32_t,8> mask = {1, 2, 3, 4, 5, 8, 11, 12};
+        if (std::array<FeatureOccupation,8> mask = { FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kTransportMoving, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
             std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
           if (instance.age >= 35.5) {
             accumulator += 0.078723;
@@ -549,12 +533,12 @@ inline bool Predict(const Instance& instance) {
     if (instance.capital_gain >= 7073.5) {
       if (instance.age >= 21.5) {
         if (instance.capital_gain >= 7565.5) {
-          if (instance.workclass == 0 ||
-              instance.workclass == 1 ||
-              instance.workclass == 3 ||
-              instance.workclass == 4 ||
-              instance.workclass == 5 ||
-              instance.workclass == 6) {
+          if (instance.workclass == FeatureWorkclass::kOutOfVocabulary ||
+              instance.workclass == FeatureWorkclass::kPrivate ||
+              instance.workclass == FeatureWorkclass::kLocalGov ||
+              instance.workclass == FeatureWorkclass::kStateGov ||
+              instance.workclass == FeatureWorkclass::kSelfEmpInc ||
+              instance.workclass == FeatureWorkclass::kFederalGov) {
             accumulator += 0.254692;
           } else {
             accumulator += 0.238989;
@@ -570,13 +554,13 @@ inline bool Predict(const Instance& instance) {
         accumulator += 0.0663047;
       }
     } else {
-      if (instance.occupation == 1 ||
-          instance.occupation == 2 ||
-          instance.occupation == 12) {
+      if (instance.occupation == FeatureOccupation::kProfSpecialty ||
+          instance.occupation == FeatureOccupation::kExecManagerial ||
+          instance.occupation == FeatureOccupation::kProtectiveServ) {
         if (instance.age >= 32.5) {
-          if (instance.education == 8 ||
-              instance.education == 10 ||
-              instance.education == 13) {
+          if (instance.education == FeatureEducation::k10th ||
+              instance.education == FeatureEducation::kProfSchool ||
+              instance.education == FeatureEducation::kDoctorate) {
             accumulator += 0.123551;
           } else {
             accumulator += -0.0303353;
@@ -606,7 +590,7 @@ inline bool Predict(const Instance& instance) {
     }
   }
 
-  return accumulator >= 0;
+  return static_cast<Label>(accumulator >= 0);
 }
 
 }  // namespace ydf_model

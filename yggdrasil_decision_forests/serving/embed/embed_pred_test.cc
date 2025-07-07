@@ -109,7 +109,7 @@ constexpr double eps = 0.00001;
 
 TEST(Embed, test_model_adult_binary_class_gbdt_filegroup_filegroup) {
   using namespace test_model_adult_binary_class_gbdt_filegroup_filegroup;
-  const float pred = Predict(Instance{});
+  const Label pred = Predict(Instance{});
   (void)pred;
 }
 
@@ -117,7 +117,7 @@ TEST(Embed, test_model_adult_binary_class_gbdt_filegroup_filegroup) {
 
 TEST(Embed, test_model_adult_binary_class_gbdt_v2_class) {
   using namespace test_model_adult_binary_class_gbdt_v2_class;
-  const int pred = Predict(ADULT_EXAMPLE);
+  const Label pred = Predict(ADULT_EXAMPLE);
   EXPECT_EQ(pred, Label::kLt50K);
 }
 
@@ -143,7 +143,7 @@ TEST(Embed, test_model_adult_binary_class_gbdt_v2_score) {
 
 TEST(Embed, test_model_adult_binary_class_rf_nwta_small_class) {
   using namespace test_model_adult_binary_class_rf_nwta_small_class;
-  const int pred = Predict(ADULT_EXAMPLE);
+  const Label pred = Predict(ADULT_EXAMPLE);
   EXPECT_EQ(pred, Label::kLt50K);
 }
 
@@ -167,7 +167,7 @@ TEST(Embed, test_model_adult_binary_class_rf_nwta_small_score) {
 
 TEST(Embed, test_model_adult_binary_class_rf_wta_small_class) {
   using namespace test_model_adult_binary_class_rf_wta_small_class;
-  const int pred = Predict(ADULT_EXAMPLE);
+  const Label pred = Predict(ADULT_EXAMPLE);
   EXPECT_EQ(pred, Label::kLt50K);
 }
 
@@ -219,7 +219,7 @@ TEST(Embed, test_model_abalone_regression_rf_small_routing) {
 
 TEST(Embed, test_model_iris_multi_class_gbdt_v2_class) {
   using namespace test_model_iris_multi_class_gbdt_v2_class;
-  const int pred = Predict(IRIS_EXAMPLE);
+  const Label pred = Predict(IRIS_EXAMPLE);
   EXPECT_EQ(pred, Label::kSetosa);
 }
 
@@ -251,62 +251,62 @@ TEST(Embed, test_model_iris_multi_class_gbdt_v2_proba_routing) {
 
 TEST(Embed, test_model_iris_multi_class_rf_nwta_small_class) {
   using namespace test_model_iris_multi_class_rf_nwta_small_class;
-  const int pred = Predict(IRIS_EXAMPLE);
+  const Label pred = Predict(IRIS_EXAMPLE);
   EXPECT_EQ(pred, Label::kSetosa);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_nwta_small_score) {
   using namespace test_model_iris_multi_class_rf_nwta_small_score;
   const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
-  EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
-  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
-  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kSetosa], 1., eps);
+  EXPECT_NEAR(pred[(int)Label::kVersicolor], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kVirginica], 0., eps);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_nwta_small_proba) {
   using namespace test_model_iris_multi_class_rf_nwta_small_proba;
   const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
-  EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
-  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
-  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kSetosa], 1., eps);
+  EXPECT_NEAR(pred[(int)Label::kVersicolor], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kVirginica], 0., eps);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_nwta_small_proba_routing) {
   using namespace test_model_iris_multi_class_rf_nwta_small_proba_routing;
   const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
-  EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
-  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
-  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kSetosa], 1., eps);
+  EXPECT_NEAR(pred[(int)Label::kVersicolor], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kVirginica], 0., eps);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_class) {
   using namespace test_model_iris_multi_class_rf_wta_small_class;
-  const int pred = Predict(IRIS_EXAMPLE);
+  const Label pred = Predict(IRIS_EXAMPLE);
   EXPECT_EQ(pred, Label::kSetosa);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_score) {
   using namespace test_model_iris_multi_class_rf_wta_small_score;
   const std::array<uint8_t, 3> pred = Predict(IRIS_EXAMPLE);
-  EXPECT_EQ(pred[Label::kSetosa], 10);
-  EXPECT_EQ(pred[Label::kVersicolor], 0);
-  EXPECT_EQ(pred[Label::kVirginica], 0);
+  EXPECT_EQ(pred[(int)Label::kSetosa], 10);
+  EXPECT_EQ(pred[(int)Label::kVersicolor], 0);
+  EXPECT_EQ(pred[(int)Label::kVirginica], 0);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_proba) {
   using namespace test_model_iris_multi_class_rf_wta_small_proba;
   const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
-  EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
-  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
-  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kSetosa], 1., eps);
+  EXPECT_NEAR(pred[(int)Label::kVersicolor], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kVirginica], 0., eps);
 }
 
 TEST(Embed, test_model_iris_multi_class_rf_wta_small_proba_routing) {
   using namespace test_model_iris_multi_class_rf_wta_small_proba_routing;
   const std::array<float, 3> pred = Predict(IRIS_EXAMPLE);
-  EXPECT_NEAR(pred[Label::kSetosa], 1., eps);
-  EXPECT_NEAR(pred[Label::kVersicolor], 0., eps);
-  EXPECT_NEAR(pred[Label::kVirginica], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kSetosa], 1., eps);
+  EXPECT_NEAR(pred[(int)Label::kVersicolor], 0., eps);
+  EXPECT_NEAR(pred[(int)Label::kVirginica], 0., eps);
 }
 
 }  // namespace

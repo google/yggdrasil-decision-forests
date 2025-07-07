@@ -238,7 +238,8 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::DecisionForestInterface& df_interface);
 
 struct FeatureDef {
-  std::string type;  // Type to encode a feature e.g. "float".
+  std::string type;  // Type to encode a feature using typedef / enum class.
+  std::string underlying_type;  // Type to encode a feature e.g. "float".
   absl::optional<std::string> default_value = {};  // Optional default value.
 };
 

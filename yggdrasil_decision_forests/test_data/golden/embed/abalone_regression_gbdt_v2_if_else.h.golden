@@ -9,27 +9,27 @@
 
 namespace ydf_model {
 
+enum class FeatureType : uint32_t {
+  kOutOfVocabulary = 0,
+  kM = 1,
+  kI = 2,
+  kF = 3,
+};
+
 constexpr const int kNumFeatures = 8;
 constexpr const int kNumTrees = 3;
 
 struct Instance {
-  uint32_t type;
-  float longestshell;
-  float diameter;
-  float height;
-  float wholeweight;
-  float shuckedweight;
-  float visceraweight;
-  float shellweight;
-};
+  typedef float Numerical;
 
-struct FeatureType {
-  enum {
-    kOutOfVocabulary = 0,
-    kM = 1,
-    kI = 2,
-    kF = 3,
-  };
+  FeatureType type;
+  Numerical longestshell;
+  Numerical diameter;
+  Numerical height;
+  Numerical wholeweight;
+  Numerical shuckedweight;
+  Numerical visceraweight;
+  Numerical shellweight;
 };
 
 inline float Predict(const Instance& instance) {
@@ -89,9 +89,9 @@ inline float Predict(const Instance& instance) {
             accumulator += -0.0446622;
           }
         } else {
-          if (instance.type == 0 ||
-              instance.type == 1 ||
-              instance.type == 3) {
+          if (instance.type == FeatureType::kOutOfVocabulary ||
+              instance.type == FeatureType::kM ||
+              instance.type == FeatureType::kF) {
             accumulator += 0.173916;
           } else {
             accumulator += -0.02731;
@@ -101,9 +101,9 @@ inline float Predict(const Instance& instance) {
     }
   } else {
     if (instance.shellweight >= 0.05875) {
-      if (instance.type == 0 ||
-          instance.type == 1 ||
-          instance.type == 3) {
+      if (instance.type == FeatureType::kOutOfVocabulary ||
+          instance.type == FeatureType::kM ||
+          instance.type == FeatureType::kF) {
         if (instance.shuckedweight >= 0.22975) {
           if (instance.visceraweight >= 0.1685) {
             accumulator += -0.0275789;
@@ -135,8 +135,8 @@ inline float Predict(const Instance& instance) {
     } else {
       if (instance.shellweight >= 0.0265) {
         if (instance.diameter >= 0.2225) {
-          if (instance.type == 0 ||
-              instance.type == 1) {
+          if (instance.type == FeatureType::kOutOfVocabulary ||
+              instance.type == FeatureType::kM) {
             accumulator += -0.188982;
           } else {
             accumulator += -0.351388;
@@ -231,9 +231,9 @@ inline float Predict(const Instance& instance) {
     }
   } else {
     if (instance.shellweight >= 0.05875) {
-      if (instance.type == 0 ||
-          instance.type == 1 ||
-          instance.type == 3) {
+      if (instance.type == FeatureType::kOutOfVocabulary ||
+          instance.type == FeatureType::kM ||
+          instance.type == FeatureType::kF) {
         if (instance.shuckedweight >= 0.233) {
           if (instance.visceraweight >= 0.1685) {
             accumulator += -0.0248209;
@@ -265,8 +265,8 @@ inline float Predict(const Instance& instance) {
     } else {
       if (instance.shellweight >= 0.0265) {
         if (instance.diameter >= 0.2225) {
-          if (instance.type == 0 ||
-              instance.type == 1) {
+          if (instance.type == FeatureType::kOutOfVocabulary ||
+              instance.type == FeatureType::kM) {
             accumulator += -0.170084;
           } else {
             accumulator += -0.31625;
@@ -361,9 +361,9 @@ inline float Predict(const Instance& instance) {
     }
   } else {
     if (instance.shellweight >= 0.0475) {
-      if (instance.type == 0 ||
-          instance.type == 1 ||
-          instance.type == 3) {
+      if (instance.type == FeatureType::kOutOfVocabulary ||
+          instance.type == FeatureType::kM ||
+          instance.type == FeatureType::kF) {
         if (instance.shuckedweight >= 0.233) {
           if (instance.visceraweight >= 0.15125) {
             accumulator += -0.0838989;

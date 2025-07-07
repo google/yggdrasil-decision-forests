@@ -10,22 +10,22 @@
 
 namespace ydf_model {
 
+enum class Label : uint32_t {
+  kSetosa = 0,
+  kVersicolor = 1,
+  kVirginica = 2,
+};
+
 constexpr const int kNumFeatures = 4;
 constexpr const int kNumTrees = 3;
 
 struct Instance {
-  float sepal_length;
-  float sepal_width;
-  float petal_length;
-  float petal_width;
-};
+  typedef float Numerical;
 
-struct Label {
-  enum {
-    kSetosa = 0,
-    kVersicolor = 1,
-    kVirginica = 2,
-  };
+  Numerical sepal_length;
+  Numerical sepal_width;
+  Numerical petal_length;
+  Numerical petal_width;
 };
 
 inline std::array<float, 3> Predict(const Instance& instance) {

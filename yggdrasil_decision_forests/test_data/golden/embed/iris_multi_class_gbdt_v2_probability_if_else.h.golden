@@ -9,25 +9,25 @@
 
 namespace ydf_model {
 
+enum class Label : uint32_t {
+  kSetosa = 0,
+  kVersicolor = 1,
+  kVirginica = 2,
+};
+
 constexpr const int kNumFeatures = 4;
 constexpr const int kNumTrees = 3;
 
 struct Instance {
-  float sepal_length;
-  float sepal_width;
-  float petal_length;
-  float petal_width;
+  typedef float Numerical;
+
+  Numerical sepal_length;
+  Numerical sepal_width;
+  Numerical petal_length;
+  Numerical petal_width;
 };
 
-struct Label {
-  enum {
-    kSetosa = 0,
-    kVersicolor = 1,
-    kVirginica = 2,
-  };
-};
-
-inline uint8_t Predict(const Instance& instance) {
+inline Label Predict(const Instance& instance) {
   std::array<float, 3> accumulator {0, 0, 0};
   // Tree #0
   if (instance.petal_width >= 0.8) {
@@ -94,7 +94,7 @@ inline uint8_t Predict(const Instance& instance) {
     }
   }
 
-  return std::distance(accumulator.begin(), std::max_element(accumulator.begin(), accumulator.end()));
+  return static_cast<Label>(std::distance(accumulator.begin(), std::max_element(accumulator.begin(), accumulator.end())));
 }
 
 }  // namespace ydf_model

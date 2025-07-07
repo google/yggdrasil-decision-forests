@@ -355,17 +355,17 @@ SIMPLE_PARAMETERIZED_TEST(
         {{},
          {.task = model::proto::Task::CLASSIFICATION,
           .num_classification_classes = 2},
-         "bool"},
+         "Label"},
 
         {{},
          {.task = model::proto::Task::CLASSIFICATION,
           .num_classification_classes = 4},
-         "uint8_t"},
+         "Label"},
 
         {{},
          {.task = model::proto::Task::CLASSIFICATION,
           .num_classification_classes = 299},
-         "uint16_t"},
+         "Label"},
 
         // Classification + score
         {PARSE_TEST_PROTO("classification_output: SCORE"),
@@ -401,7 +401,7 @@ SIMPLE_PARAMETERIZED_TEST(
 struct GenFeatureDefCase {
   dataset::proto::Column col_spec;
   internal::InternalOptions internal_options;
-  std::string expected_type;
+  std::string expected_underlying_type;
   absl::optional<std::string> expected_default_value;
 };
 
@@ -452,7 +452,7 @@ SIMPLE_PARAMETERIZED_TEST(
   ASSERT_OK_AND_ASSIGN(
       const auto value,
       internal::GenFeatureDef(test_case.col_spec, test_case.internal_options));
-  EXPECT_EQ(value.type, test_case.expected_type);
+  EXPECT_EQ(value.underlying_type, test_case.expected_underlying_type);
   EXPECT_EQ(value.default_value, test_case.expected_default_value);
 }
 

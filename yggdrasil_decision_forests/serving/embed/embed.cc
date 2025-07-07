@@ -60,14 +60,27 @@ absl::StatusOr<std::string> GenInstanceStruct(
     const internal::ModelStatistics& stats) {
   std::string content;
 
+  std::string numerical_type;
+  if (internal_options.numerical_feature_is_float) {
+    DCHECK_EQ(internal_options.feature_value_bytes, 4);
+    numerical_type = "float";
+  } else {
+    numerical_type = SignedInteger(internal_options.feature_value_bytes);
+  }
+
   // Start
   absl::SubstituteAndAppend(&content, R"(
 constexpr const int kNumFeatures = $0;
 constexpr const int kNumTrees = $1;
 
 struct Instance {
+  typedef $2 Numerical;
+
 )",
-                            model.input_features().size(), stats.num_trees);
+                            model.input_features().size(),  // $0
+                            stats.num_trees,                // $1
+                            numerical_type                  // $2
+  );
 
   for (const auto input_feature : model.input_features()) {
     const auto& col = model.data_spec().columns(input_feature);
@@ -99,21 +112,22 @@ absl::StatusOr<std::string> GenCategoricalStringDictionaries(
 
   // TODO: Create a hashmap with the string values is the user requests it.
   for (const auto& dict : internal_options.categorical_dicts) {
-    absl::SubstituteAndAppend(&content, R"(
-struct $0$1 {
-  enum {
+    absl::SubstituteAndAppend(
+        &content, R"(
+enum class $0$1 : $2 {
 )",
-                              dict.second.is_label ? "" : "Feature",
-                              dict.second.sanitized_name);
+        dict.second.is_label ? "" : "Feature",                 // $0
+        dict.second.sanitized_name,                            // $1
+        UnsignedInteger(internal_options.feature_value_bytes)  // $2
+    );
     // Create the enum values
     for (int item_idx = 0; item_idx < dict.second.sanitized_items.size();
          item_idx++) {
-      absl::SubstituteAndAppend(&content, "    k$0 = $1,\n",
+      absl::SubstituteAndAppend(&content, "  k$0 = $1,\n",
                                 dict.second.sanitized_items[item_idx],
                                 item_idx);
     }
-    absl::StrAppend(&content, R"(  };
-};
+    absl::StrAppend(&content, R"(};
 )");
   }
   return content;
@@ -197,16 +211,16 @@ namespace $0 {
 )",
                             StringToVariableSymbol(options.name()));
 
-  // Instance struct.
-  ASSIGN_OR_RETURN(const auto instance_struct,
-                   GenInstanceStruct(model, options, internal_options, stats));
-  absl::StrAppend(&header, instance_struct);
-
   // Categorical dictionary
   ASSIGN_OR_RETURN(
       const auto categorical_dict,
       GenCategoricalStringDictionaries(model, options, internal_options));
   absl::StrAppend(&header, categorical_dict);
+
+  // Instance struct.
+  ASSIGN_OR_RETURN(const auto instance_struct,
+                   GenInstanceStruct(model, options, internal_options, stats));
+  absl::StrAppend(&header, instance_struct);
 
   // Model data
   if (options.algorithm() == proto::Algorithm::ROUTING) {
@@ -438,12 +452,15 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
         case proto::ClassificationOutput::CLASS:
           if (stats.is_binary_classification()) {
             spec.return_prediction = absl::Substitute(
-                "  return accumulator >= $0;\n", stats.num_trees / 2);
+                "  return static_cast<Label>(accumulator >= $0);\n",
+                stats.num_trees / 2);
           } else {
-            absl::StrAppend(&spec.return_prediction,
-                            "  return std::distance(accumulator.begin(), "
-                            "std::max_element(accumulator.begin(), "
-                            "accumulator.end()));\n");
+            absl::StrAppend(
+                &spec.return_prediction,
+                "  return "
+                "static_cast<Label>(std::distance(accumulator.begin(), "
+                "std::max_element(accumulator.begin(), "
+                "accumulator.end())));\n");
           }
           break;
         case proto::ClassificationOutput::SCORE:
@@ -566,12 +583,14 @@ SpecializedConversionGradientBoostedTrees(
       switch (options.classification_output()) {
         case proto::ClassificationOutput::CLASS:
           if (stats.is_binary_classification()) {
-            spec.return_prediction = "  return accumulator >= 0;\n";
+            spec.return_prediction =
+                "  return static_cast<Label>(accumulator >= 0);\n";
           } else {
             spec.return_prediction =
-                ("  return std::distance(accumulator.begin(), "
+                ("  return "
+                 "static_cast<Label>(std::distance(accumulator.begin(), "
                  "std::max_element(accumulator.begin(), "
-                 "accumulator.end()));\n");
+                 "accumulator.end())));\n");
           }
           break;
         case proto::ClassificationOutput::SCORE:
@@ -798,11 +817,8 @@ absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
     case model::proto::Task::CLASSIFICATION: {
       switch (options.classification_output()) {
         case proto::ClassificationOutput::CLASS:
-          if (stats.is_binary_classification()) {
-            out->output_type = "bool";
-          } else {
-            out->output_type = UnsignedInteger(
-                MaxUnsignedValueToNumBytes(stats.num_classification_classes));
+          out->output_type = "Label";
+          if (!stats.is_binary_classification()) {
             out->includes.algorithm = true;
             out->includes.array = true;
             out->includes.algorithm = true;
@@ -907,19 +923,24 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
     case dataset::proto::ColumnType::NUMERICAL: {
       if (internal_options.numerical_feature_is_float) {
         DCHECK_EQ(internal_options.feature_value_bytes, 4);
-        return FeatureDef{.type = "float", .default_value = {}};
+        return FeatureDef{.type = "Numerical",
+                          .underlying_type = "float",
+                          .default_value = {}};
       } else {
-        return FeatureDef{
-            .type = SignedInteger(internal_options.feature_value_bytes),
-            .default_value = {}};
+        return FeatureDef{.type = "Numerical",
+                          .underlying_type = SignedInteger(
+                              internal_options.feature_value_bytes),
+                          .default_value = {}};
       }
     } break;
     case dataset::proto::ColumnType::BOOLEAN:
-    case dataset::proto::ColumnType::CATEGORICAL:
+    case dataset::proto::ColumnType::CATEGORICAL: {
       return FeatureDef{
-          .type = UnsignedInteger(internal_options.feature_value_bytes),
+          .type = absl::StrCat("Feature", StringToStructSymbol(col.name())),
+          .underlying_type =
+              UnsignedInteger(internal_options.feature_value_bytes),
           .default_value = {}};
-      break;
+    } break;
     default:
       return absl::InvalidArgumentError(
           absl::StrCat("Non supported feature type: ",
@@ -931,7 +952,7 @@ absl::Status GenerateTreeInferenceIfElseNode(
     const dataset::proto::DataSpecification& dataspec,
     const model::decision_tree::NodeWithChildren& node, const int depth,
     const IfElseSetNodeFn& set_node_ifelse_fn, const int tree_idx,
-    std::string* content) {
+    const internal::InternalOptions& internal_options, std::string* content) {
   std::string prefix(depth * 2 + 2, ' ');
 
   if (node.IsLeaf()) {
@@ -946,29 +967,53 @@ absl::Status GenerateTreeInferenceIfElseNode(
 
   // Create a contains condition.
   const auto categorical_contains_condition =
-      [&](absl::string_view variable_name, absl::Span<const int32_t> elements) {
-        // TODO: Use constants (e.g. kFeatureABC) instead of raw integers
-        // if the column has a dictionary. elements is large.
-        if (elements.size() < 8) {
-          // List the elements are a sequence of ==.
-          for (int element_idx = 0; element_idx < elements.size();
-               element_idx++) {
-            if (element_idx > 0) {
-              absl::StrAppend(&condition, " ||\n", prefix, "    ");
-            }
-            absl::SubstituteAndAppend(&condition, "instance.$0 == $1",
-                                      variable_name, elements[element_idx]);
-          }
-        } else {
-          // Use binary search.
-          absl::SubstituteAndAppend(
-              &condition,
-              "std::array<uint32_t,$0> mask = {$1};\n$3    "
-              "std::binary_search(mask.begin(), mask.end(),  instance.$2)",
-              elements.size(), absl::StrJoin(elements, ", "), variable_name,
-              prefix);
+      [&](const int attribute_idx, absl::string_view variable_name,
+          absl::Span<const int32_t> elements) -> absl::Status {
+    const auto cat_dict_it =
+        internal_options.categorical_dicts.find(attribute_idx);
+    if (cat_dict_it == internal_options.categorical_dicts.end()) {
+      return absl::InternalError("cannot find dict");
+    }
+
+    // if the column has a dictionary. elements is large.
+    if (elements.size() < 8) {
+      // List the elements are a sequence of ==.
+      for (int element_idx = 0; element_idx < elements.size(); element_idx++) {
+        if (element_idx > 0) {
+          absl::StrAppend(&condition, " ||\n", prefix, "    ");
         }
-      };
+        const auto element_str = absl::StrCat(
+            "Feature", cat_dict_it->second.sanitized_name, "::k",
+            cat_dict_it->second.sanitized_items[elements[element_idx]]);
+        absl::SubstituteAndAppend(&condition, "instance.$0 == $1",
+                                  variable_name, element_str);
+      }
+    } else {
+      // Use binary search.
+      std::string mask;
+      for (const auto element_idx : elements) {
+        const auto element_str =
+            cat_dict_it->second.sanitized_items[element_idx];
+        if (!mask.empty()) {
+          absl::StrAppend(&mask, ",");
+        }
+        absl::StrAppend(&mask, " Feature", cat_dict_it->second.sanitized_name,
+                        "::k", element_str);
+      }
+
+      absl::SubstituteAndAppend(
+          &condition,
+          "std::array<Feature$4,$0> mask = {$1};\n$3    "
+          "std::binary_search(mask.begin(), mask.end(),  instance.$2)",
+          elements.size(),                    //  $0
+          mask,                               // $1
+          variable_name,                      // $2
+          prefix,                             // $3
+          cat_dict_it->second.sanitized_name  // $4
+      );
+    }
+    return absl::OkStatus();
+  };
 
   // Evaluate condition
   switch (node.node().condition().condition().type_case()) {
@@ -988,7 +1033,9 @@ absl::Status GenerateTreeInferenceIfElseNode(
       const int attribute_idx = node.node().condition().attribute();
       const auto variable_name =
           StringToVariableSymbol(dataspec.columns(attribute_idx).name());
-      categorical_contains_condition(variable_name, typed_condition.elements());
+
+      RETURN_IF_ERROR(categorical_contains_condition(
+          attribute_idx, variable_name, typed_condition.elements()));
     } break;
 
     case model::decision_tree::proto::Condition::TypeCase::
@@ -1008,7 +1055,8 @@ absl::Status GenerateTreeInferenceIfElseNode(
           elements.push_back(item_idx);
         }
       }
-      categorical_contains_condition(variable_name, elements);
+      RETURN_IF_ERROR(categorical_contains_condition(attribute_idx,
+                                                     variable_name, elements));
     } break;
 
     case model::decision_tree::proto::Condition::TypeCase::
@@ -1025,13 +1073,13 @@ absl::Status GenerateTreeInferenceIfElseNode(
 
   // Branching
   absl::SubstituteAndAppend(content, "$0if ($1) {\n", prefix, condition);
-  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(dataspec, *node.pos_child(),
-                                                  depth + 1, set_node_ifelse_fn,
-                                                  tree_idx, content));
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
+      dataspec, *node.pos_child(), depth + 1, set_node_ifelse_fn, tree_idx,
+      internal_options, content));
   absl::StrAppend(content, prefix, "} else {\n");
-  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(dataspec, *node.neg_child(),
-                                                  depth + 1, set_node_ifelse_fn,
-                                                  tree_idx, content));
+  RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
+      dataspec, *node.neg_child(), depth + 1, set_node_ifelse_fn, tree_idx,
+      internal_options, content));
   absl::StrAppend(content, prefix, "}\n");
   return absl::OkStatus();
 };
@@ -1045,7 +1093,8 @@ absl::Status GenerateTreeInferenceIfElse(
     absl::StrAppend(content, "  // Tree #", tree_idx, "\n");
     const auto& tree = df_interface.decision_trees()[tree_idx];
     RETURN_IF_ERROR(GenerateTreeInferenceIfElseNode(
-        dataspec, tree->root(), 0, set_node_ifelse_fn, tree_idx, content));
+        dataspec, tree->root(), 0, set_node_ifelse_fn, tree_idx,
+        internal_options, content));
     absl::StrAppend(content, "\n");
   }
   return absl::OkStatus();

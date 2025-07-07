@@ -10,175 +10,159 @@
 
 namespace ydf_model {
 
+enum class Label : uint32_t {
+  kLt50K = 0,
+  kGt50K = 1,
+};
+
+enum class FeatureWorkclass : uint32_t {
+  kOutOfVocabulary = 0,
+  kPrivate = 1,
+  kSelfEmpNotInc = 2,
+  kLocalGov = 3,
+  kStateGov = 4,
+  kSelfEmpInc = 5,
+  kFederalGov = 6,
+  kWithoutPay = 7,
+};
+
+enum class FeatureEducation : uint32_t {
+  kOutOfVocabulary = 0,
+  kHsGrad = 1,
+  kSomeCollege = 2,
+  kBachelors = 3,
+  kMasters = 4,
+  kAssocVoc = 5,
+  k11th = 6,
+  kAssocAcdm = 7,
+  k10th = 8,
+  k7th8th = 9,
+  kProfSchool = 10,
+  k9th = 11,
+  k12th = 12,
+  kDoctorate = 13,
+  k5th6th = 14,
+  k1st4th = 15,
+  kPreschool = 16,
+};
+
+enum class FeatureMaritalStatus : uint32_t {
+  kOutOfVocabulary = 0,
+  kMarriedCivSpouse = 1,
+  kNeverMarried = 2,
+  kDivorced = 3,
+  kWidowed = 4,
+  kSeparated = 5,
+  kMarriedSpouseAbsent = 6,
+  kMarriedAfSpouse = 7,
+};
+
+enum class FeatureOccupation : uint32_t {
+  kOutOfVocabulary = 0,
+  kProfSpecialty = 1,
+  kExecManagerial = 2,
+  kCraftRepair = 3,
+  kAdmClerical = 4,
+  kSales = 5,
+  kOtherService = 6,
+  kMachineOpInspct = 7,
+  kTransportMoving = 8,
+  kHandlersCleaners = 9,
+  kFarmingFishing = 10,
+  kTechSupport = 11,
+  kProtectiveServ = 12,
+  kPrivHouseServ = 13,
+};
+
+enum class FeatureRelationship : uint32_t {
+  kOutOfVocabulary = 0,
+  kHusband = 1,
+  kNotInFamily = 2,
+  kOwnChild = 3,
+  kUnmarried = 4,
+  kWife = 5,
+  kOtherRelative = 6,
+};
+
+enum class FeatureRace : uint32_t {
+  kOutOfVocabulary = 0,
+  kWhite = 1,
+  kBlack = 2,
+  kAsianPacIslander = 3,
+  kAmerIndianEskimo = 4,
+  kOther = 5,
+};
+
+enum class FeatureSex : uint32_t {
+  kOutOfVocabulary = 0,
+  kMale = 1,
+  kFemale = 2,
+};
+
+enum class FeatureNativeCountry : uint32_t {
+  kOutOfVocabulary = 0,
+  kUnitedStates = 1,
+  kMexico = 2,
+  kPhilippines = 3,
+  kGermany = 4,
+  kCanada = 5,
+  kPuertoRico = 6,
+  kIndia = 7,
+  kElSalvador = 8,
+  kCuba = 9,
+  kEngland = 10,
+  kJamaica = 11,
+  kDominicanRepublic = 12,
+  kSouth = 13,
+  kChina = 14,
+  kItaly = 15,
+  kColumbia = 16,
+  kGuatemala = 17,
+  kJapan = 18,
+  kVietnam = 19,
+  kTaiwan = 20,
+  kIran = 21,
+  kPoland = 22,
+  kHaiti = 23,
+  kNicaragua = 24,
+  kGreece = 25,
+  kPortugal = 26,
+  kEcuador = 27,
+  kFrance = 28,
+  kPeru = 29,
+  kThailand = 30,
+  kCambodia = 31,
+  kIreland = 32,
+  kLaos = 33,
+  kYugoslavia = 34,
+  kTrinadadTobago = 35,
+  kHonduras = 36,
+  kHong = 37,
+  kHungary = 38,
+  kScotland = 39,
+  kOutlyingUsGuamUsviEtc = 40,
+};
+
 constexpr const int kNumFeatures = 14;
 constexpr const int kNumTrees = 3;
 
 struct Instance {
-  int32_t age;
-  uint32_t workclass;
-  int32_t fnlwgt;
-  uint32_t education;
-  int32_t education_num;
-  uint32_t marital_status;
-  uint32_t occupation;
-  uint32_t relationship;
-  uint32_t race;
-  uint32_t sex;
-  int32_t capital_gain;
-  int32_t capital_loss;
-  int32_t hours_per_week;
-  uint32_t native_country;
-};
+  typedef int32_t Numerical;
 
-struct Label {
-  enum {
-    kLt50K = 0,
-    kGt50K = 1,
-  };
-};
-
-struct FeatureWorkclass {
-  enum {
-    kOutOfVocabulary = 0,
-    kPrivate = 1,
-    kSelfEmpNotInc = 2,
-    kLocalGov = 3,
-    kStateGov = 4,
-    kSelfEmpInc = 5,
-    kFederalGov = 6,
-    kWithoutPay = 7,
-  };
-};
-
-struct FeatureEducation {
-  enum {
-    kOutOfVocabulary = 0,
-    kHsGrad = 1,
-    kSomeCollege = 2,
-    kBachelors = 3,
-    kMasters = 4,
-    kAssocVoc = 5,
-    k11th = 6,
-    kAssocAcdm = 7,
-    k10th = 8,
-    k7th8th = 9,
-    kProfSchool = 10,
-    k9th = 11,
-    k12th = 12,
-    kDoctorate = 13,
-    k5th6th = 14,
-    k1st4th = 15,
-    kPreschool = 16,
-  };
-};
-
-struct FeatureMaritalStatus {
-  enum {
-    kOutOfVocabulary = 0,
-    kMarriedCivSpouse = 1,
-    kNeverMarried = 2,
-    kDivorced = 3,
-    kWidowed = 4,
-    kSeparated = 5,
-    kMarriedSpouseAbsent = 6,
-    kMarriedAfSpouse = 7,
-  };
-};
-
-struct FeatureOccupation {
-  enum {
-    kOutOfVocabulary = 0,
-    kProfSpecialty = 1,
-    kExecManagerial = 2,
-    kCraftRepair = 3,
-    kAdmClerical = 4,
-    kSales = 5,
-    kOtherService = 6,
-    kMachineOpInspct = 7,
-    kTransportMoving = 8,
-    kHandlersCleaners = 9,
-    kFarmingFishing = 10,
-    kTechSupport = 11,
-    kProtectiveServ = 12,
-    kPrivHouseServ = 13,
-  };
-};
-
-struct FeatureRelationship {
-  enum {
-    kOutOfVocabulary = 0,
-    kHusband = 1,
-    kNotInFamily = 2,
-    kOwnChild = 3,
-    kUnmarried = 4,
-    kWife = 5,
-    kOtherRelative = 6,
-  };
-};
-
-struct FeatureRace {
-  enum {
-    kOutOfVocabulary = 0,
-    kWhite = 1,
-    kBlack = 2,
-    kAsianPacIslander = 3,
-    kAmerIndianEskimo = 4,
-    kOther = 5,
-  };
-};
-
-struct FeatureSex {
-  enum {
-    kOutOfVocabulary = 0,
-    kMale = 1,
-    kFemale = 2,
-  };
-};
-
-struct FeatureNativeCountry {
-  enum {
-    kOutOfVocabulary = 0,
-    kUnitedStates = 1,
-    kMexico = 2,
-    kPhilippines = 3,
-    kGermany = 4,
-    kCanada = 5,
-    kPuertoRico = 6,
-    kIndia = 7,
-    kElSalvador = 8,
-    kCuba = 9,
-    kEngland = 10,
-    kJamaica = 11,
-    kDominicanRepublic = 12,
-    kSouth = 13,
-    kChina = 14,
-    kItaly = 15,
-    kColumbia = 16,
-    kGuatemala = 17,
-    kJapan = 18,
-    kVietnam = 19,
-    kTaiwan = 20,
-    kIran = 21,
-    kPoland = 22,
-    kHaiti = 23,
-    kNicaragua = 24,
-    kGreece = 25,
-    kPortugal = 26,
-    kEcuador = 27,
-    kFrance = 28,
-    kPeru = 29,
-    kThailand = 30,
-    kCambodia = 31,
-    kIreland = 32,
-    kLaos = 33,
-    kYugoslavia = 34,
-    kTrinadadTobago = 35,
-    kHonduras = 36,
-    kHong = 37,
-    kHungary = 38,
-    kScotland = 39,
-    kOutlyingUsGuamUsviEtc = 40,
-  };
+  Numerical age;
+  FeatureWorkclass workclass;
+  Numerical fnlwgt;
+  FeatureEducation education;
+  Numerical education_num;
+  FeatureMaritalStatus marital_status;
+  FeatureOccupation occupation;
+  FeatureRelationship relationship;
+  FeatureRace race;
+  FeatureSex sex;
+  Numerical capital_gain;
+  Numerical capital_loss;
+  Numerical hours_per_week;
+  FeatureNativeCountry native_country;
 };
 
 struct __attribute__((packed)) Node {

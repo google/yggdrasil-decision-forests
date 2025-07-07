@@ -9,27 +9,27 @@
 
 namespace ydf_model {
 
+enum class FeatureType : uint32_t {
+  kOutOfVocabulary = 0,
+  kM = 1,
+  kI = 2,
+  kF = 3,
+};
+
 constexpr const int kNumFeatures = 8;
 constexpr const int kNumTrees = 3;
 
 struct Instance {
-  uint32_t type;
-  float longestshell;
-  float diameter;
-  float height;
-  float wholeweight;
-  float shuckedweight;
-  float visceraweight;
-  float shellweight;
-};
+  typedef float Numerical;
 
-struct FeatureType {
-  enum {
-    kOutOfVocabulary = 0,
-    kM = 1,
-    kI = 2,
-    kF = 3,
-  };
+  FeatureType type;
+  Numerical longestshell;
+  Numerical diameter;
+  Numerical height;
+  Numerical wholeweight;
+  Numerical shuckedweight;
+  Numerical visceraweight;
+  Numerical shellweight;
 };
 
 inline float Predict(const Instance& instance) {
@@ -269,7 +269,7 @@ inline float Predict(const Instance& instance) {
                 }
               } else {
                 if (instance.shellweight >= 0.5225) {
-                  if (instance.type == 1) {
+                  if (instance.type == FeatureType::kM) {
                     accumulator += 7.05556;
                   } else {
                     accumulator += 4.4;
@@ -353,7 +353,7 @@ inline float Predict(const Instance& instance) {
                             }
                           }
                         } else {
-                          if (instance.type == 1) {
+                          if (instance.type == FeatureType::kM) {
                             if (instance.wholeweight >= 1.55175) {
                               accumulator += 4.13333;
                             } else {
@@ -584,8 +584,8 @@ inline float Predict(const Instance& instance) {
               if (instance.height >= 0.1825) {
                 accumulator += 5.14286;
               } else {
-                if (instance.type == 2 ||
-                    instance.type == 3) {
+                if (instance.type == FeatureType::kI ||
+                    instance.type == FeatureType::kF) {
                   if (instance.wholeweight >= 1.09075) {
                     if (instance.shellweight >= 0.3125) {
                       accumulator += 4.53333;
@@ -715,7 +715,7 @@ inline float Predict(const Instance& instance) {
                   } else {
                     if (instance.shuckedweight >= 0.372) {
                       if (instance.shuckedweight >= 0.385) {
-                        if (instance.type == 3) {
+                        if (instance.type == FeatureType::kF) {
                           accumulator += 5.22222;
                         } else {
                           accumulator += 5;
@@ -745,8 +745,8 @@ inline float Predict(const Instance& instance) {
                   if (instance.longestshell >= 0.5775) {
                     accumulator += 4;
                   } else {
-                    if (instance.type == 1 ||
-                        instance.type == 2) {
+                    if (instance.type == FeatureType::kM ||
+                        instance.type == FeatureType::kI) {
                       if (instance.shellweight >= 0.2455) {
                         accumulator += 3.19048;
                       } else {
@@ -775,8 +775,8 @@ inline float Predict(const Instance& instance) {
                             if (instance.wholeweight >= 0.909) {
                               accumulator += 4.44444;
                             } else {
-                              if (instance.type == 1 ||
-                                  instance.type == 2) {
+                              if (instance.type == FeatureType::kM ||
+                                  instance.type == FeatureType::kI) {
                                 accumulator += 4.83333;
                               } else {
                                 accumulator += 4.57143;
@@ -812,8 +812,8 @@ inline float Predict(const Instance& instance) {
                     if (instance.height >= 0.1775) {
                       accumulator += 4.11111;
                     } else {
-                      if (instance.type == 1 ||
-                          instance.type == 3) {
+                      if (instance.type == FeatureType::kM ||
+                          instance.type == FeatureType::kF) {
                         if (instance.height >= 0.1625) {
                           if (instance.wholeweight >= 0.7625) {
                             accumulator += 4.33333;
@@ -971,7 +971,7 @@ inline float Predict(const Instance& instance) {
             } else {
               if (instance.height >= 0.1275) {
                 if (instance.diameter >= 0.4775) {
-                  if (instance.type == 1) {
+                  if (instance.type == FeatureType::kM) {
                     accumulator += 5.25;
                   } else {
                     if (instance.longestshell >= 0.6025) {
@@ -1083,7 +1083,7 @@ inline float Predict(const Instance& instance) {
                         }
                       } else {
                         if (instance.wholeweight >= 0.97725) {
-                          if (instance.type == 3) {
+                          if (instance.type == FeatureType::kF) {
                             accumulator += 3.25926;
                           } else {
                             if (instance.visceraweight >= 0.216) {
@@ -1117,7 +1117,7 @@ inline float Predict(const Instance& instance) {
                     }
                   }
                 } else {
-                  if (instance.type == 2) {
+                  if (instance.type == FeatureType::kI) {
                     if (instance.shellweight >= 0.22) {
                       if (instance.diameter >= 0.4275) {
                         if (instance.shellweight >= 0.254) {
@@ -1212,8 +1212,8 @@ inline float Predict(const Instance& instance) {
                       accumulator += 3.48148;
                     }
                   } else {
-                    if (instance.type == 1 ||
-                        instance.type == 3) {
+                    if (instance.type == FeatureType::kM ||
+                        instance.type == FeatureType::kF) {
                       if (instance.height >= 0.1525) {
                         if (instance.wholeweight >= 0.79325) {
                           accumulator += 3.2;
@@ -1273,7 +1273,7 @@ inline float Predict(const Instance& instance) {
                           if (instance.shellweight >= 0.22125) {
                             accumulator += 2.83333;
                           } else {
-                            if (instance.type == 2) {
+                            if (instance.type == FeatureType::kI) {
                               if (instance.wholeweight >= 0.7415) {
                                 accumulator += 3.27778;
                               } else {
@@ -1289,7 +1289,7 @@ inline float Predict(const Instance& instance) {
                           }
                         } else {
                           if (instance.shuckedweight >= 0.327) {
-                            if (instance.type == 2) {
+                            if (instance.type == FeatureType::kI) {
                               accumulator += 2.73333;
                             } else {
                               accumulator += 2.59259;
@@ -1375,12 +1375,12 @@ inline float Predict(const Instance& instance) {
               }
             }
           } else {
-            if (instance.type == 1 ||
-                instance.type == 3) {
+            if (instance.type == FeatureType::kM ||
+                instance.type == FeatureType::kF) {
               if (instance.longestshell >= 0.5125) {
                 if (instance.height >= 0.1325) {
                   if (instance.shuckedweight >= 0.246) {
-                    if (instance.type == 3) {
+                    if (instance.type == FeatureType::kF) {
                       if (instance.wholeweight >= 0.68575) {
                         if (instance.shuckedweight >= 0.2785) {
                           accumulator += 3.88889;
@@ -1404,7 +1404,7 @@ inline float Predict(const Instance& instance) {
                       accumulator += 3.45833;
                     }
                   } else {
-                    if (instance.type == 3) {
+                    if (instance.type == FeatureType::kF) {
                       accumulator += 3.20833;
                     } else {
                       accumulator += 2.48148;
@@ -1542,8 +1542,8 @@ inline float Predict(const Instance& instance) {
                   if (instance.visceraweight >= 0.12475) {
                     if (instance.wholeweight >= 0.6235) {
                       if (instance.shellweight >= 0.16875) {
-                        if (instance.type == 1 ||
-                            instance.type == 3) {
+                        if (instance.type == FeatureType::kM ||
+                            instance.type == FeatureType::kF) {
                           if (instance.shellweight >= 0.1735) {
                             accumulator += 2.88889;
                           } else {
@@ -1592,8 +1592,8 @@ inline float Predict(const Instance& instance) {
                     if (instance.height >= 0.1275) {
                       accumulator += 3.41667;
                     } else {
-                      if (instance.type == 2 ||
-                          instance.type == 3) {
+                      if (instance.type == FeatureType::kI ||
+                          instance.type == FeatureType::kF) {
                         if (instance.shuckedweight >= 0.25375) {
                           accumulator += 3.13333;
                         } else {
@@ -1668,8 +1668,8 @@ inline float Predict(const Instance& instance) {
           if (instance.visceraweight >= 0.153) {
             accumulator += 2.83333;
           } else {
-            if (instance.type == 1 ||
-                instance.type == 2) {
+            if (instance.type == FeatureType::kM ||
+                instance.type == FeatureType::kI) {
               if (instance.height >= 0.1175) {
                 if (instance.longestshell >= 0.4975) {
                   accumulator += 2.66667;
@@ -1689,8 +1689,8 @@ inline float Predict(const Instance& instance) {
   } else {
     if (instance.diameter >= 0.2325) {
       if (instance.shellweight >= 0.124) {
-        if (instance.type == 1 ||
-            instance.type == 3) {
+        if (instance.type == FeatureType::kM ||
+            instance.type == FeatureType::kF) {
           if (instance.shuckedweight >= 0.163) {
             if (instance.height >= 0.1225) {
               if (instance.shuckedweight >= 0.20725) {
@@ -1786,7 +1786,7 @@ inline float Predict(const Instance& instance) {
               accumulator += 4.90476;
             } else {
               if (instance.diameter >= 0.3275) {
-                if (instance.type == 3) {
+                if (instance.type == FeatureType::kF) {
                   if (instance.shellweight >= 0.14325) {
                     accumulator += 4;
                   } else {
@@ -1905,8 +1905,8 @@ inline float Predict(const Instance& instance) {
         }
       } else {
         if (instance.shellweight >= 0.05875) {
-          if (instance.type == 1 ||
-              instance.type == 3) {
+          if (instance.type == FeatureType::kM ||
+              instance.type == FeatureType::kF) {
             if (instance.shuckedweight >= 0.123) {
               if (instance.diameter >= 0.3075) {
                 if (instance.longestshell >= 0.4275) {
@@ -1928,7 +1928,7 @@ inline float Predict(const Instance& instance) {
                     }
                   }
                 } else {
-                  if (instance.type == 3) {
+                  if (instance.type == FeatureType::kF) {
                     if (instance.wholeweight >= 0.3595) {
                       accumulator += 3.44444;
                     } else {
@@ -2232,7 +2232,7 @@ inline float Predict(const Instance& instance) {
             }
           }
         } else {
-          if (instance.type == 1) {
+          if (instance.type == FeatureType::kM) {
             if (instance.shuckedweight >= 0.0635) {
               accumulator += 2.4;
             } else {
@@ -2305,8 +2305,8 @@ inline float Predict(const Instance& instance) {
                       }
                     }
                   } else {
-                    if (instance.type == 1 ||
-                        instance.type == 3) {
+                    if (instance.type == FeatureType::kM ||
+                        instance.type == FeatureType::kF) {
                       accumulator += 2.33333;
                     } else {
                       accumulator += 2.13333;
@@ -2412,7 +2412,7 @@ inline float Predict(const Instance& instance) {
           if (instance.shellweight >= 0.01525) {
             accumulator += 1.77778;
           } else {
-            if (instance.type == 1) {
+            if (instance.type == FeatureType::kM) {
               accumulator += 1.53333;
             } else {
               if (instance.shellweight >= 0.01025) {
@@ -2484,7 +2484,7 @@ inline float Predict(const Instance& instance) {
                             if (instance.shellweight >= 0.5935) {
                               accumulator += 4;
                             } else {
-                              if (instance.type == 1) {
+                              if (instance.type == FeatureType::kM) {
                                 accumulator += 3.77083;
                               } else {
                                 accumulator += 3.2963;
@@ -2639,7 +2639,7 @@ inline float Predict(const Instance& instance) {
           if (instance.shellweight >= 0.3685) {
             if (instance.visceraweight >= 0.198) {
               if (instance.height >= 0.1975) {
-                if (instance.type == 3) {
+                if (instance.type == FeatureType::kF) {
                   if (instance.longestshell >= 0.6025) {
                     if (instance.shuckedweight >= 0.4625) {
                       if (instance.wholeweight >= 1.48325) {
@@ -2666,8 +2666,8 @@ inline float Predict(const Instance& instance) {
                 }
               } else {
                 if (instance.shellweight >= 0.3875) {
-                  if (instance.type == 1 ||
-                      instance.type == 2) {
+                  if (instance.type == FeatureType::kM ||
+                      instance.type == FeatureType::kI) {
                     if (instance.shuckedweight >= 0.5215) {
                       accumulator += 6;
                     } else {
@@ -2713,8 +2713,8 @@ inline float Predict(const Instance& instance) {
             } else {
               if (instance.diameter >= 0.4575) {
                 if (instance.longestshell >= 0.6025) {
-                  if (instance.type == 1 ||
-                      instance.type == 2) {
+                  if (instance.type == FeatureType::kM ||
+                      instance.type == FeatureType::kI) {
                     accumulator += 3.375;
                   } else {
                     accumulator += 3.26667;
@@ -3137,8 +3137,8 @@ inline float Predict(const Instance& instance) {
                           }
                         }
                       } else {
-                        if (instance.type == 2 ||
-                            instance.type == 3) {
+                        if (instance.type == FeatureType::kI ||
+                            instance.type == FeatureType::kF) {
                           accumulator += 3.66667;
                         } else {
                           accumulator += 3.33333;
@@ -3246,8 +3246,8 @@ inline float Predict(const Instance& instance) {
               } else {
                 if (instance.visceraweight >= 0.20225) {
                   if (instance.height >= 0.1475) {
-                    if (instance.type == 1 ||
-                        instance.type == 2) {
+                    if (instance.type == FeatureType::kM ||
+                        instance.type == FeatureType::kI) {
                       if (instance.shuckedweight >= 0.4185) {
                         accumulator += 3.38095;
                       } else {
@@ -3297,7 +3297,7 @@ inline float Predict(const Instance& instance) {
                           accumulator += 3.53333;
                         }
                       } else {
-                        if (instance.type == 3) {
+                        if (instance.type == FeatureType::kF) {
                           accumulator += 5.66667;
                         } else {
                           accumulator += 4.61905;
@@ -3346,8 +3346,8 @@ inline float Predict(const Instance& instance) {
                             if (instance.height >= 0.1425) {
                               accumulator += 3.48148;
                             } else {
-                              if (instance.type == 1 ||
-                                  instance.type == 2) {
+                              if (instance.type == FeatureType::kM ||
+                                  instance.type == FeatureType::kI) {
                                 accumulator += 3.06667;
                               } else {
                                 accumulator += 2.94444;
@@ -3399,7 +3399,7 @@ inline float Predict(const Instance& instance) {
                 }
               } else {
                 if (instance.shuckedweight >= 0.3985) {
-                  if (instance.type == 2) {
+                  if (instance.type == FeatureType::kI) {
                     if (instance.height >= 0.1525) {
                       accumulator += 3.13333;
                     } else {
@@ -3463,8 +3463,8 @@ inline float Predict(const Instance& instance) {
             if (instance.shuckedweight >= 0.37575) {
               accumulator += 5.06667;
             } else {
-              if (instance.type == 1 ||
-                  instance.type == 3) {
+              if (instance.type == FeatureType::kM ||
+                  instance.type == FeatureType::kF) {
                 if (instance.wholeweight >= 0.8035) {
                   if (instance.wholeweight >= 0.821) {
                     if (instance.shuckedweight >= 0.33625) {
@@ -3479,7 +3479,7 @@ inline float Predict(const Instance& instance) {
                           }
                         } else {
                           if (instance.shellweight >= 0.24125) {
-                            if (instance.type == 1) {
+                            if (instance.type == FeatureType::kM) {
                               if (instance.visceraweight >= 0.17675) {
                                 accumulator += 3.66667;
                               } else {
@@ -3505,7 +3505,7 @@ inline float Predict(const Instance& instance) {
                       }
                     }
                   } else {
-                    if (instance.type == 3) {
+                    if (instance.type == FeatureType::kF) {
                       accumulator += 5.06667;
                     } else {
                       accumulator += 4.2;
@@ -3648,7 +3648,7 @@ inline float Predict(const Instance& instance) {
                             }
                           }
                         } else {
-                          if (instance.type == 3) {
+                          if (instance.type == FeatureType::kF) {
                             accumulator += 5.06667;
                           } else {
                             if (instance.wholeweight >= 0.7695) {
@@ -3680,7 +3680,7 @@ inline float Predict(const Instance& instance) {
             }
           } else {
             if (instance.longestshell >= 0.5275) {
-              if (instance.type == 1) {
+              if (instance.type == FeatureType::kM) {
                 if (instance.shellweight >= 0.2225) {
                   accumulator += 4.73333;
                 } else {
@@ -3723,7 +3723,7 @@ inline float Predict(const Instance& instance) {
                   }
                 } else {
                   if (instance.wholeweight >= 0.68) {
-                    if (instance.type == 3) {
+                    if (instance.type == FeatureType::kF) {
                       accumulator += 3.44444;
                     } else {
                       accumulator += 3.05556;
@@ -3797,8 +3797,8 @@ inline float Predict(const Instance& instance) {
               }
             } else {
               if (instance.height >= 0.1325) {
-                if (instance.type == 1 ||
-                    instance.type == 2) {
+                if (instance.type == FeatureType::kM ||
+                    instance.type == FeatureType::kI) {
                   if (instance.shuckedweight >= 0.30075) {
                     accumulator += 3.46667;
                   } else {
@@ -3855,12 +3855,12 @@ inline float Predict(const Instance& instance) {
                     accumulator += 3.2381;
                   }
                 } else {
-                  if (instance.type == 1 ||
-                      instance.type == 3) {
+                  if (instance.type == FeatureType::kM ||
+                      instance.type == FeatureType::kF) {
                     if (instance.height >= 0.1225) {
                       if (instance.wholeweight >= 0.625) {
                         if (instance.height >= 0.1275) {
-                          if (instance.type == 1) {
+                          if (instance.type == FeatureType::kM) {
                             if (instance.shuckedweight >= 0.31875) {
                               accumulator += 3;
                             } else {
@@ -3941,8 +3941,8 @@ inline float Predict(const Instance& instance) {
               }
             } else {
               if (instance.shuckedweight >= 0.214) {
-                if (instance.type == 1 ||
-                    instance.type == 2) {
+                if (instance.type == FeatureType::kM ||
+                    instance.type == FeatureType::kI) {
                   if (instance.shuckedweight >= 0.313) {
                     if (instance.wholeweight >= 0.662) {
                       accumulator += 2.5;
@@ -3960,7 +3960,7 @@ inline float Predict(const Instance& instance) {
                       if (instance.shuckedweight >= 0.2335) {
                         if (instance.wholeweight >= 0.595) {
                           if (instance.shellweight >= 0.149) {
-                            if (instance.type == 2) {
+                            if (instance.type == FeatureType::kI) {
                               accumulator += 2.8;
                             } else {
                               accumulator += 2.61111;
@@ -4003,14 +4003,14 @@ inline float Predict(const Instance& instance) {
         } else {
           if (instance.shellweight >= 0.1715) {
             if (instance.shuckedweight >= 0.21875) {
-              if (instance.type == 1) {
+              if (instance.type == FeatureType::kM) {
                 if (instance.height >= 0.1275) {
                   accumulator += 4.2963;
                 } else {
                   accumulator += 3.33333;
                 }
               } else {
-                if (instance.type == 3) {
+                if (instance.type == FeatureType::kF) {
                   if (instance.shuckedweight >= 0.23) {
                     accumulator += 3.55556;
                   } else {
@@ -4025,8 +4025,8 @@ inline float Predict(const Instance& instance) {
                 }
               }
             } else {
-              if (instance.type == 1 ||
-                  instance.type == 2) {
+              if (instance.type == FeatureType::kM ||
+                  instance.type == FeatureType::kI) {
                 accumulator += 5.11111;
               } else {
                 accumulator += 4.25926;
@@ -4037,7 +4037,7 @@ inline float Predict(const Instance& instance) {
               if (instance.visceraweight >= 0.149) {
                 accumulator += 3.55556;
               } else {
-                if (instance.type == 3) {
+                if (instance.type == FeatureType::kF) {
                   accumulator += 2.88889;
                 } else {
                   if (instance.shuckedweight >= 0.29075) {
@@ -4048,7 +4048,7 @@ inline float Predict(const Instance& instance) {
                 }
               }
             } else {
-              if (instance.type == 3) {
+              if (instance.type == FeatureType::kF) {
                 if (instance.diameter >= 0.3825) {
                   accumulator += 3.26667;
                 } else {
@@ -4089,8 +4089,8 @@ inline float Predict(const Instance& instance) {
           if (instance.height >= 0.1275) {
             if (instance.visceraweight >= 0.1315) {
               if (instance.wholeweight >= 0.623) {
-                if (instance.type == 1 ||
-                    instance.type == 2) {
+                if (instance.type == FeatureType::kM ||
+                    instance.type == FeatureType::kI) {
                   if (instance.wholeweight >= 0.96425) {
                     accumulator += 2.92593;
                   } else {
@@ -4220,8 +4220,8 @@ inline float Predict(const Instance& instance) {
           }
         }
       } else {
-        if (instance.type == 1 ||
-            instance.type == 3) {
+        if (instance.type == FeatureType::kM ||
+            instance.type == FeatureType::kF) {
           if (instance.wholeweight >= 0.454) {
             if (instance.height >= 0.135) {
               accumulator += 3.11111;
@@ -4253,7 +4253,7 @@ inline float Predict(const Instance& instance) {
               }
             }
           } else {
-            if (instance.type == 3) {
+            if (instance.type == FeatureType::kF) {
               if (instance.wholeweight >= 0.44275) {
                 accumulator += 3.94444;
               } else {
@@ -4633,7 +4633,7 @@ inline float Predict(const Instance& instance) {
       }
     } else {
       if (instance.visceraweight >= 0.025) {
-        if (instance.type == 1) {
+        if (instance.type == FeatureType::kM) {
           if (instance.longestshell >= 0.315) {
             if (instance.longestshell >= 0.3325) {
               if (instance.shuckedweight >= 0.074) {
@@ -4928,7 +4928,7 @@ inline float Predict(const Instance& instance) {
                       if (instance.wholeweight >= 2.21825) {
                         accumulator += 3.11111;
                       } else {
-                        if (instance.type == 3) {
+                        if (instance.type == FeatureType::kF) {
                           accumulator += 3.94444;
                         } else {
                           accumulator += 3.66667;
@@ -5009,7 +5009,7 @@ inline float Predict(const Instance& instance) {
                     accumulator += 6.66667;
                   }
                 } else {
-                  if (instance.type == 3) {
+                  if (instance.type == FeatureType::kF) {
                     accumulator += 5.57143;
                   } else {
                     accumulator += 4.66667;
@@ -5033,8 +5033,8 @@ inline float Predict(const Instance& instance) {
                     accumulator += 4;
                   }
                 } else {
-                  if (instance.type == 1 ||
-                      instance.type == 2) {
+                  if (instance.type == FeatureType::kM ||
+                      instance.type == FeatureType::kI) {
                     if (instance.visceraweight >= 0.26) {
                       if (instance.diameter >= 0.51) {
                         accumulator += 5.5;
@@ -5066,7 +5066,7 @@ inline float Predict(const Instance& instance) {
         if (instance.shuckedweight >= 0.43725) {
           if (instance.shuckedweight >= 0.5925) {
             if (instance.wholeweight >= 1.49175) {
-              if (instance.type == 2) {
+              if (instance.type == FeatureType::kI) {
                 accumulator += 4.2;
               } else {
                 if (instance.shuckedweight >= 0.69775) {
@@ -5202,7 +5202,7 @@ inline float Predict(const Instance& instance) {
                 if (instance.wholeweight >= 1.3285) {
                   if (instance.shellweight >= 0.3335) {
                     if (instance.shuckedweight >= 0.618) {
-                      if (instance.type == 3) {
+                      if (instance.type == FeatureType::kF) {
                         accumulator += 2.86667;
                       } else {
                         accumulator += 2.66667;
@@ -5275,8 +5275,8 @@ inline float Predict(const Instance& instance) {
                       accumulator += 4.5;
                     }
                   } else {
-                    if (instance.type == 1 ||
-                        instance.type == 2) {
+                    if (instance.type == FeatureType::kM ||
+                        instance.type == FeatureType::kI) {
                       if (instance.wholeweight >= 1.3175) {
                         accumulator += 5.80952;
                       } else {
@@ -5336,7 +5336,7 @@ inline float Predict(const Instance& instance) {
                           accumulator += 3.95238;
                         }
                       } else {
-                        if (instance.type == 3) {
+                        if (instance.type == FeatureType::kF) {
                           accumulator += 4.13333;
                         } else {
                           accumulator += 3.73333;
@@ -5363,7 +5363,7 @@ inline float Predict(const Instance& instance) {
                         accumulator += 4.375;
                       } else {
                         if (instance.visceraweight >= 0.221) {
-                          if (instance.type == 1) {
+                          if (instance.type == FeatureType::kM) {
                             if (instance.longestshell >= 0.6325) {
                               accumulator += 3.46667;
                             } else {
@@ -5397,7 +5397,7 @@ inline float Predict(const Instance& instance) {
                             accumulator += 3.27778;
                           }
                         } else {
-                          if (instance.type == 1) {
+                          if (instance.type == FeatureType::kM) {
                             accumulator += 3.38095;
                           } else {
                             accumulator += 3;
@@ -5516,7 +5516,7 @@ inline float Predict(const Instance& instance) {
                   accumulator += 5.26667;
                 }
               } else {
-                if (instance.type == 2) {
+                if (instance.type == FeatureType::kI) {
                   if (instance.shuckedweight >= 0.4485) {
                     if (instance.wholeweight >= 1.0395) {
                       accumulator += 3.6;
@@ -5559,7 +5559,7 @@ inline float Predict(const Instance& instance) {
                         }
                       } else {
                         if (instance.shuckedweight >= 0.42675) {
-                          if (instance.type == 1) {
+                          if (instance.type == FeatureType::kM) {
                             if (instance.longestshell >= 0.6025) {
                               if (instance.wholeweight >= 1.15075) {
                                 accumulator += 3.38095;
@@ -5588,7 +5588,7 @@ inline float Predict(const Instance& instance) {
                   } else {
                     if (instance.shuckedweight >= 0.4405) {
                       if (instance.visceraweight >= 0.24675) {
-                        if (instance.type == 3) {
+                        if (instance.type == FeatureType::kF) {
                           if (instance.longestshell >= 0.5875) {
                             if (instance.longestshell >= 0.605) {
                               accumulator += 3.375;
@@ -5646,7 +5646,7 @@ inline float Predict(const Instance& instance) {
                       }
                     } else {
                       if (instance.shuckedweight >= 0.41875) {
-                        if (instance.type == 1) {
+                        if (instance.type == FeatureType::kM) {
                           accumulator += 4;
                         } else {
                           accumulator += 3.38889;
@@ -5705,8 +5705,8 @@ inline float Predict(const Instance& instance) {
                 }
               } else {
                 if (instance.shuckedweight >= 0.381) {
-                  if (instance.type == 1 ||
-                      instance.type == 2) {
+                  if (instance.type == FeatureType::kM ||
+                      instance.type == FeatureType::kI) {
                     accumulator += 5.86667;
                   } else {
                     accumulator += 4.33333;
@@ -5714,8 +5714,8 @@ inline float Predict(const Instance& instance) {
                 } else {
                   if (instance.longestshell >= 0.5725) {
                     if (instance.diameter >= 0.4575) {
-                      if (instance.type == 1 ||
-                          instance.type == 2) {
+                      if (instance.type == FeatureType::kM ||
+                          instance.type == FeatureType::kI) {
                         accumulator += 3.46667;
                       } else {
                         accumulator += 3.26667;
@@ -5773,7 +5773,7 @@ inline float Predict(const Instance& instance) {
             }
           } else {
             if (instance.wholeweight >= 0.71) {
-              if (instance.type == 2) {
+              if (instance.type == FeatureType::kI) {
                 accumulator += 4.61905;
               } else {
                 if (instance.shuckedweight >= 0.31175) {
@@ -5826,7 +5826,7 @@ inline float Predict(const Instance& instance) {
                   if (instance.wholeweight >= 0.9565) {
                     if (instance.shellweight >= 0.251) {
                       if (instance.visceraweight >= 0.259) {
-                        if (instance.type == 3) {
+                        if (instance.type == FeatureType::kF) {
                           if (instance.shuckedweight >= 0.5445) {
                             accumulator += 3.33333;
                           } else {
@@ -5896,7 +5896,7 @@ inline float Predict(const Instance& instance) {
                       }
                     } else {
                       if (instance.height >= 0.1475) {
-                        if (instance.type == 3) {
+                        if (instance.type == FeatureType::kF) {
                           accumulator += 4.77778;
                         } else {
                           accumulator += 3.8;
@@ -6017,15 +6017,15 @@ inline float Predict(const Instance& instance) {
                     if (instance.longestshell >= 0.5275) {
                       accumulator += 6.33333;
                     } else {
-                      if (instance.type == 2 ||
-                          instance.type == 3) {
+                      if (instance.type == FeatureType::kI ||
+                          instance.type == FeatureType::kF) {
                         accumulator += 5.47619;
                       } else {
                         accumulator += 4.42857;
                       }
                     }
                   } else {
-                    if (instance.type == 1) {
+                    if (instance.type == FeatureType::kM) {
                       accumulator += 4.73333;
                     } else {
                       accumulator += 3.93333;
@@ -6209,7 +6209,7 @@ inline float Predict(const Instance& instance) {
                   }
                 }
               } else {
-                if (instance.type == 3) {
+                if (instance.type == FeatureType::kF) {
                   if (instance.shuckedweight >= 0.293) {
                     if (instance.shellweight >= 0.1935) {
                       if (instance.longestshell >= 0.5325) {
@@ -6297,7 +6297,7 @@ inline float Predict(const Instance& instance) {
                           accumulator += 3.13333;
                         } else {
                           if (instance.visceraweight >= 0.15825) {
-                            if (instance.type == 1) {
+                            if (instance.type == FeatureType::kM) {
                               accumulator += 2.66667;
                             } else {
                               accumulator += 2.47619;
@@ -6338,7 +6338,7 @@ inline float Predict(const Instance& instance) {
             if (instance.shellweight >= 0.16975) {
               if (instance.shuckedweight >= 0.2435) {
                 if (instance.diameter >= 0.3925) {
-                  if (instance.type == 1) {
+                  if (instance.type == FeatureType::kM) {
                     accumulator += 3.72222;
                   } else {
                     if (instance.visceraweight >= 0.17425) {
@@ -6374,7 +6374,7 @@ inline float Predict(const Instance& instance) {
                         }
                       }
                     } else {
-                      if (instance.type == 1) {
+                      if (instance.type == FeatureType::kM) {
                         accumulator += 3.33333;
                       } else {
                         accumulator += 2.80952;
@@ -6387,7 +6387,7 @@ inline float Predict(const Instance& instance) {
                   if (instance.wholeweight >= 0.6415) {
                     accumulator += 5.375;
                   } else {
-                    if (instance.type == 1) {
+                    if (instance.type == FeatureType::kM) {
                       if (instance.wholeweight >= 0.6065) {
                         accumulator += 4.74074;
                       } else {
@@ -6401,8 +6401,8 @@ inline float Predict(const Instance& instance) {
                   if (instance.diameter >= 0.3825) {
                     accumulator += 4.53333;
                   } else {
-                    if (instance.type == 1 ||
-                        instance.type == 3) {
+                    if (instance.type == FeatureType::kM ||
+                        instance.type == FeatureType::kF) {
                       if (instance.shuckedweight >= 0.21575) {
                         accumulator += 3.13333;
                       } else {
@@ -6486,7 +6486,7 @@ inline float Predict(const Instance& instance) {
       if (instance.height >= 0.1225) {
         if (instance.shuckedweight >= 0.21375) {
           if (instance.shellweight >= 0.18775) {
-            if (instance.type == 3) {
+            if (instance.type == FeatureType::kF) {
               accumulator += 3.90476;
             } else {
               if (instance.shellweight >= 0.22275) {
@@ -6511,8 +6511,8 @@ inline float Predict(const Instance& instance) {
             if (instance.visceraweight >= 0.08525) {
               if (instance.shellweight >= 0.14775) {
                 if (instance.longestshell >= 0.4775) {
-                  if (instance.type == 2 ||
-                      instance.type == 3) {
+                  if (instance.type == FeatureType::kI ||
+                      instance.type == FeatureType::kF) {
                     if (instance.shellweight >= 0.16225) {
                       if (instance.shellweight >= 0.1745) {
                         if (instance.height >= 0.1275) {
@@ -6607,7 +6607,7 @@ inline float Predict(const Instance& instance) {
                   if (instance.wholeweight >= 0.42375) {
                     accumulator += 4.16667;
                   } else {
-                    if (instance.type == 3) {
+                    if (instance.type == FeatureType::kF) {
                       accumulator += 3.66667;
                     } else {
                       accumulator += 3.06667;
@@ -6623,8 +6623,8 @@ inline float Predict(const Instance& instance) {
               }
             }
           } else {
-            if (instance.type == 1 ||
-                instance.type == 2) {
+            if (instance.type == FeatureType::kM ||
+                instance.type == FeatureType::kI) {
               if (instance.height >= 0.1275) {
                 accumulator += 4.06667;
               } else {
@@ -6668,7 +6668,7 @@ inline float Predict(const Instance& instance) {
           }
         } else {
           if (instance.shuckedweight >= 0.1585) {
-            if (instance.type == 3) {
+            if (instance.type == FeatureType::kF) {
               if (instance.visceraweight >= 0.0845) {
                 if (instance.longestshell >= 0.4525) {
                   if (instance.visceraweight >= 0.10725) {
@@ -6818,8 +6818,8 @@ inline float Predict(const Instance& instance) {
               }
             }
           } else {
-            if (instance.type == 1 ||
-                instance.type == 3) {
+            if (instance.type == FeatureType::kM ||
+                instance.type == FeatureType::kF) {
               if (instance.diameter >= 0.2825) {
                 if (instance.wholeweight >= 0.3875) {
                   accumulator += 2.85714;
@@ -6962,8 +6962,8 @@ inline float Predict(const Instance& instance) {
     } else {
       if (instance.shellweight >= 0.03425) {
         if (instance.diameter >= 0.2425) {
-          if (instance.type == 1 ||
-              instance.type == 3) {
+          if (instance.type == FeatureType::kM ||
+              instance.type == FeatureType::kF) {
             if (instance.shuckedweight >= 0.08025) {
               if (instance.shellweight >= 0.0575) {
                 if (instance.longestshell >= 0.34) {
@@ -7190,7 +7190,7 @@ inline float Predict(const Instance& instance) {
                   accumulator += 1.73333;
                 }
               } else {
-                if (instance.type == 2) {
+                if (instance.type == FeatureType::kI) {
                   accumulator += 1.93333;
                 } else {
                   accumulator += 1.6;
@@ -7266,7 +7266,7 @@ inline float Predict(const Instance& instance) {
               }
             } else {
               if (instance.height >= 0.0625) {
-                if (instance.type == 2) {
+                if (instance.type == FeatureType::kI) {
                   if (instance.wholeweight >= 0.094) {
                     accumulator += 2.33333;
                   } else {
