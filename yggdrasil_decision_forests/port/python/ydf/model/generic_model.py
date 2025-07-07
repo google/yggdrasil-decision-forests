@@ -1063,6 +1063,9 @@ Use `model.describe()` for more details
     For more flexibility, use the method `to_tensorflow_function` instead of
     `to_tensorflow_saved_model`.
 
+    Note that export to Tensorflow is not yet available for Isolation Forest
+    models.
+
     Args:
       path: Path to store the Tensorflow Decision Forests model.
       input_model_signature_fn: A lambda that returns the
@@ -1145,6 +1148,9 @@ Use `model.describe()` for more details
     TensorFlow Decision Forests Custom Inference Op. This Op is available by
     default in various platforms such as Servomatic, TensorFlow Serving, Vertex
     AI, and TensorFlow.js.
+
+    Note that export to Tensorflow is not yet available for Isolation Forest
+    models.
 
     Usage example:
 
