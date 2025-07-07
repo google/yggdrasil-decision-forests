@@ -174,12 +174,14 @@ cc_test(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_filegroup_filegroup",
+    algorithm = "IF_ELSE",
     data = "//yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_filegroup",
 )
 
 # GBT binary class
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_class",
+    algorithm = "IF_ELSE",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
@@ -187,6 +189,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_score",
+    algorithm = "IF_ELSE",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
@@ -194,6 +197,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_proba",
+    algorithm = "IF_ELSE",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
@@ -211,6 +215,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_wta_small_class",
+    algorithm = "IF_ELSE",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
@@ -218,6 +223,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_wta_small_score",
+    algorithm = "IF_ELSE",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
@@ -225,6 +231,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_wta_small_proba",
+    algorithm = "IF_ELSE",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_wta_small",
@@ -240,6 +247,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_nwta_small_class",
+    algorithm = "IF_ELSE",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
@@ -247,6 +255,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_nwta_small_score",
+    algorithm = "IF_ELSE",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
@@ -254,6 +263,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_rf_nwta_small_proba",
+    algorithm = "IF_ELSE",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
@@ -271,6 +281,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_abalone_regression_gbdt_v2",
+    algorithm = "IF_ELSE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/abalone_regression_gbdt_v2",
 )
@@ -284,6 +295,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_abalone_regression_rf_small",
+    algorithm = "IF_ELSE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/abalone_regression_rf_small",
 )
@@ -298,6 +310,7 @@ cc_ydf_standalone_model(
 # GBT multi-class
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_gbdt_v2_class",
+    algorithm = "IF_ELSE",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
@@ -305,6 +318,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_gbdt_v2_score",
+    algorithm = "IF_ELSE",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
@@ -312,6 +326,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_gbdt_v2_proba",
+    algorithm = "IF_ELSE",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_gbdt_v2",
@@ -328,6 +343,7 @@ cc_ydf_standalone_model(
 # RF multi-class
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_nwta_small_class",
+    algorithm = "IF_ELSE",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
@@ -335,6 +351,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_nwta_small_score",
+    algorithm = "IF_ELSE",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
@@ -342,6 +359,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_nwta_small_proba",
+    algorithm = "IF_ELSE",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_nwta_small",
@@ -357,6 +375,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_wta_small_class",
+    algorithm = "IF_ELSE",
     classification_output = "CLASS",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
@@ -364,6 +383,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_wta_small_score",
+    algorithm = "IF_ELSE",
     classification_output = "SCORE",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",
@@ -371,6 +391,7 @@ cc_ydf_standalone_model(
 
 cc_ydf_standalone_model(
     name = "test_model_iris_multi_class_rf_wta_small_proba",
+    algorithm = "IF_ELSE",
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/iris_multi_class_rf_wta_small",

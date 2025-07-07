@@ -5,7 +5,7 @@ def cc_ydf_standalone_model(
         data,
         path = None,
         classification_output = "CLASS",
-        algorithm = "IF_ELSE",
+        algorithm = "ROUTING",
         **attrs):
     """Embed a YDF model into a CC library.
 

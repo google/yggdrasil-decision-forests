@@ -35,7 +35,7 @@ message Options {
   optional int32 accumulator_precision_bytes = 4 [default = 2];
 
   // Algorithm used to compute the tree output.
-  optional Algorithm.Enum algorithm = 5 [default = IF_ELSE];
+  optional Algorithm.Enum algorithm = 5 [default = ROUTING];
 }
 
 // Output of a classification model.
