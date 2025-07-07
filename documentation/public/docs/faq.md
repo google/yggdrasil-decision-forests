@@ -166,8 +166,11 @@ a different model—similar to changing the training seed.
 
 ### Can I train YDF models on a GPU or TPU?
 
-YDF currently does not support training or inference on GPU. Contact the team
-if you have an impactful use case for this.
+Most YDF training and inference is done on CPU and does not use GPU or TPU.
+Training of YDF models with vector sequences can use GPU. YDF models exported to
+JAX can be run on GPU or TPU, thought experiments show that YDF+JAX models don't
+run significantly faster than on CPU. Contact the team if you have an impactful
+use case for this.
 
 ## Miscellaneous
 
@@ -175,7 +178,7 @@ if you have an impactful use case for this.
 
 YDF provides pre-compiled binaries for these architectures:
 
-*   manylinux_2_17  x86_64 (Linux)
+*   manylinux_2_17 x86_64 (Linux)
 
 *   macOS arm64 (Apple Silicon)
 
@@ -199,12 +202,13 @@ libraries may use different defaults.
 
 YDF's strength lies in the number of available techniques and advanced features.
 For a detailed comparison of model performance across libraries, please see our
-paper from KDD 2023: [Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933).
+paper from KDD 2023:
+[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933).
 
 ### Can I use the ydf.experimental module?
 
-Any API under `ydf.experimental` should not be used in production. These features
-are subject to change, may be unstable, or could have poor performance.
+Any API under `ydf.experimental` should not be used in production. These
+features are subject to change, may be unstable, or could have poor performance.
 
 ### Is the library called PYDF or YDF?
 
@@ -219,5 +223,7 @@ an internal nickname, you don't really have to pronounce it at all.
 
 ### My question isn't answered here!
 
-For bugs or feature requests, please open an issue on [Github](https://github.com/google/yggdrasil-decision-forests/issues). You can also
-contact the core development team at [decision-forests-contact@google.com](mailto:decision-forests-contact@google.com).
+For bugs or feature requests, please open an issue on
+[Github](https://github.com/google/yggdrasil-decision-forests/issues). You can
+also contact the core development team at
+[decision-forests-contact@google.com](mailto:decision-forests-contact@google.com).
