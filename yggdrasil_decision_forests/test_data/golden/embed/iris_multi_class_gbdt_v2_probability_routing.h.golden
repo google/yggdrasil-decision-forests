@@ -31,13 +31,13 @@ struct __attribute__((packed)) Node {
   uint8_t pos = 0;
   union {
     struct {
-      uint8_t feature;
+      uint8_t feat;
       union {
-        float threshold;
+        float thr;
       };
     } cond;
     struct {
-      float value;
+      float val;
     } leaf;
   };
 };
@@ -45,37 +45,37 @@ struct __attribute__((packed)) Node {
 static const uint8_t root_deltas[] = {5,15,11};
 
 static const Node nodes[] = {
-{.pos=1,.cond={.feature=3,.threshold=0.8}},
-{.leaf={.value=0.3}},
-{.pos=1,.cond={.feature=2,.threshold=3.65}},
-{.leaf={.value=-0.15}},
-{.leaf={.value=-0.15}},
-{.pos=3,.cond={.feature=3,.threshold=0.8}},
-{.pos=1,.cond={.feature=2,.threshold=1.45}},
-{.leaf={.value=-0.15}},
-{.leaf={.value=-0.15}},
-{.pos=5,.cond={.feature=3,.threshold=1.75}},
-{.pos=3,.cond={.feature=2,.threshold=4.95}},
-{.pos=1,.cond={.feature=0,.threshold=5.3}},
-{.leaf={.value=0.21}},
-{.leaf={.value=0.3}},
-{.leaf={.value=0.03}},
-{.pos=1,.cond={.feature=2,.threshold=4.95}},
-{.leaf={.value=-0.06}},
-{.pos=1,.cond={.feature=0,.threshold=7.25}},
-{.leaf={.value=-0.15}},
-{.leaf={.value=-0.15}},
-{.pos=7,.cond={.feature=3,.threshold=1.65}},
-{.pos=5,.cond={.feature=2,.threshold=4.85}},
-{.pos=3,.cond={.feature=3,.threshold=0.35}},
-{.pos=1,.cond={.feature=1,.threshold=3.45}},
-{.leaf={.value=-0.15}},
-{.leaf={.value=-0.15}},
-{.leaf={.value=-0.15}},
-{.leaf={.value=0.075}},
-{.pos=1,.cond={.feature=2,.threshold=5.05}},
-{.leaf={.value=0.2}},
-{.leaf={.value=0.3}},
+{.pos=1,.cond={.feat=3,.thr=0.8}},
+{.leaf={.val=0.3}},
+{.pos=1,.cond={.feat=2,.thr=3.65}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.pos=3,.cond={.feat=3,.thr=0.8}},
+{.pos=1,.cond={.feat=2,.thr=1.45}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.pos=5,.cond={.feat=3,.thr=1.75}},
+{.pos=3,.cond={.feat=2,.thr=4.95}},
+{.pos=1,.cond={.feat=0,.thr=5.3}},
+{.leaf={.val=0.21}},
+{.leaf={.val=0.3}},
+{.leaf={.val=0.03}},
+{.pos=1,.cond={.feat=2,.thr=4.95}},
+{.leaf={.val=-0.06}},
+{.pos=1,.cond={.feat=0,.thr=7.25}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.pos=7,.cond={.feat=3,.thr=1.65}},
+{.pos=5,.cond={.feat=2,.thr=4.85}},
+{.pos=3,.cond={.feat=3,.thr=0.35}},
+{.pos=1,.cond={.feat=1,.thr=3.45}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=0.075}},
+{.pos=1,.cond={.feat=2,.thr=5.05}},
+{.leaf={.val=0.2}},
+{.leaf={.val=0.3}},
 };
 
 inline Label Predict(const Instance& instance) {
@@ -89,11 +89,11 @@ inline Label Predict(const Instance& instance) {
   for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
     node = root;
     while(node->pos) {
-        eval = raw_numerical[node->cond.feature] >= node->cond.threshold;
+        eval = raw_numerical[node->cond.feat] >= node->cond.thr;
 
       node += (node->pos & -eval) + 1;
     }
-    accumulator[tree_idx % 3] += node->leaf.value;
+    accumulator[tree_idx % 3] += node->leaf.val;
     root += root_deltas[tree_idx];
   }
 

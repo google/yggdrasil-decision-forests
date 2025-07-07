@@ -32,13 +32,13 @@ struct __attribute__((packed)) Node {
   uint8_t pos = 0;
   union {
     struct {
-      uint8_t feature;
+      uint8_t feat;
       union {
-        float threshold;
+        float thr;
       };
     } cond;
     struct {
-      uint8_t value;
+      uint8_t val;
     } leaf;
   };
 };
@@ -46,35 +46,35 @@ struct __attribute__((packed)) Node {
 static const uint8_t root_deltas[] = {13,9,7};
 
 static const Node nodes[] = {
-{.pos=1,.cond={.feature=3,.threshold=0.75}},
-{.leaf={.value=0}},
-{.pos=7,.cond={.feature=3,.threshold=1.65}},
-{.pos=1,.cond={.feature=3,.threshold=1.35}},
-{.leaf={.value=1}},
-{.pos=1,.cond={.feature=1,.threshold=2.65}},
-{.leaf={.value=2}},
-{.pos=1,.cond={.feature=0,.threshold=6.65}},
-{.leaf={.value=3}},
-{.leaf={.value=4}},
-{.pos=1,.cond={.feature=2,.threshold=4.85}},
-{.leaf={.value=5}},
-{.leaf={.value=6}},
-{.pos=1,.cond={.feature=3,.threshold=0.8}},
-{.leaf={.value=7}},
-{.pos=3,.cond={.feature=2,.threshold=4.95}},
-{.pos=1,.cond={.feature=3,.threshold=1.65}},
-{.leaf={.value=8}},
-{.leaf={.value=9}},
-{.pos=1,.cond={.feature=3,.threshold=1.75}},
-{.leaf={.value=10}},
-{.leaf={.value=11}},
-{.pos=1,.cond={.feature=2,.threshold=2.6}},
-{.leaf={.value=12}},
-{.pos=3,.cond={.feature=3,.threshold=1.75}},
-{.pos=1,.cond={.feature=3,.threshold=1.55}},
-{.leaf={.value=13}},
-{.leaf={.value=14}},
-{.leaf={.value=15}},
+{.pos=1,.cond={.feat=3,.thr=0.75}},
+{.leaf={.val=0}},
+{.pos=7,.cond={.feat=3,.thr=1.65}},
+{.pos=1,.cond={.feat=3,.thr=1.35}},
+{.leaf={.val=1}},
+{.pos=1,.cond={.feat=1,.thr=2.65}},
+{.leaf={.val=2}},
+{.pos=1,.cond={.feat=0,.thr=6.65}},
+{.leaf={.val=3}},
+{.leaf={.val=4}},
+{.pos=1,.cond={.feat=2,.thr=4.85}},
+{.leaf={.val=5}},
+{.leaf={.val=6}},
+{.pos=1,.cond={.feat=3,.thr=0.8}},
+{.leaf={.val=7}},
+{.pos=3,.cond={.feat=2,.thr=4.95}},
+{.pos=1,.cond={.feat=3,.thr=1.65}},
+{.leaf={.val=8}},
+{.leaf={.val=9}},
+{.pos=1,.cond={.feat=3,.thr=1.75}},
+{.leaf={.val=10}},
+{.leaf={.val=11}},
+{.pos=1,.cond={.feat=2,.thr=2.6}},
+{.leaf={.val=12}},
+{.pos=3,.cond={.feat=3,.thr=1.75}},
+{.pos=1,.cond={.feat=3,.thr=1.55}},
+{.leaf={.val=13}},
+{.leaf={.val=14}},
+{.leaf={.val=15}},
 };
 
 static const float leaf_value_bank[] = {0.333333,0,0,0,0.333333,0,0,0.2,0.133333,0,0.333333,0,0,0.266667,0.0666667,0,0.166667,0.166667,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.125,0.208333,0,0.133333,0.2,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.266667,0.0666667,0,0,0.333333};
@@ -90,11 +90,11 @@ inline std::array<float, 3> Predict(const Instance& instance) {
   for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
     node = root;
     while(node->pos) {
-        eval = raw_numerical[node->cond.feature] >= node->cond.threshold;
+        eval = raw_numerical[node->cond.feat] >= node->cond.thr;
 
       node += (node->pos & -eval) + 1;
     }
-    const size_t offset = node->leaf.value * 3;
+    const size_t offset = node->leaf.val * 3;
     for(int dim=0; dim!=3; dim++) {
       accumulator[dim] += leaf_value_bank[offset + dim];
     }

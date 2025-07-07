@@ -335,7 +335,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
           };
 
           spec.routing_node = R"(
-    accumulator += node->leaf.value;
+    accumulator += node->leaf.val;
 )";
         } else {
           // We accumulate the probability vote for the positive class.
@@ -365,7 +365,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
           };
 
           spec.routing_node = R"(
-    accumulator += node->leaf.value;
+    accumulator += node->leaf.val;
 )";
         }
       } else {
@@ -395,7 +395,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
           };
 
           spec.routing_node = R"(
-    accumulator[node->leaf.value]++;
+    accumulator[node->leaf.val]++;
 )";
         } else {
           // We accumulate the probability for each class.
@@ -438,7 +438,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
 
           spec.routing_node =
               absl::Substitute(R"(
-    const size_t offset = node->leaf.value * $0;
+    const size_t offset = node->leaf.val * $0;
     for(int dim=0; dim!=$0; dim++) {
       accumulator[dim] += leaf_value_bank[offset + dim];
     }
@@ -509,7 +509,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
       };
 
       spec.routing_node = R"(
-    accumulator += node->leaf.value;
+    accumulator += node->leaf.val;
 )";
       break;
 
@@ -550,7 +550,7 @@ SpecializedConversionGradientBoostedTrees(
         };
 
         spec.routing_node = R"(
-    accumulator += node->leaf.value;
+    accumulator += node->leaf.val;
 )";
 
       } else {
@@ -575,7 +575,7 @@ SpecializedConversionGradientBoostedTrees(
         };
 
         spec.routing_node = absl::Substitute(R"(
-    accumulator[tree_idx % $0] += node->leaf.value;
+    accumulator[tree_idx % $0] += node->leaf.val;
 )",
                                              stats.num_classification_classes);
       }
@@ -636,7 +636,7 @@ SpecializedConversionGradientBoostedTrees(
       };
 
       spec.routing_node = R"(
-    accumulator += node->leaf.value;
+    accumulator += node->leaf.val;
 )";
       break;
 
@@ -1182,7 +1182,7 @@ absl::Status GenerateTreeInferenceRouting(
             absl::StrAppend(content, "\n      ");
           }
           absl::SubstituteAndAppend(
-              content, "if (condition_types[node->cond.feature] == $0) {\n",
+              content, "if (condition_types[node->cond.feat] == $0) {\n",
               routing_cond_type);
         } else {
           absl::StrAppend(content, "\n");
@@ -1194,14 +1194,14 @@ absl::Status GenerateTreeInferenceRouting(
       };
   add_condition_code({model::decision_tree::proto::Condition::kHigherCondition},
                      RoutingConditionType::HIGHER_CONDITION,
-                     "        eval = raw_numerical[node->cond.feature] >= "
-                     "node->cond.threshold;\n");
+                     "        eval = raw_numerical[node->cond.feat] >= "
+                     "node->cond.thr;\n");
   add_condition_code(
       {model::decision_tree::proto::Condition::kContainsCondition,
        model::decision_tree::proto::Condition::kContainsBitmapCondition},
       RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP,
-      "        eval = categorical_bank[raw_categorical[node->cond.feature] + "
-      "node->cond.categorical];\n");
+      "        eval = categorical_bank[raw_categorical[node->cond.feat] + "
+      "node->cond.cat];\n");
 
   if (stats.has_multiple_condition_types) {
     absl::StrAppend(content, R"( else {
@@ -1237,7 +1237,7 @@ absl::Status GenRoutingModelDataNode(
     std::string* serialized_nodes, int* node_idx,
     std::vector<bool>* categorical_bank, std::vector<float>* leaf_value_bank) {
   if (node.IsLeaf()) {
-    absl::StrAppend(serialized_nodes, "{.leaf={.value=");
+    absl::StrAppend(serialized_nodes, "{.leaf={.val=");
 
     // Unroll the leaf values.
     const auto leaf_value = specialized_conversion.leaf_value_fn(node.node());
@@ -1316,12 +1316,11 @@ absl::Status GenRoutingModelDataNode(
         // store the mask in the node directly (instead of using the bank).
         // TODO: Search if the bitmap bank already contains the current
         // bitmap. If so, use the existing bitmap segment instead.
-        absl::SubstituteAndAppend(
-            serialized_nodes,
-            "{.pos=$0,.cond={.feature=$1,.categorical=$2}},\n",
-            delta_pos_node,           // $0
-            feature_idx,              // $1
-            categorical_bank->size()  // $2
+        absl::SubstituteAndAppend(serialized_nodes,
+                                  "{.pos=$0,.cond={.feat=$1,.cat=$2}},\n",
+                                  delta_pos_node,           // $0
+                                  feature_idx,              // $1
+                                  categorical_bank->size()  // $2
         );
         categorical_bank->insert(categorical_bank->end(), bitmap.begin(),
                                  bitmap.end());
@@ -1337,11 +1336,11 @@ absl::Status GenRoutingModelDataNode(
       if (!internal_options.numerical_feature_is_float) {
         threshold = std::ceil(threshold);
       }
-      absl::SubstituteAndAppend(
-          serialized_nodes, "{.pos=$0,.cond={.feature=$1,.threshold=$2}},\n",
-          delta_pos_node,  // $0
-          feature_idx,     // $1
-          threshold        // $2
+      absl::SubstituteAndAppend(serialized_nodes,
+                                "{.pos=$0,.cond={.feat=$1,.thr=$2}},\n",
+                                delta_pos_node,  // $0
+                                feature_idx,     // $1
+                                threshold        // $2
       );
     } break;
 
@@ -1447,9 +1446,9 @@ struct __attribute__((packed)) Node {
   $2 pos = 0;
   union {
     struct {
-      $1 feature;
+      $1 feat;
       union {
-        $0 threshold;)",
+        $0 thr;)",
                             is_greather_threshold_type,  // $0
                             feature_index_type,          // $1
                             node_offset_type             // $2
@@ -1457,7 +1456,7 @@ struct __attribute__((packed)) Node {
 
   if (!categorical_idx_type.empty()) {
     absl::SubstituteAndAppend(content, R"(
-        $0 categorical;)",
+        $0 cat;)",
                               categorical_idx_type  // $0
     );
   }
@@ -1466,7 +1465,7 @@ struct __attribute__((packed)) Node {
       };
     } cond;
     struct {
-      $0 value;
+      $0 val;
     } leaf;
   };
 };
