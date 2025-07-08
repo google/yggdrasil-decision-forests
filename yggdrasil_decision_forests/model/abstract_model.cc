@@ -840,8 +840,7 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
 
     case proto::Task::SURVIVAL_ANALYSIS: {
       STATUS_CHECK_NE(columns.event_observed_col_idx, -1);
-      // TODO: Implement.
-      return absl::InvalidArgumentError("Not implemented");
+      // No ground truth to set.
     } break;
 
     default:
@@ -1363,6 +1362,28 @@ absl::Status AbstractModel::Validate() const {
         return absl::InvalidArgumentError(absl::StrCat(
             "Invalid label type for regression: ",
             dataset::proto::ColumnType_Name(label_col_spec().type())));
+      }
+      break;
+    case model::proto::Task::SURVIVAL_ANALYSIS:
+      if (label_col_spec().type() != dataset::proto::NUMERICAL) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label type for regression: ",
+            dataset::proto::ColumnType_Name(label_col_spec().type())));
+      }
+      if (data_spec().columns(label_event_observed_col_idx()).type() !=
+          dataset::proto::BOOLEAN) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label event observed type for survival analysis: ",
+            dataset::proto::ColumnType_Name(
+                data_spec().columns(label_event_observed_col_idx()).type())));
+      }
+      if (label_entry_age_col_idx() != -1 &&
+          data_spec().columns(label_entry_age_col_idx()).type() !=
+              dataset::proto::NUMERICAL) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label entry age type for survival analysis: ",
+            dataset::proto::ColumnType_Name(
+                data_spec().columns(label_entry_age_col_idx()).type())));
       }
       break;
     case model::proto::Task::CATEGORICAL_UPLIFT:

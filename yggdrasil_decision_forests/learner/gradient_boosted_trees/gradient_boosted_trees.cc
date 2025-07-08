@@ -2610,6 +2610,10 @@ absl::StatusOr<proto::Loss> DefaultLoss(
     return proto::Loss::LAMBDA_MART_NDCG;
   }
 
+  if (task == model::proto::Task::SURVIVAL_ANALYSIS) {
+    return proto::Loss::COX_PROPORTIONAL_HAZARD;
+  }
+
   return absl::InvalidArgumentError(
       "No defined default loss for this combination of label type and task");
 }

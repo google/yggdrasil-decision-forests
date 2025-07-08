@@ -394,7 +394,12 @@ Hyper-parameters: ydf.{self._hyperparameters}
             max_vocab_count=-1,
             min_vocab_frequency=1,
         )
-      elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
+      elif task in [
+          Task.REGRESSION,
+          Task.RANKING,
+          Task.NUMERICAL_UPLIFT,
+          Task.SURVIVAL_ANALYSIS,
+      ]:
         return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
       elif task in [Task.ANOMALY_DETECTION]:
         if name is None:

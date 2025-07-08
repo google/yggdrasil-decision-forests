@@ -269,6 +269,14 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
         return engine;
       }
 
+      case proto::SURVIVAL_ANALYSIS: {
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
+            serving::decision_forest::GradientBoostedTreesSurvivalAnalysis,
+            serving::decision_forest::Predict>>();
+        RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
+        return engine;
+      }
+
       default:
         return absl::InvalidArgumentError("Non supported GBDT model");
     }

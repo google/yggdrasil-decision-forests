@@ -2475,6 +2475,36 @@ TEST_F(GradientBoostedTreesOnSyntheticRanking, IndicatorLabelsQuality) {
   YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.5337, 0.0725, 0.5204);
 }
 
+class GradientBoostedTreesOnSurvivalAnalysisWithLeftTruncation
+    : public utils::TrainAndTestTester {
+  void SetUp() override {
+    auto* deletion_observed_column = guide_.add_column_guides();
+    deletion_observed_column->set_column_name_pattern("^deletion_observed$");
+    deletion_observed_column->set_type(dataset::proto::ColumnType::BOOLEAN);
+    train_config_.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+    train_config_.set_task(model::proto::Task::SURVIVAL_ANALYSIS);
+    train_config_.set_label("deletion_age");
+    train_config_.set_label_event_observed("deletion_observed");
+    train_config_.set_label_entry_age("arrival_age");
+    dataset_filename_ = "file_deletions_train.csv";
+    dataset_test_filename_ = "file_deletions_test.csv";
+    deployment_config_.set_num_threads(1);
+    auto* gbt_config = train_config_.MutableExtension(
+        gradient_boosted_trees::proto::gradient_boosted_trees_config);
+    gbt_config->set_num_trees(2);
+    gbt_config->mutable_decision_tree()
+        ->set_internal_error_on_wrong_splitter_statistics(true);
+  }
+};
+
+TEST_F(GradientBoostedTreesOnSurvivalAnalysisWithLeftTruncation, Base) {
+  TrainAndEvaluateModel();
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  // TODO: Test the test loss instead of the validation loss.
+  CHECK_NEAR(gbt_model->validation_loss(), 0.354653, 0.001);
+  // TODO: Test model structure.
+}
+
 }  // namespace
 }  // namespace gradient_boosted_trees
 }  // namespace model

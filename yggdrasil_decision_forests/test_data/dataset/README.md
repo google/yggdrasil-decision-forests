@@ -300,3 +300,111 @@ def export_dataset_as_avro(ds: dict[str, Any], path: str):
 
 export_dataset_as_avro(gen_dataset(),"toy_vector_sequence_from_fastavro.avro")
 ```
+
+## file_deletions_train.csv and file_deletions_test.csv
+
+Those are survival datasets that represent file lifetimes, with left-truncation
+and right-censoring effects. The file lifetime is correlated to three
+categorical features (user, location & class), and two numerical ones (size &
+temperature).
+
+They are generated with:
+
+```python
+def generate_random_covariance_matrix(n):
+  A = numpy.random.rand(n, n)
+  Q, R = numpy.linalg.qr(A)
+  eigenvalues = numpy.exp(numpy.random.randn(n))
+  D = numpy.diag(eigenvalues)
+  cov_matrix = Q @ D @ Q.T
+  return cov_matrix
+
+
+def generate_correlated_samples(sample_size, distributions, covariance_matrix):
+  n = len(distributions)
+  covariance_matrix = numpy.array(covariance_matrix)
+  if covariance_matrix.shape != (n, n):
+    raise ValueError('Covariance matrix must have shape (n, n).')
+
+  samples = []
+  mvn_samples = scipy.stats.multivariate_normal.rvs(
+      cov=covariance_matrix, size=sample_size
+  )
+  for i, distribution in enumerate(distributions):
+    uniform_sample = scipy.stats.norm.cdf(mvn_samples[:, i])
+    samples.append(distribution.ppf(uniform_sample))
+  return samples
+
+
+def coalesce_cols(df, name, count):
+  popped_columns = {}
+  for col in [f'{name}_{i}' for i in range(count)]:
+    popped_columns[col] = df.pop(col)
+  extracted_cols = pandas.DataFrame(popped_columns)
+  df[name] = extracted_cols.idxmax(axis=1)
+
+def generate_dataset(size, covariance_matrix, betas, base_hazard):
+  samples = generate_correlated_samples(
+      size, distributions.values(), covariance_matrix
+  )
+  data = {k: s for k, s in zip(distributions.keys(), samples)}
+  df = pandas.DataFrame(data)
+
+  # Derive proportional hazard lifetime.
+  df['hazard'] = numpy.dot(df.values, betas)
+  df['lifetime'] = 1 - numpy.log(numpy.random.uniform(size=len(df))) / numpy.exp(df['hazard']) / base_hazard
+
+  # Add age.
+  observation_window = 10
+  df['age'] = scipy.stats.randint(1, 300).rvs(len(df))
+
+  # Apply left-truncation
+  left_truncated = df['age'] - df['lifetime'] > observation_window
+  df = df.loc[~left_truncated]
+
+  # Apply right-censoring, turning the age from "age at the end of
+  # the observation window" to "age at which it entered the observation
+  # window".
+  right_censored = df['lifetime'] > df['age']
+  df['event'] = ~right_censored
+  df.loc[right_censored, 'lifetime'] = df['age']
+  df['age'] -= observation_window
+  df.loc[df['age'] < 0, 'age'] = 0
+
+  coalesce_cols(df, 'user', 6)
+  coalesce_cols(df, 'location', 4)
+  coalesce_cols(df, 'class', 5)
+  return df
+
+distributions = {
+    'size': scipy.stats.pareto(b=2),
+    'temperature': scipy.stats.norm(1000, 200),
+    'user_0': scipy.stats.randint(0, 2),
+    'user_1': scipy.stats.randint(0, 2),
+    'user_2': scipy.stats.randint(0, 2),
+    'user_3': scipy.stats.randint(0, 2),
+    'user_4': scipy.stats.randint(0, 2),
+    'user_5': scipy.stats.randint(0, 2),
+    'location_0': scipy.stats.randint(0, 2),
+    'location_1': scipy.stats.randint(0, 2),
+    'location_2': scipy.stats.randint(0, 2),
+    'location_3': scipy.stats.randint(0, 2),
+    'class_0': scipy.stats.randint(0, 2),
+    'class_1': scipy.stats.randint(0, 2),
+    'class_2': scipy.stats.randint(0, 2),
+    'class_3': scipy.stats.randint(0, 2),
+    'class_4': scipy.stats.randint(0, 2),
+}
+covariance_matrix = generate_random_covariance_matrix(len(distributions))
+betas = [.01, -.002, 1, -1, 2, -2, 3, -3, 1, -1, 2, -2, 1, 1, 1, 1, 1]
+base_hazard = .01
+
+train_df = generate_dataset(100000, covariance_matrix, betas, base_hazard)
+test_df = generate_dataset(10000, covariance_matrix, betas, base_hazard)
+
+with open('file_deletions_train.csv', 'w') as train_f:
+  train_df.drop('hazard', axis=1).to_csv(train_f, index=False)
+
+with open('file_deletions_test.csv', 'w') as test_f:
+  test_df.drop('hazard', axis=1).to_csv(test_f, index=False)
+```

@@ -74,6 +74,7 @@ cc_library_ydf(
     deps = [
         ":loss_imp_binary_focal",
         ":loss_imp_binomial",
+        ":loss_imp_cox",
         ":loss_imp_cross_entropy_ndcg",
         ":loss_imp_custom_binary_classification",
         ":loss_imp_custom_regression",
@@ -158,6 +159,31 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+    alwayslink = 1,
+)
+
+cc_library_ydf(
+    name = "loss_imp_cox",
+    srcs = ["loss_imp_cox.cc"],
+    hdrs = ["loss_imp_cox.h"],
+    deps = [
+        ":loss_interface",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
+        "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/learner/decision_tree:training",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:concurrency",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
     ],
     alwayslink = 1,
@@ -426,6 +452,23 @@ cc_test(
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:optional",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "loss_imp_cox_test",
+    srcs = ["loss_imp_cox_test.cc"],
+    deps = [
+        ":loss_imp_cox",
+        ":loss_interface",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_googletest//:gtest_main",
     ],
 )

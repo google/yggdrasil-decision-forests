@@ -74,6 +74,8 @@ enum Loss {
   MEAN_AVERAGE_ERROR = 8;
   // LambdaMART with NDCG loss. Truncation defaults to 5, configurable.
   LAMBDA_MART_NDCG = 9;
+  // Cox Proportional Hazard loss. Only valid for survival analysis.
+  COX_PROPORTIONAL_HAZARD = 10;
 }
 
 // Log of the training. This proto is generated during the training of the

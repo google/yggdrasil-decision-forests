@@ -73,6 +73,7 @@ class Task(enum.Enum):
       training data or anomalous (a.k.a. an outlier). An anomaly detection
       prediction is a value between 0 and 1, where 0 indicates the possible most
       normal instance and 1 indicates the most possible anomalous instance.
+    SURVIVAL_ANALYSIS: Predicts the survival probability of an individual.
   """
 
   CLASSIFICATION = "CLASSIFICATION"
@@ -81,6 +82,7 @@ class Task(enum.Enum):
   CATEGORICAL_UPLIFT = "CATEGORICAL_UPLIFT"
   NUMERICAL_UPLIFT = "NUMERICAL_UPLIFT"
   ANOMALY_DETECTION = "ANOMALY_DETECTION"
+  SURVIVAL_ANALYSIS = "SURVIVAL_ANALYSIS"
 
   def _to_proto_type(self) -> abstract_model_pb2.Task:
     if self in TASK_TO_PROTO:
@@ -104,6 +106,7 @@ TASK_TO_PROTO = {
     Task.CATEGORICAL_UPLIFT: abstract_model_pb2.CATEGORICAL_UPLIFT,
     Task.NUMERICAL_UPLIFT: abstract_model_pb2.NUMERICAL_UPLIFT,
     Task.ANOMALY_DETECTION: abstract_model_pb2.ANOMALY_DETECTION,
+    Task.SURVIVAL_ANALYSIS: abstract_model_pb2.SURVIVAL_ANALYSIS,
 }
 PROTO_TO_TASK = {v: k for k, v in TASK_TO_PROTO.items()}
 

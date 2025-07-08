@@ -735,6 +735,15 @@ absl::Status SetLeafGradientBoostedTreesRanking(
   return SetRegressiveLeaf(src_model, src_node, 1.f, dst_node);
 }
 
+// Set the leaf of a survival analysis Gradient Boosted Trees.
+template <typename SpecializedModel>
+absl::Status SetLeafGradientBoostedTreesSurvivalAnalysis(
+    const GradientBoostedTreesModel& src_model,
+    const NodeWithChildren& src_node, SpecializedModel* dst_model,
+    typename SpecializedModel::NodeType* dst_node) {
+  return SetRegressiveLeaf(src_model, src_node, 1.f, dst_node);
+}
+
 // Recursively explore the children of a node and output the result in the flat
 // node array "specialized_node_array".
 //
@@ -1209,6 +1218,23 @@ absl::Status GenericToSpecializedModel(const GradientBoostedTreesModel& src,
       src.initial_predictions().size() != 1) {
     return absl::InvalidArgumentError(
         "The Gradient Boosted Tree is not trained for regression.");
+  }
+
+  dst->initial_predictions = src.initial_predictions()[0];
+
+  using DstType = std::remove_pointer<decltype(dst)>::type;
+  return GenericToSpecializedGenericModelHelper(
+      SetLeafGradientBoostedTreesRegression<DstType>, src, dst);
+}
+
+template <>
+absl::Status GenericToSpecializedModel(
+    const GradientBoostedTreesModel& src,
+    GradientBoostedTreesSurvivalAnalysis* dst) {
+  if (src.loss() != Loss::COX_PROPORTIONAL_HAZARD ||
+      src.initial_predictions().size() != 1) {
+    return absl::InvalidArgumentError(
+        "The Gradient Boosted Tree is not trained for survival.");
   }
 
   dst->initial_predictions = src.initial_predictions()[0];

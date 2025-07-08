@@ -213,6 +213,7 @@ absl::Status GradientBoostedTreesModel::Validate() const {
       }
       break;
     case model::proto::Task::REGRESSION:
+    case model::proto::Task::SURVIVAL_ANALYSIS:
       expected_initial_predictions_size = 1;
       break;
     case model::proto::Task::RANKING:
@@ -429,6 +430,17 @@ void GradientBoostedTreesModel::Predict(
                      });
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
+
+    case proto::Loss::COX_PROPORTIONAL_HAZARD: {
+      double accumulator = initial_predictions_[0];
+      CallOnAllLeafs(dataset, row_idx,
+                     [&accumulator](const decision_tree::proto::Node& node) {
+                       accumulator += node.regressor().top_value();
+                     });
+      prediction->mutable_survival_analysis()->set_log_hazard_ratio(
+          accumulator);
+    } break;
+
     case proto::Loss::DEFAULT:
       LOG(FATAL) << "Loss not set";
   }
@@ -543,6 +555,17 @@ void GradientBoostedTreesModel::Predict(
                      });
       prediction->mutable_ranking()->set_relevance(accumulator);
     } break;
+
+    case proto::Loss::COX_PROPORTIONAL_HAZARD: {
+      double accumulator = initial_predictions_[0];
+      CallOnAllLeafs(example,
+                     [&accumulator](const decision_tree::proto::Node& node) {
+                       accumulator += node.regressor().top_value();
+                     });
+      prediction->mutable_survival_analysis()->set_log_hazard_ratio(
+          accumulator);
+    } break;
+
     case proto::Loss::DEFAULT:
       LOG(FATAL) << "Loss not set";
   }

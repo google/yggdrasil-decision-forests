@@ -458,6 +458,19 @@ struct GenericGradientBoostedTreesRanking : ExampleSetModel<NodeOffsetRep> {
 };
 using GradientBoostedTreesRanking = GenericGradientBoostedTreesRanking<>;
 
+// GBDT model for survival analysis.
+template <typename NodeOffsetRep = uint16_t>
+struct GenericGradientBoostedTreesSurvivalAnalysis
+    : ExampleSetModel<NodeOffsetRep> {
+  static constexpr model::proto::Task kTask =
+      model::proto::Task::SURVIVAL_ANALYSIS;
+  // Output of the model before any tree is applied, and before the final
+  // activation function.
+  float initial_predictions = 0.f;
+};
+using GradientBoostedTreesSurvivalAnalysis =
+    GenericGradientBoostedTreesSurvivalAnalysis<>;
+
 // GBDT model for poisson regression.
 template <typename NodeOffsetRep = uint16_t>
 struct GenericGradientBoostedTreesPoissonRegression

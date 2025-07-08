@@ -46,6 +46,8 @@ absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
                                     std::string* report);
 absl::Status AppendTextReportAnomalyDetection(
     const proto::EvaluationResults& eval, std::string* report);
+absl::Status AppendTextReportSurvivalAnalysis(
+    const proto::EvaluationResults& eval, std::string* report);
 
 // Add the report in a html format.
 struct HtmlReportOptions {

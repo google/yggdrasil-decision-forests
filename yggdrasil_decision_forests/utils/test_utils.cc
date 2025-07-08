@@ -331,6 +331,9 @@ absl::Status TrainAndTestTester::PostTrainingChecks() {
           case model::proto::Task::RANKING:
             CHECK_NEAR(metric::NDCG(e1), metric::NDCG(e2), 0.001);
             break;
+          case model::proto::Task::SURVIVAL_ANALYSIS:
+            // TODO: Add metrics for survival analysis.
+            break;
           case model::proto::Task::CATEGORICAL_UPLIFT:
           case model::proto::Task::NUMERICAL_UPLIFT:
             CHECK_NEAR(metric::AUUC(e1), metric::AUUC(e2), 0.001);
@@ -714,6 +717,11 @@ void ExpectEqualPredictions(const model::proto::Task task,
                  epsilon);
       break;
 
+    case model::proto::Task::SURVIVAL_ANALYSIS:
+      CHECK_NEAR(a.survival_analysis().log_hazard_ratio(),
+                 b.survival_analysis().log_hazard_ratio(), epsilon);
+      break;
+
     default:
       LOG(FATAL) << "Not supported task";
   }
@@ -815,6 +823,12 @@ void ExpectEqualPredictions(
 
       case model::proto::Task::ANOMALY_DETECTION:
         CHECK_NEAR(generic_prediction.anomaly_detection().value(),
+                   predictions[prediction_idx], epsilon)
+            << "row_idx:" << row_idx;
+        break;
+
+      case model::proto::Task::SURVIVAL_ANALYSIS:
+        CHECK_NEAR(generic_prediction.survival_analysis().log_hazard_ratio(),
                    predictions[prediction_idx], epsilon)
             << "row_idx:" << row_idx;
         break;

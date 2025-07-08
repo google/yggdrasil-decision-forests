@@ -406,6 +406,9 @@ absl::Status AppendTextReportWithStatus(const proto::EvaluationResults& eval,
     case proto::EvaluationResults::TypeCase::kAnomalyDetection:
       RETURN_IF_ERROR(AppendTextReportAnomalyDetection(eval, report));
       break;
+    case proto::EvaluationResults::TypeCase::kSurvivalAnalysis:
+      RETURN_IF_ERROR(AppendTextReportSurvivalAnalysis(eval, report));
+      break;
     default:
       STATUS_FATAL("This model does not support evaluation reports.");
   }
@@ -613,6 +616,12 @@ absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
 absl::Status AppendTextReportAnomalyDetection(
     const proto::EvaluationResults& eval, std::string* report) {
   absl::StrAppend(report, "No report for anomaly detection\n");
+  return absl::OkStatus();
+}
+
+absl::Status AppendTextReportSurvivalAnalysis(
+    const proto::EvaluationResults& eval, std::string* report) {
+  absl::StrAppend(report, "No report for survival analysis\n");
   return absl::OkStatus();
 }
 

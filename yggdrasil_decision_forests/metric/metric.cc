@@ -423,6 +423,12 @@ void MergeEvaluationAnomalyDetection(
   // No merging to be done.
 }
 
+void MergeEvaluationSurvivalAnalysis(
+    const proto::EvaluationResults::SurvivalAnalysis& src,
+    proto::EvaluationResults::SurvivalAnalysis* dst) {
+  // No merging to be done.
+}
+
 }  // namespace
 
 float PValueMeanIsGreaterThanZero(const std::vector<float>& sample) {
@@ -873,6 +879,9 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
       RETURN_IF_ERROR(uplift::InitializeNumericalUpliftEvaluation(
           option, label_column, eval));
       break;
+    case model::proto::Task::SURVIVAL_ANALYSIS:
+      eval->mutable_survival_analysis();
+      break;
     case model::proto::Task::ANOMALY_DETECTION: {
       return absl::InvalidArgumentError(
           "Evaluating with task ANOMALY_DETECTION is not supported. Use "
@@ -954,6 +963,11 @@ absl::Status AddPrediction(const proto::EvaluationOptions& option,
       STATUS_CHECK(pred.has_ranking());
       need_prediction_sampling = true;
       break;
+
+    case model::proto::Task::SURVIVAL_ANALYSIS:
+      STATUS_CHECK(pred.has_survival_analysis());
+      break;
+
     case model::proto::Task::CATEGORICAL_UPLIFT:
     case model::proto::Task::NUMERICAL_UPLIFT:
       RETURN_IF_ERROR(uplift::AddUpliftPredictionImp(option, pred, rnd, eval));
@@ -1090,6 +1104,9 @@ absl::Status FinalizeEvaluation(const proto::EvaluationOptions& option,
     case model::proto::Task::NUMERICAL_UPLIFT:
       RETURN_IF_ERROR(uplift::FinalizeUpliftMetricsFromSampledPredictions(
           option, label_column, eval));
+      break;
+    case model::proto::Task::SURVIVAL_ANALYSIS:
+      // TODO: Implement.
       break;
 
     default:
@@ -1425,6 +1442,10 @@ absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
     case proto::EvaluationResults::kAnomalyDetection:
       MergeEvaluationAnomalyDetection(src.anomaly_detection(),
                                       dst->mutable_anomaly_detection());
+      break;
+    case proto::EvaluationResults::kSurvivalAnalysis:
+      MergeEvaluationSurvivalAnalysis(src.survival_analysis(),
+                                      dst->mutable_survival_analysis());
       break;
     case proto::EvaluationResults::TYPE_NOT_SET:
       return absl::InvalidArgumentError("Evaluation not initialized.");
