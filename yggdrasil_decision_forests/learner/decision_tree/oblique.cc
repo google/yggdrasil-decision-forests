@@ -727,7 +727,6 @@ void SampleProjection(const absl::Span<const int>& features,
                       utils::RandomEngine* random) {
   *monotonic_direction = 0;
   projection->clear();
-  projection->reserve(projection_density * features.size());
   std::uniform_real_distribution<float> unif01;
   std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
   const auto& oblique_config = dt_config.sparse_oblique_split();
@@ -807,8 +806,9 @@ void SampleProjection(const absl::Span<const int>& features,
     if (!picked_idx.insert(t).second) picked_idx.insert(j);
   }
 
+  projection->reserve(projection_density * features.size());
   // O(k) minimal pass to fill in those indices
-  for (size_t idx : picked_idx) {
+  for (const auto idx : picked_idx) {
     projection->push_back({features[idx], gen_weight(features[idx])});
   }
 
