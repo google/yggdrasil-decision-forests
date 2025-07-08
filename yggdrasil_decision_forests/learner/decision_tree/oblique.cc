@@ -794,16 +794,15 @@ void SampleProjection(const absl::Span<const int>& features,
   }
   #endif
 
-  const size_t p = features.size();
-  std::binomial_distribution<size_t> binom(p, projection_density);
+  std::binomial_distribution<size_t> binom(features.size(), projection_density);
 
-  // Exp[Binomial(p,projection_density)] = k
-  const size_t k = binom(*random);
+  // Expectation[Binomial(p,projection_density)] = num_selected_features
+  const size_t num_selected_features = binom(*random);
 
   absl::btree_set<size_t> picked_idx;
 
   // Floyd's sampler to select k indices uniformly
-  for (size_t j = p - k; j < p; ++j) {
+  for (size_t j = features.size() - num_selected_features; j < features.size(); ++j) {
     size_t t = absl::Uniform<size_t>(*random, 0, j + 1);
     if (!picked_idx.insert(t).second) picked_idx.insert(j);
   }
