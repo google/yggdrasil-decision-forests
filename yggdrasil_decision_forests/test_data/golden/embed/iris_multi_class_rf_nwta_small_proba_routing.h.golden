@@ -84,7 +84,7 @@ inline std::array<float, 3> Predict(const Instance& instance) {
 
   const Node* root = nodes;
   const Node* node;
-  const auto* raw_numerical = reinterpret_cast<const float*>(&instance);
+  const auto* raw_numerical = (const float*)(&instance);
   (void) raw_numerical;
   uint8_t eval;
   for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {

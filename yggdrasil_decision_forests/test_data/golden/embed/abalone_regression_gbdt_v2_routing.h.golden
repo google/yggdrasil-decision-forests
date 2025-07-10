@@ -252,9 +252,9 @@ inline float Predict(const Instance& instance) {
 
   const Node* root = nodes;
   const Node* node;
-  const auto* raw_numerical = reinterpret_cast<const float*>(&instance);
+  const auto* raw_numerical = (const float*)(&instance);
   (void) raw_numerical;
-  const auto* raw_categorical = reinterpret_cast<const uint32_t*>(&instance);
+  const auto* raw_categorical = (const uint32_t*)(&instance);
   (void) raw_categorical;
   uint8_t eval;
   for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {

@@ -1130,14 +1130,14 @@ absl::Status GenerateTreeInferenceRouting(
   absl::SubstituteAndAppend(content, R"(
   const Node* root = nodes;
   const Node* node;
-  const auto* raw_numerical = reinterpret_cast<const $0*>(&instance);
+  const auto* raw_numerical = (const $0*)(&instance);
   (void) raw_numerical;)",
                             is_greather_threshold_type  // $0
   );
 
   if (!categorical_idx_type.empty()) {
     absl::SubstituteAndAppend(content, R"(
-  const auto* raw_categorical = reinterpret_cast<const $0*>(&instance);
+  const auto* raw_categorical = (const $0*)(&instance);
   (void) raw_categorical;)",
                               categorical_idx_type  // $0
     );
