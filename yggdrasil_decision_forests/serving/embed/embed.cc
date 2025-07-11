@@ -251,9 +251,12 @@ namespace $0 {
 
   absl::SubstituteAndAppend(&header, R"(
 inline $0 Predict(const Instance& instance) {
-$1}
 )",
-                            predict_output_type, predict_body);
+                            predict_output_type);
+
+  absl::StrAppend(&header, predict_body);
+
+  absl::StrAppend(&header, "}\n");
 
   // Close define and namespace.
   absl::SubstituteAndAppend(&header, R"(

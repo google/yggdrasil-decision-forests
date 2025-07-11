@@ -6,6 +6,7 @@ def cc_ydf_standalone_model(
         path = None,
         classification_output = "CLASS",
         algorithm = "ROUTING",
+        monitor_usage = False,
         **attrs):
     """Embed a YDF model into a CC library.
 
@@ -22,6 +23,9 @@ def cc_ydf_standalone_model(
             about those values. Has no impact on non-classification models.
         algorithm: How the predictions are computed. One of the values of
             "yggdrasil_decision_forests.serving.embed.proto.Algorithm".
+        monitor_usage: If set, monitor the model usage. This creates a dependency to
+            yggdrasil_decision_forests/utils/usage.h. If you can, leave this flag to true as it
+            helps the YDF team to understand our library usage.
         **attrs: Classical cc_library attributes.
     """
 
@@ -50,7 +54,7 @@ def cc_ydf_standalone_model(
 
     # Convert the model into source files.
 
-    options = "classification_output: " + classification_output + " algorithm: " + algorithm
+    options = "classification_output: " + classification_output + " algorithm: " + algorithm + " monitor_usage: " + str(monitor_usage)
 
     native.genrule(
         name = name + "_write_embed",

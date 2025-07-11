@@ -36,6 +36,9 @@ message Options {
 
   // Algorithm used to compute the tree output.
   optional Algorithm.Enum algorithm = 5 [default = ROUTING];
+
+  // Add a monitor of the library used in the generated code.
+  optional bool monitor_usage = 6 [default = false];
 }
 
 // Output of a classification model.
