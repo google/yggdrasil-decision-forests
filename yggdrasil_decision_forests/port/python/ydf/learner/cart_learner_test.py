@@ -158,6 +158,7 @@ class CARTLearnerTest(learner_test_utils.LearnerTest):
         label="label",
         max_depth=2,
         split_axis="SPARSE_OBLIQUE",
+        sparse_oblique_num_projections_exponent=4.0,
         sparse_oblique_weights="POWER_OF_TWO",
     )
     f1 = np.linspace(-1, 1, 50) ** 2

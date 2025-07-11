@@ -392,7 +392,7 @@ TEST(SparseOblique, Classification) {
   const auto result = FindBestConditionOblique(
                           dataset, selected_examples, weights, config,
                           config_link, dt_config, parent, internal_config,
-                          label_stats, 50, &best_condition, &random, &cache)
+                          label_stats, 20000, &best_condition, &random, &cache)
                           .value();
   EXPECT_TRUE(result);
   EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);

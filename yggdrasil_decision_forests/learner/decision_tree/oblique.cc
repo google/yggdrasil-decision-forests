@@ -727,7 +727,6 @@ void SampleProjection(const absl::Span<const int>& features,
                       utils::RandomEngine* random) {
   *monotonic_direction = 0;
   projection->clear();
-  projection->reserve(projection_density * features.size());
   std::uniform_real_distribution<float> unif01;
   std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
   const auto& oblique_config = dt_config.sparse_oblique_split();
@@ -788,12 +787,33 @@ void SampleProjection(const absl::Span<const int>& features,
     }
   };
 
+#ifndef NDEBUG  // Keep DCHECK_EQ from for feature : features
   for (const auto feature : features) {
     DCHECK_EQ(data_spec.columns(feature).type(), dataset::proto::NUMERICAL);
-    if (unif01(*random) < projection_density) {
-      projection->push_back({feature, gen_weight(feature)});
-    }
   }
+#endif
+
+  std::binomial_distribution<size_t> binom(features.size(), projection_density);
+
+  // Expectation[Binomial(p,projection_density)] = num_selected_features
+  const size_t num_selected_features = binom(*random);
+
+  // TODO: Try std::bitmap
+  absl::btree_set<size_t> picked_idx;
+
+  // Floyd's sampler to select k indices uniformly
+  for (size_t j = features.size() - num_selected_features; j < features.size();
+       ++j) {
+    size_t t = absl::Uniform<size_t>(*random, 0, j + 1);
+    if (!picked_idx.insert(t).second) picked_idx.insert(j);
+  }
+
+  projection->reserve(projection_density * features.size());
+  // O(k) minimal pass to fill in those indices
+  for (const auto idx : picked_idx) {
+    projection->push_back({features[idx], gen_weight(features[idx])});
+  }
+
   if (projection->empty()) {
     std::uniform_int_distribution<int> unif_feature_idx(0, features.size() - 1);
     projection->push_back(
@@ -812,9 +832,10 @@ void SampleProjection(const absl::Span<const int>& features,
     // For a small number of features, a boolean vector is more efficient.
     // Re-evaluate if this becomes a bottleneck.
     absl::btree_set<size_t> sampled_features;
-    // Floyd's sampling algorithm.
+    // Floyd's sampling algorithm. TODO could reuse this
     for (size_t j = cur_num_projections - max_num_features;
          j < cur_num_projections; j++) {
+      // TODO: Try uint32.
       size_t t = absl::Uniform<size_t>(*random, 0, j + 1);
       if (!sampled_features.insert(t).second) {
         // t was already sampled, so insert j instead.
