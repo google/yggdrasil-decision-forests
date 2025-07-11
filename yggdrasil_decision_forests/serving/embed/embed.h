@@ -17,6 +17,7 @@
 #define YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_EMBED_H_
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -162,6 +163,75 @@ struct InternalOptions {
   absl::btree_map<int, CategoricalDict> categorical_dicts;
 };
 
+// Number of feature indexes to reserve.
+// The precision of feature indexes should be sufficient to encode the index of
+// any features + kReservedFeatureIndexes.
+// For example, if the model has 254 features, but kReservedFeatureIndexes=2,
+// the maximum feature index is 254+2=256, and feature indexes are encoded as
+// uint16 (instead of uint8).
+static constexpr int kReservedFeatureIndexes = 1;
+
+// Index of the condition types supported by the routing algorithm.
+enum class RoutingConditionType {
+  HIGHER_CONDITION = 0,
+  CONTAINS_CONDITION_BUFFER_BITMAP = 1,
+  OBLIQUE_CONDITION = 2,
+  NUM_ROUTING_CONDITION_TYPES = 3,
+};
+
+// Data that is not stored inside of the nodes with the routing algorithm.
+struct ValueBank {
+  // Values for categorical conditions.
+  std::vector<bool> categorical;
+
+  // Values of leaf nodes.
+  std::vector<float> leaf_value;
+
+  // The "root_deltas" contains the number of nodes in each tree. The node index
+  // of the root of each tree can be computed by running a cumulative sum.
+  std::vector<int> root_deltas;
+
+  // Weights to encode oblique conditions. Also contain the threshold.
+  //
+  // An oblique condition for a node with a given "obl(ique")" is defined as
+  // follow:
+  // num_oblique_projections := oblique_features[obl]
+  // threshold := oblique_weights[obl]
+  // acc := 0
+  // for i in 0..num_oblique_projections:
+  //   offset := obl + i + 1
+  //   acc += feature_value[oblique_features[offset]] *
+  //     oblique_weights[offset];
+  // eval := acc >= threshold
+  std::vector<float> oblique_weights;
+
+  // Feature index to encode oblique conditions. Also contain the number of
+  // features in an oblique split. See definition of "oblique_weights".
+  std::vector<size_t> oblique_features;
+
+  // Number of conditions for each condition implementations.
+  std::array<int, static_cast<int>(
+                      RoutingConditionType::NUM_ROUTING_CONDITION_TYPES)>
+      num_conditions{0};
+};
+
+// Code to evaluate a condition in the routing algorithm.
+struct RoutingConditionCode {
+  // Condition type. Used to determine if the code is needed for the model.
+  // Also, used to define "cond" if not provided by the user.
+  RoutingConditionType type;
+
+  // Code expression that tests if the condition should be evaluated e.g.
+  // "node->cond.feat == 2".
+  // If "cond" is not set, create automatically a condition of the type
+  // "condition_types[node->cond.feat] == condition_type".
+  std::string used_code;
+
+  // Code of the condition. Should set a "eval" boolean value, e.g.
+  // "eval = eval = raw_numerical[node->cond.feat] >= node->cond.thr"
+  std::string eval_code;
+};
+
 // Function signature to generate the tree inference code using the if-else
 // algorithm.
 typedef std::function<absl::StatusOr<std::string>(
@@ -197,6 +267,14 @@ struct SpecializedConversion {
   // Validate the object.
   absl::Status Validate() const;
 };
+
+// Reserved feature index used for oblique conditions.
+int ObliqueFeatureIndex(const InternalOptions& internal_options);
+
+// Type used to encode an oblique index.
+// This cannot be computed with the other internal options as it depends on the
+// forest node tracing.
+std::string ObliqueFeatureType(const ValueBank& bank);
 
 absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
     const model::random_forest::RandomForestModel& model,
@@ -248,12 +326,19 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
     const internal::InternalOptions& internal_options);
 
+// Adds the code of a condition for the routing algorithm.
+// If the model supports multiple types of condition, wrapps the code with the
+// necessary branching.
+absl::Status AddRoutingConditions(std::vector<RoutingConditionCode> conditions,
+                                  const ValueBank& bank, std::string* content);
+
 absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
                          const model::DecisionForestInterface& df_interface,
                          const SpecializedConversion& specialized_conversion,
                          const ModelStatistics& stats,
                          const InternalOptions& internal_options,
-                         const proto::Options& options, std::string* content);
+                         const proto::Options& options,
+                         const ValueBank& routing_bank, std::string* content);
 
 // The scalar type of an accumulator.
 struct AccumulatorDef {
@@ -270,18 +355,13 @@ absl::Status GenerateTreeInferenceIfElse(
     const proto::Options& options, const InternalOptions& internal_options,
     const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content);
 
-// Index of the condition types supported by the routing algorithm.
-enum class RoutingConditionType {
-  HIGHER_CONDITION = 0,
-  CONTAINS_CONDITION_BUFFER_BITMAP = 1,
-};
-
 absl::Status GenerateTreeInferenceRouting(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
     const proto::Options& options, const InternalOptions& internal_options,
     const SpecializedConversion& specialized_conversion,
-    const ModelStatistics& stats, std::string* content);
+    const ModelStatistics& stats, const ValueBank& routing_bank,
+    std::string* content);
 
 absl::Status GenRoutingModelData(
     const model::AbstractModel& model,
@@ -290,7 +370,7 @@ absl::Status GenRoutingModelData(
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
     const proto::Options& options, const InternalOptions& internal_options,
-    std::string* content);
+    std::string* content, ValueBank* bank);
 
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed

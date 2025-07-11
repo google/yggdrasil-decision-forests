@@ -39,6 +39,7 @@ print(model.predict(ds[:1]))
 #include "yggdrasil_decision_forests/serving/embed/test_model_abalone_regression_rf_small.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_abalone_regression_rf_small_routing.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_filegroup_filegroup.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_oblique_proba.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba_routing.h"
@@ -137,6 +138,12 @@ TEST(Embed, test_model_adult_binary_class_gbdt_v2_score) {
   using namespace test_model_adult_binary_class_gbdt_v2_score;
   const float pred = Predict(ADULT_EXAMPLE);
   EXPECT_NEAR(pred, -3.96557950, eps);
+}
+
+TEST(Embed, test_model_adult_binary_class_gbdt_oblique_proba) {
+  using namespace test_model_adult_binary_class_gbdt_oblique_proba;
+  const float pred = Predict(ADULT_EXAMPLE);
+  EXPECT_NEAR(pred, 0.03093987, eps);
 }
 
 // RF binary class

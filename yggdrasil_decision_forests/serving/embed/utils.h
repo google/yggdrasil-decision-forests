@@ -47,6 +47,9 @@ std::string StringToStructSymbol(absl::string_view input,
 // (since using a single byte cannot encode a value greater than 255).
 int MaxUnsignedValueToNumBytes(uint32_t value);
 
+// Maximum unsigned value to encode with "bytes" bytes.
+uint32_t NumBytesToMaxUnsignedValue(int bytes);
+
 // Same as MaxUnsignedValueToNumBytes, but for signed values.
 int MaxSignedValueToNumBytes(int32_t value);
 

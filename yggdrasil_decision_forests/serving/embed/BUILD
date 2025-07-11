@@ -142,6 +142,7 @@ cc_test(
         ":test_model_abalone_regression_rf_small",
         ":test_model_abalone_regression_rf_small_routing",
         ":test_model_adult_binary_class_gbdt_filegroup_filegroup",
+        ":test_model_adult_binary_class_gbdt_oblique_proba",
         ":test_model_adult_binary_class_gbdt_v2_class",
         ":test_model_adult_binary_class_gbdt_v2_proba",
         ":test_model_adult_binary_class_gbdt_v2_proba_routing",
@@ -275,6 +276,14 @@ cc_ydf_standalone_model(
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_rf_nwta_small",
+)
+
+cc_ydf_standalone_model(
+    name = "test_model_adult_binary_class_gbdt_oblique_proba",
+    algorithm = "ROUTING",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_oblique",
 )
 
 # Regression

@@ -42,9 +42,6 @@ struct __attribute__((packed)) Node {
     } leaf;
   };
 };
-
-static const uint8_t root_deltas[] = {13,9,7};
-
 static const Node nodes[] = {
 {.pos=1,.cond={.feat=3,.thr=0.75}},
 {.leaf={.val=0}},
@@ -76,6 +73,9 @@ static const Node nodes[] = {
 {.leaf={.val=14}},
 {.leaf={.val=15}},
 };
+
+static const uint8_t root_deltas[] = {13,9,7};
+
 
 static const float leaf_value_bank[] = {0.333333,0,0,0,0.333333,0,0,0.2,0.133333,0,0.333333,0,0,0.266667,0.0666667,0,0.166667,0.166667,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.125,0.208333,0,0.133333,0.2,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.266667,0.0666667,0,0,0.333333};
 

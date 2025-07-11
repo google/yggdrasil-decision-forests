@@ -47,12 +47,6 @@ struct __attribute__((packed)) Node {
     } leaf;
   };
 };
-
-static const uint8_t condition_types[] = {1,0,0,0,0,0,0,0};
-
-
-static const uint8_t root_deltas[] = {63,63,63};
-
 static const Node nodes[] = {
 {.pos=31,.cond={.feat=7,.thr=0.16775}},
 {.pos=15,.cond={.feat=7,.thr=0.05875}},
@@ -245,8 +239,14 @@ static const Node nodes[] = {
 {.leaf={.val=0.252696}},
 };
 
-  static const std::bitset<24> categorical_bank {"101110110011101110110011"};
-  
+static const uint8_t condition_types[] = {1,0,0,0,0,0,0,0};
+
+
+static const uint8_t root_deltas[] = {63,63,63};
+
+
+static const std::bitset<24> categorical_bank {"101110110011101110110011"};
+
 inline float Predict(const Instance& instance) {
   float accumulator {9.94246};
 

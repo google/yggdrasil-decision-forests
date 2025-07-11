@@ -41,9 +41,6 @@ struct __attribute__((packed)) Node {
     } leaf;
   };
 };
-
-static const uint8_t root_deltas[] = {5,15,11};
-
 static const Node nodes[] = {
 {.pos=1,.cond={.feat=3,.thr=0.8}},
 {.leaf={.val=0.3}},
@@ -77,6 +74,9 @@ static const Node nodes[] = {
 {.leaf={.val=0.2}},
 {.leaf={.val=0.3}},
 };
+
+static const uint8_t root_deltas[] = {5,15,11};
+
 
 inline Label Predict(const Instance& instance) {
   std::array<float, 3> accumulator {0, 0, 0};

@@ -186,6 +186,20 @@ int MaxUnsignedValueToNumBytes(uint32_t value) {
   }
 }
 
+uint32_t NumBytesToMaxUnsignedValue(int bytes) {
+  switch (bytes) {
+    case 1:
+      return 0xff;
+    case 2:
+      return 0xffff;
+    case 4:
+      return 0xffffffff;
+    default:
+      DCHECK(false);
+      return 0;
+  }
+}
+
 int MaxSignedValueToNumBytes(int32_t value) {
   if (value <= 0x7f && value >= -0x80) {
     return 1;
