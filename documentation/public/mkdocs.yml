@@ -53,6 +53,7 @@ nav:
     - How to improve a model?: guide_how_to_improve_model.md
     - How to train a model faster?: guide_how_to_improve_learner.md
     - Migrating from TF-DF: tutorial/migrating_to_ydf.ipynb
+    - General ML FAQ: general_ml_faq.md
   - Tasks solved by YDF:
     - Classification: tutorial/classification.ipynb
     - Regression: tutorial/regression.ipynb
