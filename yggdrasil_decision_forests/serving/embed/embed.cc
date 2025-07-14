@@ -190,6 +190,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
 #define YDF_MODEL_$0_H_
 
 #include <stdint.h>
+#include <cstring>
 )",
                             StringToConstantSymbol(options.name()));
 
@@ -1190,19 +1191,17 @@ absl::Status GenerateTreeInferenceRouting(
   const std::string tree_index_type =
       UnsignedInteger(internal_options.tree_index_bytes);
 
-  std::string is_greather_threshold_type;
+  std::string numerical_type;
   if (internal_options.numerical_feature_is_float) {
-    is_greather_threshold_type = "float";
+    numerical_type = "float";
     STATUS_CHECK_EQ(internal_options.feature_value_bytes, 4);
   } else {
-    is_greather_threshold_type =
-        SignedInteger(internal_options.feature_value_bytes);
+    numerical_type = SignedInteger(internal_options.feature_value_bytes);
   }
 
-  std::string categorical_idx_type;
+  std::string categorical_type;
   if (internal_options.categorical_idx_bytes > 0) {
-    categorical_idx_type =
-        UnsignedInteger(internal_options.feature_value_bytes);
+    categorical_type = UnsignedInteger(internal_options.feature_value_bytes);
   }
 
   const std::string feature_index_type =
@@ -1212,18 +1211,7 @@ absl::Status GenerateTreeInferenceRouting(
   absl::SubstituteAndAppend(content, R"(
   const Node* root = nodes;
   const Node* node;
-  const auto* raw_numerical = (const $0*)(&instance);
-  (void) raw_numerical;)",
-                            is_greather_threshold_type  // $0
-  );
-
-  if (!categorical_idx_type.empty()) {
-    absl::SubstituteAndAppend(content, R"(
-  const auto* raw_categorical = (const $0*)(&instance);
-  (void) raw_categorical;)",
-                              categorical_idx_type  // $0
-    );
-  }
+  const char* raw_instance = (const char*)(&instance);)");
 
   absl::SubstituteAndAppend(content, R"(
   $0 eval;
@@ -1245,19 +1233,27 @@ absl::Status GenerateTreeInferenceRouting(
         float obl_acc = -oblique_weights[node->cond.obl];
         for ($0 proj_idx=0; proj_idx<num_projs; proj_idx++){
           const auto off = node->cond.obl + proj_idx + 1;
-          obl_acc += raw_numerical[oblique_features[off]] * oblique_weights[off];
+          $1 numerical_feature;
+          std::memcpy(&numerical_feature, raw_instance + oblique_features[off] * sizeof($1), sizeof($1));
+          obl_acc += numerical_feature * oblique_weights[off];
         }
         eval = obl_acc >= 0;
 )",
-            ObliqueFeatureType(routing_bank))},
+            ObliqueFeatureType(routing_bank), numerical_type)},
        {RoutingConditionType::HIGHER_CONDITION,
         {},
-        "        eval = raw_numerical[node->cond.feat] >= "
-        "node->cond.thr;\n"},
+        absl::Substitute(R"(        $0 numerical_feature;
+        std::memcpy(&numerical_feature, raw_instance + node->cond.feat * sizeof($0), sizeof($0));
+        eval = numerical_feature >= node->cond.thr;
+)",
+                         numerical_type)},
        {RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP,
         {},
-        "        eval = categorical_bank[raw_categorical[node->cond.feat] + "
-        "node->cond.cat];\n"}},
+        absl::Substitute(R"(        $0 categorical_feature;
+        std::memcpy(&categorical_feature, raw_instance + node->cond.feat * sizeof($0), sizeof($0));
+        eval = categorical_bank[categorical_feature + node->cond.cat];
+)",
+                         categorical_type)}},
       routing_bank, content));
 
   // Middle of the loop: Select the next node.

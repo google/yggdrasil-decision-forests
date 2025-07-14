@@ -2,6 +2,7 @@
 #define YDF_MODEL_YDF_MODEL_H_
 
 #include <stdint.h>
+#include <cstring>
 #include <array>
 #include <algorithm>
 #include <cmath>
@@ -365,18 +366,19 @@ inline float Predict(const Instance& instance) {
 
   const Node* root = nodes;
   const Node* node;
-  const auto* raw_numerical = (const int32_t*)(&instance);
-  (void) raw_numerical;
-  const auto* raw_categorical = (const uint32_t*)(&instance);
-  (void) raw_categorical;
+  const char* raw_instance = (const char*)(&instance);
   uint8_t eval;
   for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
     node = root;
     while(node->pos) {
       if (condition_types[node->cond.feat] == 0) {
-        eval = raw_numerical[node->cond.feat] >= node->cond.thr;
+        int32_t numerical_feature;
+        std::memcpy(&numerical_feature, raw_instance + node->cond.feat * sizeof(int32_t), sizeof(int32_t));
+        eval = numerical_feature >= node->cond.thr;
       } else if (condition_types[node->cond.feat] == 1) {
-        eval = categorical_bank[raw_categorical[node->cond.feat] + node->cond.cat];
+        uint32_t categorical_feature;
+        std::memcpy(&categorical_feature, raw_instance + node->cond.feat * sizeof(uint32_t), sizeof(uint32_t));
+        eval = categorical_bank[categorical_feature + node->cond.cat];
       } else {
         assert(false);
       }

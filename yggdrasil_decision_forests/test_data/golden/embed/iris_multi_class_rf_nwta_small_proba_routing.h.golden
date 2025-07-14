@@ -2,6 +2,7 @@
 #define YDF_MODEL_YDF_MODEL_H_
 
 #include <stdint.h>
+#include <cstring>
 #include <array>
 #include <algorithm>
 #include <cmath>
@@ -84,13 +85,14 @@ inline std::array<float, 3> Predict(const Instance& instance) {
 
   const Node* root = nodes;
   const Node* node;
-  const auto* raw_numerical = (const float*)(&instance);
-  (void) raw_numerical;
+  const char* raw_instance = (const char*)(&instance);
   uint8_t eval;
   for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
     node = root;
     while(node->pos) {
-        eval = raw_numerical[node->cond.feat] >= node->cond.thr;
+        float numerical_feature;
+        std::memcpy(&numerical_feature, raw_instance + node->cond.feat * sizeof(float), sizeof(float));
+        eval = numerical_feature >= node->cond.thr;
 
       node += (node->pos & -eval) + 1;
     }
