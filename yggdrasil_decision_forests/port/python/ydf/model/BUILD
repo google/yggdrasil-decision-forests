@@ -407,7 +407,7 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # fastapi dep,  # buildcleaner: keep
-        # pydantic dep,  # buildcleaner: keep
+        # pydantic:pydantic_v2 dep,  # buildcleaner: keep
         # requests dep,  # buildcleaner: keep
         "//ydf:api",
         "//ydf/utils:test_utils",

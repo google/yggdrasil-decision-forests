@@ -168,8 +168,6 @@ def feature_name_to_field_name_dict(
 def content_main_py(model: generic_model.GenericModel) -> str:
   """Generates the content of the main.py file."""
 
-  pydantic_module = "pydantic"
-
   feature_to_field = feature_name_to_field_name_dict(
       model.input_feature_names()
   )
@@ -217,7 +215,7 @@ field_to_feature = {field_to_feature!r}
   return f"""\
 from typing import Any, Dict, List
 from fastapi import FastAPI
-from {pydantic_module} import BaseModel
+from pydantic import BaseModel
 import ydf
 import math
 
