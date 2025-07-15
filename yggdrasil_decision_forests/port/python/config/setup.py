@@ -22,7 +22,7 @@ import setuptools
 from setuptools.command.install import install
 from setuptools.dist import Distribution
 
-_VERSION = "0.12.0"
+_VERSION = "0.13.0"
 
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
@@ -30,7 +30,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 REQUIRED_PACKAGES = [
     "numpy",
     "absl_py",
-    "protobuf>=5.29.1,<6.0.0",
+    "protobuf>=5.29.1,<7.0.0",
 ]
 
 OPTIONAL_PACKAGES = {"pandas": ["pandas"]}

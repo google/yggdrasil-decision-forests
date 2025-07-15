@@ -430,7 +430,7 @@ def create_vertical_dataset(
 
   The feature semantics are automatically determined and can be explicitly
   set with the `columns` argument. The semantics of a dataset (or model) are
-  available its data_spec.
+  available in its data_spec.
 
   Note that the CATEGORICAL_SET semantic is not automatically inferred when
   reading from file. When reading from CSV files, setting the CATEGORICAL_SET
@@ -487,7 +487,7 @@ def create_vertical_dataset(
       `discretize_numerical_columns=True` is equivalent as setting the column
       semantic DISCRETIZED_NUMERICAL in the `column` argument. See the
       definition of DISCRETIZED_NUMERICAL for more details.
-    num_discretized_numerical_bins: Number of bins used when disretizing
+    num_discretized_numerical_bins: Number of bins used when discretizing
       numerical columns.
     max_num_scanned_rows_to_infer_semantic: Number of rows to scan when
       inferring the column's semantic if it is not explicitly specified. Only

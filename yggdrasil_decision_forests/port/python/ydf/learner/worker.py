@@ -38,7 +38,7 @@ def start_worker(
   # On manager
   learner = ydf.DistributedGradientBoostedTreesLearner(
         label = "my_label",
-        working_dir = "/shared/working_dir,
+        working_dir = "/shared/working_dir",
         resume_training = True,
         workers = ["192.168.0.1:9000", "192.168.0.2:9000"],
     ).train(dataset)
@@ -61,7 +61,7 @@ def start_worker(
       worker.
 
   Returns:
-    Callable to stop the worker. Only returned if `blocking=True`.
+    Callable to stop the worker. Only returned if `blocking=False`.
   """
 
   if blocking:

@@ -109,7 +109,7 @@ class RandomForestModel(decision_forest_model.DecisionForestModel):
 
     This parameter determines how to aggregate individual tree votes during
     inference in a classification random forest. It is defined by the
-    `winner_take_all` Random Forest learner hyper-parameter,
+    `winner_take_all` Random Forest learner hyper-parameter.
 
     If true, each tree votes for a single class, which is the traditional random
     forest inference method. If false, each tree outputs a probability

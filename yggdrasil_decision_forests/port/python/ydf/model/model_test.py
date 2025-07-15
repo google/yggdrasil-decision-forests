@@ -686,7 +686,7 @@ class GenericModelTest(parameterized.TestCase):
 Model: GRADIENT_BOOSTED_TREES
 Task: CLASSIFICATION
 Class: ydf.GradientBoostedTreesModel
-Use `model.describe()` for more details
+Use `model.describe()` for more details.
 """,
     )
 

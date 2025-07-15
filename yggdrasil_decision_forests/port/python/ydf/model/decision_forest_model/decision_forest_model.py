@@ -31,7 +31,7 @@ class DecisionForestModel(generic_model.GenericCCModel):
 
   _model: ydf.DecisionForestCCModel
 
-  def num_trees(self):
+  def num_trees(self) -> int:
     """Returns the number of trees in the decision forest."""
     return self._model.num_trees()
 
@@ -68,6 +68,9 @@ class DecisionForestModel(generic_model.GenericCCModel):
     Usage example:
 
     ```python
+    import pandas as pd
+    import ydf
+
     # Create a dataset
     train_ds = pd.DataFrame({
         "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
@@ -104,6 +107,9 @@ class DecisionForestModel(generic_model.GenericCCModel):
     Usage example:
 
     ```python
+    import pandas as pd
+    import ydf
+
     # Create a dataset
     train_ds = pd.DataFrame({
         "c1": [1.0, 1.1, 2.0, 3.5, 4.2] + list(range(10)),
@@ -165,7 +171,7 @@ class DecisionForestModel(generic_model.GenericCCModel):
   def predict_leaves(self, data: dataset.InputDataset) -> np.ndarray:
     """Gets the index of the active leaf in each tree.
 
-    The active leaf is the leave that that receive the example during inference.
+    The active leaf is the leaf that receives the example during inference.
 
     The returned value "leaves[i,j]" is the index of the active leaf for the
     i-th example and the j-th tree. Leaves are indexed by depth first
@@ -201,7 +207,7 @@ class DecisionForestModel(generic_model.GenericCCModel):
 
     # Train model
     train_ds = pd.read_csv("train.csv")
-    model = ydf.RandomForestLearner(label="label").Train(train_ds)
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
 
     test_ds = pd.read_csv("test.csv")
     distances = model.distance(test_ds, train_ds)
@@ -210,7 +216,7 @@ class DecisionForestModel(generic_model.GenericCCModel):
     ```
 
     Different models are free to implement different distances with different
-    definitions. For this reasons, unless indicated by the model, distances
+    definitions. For this reason, unless indicated by the model, distances
     from different models cannot be compared.
 
     The distance is not guaranteed to satisfy the triangular inequality

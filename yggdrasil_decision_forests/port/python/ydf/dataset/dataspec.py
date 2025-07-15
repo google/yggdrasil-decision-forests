@@ -112,7 +112,7 @@ class Semantic(enum.Enum):
     CATEGORICAL: A categorical value. Generally for a type/class in finite set
       of possible values without ordering. For example, the color RED in the set
       {RED, BLUE, GREEN}. Can be a string or an integer.  Missing values are
-      represented by "" (empty sting) or value -2. An out-of-vocabulary value
+      represented by "" (empty string) or value -2. An out-of-vocabulary value
       (i.e. a value that was never seen in training) is represented by any new
       string value or the value -1. Integer categorical values: (1) The training
       logic and model representation is optimized with the assumption that
@@ -131,20 +131,18 @@ class Semantic(enum.Enum):
       CATEGORICAL_SET can change between examples. The order of values inside a
       feature values does not matter.
     BOOLEAN: Boolean value. Can be a float or an integer. Missing values are
-      represented by math.nan.  If a numerical tensor contains multiple values,
-      its size should be constant, and each dimension isthreaded independently
-      (and each dimension should always have the same "meaning").
+      represented by math.nan.
     DISCRETIZED_NUMERICAL: Numerical values automatically discretized into bins.
       Discretized numerical columns are faster to train than (non-discretized)
       numerical columns. If the number of unique values of these columns is
       lower than the number of bins, the discretization is lossless from the
       point of view of the model. If the number of unique values of this columns
       is greater than the number of bins, the discretization is lossy from the
-      point of view of the model. Lossy discretization can reduce and sometime
+      point of view of the model. Lossy discretization can reduce and sometimes
       increase (due to regularization) the quality of the model.
     NUMERICAL_VECTOR_SEQUENCE: Each value of a vector-sequence feature is a
       sequence (i.e., ordered list) of fixed-sized numerical vectors. All the
-      vectors in a vector sequence shoud have the same size, but each
+      vectors in a vector sequence should have the same size, but each
       vector-sequence can have a different number of vectors. A vector-sequence
       is suited, for example, to represent a multi-variate time-series or a list
       of LLM tokens.
@@ -263,10 +261,10 @@ class Column(object):
     semantic: Semantic of the column. If None, the semantic is automatically
       determined. The semantic controls how a column is interpreted by a model.
       Using the wrong semantic (e.g. numerical instead of categorical) will hurt
-      your model"s quality.
+      your model's quality.
     max_vocab_count: For CATEGORICAL and CATEGORICAL_SET columns only. Number of
       unique categorical values stored as string. If more categorical values are
-      present, the least frequent values are grouped into a Out-of-vocabulary
+      present, the least frequent values are grouped into an Out-of-vocabulary
       item. Reducing the value can improve or hurt the model. If max_vocab_count
       = -1, the number of values in the column is not limited.
     min_vocab_frequency: For CATEGORICAL and CATEGORICAL_SET columns only.

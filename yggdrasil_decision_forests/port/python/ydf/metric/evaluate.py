@@ -327,7 +327,7 @@ def evaluate_predictions(
   predictions = np.linspace(0, 1, 100)
   labels = np.concatenate([np.ones(50), np.zeros(50)]).astype(float)
   evaluation = ydf.evaluate.evaluate_predictions(
-      predictions, labels, ydf.Task.REGRESSIONS
+      predictions, labels, ydf.Task.REGRESSION
   )
   print(evaluation)
   evaluation  # Prints an interactive report in IPython / Colab notebooks.
@@ -336,11 +336,11 @@ def evaluate_predictions(
   Args:
     predictions: Array of predictions to evaluate. The "task" argument defines
       the expected shape of the prediction array.
-    labels: Label values.The "task" argument defines the expected shape of the
+    labels: Label values. The "task" argument defines the expected shape of the
       prediction array.
     task: Task of the model.
     weights: Weights of the examples as a 1D float array of shape [n]. If not
-      provided, all examples have the idential weight.
+      provided, all examples have idential weight.
     label_classes: Names of the labels. Only used for classification tasks.
     ranking_groups: Ranking groups as a 1D integer array of shape [n]. Only used
       for ranking tasks.

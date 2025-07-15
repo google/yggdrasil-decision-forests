@@ -1,6 +1,6 @@
 # Changelog
 
-## HEAD
+## 0.13.0 - 2025-07-15
 
 ### API Changes
 
@@ -16,12 +16,35 @@
 
 ### Feature
 
+-   Add standalone C++ export with `model.to_standalone_cc()`. Standalone models
+    are super flexible, fast and memory-efficient. They only depend on the C++
+    standard library.
 -   Add `model.training_logs()` method to return the training logs of the model.
 -   Expose Mean Average Precision for Ranking tasks.
 -   Add hyperparameters
     `numerical_vector_sequence_enable_closer_than_conditions` and
     `numerical_vector_sequence_enable_projected_more_than_conditions`.
 -   Clear error messages when attempting to evaluate models without label.
+-   Faster training with sparse oblique splits for datasets with many numerical
+    features
+-   Many documentation improvements.
+-   Increase default number of threads to 256 or number of CPU cores.
+-   Enable cross-validation for hyperparameter tuning.
+-   Add thresholds to classification plots.
+-   Explicitly disable custom losses for hyperparameter tuning.
+-   Disable parallel evaluation for cross-validation custom losses.
+
+### Fix
+
+-   Distributed Training: Add `recvmsg: Connection reset to isTransientError` error.
+-   Enable SHAP values when training with BEST_FIRST_GLOBAL.
+-   Predictions with cross-entropy LambdaMART no longer need the slow engine.
+-   Disable the generic engine for oblique splits without global imputation. 
+    This may fix a very rare bug in the way predictions are computed.
+
+### Release music
+
+Sinfonie Nr. 4 in A-Dur, op. 90. Felix Mendelssohn
 
 ## 0.12.0 - 2025-05-20
 

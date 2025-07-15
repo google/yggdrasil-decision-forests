@@ -53,7 +53,7 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
 
     Gradient Boosted Trees use a validation dataset for early stopping.
 
-    Returns None if no validation evaluation been computed or it has been
+    Returns None if no validation evaluation has been computed or it has been
     removed from the model.
 
     Usage example:

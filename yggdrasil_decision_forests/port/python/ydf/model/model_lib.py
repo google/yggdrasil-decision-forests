@@ -16,8 +16,6 @@
 
 import os
 
-from absl import logging
-
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from ydf.cc import ydf as ydf_cc
 from ydf.dataset import dataspec
@@ -42,7 +40,7 @@ def transform_tfdf_categorical_columns(
 ) -> None:
   """Add a vocabulary to integerized columns in the dataspec.
 
-  Tensorflow Decision Forests consumes categorical columns a pre-integerized
+  Tensorflow Decision Forests consumes categorical columns as pre-integerized
   columns shifted by one for compliance with the Keras API. This is not
   supported by PYDF since it makes it very hard to feed data without using
   data converters. This function therefore adds an artificial dictionary to
@@ -122,13 +120,13 @@ def load_model(
     Model to use for inference, evaluation or inspection
   """
   if advanced_options.file_prefix is not None:
-    logging.info(
+    log.info(
         "Loading model with prefix %s from %s",
-        directory,
         advanced_options.file_prefix,
+        directory,
     )
   else:
-    logging.info("Loading model from %s", directory)
+    log.info("Loading model from %s", directory)
   model_is_tfdf = is_saved_model(directory)
 
   if model_is_tfdf:
@@ -159,7 +157,7 @@ def load_cc_model(cc_model: ydf_cc.GenericCCModel) -> generic_model.ModelType:
     return gradient_boosted_trees_model.GradientBoostedTreesModel(cc_model)
   if model_name == ydf_cc.IsolationForestCCModel.kRegisteredName:
     return isolation_forest_model.IsolationForestModel(cc_model)
-  logging.info(
+  log.info(
       "This model has type %s, which is not fully supported. Only generic model"
       " tasks (e.g. inference) are possible",
       model_name,
@@ -181,10 +179,10 @@ def from_tensorflow_decision_forests(directory: str) -> generic_model.ModelType:
 
   # Make predictions
   dataset = pd.read_csv("my_dataset.csv")
-  model.predict(dataset)
+  loaded_model.predict(dataset)
 
   # Show details about the model
-  model.describe()
+  loaded_model.describe()
   ```
 
   The imported model creates the same predictions as the original TF-DF model.
