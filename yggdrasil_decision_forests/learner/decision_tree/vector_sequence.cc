@@ -55,7 +55,7 @@ absl::Status TryCloserThanCondition(
     std::vector<UnsignedExampleIdx> dense_example_idxs,
     const InternalTrainConfig& internal_config, SplitterPerThreadCache* cache,
     proto::NodeCondition* condition, SplitSearchResult* result_flag,
-    std::vector<float>* projections) {
+    std::vector<float>* projections, utils::RandomEngine* random) {
   STATUS_CHECK(internal_config.vector_sequence_computer);
   projections->resize(selected_examples.size() * num_anchors);
   RETURN_IF_ERROR(
@@ -79,7 +79,7 @@ absl::Status TryCloserThanCondition(
         EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                            selected_weights, selected_labels, local_projection,
                            internal_config, attribute_idx, {}, 0, condition,
-                           cache));
+                           cache, random));
 
     if (*result_flag == SplitSearchResult::kInvalidAttribute &&
         local_result_flag == SplitSearchResult::kNoBetterSplitFound) {
@@ -115,7 +115,8 @@ absl::Status TryProjectedMoreThanCondition(
     std::vector<UnsignedExampleIdx> dense_example_idxs,
     const InternalTrainConfig& internal_config, SplitterPerThreadCache* cache,
     proto::NodeCondition* condition, SplitSearchResult* result_flag,
-    std::vector<float>* projections) {
+    std::vector<float>* projections, utils::RandomEngine* random) {
+
   STATUS_CHECK(internal_config.vector_sequence_computer);
   projections->resize(selected_examples.size() * num_anchors);
   RETURN_IF_ERROR(
@@ -137,7 +138,7 @@ absl::Status TryProjectedMoreThanCondition(
         EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                            selected_weights, selected_labels, local_projection,
                            internal_config, attribute_idx, {}, 0, condition,
-                           cache));
+                           cache, random));
 
     if (*result_flag == SplitSearchResult::kInvalidAttribute &&
         local_result_flag == SplitSearchResult::kNoBetterSplitFound) {
@@ -236,7 +237,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
         effective_selected_examples, dt_config, label_stats,
         effective_selected_labels, effective_selected_weights, attribute_idx,
         dense_example_idxs, internal_config, cache, effective_condition,
-        &effective_result_flag, &projections);
+        &effective_result_flag, &projections, random);
   };
 
   const auto try_projected_more_than = [&](absl::Span<const float> anchors,
@@ -246,7 +247,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
         effective_selected_examples, dt_config, label_stats,
         effective_selected_labels, effective_selected_weights, attribute_idx,
         dense_example_idxs, internal_config, cache, effective_condition,
-        &effective_result_flag, &projections);
+        &effective_result_flag, &projections, random);
   };
 
   const auto sample_vector_forced =
@@ -357,7 +358,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
               anchor, 1, attribute, attribute_spec, selected_examples,
               dt_config, label_stats, selected_labels, selected_weights,
               attribute_idx, dense_example_idxs, internal_config, cache,
-              condition, &final_result_flag, &projections));
+              condition, &final_result_flag, &projections, random));
         } break;
 
         case proto::Condition::NumericalVectorSequence::kProjectedMoreThan: {
@@ -372,7 +373,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
               anchor, 1, attribute, attribute_spec, selected_examples,
               dt_config, label_stats, selected_labels, selected_weights,
               attribute_idx, dense_example_idxs, internal_config, cache,
-              condition, &final_result_flag, &projections));
+              condition, &final_result_flag, &projections, random));
         } break;
 
         default:

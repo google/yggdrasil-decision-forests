@@ -194,7 +194,7 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
             dt_config, label_stats, dense_example_idxs, selected_weights,
             selected_labels, projection_values, internal_config,
             current_projection.front().attribute_idx, constraints,
-            monotonic_direction, best_condition, cache));
+            monotonic_direction, best_condition, cache, random)); // random needed for Histogramming
 
     if (result == SplitSearchResult::kBetterSplitFound) {
       best_projection = current_projection;
@@ -291,7 +291,8 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
-    proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache,
+    utils::RandomEngine* random) {
   InternalTrainConfig effective_internal_config = internal_config;
   effective_internal_config.override_sorting_strategy =
       proto::DecisionTreeTrainingConfig::Internal::SortingStrategy::
@@ -311,15 +312,31 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
   // Find a good split in the current_projection.
   SplitSearchResult result;
   if constexpr (is_same<LabelStats, ClassificationLabelStats>::value) {
+    if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
     ASSIGN_OR_RETURN(
         result,
         FindSplitLabelClassificationFeatureNumericalCart(
-            dense_example_idxs, selected_weights, projection_values,
+            dense_example_idxs, selected_weights,
+            projection_values, // Ariel: vector?
             selected_labels, label_stats.num_label_classes, na_replacement,
             min_num_obs, dt_config, label_stats.label_distribution,
             first_attribute_idx, effective_internal_config, condition, cache));
-  } else if constexpr (is_same<LabelStats,
-                               RegressionHessianLabelStats>::value) {
+  }
+  else {
+      ASSIGN_OR_RETURN(
+          result,
+          FindSplitLabelClassificationFeatureNumericalHistogram(
+              dense_example_idxs, selected_weights, projection_values,
+              selected_labels, label_stats.num_label_classes, na_replacement,
+              min_num_obs, dt_config, label_stats.label_distribution,
+              first_attribute_idx, random, condition));
+  }
+}
+
+  /* #region Non-Numerical Methods */
+  else if constexpr (is_same<LabelStats,
+                               RegressionHessianLabelStats>::value)
+    {
     if (!selected_weights.empty()) {
       ASSIGN_OR_RETURN(
           result,
@@ -379,7 +396,8 @@ EvaluateProjection<ClassificationLabelStats, std::vector<int32_t>>(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
-    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache,
+    utils::RandomEngine* random);
 
 template absl::StatusOr<SplitSearchResult>
 EvaluateProjection<RegressionLabelStats, std::vector<float>>(
@@ -391,7 +409,8 @@ EvaluateProjection<RegressionLabelStats, std::vector<float>>(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
-    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache,
+    utils::RandomEngine* random);
 
 template absl::StatusOr<SplitSearchResult>
 EvaluateProjection<RegressionHessianLabelStats, GradientAndHessian>(
@@ -403,7 +422,9 @@ EvaluateProjection<RegressionHessianLabelStats, GradientAndHessian>(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
-    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache,
+    utils::RandomEngine* random);
+
 
 template <typename LabelStats, typename Labels>
 absl::Status EvaluateProjectionAndSetCondition(
@@ -415,14 +436,14 @@ absl::Status EvaluateProjectionAndSetCondition(
     const absl::Span<const float> projection_values,
     const Projection& projection, const InternalTrainConfig& internal_config,
     const int first_attribute_idx, proto::NodeCondition* condition,
-    SplitterPerThreadCache* cache) {
+    SplitterPerThreadCache* cache, utils::RandomEngine* random) {
   ASSIGN_OR_RETURN(
       const auto result,
       EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                          selected_weights, selected_labels, projection_values,
                          internal_config, first_attribute_idx,
                          /*constraints=*/{}, /*monotonic_direction=*/0,
-                         condition, cache));
+                         condition, cache, random));
 
   if (result == SplitSearchResult::kBetterSplitFound) {
     RETURN_IF_ERROR(SetCondition(
@@ -467,7 +488,7 @@ absl::Status EvaluateMHLDCandidates(
           dataspec, dt_config, label_stats, dense_example_idxs,
           selected_weights, selected_labels, projection_values,
           {{attribute_idx, 1.f}}, internal_config, attribute_idx, &condition,
-          cache));
+          cache, random));
     } else {
       // Find best projection
       Projection projection;
@@ -493,7 +514,7 @@ absl::Status EvaluateMHLDCandidates(
       RETURN_IF_ERROR(EvaluateProjectionAndSetCondition(
           dataspec, dt_config, label_stats, dense_example_idxs,
           selected_weights, selected_labels, projection_values, projection,
-          internal_config, candidate.front(), &condition, cache));
+          internal_config, candidate.front(), &condition, cache, random));
     }
   }
 
