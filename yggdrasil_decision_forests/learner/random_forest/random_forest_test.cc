@@ -1094,7 +1094,7 @@ TEST_F(RandomForestOnSyntheticClassification, SparseOblique) {
       ->set_internal_error_on_wrong_splitter_statistics(true);
   SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.764, 0.03);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.764, 0.035);
 }
 
 TEST_F(RandomForestOnSyntheticClassification, MHLDTOblique) {

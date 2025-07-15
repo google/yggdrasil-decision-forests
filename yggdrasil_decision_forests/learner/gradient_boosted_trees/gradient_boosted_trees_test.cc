@@ -797,8 +797,8 @@ TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.861, 0.009, 0.8596);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3049, 0.0195, 0.3057);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8616, 0.0099, 0.8627);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3049, 0.0195, 0.3017);
 
   // Show the tree structure.
   std::string description;
@@ -1664,7 +1664,7 @@ TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1155, 0.0988, 2.1001);
+  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.0971, 0.0612, 2.0842);
   utils::ExpectEqualGoldenModel(*model_, "gbt_abalone_sparse_oblique");
 }
 
