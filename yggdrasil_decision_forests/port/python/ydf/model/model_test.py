@@ -691,10 +691,12 @@ Use `model.describe()` for more details.
     )
 
   def test_model_describe_text(self):
-    self.assertIn(
-        'Type: "GRADIENT_BOOSTED_TREES"',
-        self.adult_binary_class_gbdt.describe("text"),
-    )
+    text_description = self.adult_binary_class_gbdt.describe("text")
+    # Model description
+    self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', text_description)
+    # Dataspec description
+    self.assertIn("DATASPEC:", text_description)
+    self.assertIn("Number of records:", text_description)
 
   def test_model_describe_html(self):
     html_description = self.adult_binary_class_gbdt.describe("html")

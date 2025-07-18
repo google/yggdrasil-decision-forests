@@ -37,6 +37,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -426,7 +427,11 @@ model::proto::Metadata GenericCCModel::metadata() const {
 absl::StatusOr<std::string> GenericCCModel::Describe(
     const bool full_details, const bool text_format) const {
   if (text_format) {
-    return model_->DescriptionAndStatistics(full_details);
+    const std::string model_report =
+        model_->DescriptionAndStatistics(full_details);
+    const std::string dataspec_report =
+        dataset::PrintHumanReadable(model_->data_spec());
+    return absl::StrCat(model_report, "\nDATASPEC:\n\n", dataspec_report);
   } else {
     return model::DescribeModelHtml(*model_, utils::GenUniqueId());
   }
