@@ -853,6 +853,7 @@ Use `model.describe()` for more details.
     embedded_model_routing_proba = model.to_standalone_cc(
         algorithm="ROUTING",
         classification_output="PROBABILITY",
+        categorical_from_string=False,
     )
     self.assertIsInstance(embedded_model_if_else_class, str)
     self.assertIsInstance(embedded_model_routing_proba, str)

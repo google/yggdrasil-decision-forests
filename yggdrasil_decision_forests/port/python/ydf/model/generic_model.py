@@ -841,6 +841,7 @@ Use `model.describe()` for more details.
       name: str = "ydf_model",
       algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      categorical_from_string: bool = False,
   ) -> Union[str, Dict[str, str]]:
     """Generates the standalone code of a .h file to run the model in C++.
 
@@ -896,6 +897,10 @@ Use `model.describe()` for more details.
         of all the classes, e.g. logits), "PROBABILITY" (probability of all the
         classes; slower than other approaches as it requires the evaluation of a
         soft-max or equivalent).
+      categorical_from_string: If true, generates functions to create
+        categorical feature values from strings. For example, for a categorical
+        feature "X" with an associated "FeatureX" enum class, the method
+        "FeatureXFromString(absl::string_view name) -> FeatureX" is created.
 
     Returns:
       Source code content (if there is only one file) or dictionary of filename
@@ -1970,6 +1975,7 @@ class GenericCCModel(GenericModel):
       name: str = "ydf_model",
       algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      categorical_from_string: bool = False,
   ) -> Union[str, Dict[str, str]]:
     options = embed_pb2.Options(
         name=name,
@@ -1977,6 +1983,7 @@ class GenericCCModel(GenericModel):
             classification_output
         ),
         algorithm=embed_pb2.Algorithm.Enum.Value(algorithm),
+        categorical_from_string=categorical_from_string,
     )
     results = self._model.EmbedModel(options)
     if len(results) == 1:

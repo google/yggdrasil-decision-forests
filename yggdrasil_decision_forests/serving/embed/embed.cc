@@ -110,7 +110,6 @@ absl::StatusOr<std::string> GenCategoricalStringDictionaries(
     const internal::InternalOptions& internal_options) {
   std::string content;
 
-  // TODO: Create a hashmap with the string values is the user requests it.
   for (const auto& dict : internal_options.categorical_dicts) {
     absl::SubstituteAndAppend(
         &content, R"(
@@ -129,6 +128,37 @@ enum class $0$1 : $2 {
     }
     absl::StrAppend(&content, R"(};
 )");
+
+    if (options.categorical_from_string() && !dict.second.is_label) {
+      // Create a function to create an enum class value from a string.
+      absl::SubstituteAndAppend(&content, R"(
+Feature$0 Feature$0FromString(const std::string_view name) {
+  using F = Feature$0;
+  static const std::unordered_map<std::string_view, Feature$0>
+      kFeature$0Map = {
+)",
+                                dict.second.sanitized_name  // $0
+      );
+      // Note: We skip the OOV item with index 0.
+      for (int item_idx = 1; item_idx < dict.second.sanitized_items.size();
+           item_idx++) {
+        absl::SubstituteAndAppend(
+            &content, "          {$0, F::k$1},\n",
+            QuoteString(dict.second.items[item_idx]),  // $0
+            dict.second.sanitized_items[item_idx]      // $1
+        );
+      }
+      absl::SubstituteAndAppend(&content, R"(      };
+  auto it = kFeature$0Map.find(name);
+  if (it == kFeature$0Map.end()) {
+    return F::kOutOfVocabulary;
+  }
+  return it->second;
+}
+)",
+                                dict.second.sanitized_name  // $0
+      );
+    }
   }
   return content;
 }
@@ -203,6 +233,10 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   if (internal_options.includes.cmath) {
     absl::StrAppend(&header, "#include <cmath>\n");
   }
+  if (options.categorical_from_string()) {
+    absl::StrAppend(&header, "#include <unordered_map>\n");
+  }
+
   // TODO: Only include if necessary.
   absl::StrAppend(&header, "#include <bitset>\n");
   absl::StrAppend(&header, "#include <cassert>\n");
@@ -877,6 +911,7 @@ absl::Status ComputeInternalOptionsCategoricalDictionaries(
     dictionary.is_label = is_label;
     dictionary.sanitized_items.assign(
         column.number_of_unique_values() - is_label, "");
+    dictionary.items.assign(column.number_of_unique_values() - is_label, "");
     for (const auto& item : column.items()) {
       int index = item.second.index();
 
@@ -897,6 +932,7 @@ absl::Status ComputeInternalOptionsCategoricalDictionaries(
                                            /*.ensure_letter_first=*/false);
       }
       dictionary.sanitized_items[index] = item_symbol;
+      dictionary.items[index] = item.first;
     }
   };
 

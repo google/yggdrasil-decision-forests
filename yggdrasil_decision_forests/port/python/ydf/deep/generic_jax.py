@@ -516,6 +516,7 @@ class GenericJAXModel(generic_model.GenericModel):
       name: str = "ydf_model",
       algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      categorical_from_string: bool = False,
   ) -> Union[str, Dict[str, str]]:
     raise NotImplementedError
 

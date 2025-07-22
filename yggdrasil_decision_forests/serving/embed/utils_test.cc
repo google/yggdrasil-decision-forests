@@ -116,5 +116,11 @@ TEST(NumBytesToMaxUnsignedValue, Basic) {
   EXPECT_EQ(NumBytesToMaxUnsignedValue(4), 0xffffffff);
 }
 
+TEST(QuoteString, Basic) {
+  EXPECT_EQ(QuoteString("hello"), "\"hello\"");
+  EXPECT_EQ(QuoteString("hello\"world"), "\"hello\\\"world\"");
+  EXPECT_EQ(QuoteString("hello\nworld"), "\"hello\\nworld\"");
+}
+
 }  // namespace
 }  // namespace yggdrasil_decision_forests::serving::embed

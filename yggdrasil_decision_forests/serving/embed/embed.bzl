@@ -7,6 +7,7 @@ def cc_ydf_standalone_model(
         classification_output = "CLASS",
         algorithm = "ROUTING",
         monitor_usage = False,
+        categorical_from_string = False,
         **attrs):
     """Embed a YDF model into a CC library.
 
@@ -26,6 +27,10 @@ def cc_ydf_standalone_model(
         monitor_usage: If set, monitor the model usage. This creates a dependency to
             yggdrasil_decision_forests/utils/usage.h. If you can, leave this flag to true as it
             helps the YDF team to understand our library usage.
+        categorical_from_string: If true, generates functions to create categorical feature values
+            from strings. For example, for a categorical feature "X" with an associated "FeatureX"
+            enum class, the method "FeatureXFromString(absl::string_view name) -> FeatureX" is
+            created.
         **attrs: Classical cc_library attributes.
     """
 
@@ -54,7 +59,7 @@ def cc_ydf_standalone_model(
 
     # Convert the model into source files.
 
-    options = "classification_output: " + classification_output + " algorithm: " + algorithm + " monitor_usage: " + str(monitor_usage)
+    options = "classification_output: " + classification_output + " algorithm: " + algorithm + " monitor_usage: " + str(monitor_usage) + " categorical_from_string: " + str(categorical_from_string)
 
     native.genrule(
         name = name + "_write_embed",

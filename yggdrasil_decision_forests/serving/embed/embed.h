@@ -155,8 +155,10 @@ struct InternalOptions {
   struct CategoricalDict {
     // Name of the column
     std::string sanitized_name;
-    // Possible values
+    // Possible values sanitized so they can be used as c++ variable names.
     std::vector<std::string> sanitized_items;
+    // Possible values
+    std::vector<std::string> items;
     // If this column a label.
     bool is_label;
   };

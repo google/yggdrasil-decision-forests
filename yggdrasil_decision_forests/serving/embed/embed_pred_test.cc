@@ -43,6 +43,7 @@ print(model.predict(ds[:1]))
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba_routing.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_score.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_rf_nwta_small_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_rf_nwta_small_proba.h"
@@ -84,6 +85,24 @@ namespace {
       .capital_loss = 0,                                     \
       .hours_per_week = 40,                                  \
       .native_country = FeatureNativeCountry::kUnitedStates, \
+  }
+
+#define ADULT_EXAMPLE_STRING_CAT                                         \
+  {                                                                      \
+      .age = 39,                                                         \
+      .workclass = FeatureWorkclassFromString("State-gov"),              \
+      .fnlwgt = 77516,                                                   \
+      .education = FeatureEducationFromString("Bachelors"),              \
+      .education_num = 13,                                               \
+      .marital_status = FeatureMaritalStatusFromString("Never-married"), \
+      .occupation = FeatureOccupationFromString("Adm-clerical"),         \
+      .relationship = FeatureRelationshipFromString("Not-in-family"),    \
+      .race = FeatureRaceFromString("White"),                            \
+      .sex = FeatureSexFromString("Male"),                               \
+      .capital_gain = 2174,                                              \
+      .capital_loss = 0,                                                 \
+      .hours_per_week = 40,                                              \
+      .native_country = FeatureNativeCountryFromString("United-States"), \
   }
 
 #define IRIS_EXAMPLE        \
@@ -131,6 +150,13 @@ TEST(Embed, test_model_adult_binary_class_gbdt_v2_proba) {
 TEST(Embed, test_model_adult_binary_class_gbdt_v2_proba_routing) {
   using namespace test_model_adult_binary_class_gbdt_v2_proba_routing;
   const float pred = Predict(ADULT_EXAMPLE);
+  EXPECT_NEAR(pred, 0.01860435, eps);
+}
+
+TEST(Embed,
+     test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab) {
+  using namespace test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab;
+  const float pred = Predict(ADULT_EXAMPLE_STRING_CAT);
   EXPECT_NEAR(pred, 0.01860435, eps);
 }
 

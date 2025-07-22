@@ -105,6 +105,7 @@ struct GoldenGeneratedHCase {
   proto::Algorithm::Enum algorithm;
   std::optional<proto::ClassificationOutput::Enum> output;
   int crop_num_trees = 3;
+  bool categorical_from_string = false;
 };
 
 // Compare the generated .h files against golden files.
@@ -134,6 +135,15 @@ SIMPLE_PARAMETERIZED_TEST(
             "adult_binary_class_gbdt_v2_probability_routing.h.golden",
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_probability_routing_with_string_vocab."
+            "h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+            3,
+            true,
         },
         {
             "iris_multi_class_gbdt_v2",
@@ -225,6 +235,7 @@ SIMPLE_PARAMETERIZED_TEST(
 
   proto::Options options;
   options.set_algorithm(test_case.algorithm);
+  options.set_categorical_from_string(test_case.categorical_from_string);
   if (test_case.output.has_value()) {
     options.set_classification_output(*test_case.output);
   }
