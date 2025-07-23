@@ -169,14 +169,14 @@ struct Instance {
 struct __attribute__((packed)) Node {
   uint8_t pos = 0;
   union {
-    struct {
+    struct __attribute__((packed)) {
       uint8_t feat;
       union {
         int32_t thr;
         uint16_t cat;
       };
     } cond;
-    struct {
+    struct __attribute__((packed)) {
       float val;
     } leaf;
   };

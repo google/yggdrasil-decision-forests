@@ -31,13 +31,13 @@ struct Instance {
 struct __attribute__((packed)) Node {
   uint8_t pos = 0;
   union {
-    struct {
+    struct __attribute__((packed)) {
       uint8_t feat;
       union {
         float thr;
       };
     } cond;
-    struct {
+    struct __attribute__((packed)) {
       float val;
     } leaf;
   };

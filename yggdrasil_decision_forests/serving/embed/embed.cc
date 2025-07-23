@@ -1640,11 +1640,12 @@ absl::Status GenRoutingModelDataStruct(
         stats.num_leaves / specialized_conversion.leaf_value_spec.dims));
   }
 
+  // TODO: Re-order the item dynamically to optimize the alignment.
   absl::SubstituteAndAppend(content, R"(
 struct __attribute__((packed)) Node {
   $2 pos = 0;
   union {
-    struct {
+    struct __attribute__((packed)) {
       $1 feat;
       union {
         $0 thr;)",
@@ -1672,7 +1673,7 @@ struct __attribute__((packed)) Node {
   absl::SubstituteAndAppend(content, R"(
       };
     } cond;
-    struct {
+    struct __attribute__((packed)) {
       $0 val;
     } leaf;
   };
