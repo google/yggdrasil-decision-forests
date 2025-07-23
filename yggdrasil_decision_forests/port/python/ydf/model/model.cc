@@ -207,6 +207,7 @@ void init_model(py::module_& m) {
                  "<model_cc.DecisionForestCCModel of type $0.", a.name());
            })
       .def("num_trees", &DecisionForestCCModel::num_trees)
+      .def("num_nodes", &DecisionForestCCModel::num_nodes)
       .def("set_node_format", &DecisionForestCCModel::set_node_format,
            py::arg("node_format"))
       .def("PredictLeaves", WithStatusOr(&DecisionForestCCModel::PredictLeaves),

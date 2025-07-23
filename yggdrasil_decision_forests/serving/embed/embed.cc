@@ -697,7 +697,7 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface) {
   ModelStatistics stats{
-      .num_trees = df_interface.num_trees(),
+      .num_trees = static_cast<int64_t>(df_interface.num_trees()),
       .num_features = static_cast<int>(model.input_features().size()),
       .task = model.task(),
   };

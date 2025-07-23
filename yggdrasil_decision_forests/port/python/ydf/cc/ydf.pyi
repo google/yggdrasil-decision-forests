@@ -218,6 +218,7 @@ class GenericCCModel:
 
 class DecisionForestCCModel(GenericCCModel):
   def num_trees(self) -> int: ...
+  def num_nodes(self) -> int: ...
   def PredictLeaves(
       self,
       dataset: VerticalDataset,
