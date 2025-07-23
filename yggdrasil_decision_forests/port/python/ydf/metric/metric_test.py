@@ -125,6 +125,10 @@ class CharacteristicTest(absltest.TestCase):
         [(1 + 3) / (1 + 2 + 3 + 4), (10 + 30) / (10 + 20 + 30 + 40)],
     )
 
+    self.assertEqual(c.precision_at_recall(0.0), 1.0)
+    self.assertAlmostEqual(c.precision_at_recall(0.1), 1.0 / 3)
+    self.assertEqual(c.precision_at_recall(0.5), 0.0)
+
 
 class EvaluationTest(absltest.TestCase):
 
@@ -320,6 +324,46 @@ class EvaluationTest(absltest.TestCase):
     )
 
     _ = evaluation.html()
+
+
+class MaxYAtMinXTest(absltest.TestCase):
+
+  def test_base(self):
+    self.assertEqual(
+        metric.max_y_at_min_x(
+            xs=np.array([1, 2, 3]),
+            ys=np.array([4, 5, 6]),
+            x_min=2,
+            no_found_result=1.0,
+        ),
+        6,
+    )
+
+  def test_no_found(self):
+    self.assertEqual(
+        metric.max_y_at_min_x(
+            xs=np.array([1, 2, 3]),
+            ys=np.array([4, 5, 6]),
+            x_min=4,
+            no_found_result=1.0,
+        ),
+        1.0,
+    )
+
+  def test_empty(self):
+    with self.assertRaisesRegex(ValueError, "cannot be empty"):
+      metric.max_y_at_min_x(
+          xs=np.array([]), ys=np.array([]), x_min=2, no_found_result=1.0
+      )
+
+  def test_size_mismatch(self):
+    with self.assertRaisesRegex(ValueError, "should have the same size"):
+      metric.max_y_at_min_x(
+          xs=np.array([1, 2]),
+          ys=np.array([4, 5, 6]),
+          x_min=2,
+          no_found_result=1.0,
+      )
 
 
 if __name__ == "__main__":

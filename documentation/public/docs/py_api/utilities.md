@@ -22,6 +22,8 @@
 
 ::: ydf.strict
 
+::: ydf.Evaluation
+
 ::: ydf.ModelIOOptions
 
 ::: ydf.create_vertical_dataset

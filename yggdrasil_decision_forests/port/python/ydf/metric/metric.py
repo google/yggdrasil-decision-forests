@@ -255,6 +255,24 @@ Num thresholds: {len(self.per_threshold)}
         np.float32,
     )
 
+  def precision_at_recall(self, recall: float) -> float:
+    """Computes the precision at a given recall.
+
+    Args:
+      recall: The target recall value.
+
+    Returns:
+      The precision at the specified recall.
+    """
+
+    if recall <= 0.0:
+      # A recall of 0 is generally associated with a precision of 1.
+      return 1.0
+
+    return max_y_at_min_x(
+        xs=self.recalls, ys=self.precisions, x_min=recall, no_found_result=0.0
+    )
+
 
 @dataclasses.dataclass
 class Evaluation:
@@ -553,3 +571,33 @@ def safe_div(a: float, b: float) -> float:
       )
     return 0.0
   return a / b
+
+
+def max_y_at_min_x(
+    xs: np.ndarray, ys: np.ndarray, x_min: float, no_found_result: float
+) -> float:
+  """Calculates the maximum value of "y" for "x >= x_min".
+
+  Given two aligned arrays xs and ys, return the maximum value of ys for xs >=
+  target_x.
+
+  Args:
+    xs: x values.
+    ys: y values.
+    x_min: The minimum allowed x value.
+    no_found_result: Value to return if no xs is >= x_min.
+
+  Returns:
+    The target y.
+  """
+
+  if len(xs) != len(ys):
+    raise ValueError("xs and ys should have the same size")
+
+  if len(xs) == 0:
+    raise ValueError("xs cannot be empty")
+
+  filtered_ys = ys[xs >= x_min]
+  if len(filtered_ys) == 0:
+    return no_found_result
+  return np.max(filtered_ys).item()
