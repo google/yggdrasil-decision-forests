@@ -559,7 +559,7 @@ absl::Status AbstractLearner::CheckConfiguration(
       return absl::InvalidArgumentError(
           "The \"task\" field is not defined in the TrainingConfig proto.");
       break;
-    case model::proto::Task::CLASSIFICATION:
+    case model::proto::Task::CLASSIFICATION: {
       if (label_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
         return absl::InvalidArgumentError(absl::StrCat(
             "The label column \"", config.label(),
@@ -568,7 +568,18 @@ absl::Status AbstractLearner::CheckConfiguration(
             "a "
             "dataspec guide, even for a binary classification task."));
       }
-      break;
+      // Check for the count for OOD items.
+      const auto it_ood_item = label_col_spec.categorical().items().find(
+          dataset::kOutOfDictionaryItemKey);
+      if (it_ood_item != label_col_spec.categorical().items().end() &&
+          it_ood_item->second.count() > 0) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The categorical training label column \"", config.label(),
+            "\" contains out-of-dictionary values. This is not allowed. Make "
+            "sure the Dataspec guide of the label column is configured with "
+            "`min_vocab_frequency=0` and `max_vocab_count=-1`."));
+      }
+    } break;
     case model::proto::Task::REGRESSION:
       if (label_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
         return absl::InvalidArgumentError(

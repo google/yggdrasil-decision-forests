@@ -1837,9 +1837,18 @@ absl::StatusOr<bool> FindBestCondition(
       if (label_stat.label_distribution.NumClasses() >= 1 &&
           label_stat.label_distribution.count(
               dataset::kOutOfDictionaryItemIndex) > 0) {
-        return absl::InternalError(
-            absl::StrCat("The training label column \"", config.label(),
-                         "\" contain out-of-dictionary (=0) values."));
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The categorical training label column \"", config.label(),
+            "\" contains out-of-dictionary values. This is not allowed. "
+            "Most likely, the subset of the training dataset used to compute "
+            "the label dictionary did not contain some label values found in "
+            "the remaining of the training dataset. To solve this issue, "
+            "increase the number of training examples used to compute "
+            "dictionnaries with "
+            "`max_num_scanned_rows_to_compute_statistics=100000` (or a larger "
+            "value). To use all the training examples to build the dictionary, "
+            "use `max_num_scanned_rows_to_compute_statistics=-1` (Warning: "
+            "this can be slow on large datasets)."));
       }
 
       return FindBestConditionManager(train_dataset, selected_examples, weights,
