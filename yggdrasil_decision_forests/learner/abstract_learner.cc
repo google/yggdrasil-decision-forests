@@ -476,11 +476,20 @@ absl::Status CheckGenericHyperParameterSpecification(
         }
         const auto& possible_values =
             spec_field_it->second.categorical().possible_values();
+        std::string possible_values_str;
+        if (possible_values.size() > 10) {
+          possible_values_str = absl::StrJoin(
+              possible_values.begin(), possible_values.begin() + 10, ", ");
+          possible_values_str += ", ...";
+        } else {
+          possible_values_str = absl::StrJoin(possible_values, ", ");
+        }
         if (std::find(possible_values.begin(), possible_values.end(),
                       param.value().categorical()) == possible_values.end()) {
-          return absl::InvalidArgumentError(
-              absl::StrCat("Unknown value \"", param.value().categorical(),
-                           "\" for the parameter \"", param.name(), "\"."));
+          return absl::InvalidArgumentError(absl::StrCat(
+              "Unknown value \"", param.value().categorical(),
+              "\" for the parameter \"", param.name(),
+              "\". Possible values are: ", possible_values_str, "."));
         }
       } break;
       case proto::GenericHyperParameterSpecification::Value::kInteger: {
