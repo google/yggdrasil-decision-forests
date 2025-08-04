@@ -25,6 +25,8 @@ from ydf.model.tree.condition import IsMissingInCondition
 from ydf.model.tree.condition import IsTrueCondition
 from ydf.model.tree.condition import NumericalHigherThanCondition
 from ydf.model.tree.condition import NumericalSparseObliqueCondition
+from ydf.model.tree.condition import NumericalVectorSequenceCloserThanCondition
+from ydf.model.tree.condition import NumericalVectorSequenceProjectedMoreThanCondition
 
 # Node
 from ydf.model.tree.node import AbstractNode
