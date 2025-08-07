@@ -27,7 +27,7 @@
 # Before running this script, make sure to compile or download the Yggdrasil
 # Decision Forests binaries.
 #
-# See https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/rtd/cli_user_manual.md#distributed-training for more details.
+# See https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/public/docs/cli_user_manual.md#distributed-training for more details.
 #
 
 set -x

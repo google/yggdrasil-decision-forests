@@ -11,7 +11,7 @@ to this API.
 
 This directory contains an implementation of Yggdrasil Decision Forests
 inference written in Go. The API is similar to the
-[C++ inference API](https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/rtd/cli_user_manual.md).
+[C++ inference API](https://github.com/google/yggdrasil-decision-forests/blob/main/documentation/public/docs/cli_user_manual.md).
 
 ### Limitations
 
