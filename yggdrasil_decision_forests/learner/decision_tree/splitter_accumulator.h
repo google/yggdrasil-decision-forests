@@ -1795,7 +1795,7 @@ struct LabelHessianNumericalBucket {
   }
 
   bool operator<(const LabelHessianNumericalBucket& other) const {
-    return priority < priority;
+    return priority < other.priority;
   }
 
   class Initializer {
