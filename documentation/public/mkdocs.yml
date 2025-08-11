@@ -36,7 +36,7 @@ extra_css:
   - style/extra.css
   - https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined
 
-strict: false # TODO: Set to true before release.
+strict: true
 
 nav:
   - 🏡 Home: index.md
@@ -104,8 +104,6 @@ nav:
     - Inspecting trees: tutorial/inspecting_trees.ipynb
     - Editing trees: tutorial/editing_trees.ipynb
     - Custom loss: tutorial/custom_loss.ipynb
-  #  - example distance: tutorial/example_distance.ipynb
-    # TODO: model inspection, manual tree creation, custom loss.
   - Other APIs:
     - CLI quickstart: cli_quickstart.md
     - JavaScript: javascript.md
