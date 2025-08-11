@@ -528,6 +528,8 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     predictions = model.predict(data)
     self.assertEqual(predictions.shape, (2,))
 
+    _ = model.describe(output_format="html")
+
   def test_multidimensional_features_with_feature_arg(self):
     ds = {
         "f1": np.random.uniform(size=(100, 5)),

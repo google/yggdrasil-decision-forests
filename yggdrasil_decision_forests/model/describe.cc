@@ -17,9 +17,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <numeric>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -98,14 +100,55 @@ utils::html::Html Model(const model::AbstractModel& model) {
         model.data_spec().columns(model.uplift_treatment_col_idx()).name());
   }
 
+  // Set of "unstackeds" already displayed (each used unstackeds should only be
+  // displayed once).
+  std::unordered_set<size_t> visited_unstacked;
+
   std::string str_input_features;
-  for (int i = 0; i < model.input_features().size(); i++) {
+  for (size_t i = 0; i < model.input_features().size(); i++) {
     if (i != 0) {
       absl::StrAppend(&str_input_features, " ");
     }
-    absl::StrAppend(
-        &str_input_features,
-        model.data_spec().columns(model.input_features()[i]).name());
+    const auto col_idx = model.input_features()[i];
+    const auto& col_spec = model.data_spec().columns(col_idx);
+    if (col_spec.is_unstacked()) {
+      // Unstacked feature.
+
+      // Find the unstacked item.
+      int selected_unstacked_idx = -1;
+      for (size_t unstacked_idx = 0;
+           unstacked_idx < model.data_spec().unstackeds_size();
+           unstacked_idx++) {
+        const auto& unstacked = model.data_spec().unstackeds(unstacked_idx);
+        if (col_idx >= unstacked.begin_column_idx() &&
+            col_idx < unstacked.begin_column_idx() + unstacked.size()) {
+          selected_unstacked_idx = unstacked_idx;
+          break;
+        }
+      }
+
+      if (selected_unstacked_idx == -1) {
+        // Cannot find the corresponding unstacked. The dataspec is either
+        // invalid or very old. We should the individual feature.
+        absl::StrAppend(&str_input_features, col_spec.name());
+      } else {
+        if (visited_unstacked.find(selected_unstacked_idx) !=
+            visited_unstacked.end()) {
+          // This unstacked feature was already shown.
+          continue;
+        }
+
+        // Show the unstacked feature with its size.
+        const auto& unstacked =
+            model.data_spec().unstackeds(selected_unstacked_idx);
+        absl::StrAppend(&str_input_features, unstacked.original_name(), "[",
+                        unstacked.size(), "]");
+        visited_unstacked.insert(selected_unstacked_idx);
+      }
+
+    } else {
+      absl::StrAppend(&str_input_features, col_spec.name());
+    }
   }
   AddKeyValue(&content,
               absl::StrCat("Features (", model.input_features().size(), ")"),

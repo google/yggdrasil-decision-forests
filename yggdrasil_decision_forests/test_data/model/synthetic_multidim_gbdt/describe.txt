@@ -1,0 +1,214 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: REGRESSION
+Label: "label"
+
+Input Features (8):
+	f1.0_of_5
+	f1.1_of_5
+	f1.2_of_5
+	f1.3_of_5
+	f1.4_of_5
+	f2.0_of_3
+	f2.1_of_3
+	f2.2_of_3
+
+No weights
+
+Variable Importance: INV_MEAN_MIN_DEPTH:
+    1. "f2.0_of_3"  1.000000 ################
+    2. "f2.2_of_3"  0.278529 #
+    3. "f1.1_of_5"  0.275493 #
+    4. "f1.4_of_5"  0.273035 #
+    5. "f2.1_of_3"  0.242291 
+    6. "f1.2_of_5"  0.229392 
+    7. "f1.3_of_5"  0.211068 
+    8. "f1.0_of_5"  0.205818 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "f2.0_of_3" 18.000000 
+
+Variable Importance: NUM_NODES:
+    1. "f2.0_of_3" 42.000000 ################
+    2. "f2.1_of_3" 31.000000 ##########
+    3. "f2.2_of_3" 27.000000 ########
+    4. "f1.4_of_5" 26.000000 ########
+    5. "f1.1_of_5" 25.000000 #######
+    6. "f1.3_of_5" 24.000000 #######
+    7. "f1.2_of_5" 17.000000 ###
+    8. "f1.0_of_5"  9.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "f2.0_of_3" 30.487660 ################
+    2. "f1.4_of_5" 18.689637 #########
+    3. "f2.2_of_3" 15.432474 #######
+    4. "f1.1_of_5" 13.307686 ######
+    5. "f2.1_of_3" 11.557981 #####
+    6. "f1.2_of_5"  9.676942 ####
+    7. "f1.3_of_5"  9.185909 ####
+    8. "f1.0_of_5"  0.563885 
+
+
+
+Loss: SQUARED_ERROR
+Validation loss value: 0.393557
+Number of trees per iteration: 1
+Node format: BLOB_SEQUENCE_GZIP
+Number of trees: 18
+Total number of nodes: 420
+
+Number of nodes by tree:
+Count: 18 Average: 23.3333 StdDev: 4.22953
+Min: 15 Max: 27 Ignored: 0
+----------------------------------------------
+[ 15, 16) 1   5.56%   5.56% #
+[ 16, 17) 0   0.00%   5.56%
+[ 17, 18) 3  16.67%  22.22% ####
+[ 18, 19) 0   0.00%  22.22%
+[ 19, 20) 0   0.00%  22.22%
+[ 20, 21) 0   0.00%  22.22%
+[ 21, 22) 3  16.67%  38.89% ####
+[ 22, 23) 0   0.00%  38.89%
+[ 23, 24) 0   0.00%  38.89%
+[ 24, 25) 0   0.00%  38.89%
+[ 25, 26) 3  16.67%  55.56% ####
+[ 26, 27) 0   0.00%  55.56%
+[ 27, 27] 8  44.44% 100.00% ##########
+
+Depth by leafs:
+Count: 219 Average: 4.0274 StdDev: 1.06808
+Min: 2 Max: 5 Ignored: 0
+----------------------------------------------
+[ 2, 3)  22  10.05%  10.05% ##
+[ 3, 4)  56  25.57%  35.62% #####
+[ 4, 5)  35  15.98%  51.60% ###
+[ 5, 5] 106  48.40% 100.00% ##########
+
+Number of training obs by leaf:
+Count: 219 Average: 7.72603 StdDev: 4.61265
+Min: 5 Max: 30 Ignored: 0
+----------------------------------------------
+[  5,  6) 80  36.53%  36.53% ##########
+[  6,  7) 40  18.26%  54.79% #####
+[  7,  8) 37  16.89%  71.69% #####
+[  8, 10) 29  13.24%  84.93% ####
+[ 10, 11)  2   0.91%  85.84%
+[ 11, 12)  8   3.65%  89.50% #
+[ 12, 14)  3   1.37%  90.87%
+[ 14, 15)  0   0.00%  90.87%
+[ 15, 16)  7   3.20%  94.06% #
+[ 16, 18)  3   1.37%  95.43%
+[ 18, 19)  2   0.91%  96.35%
+[ 19, 20)  1   0.46%  96.80%
+[ 20, 21)  1   0.46%  97.26%
+[ 21, 23)  1   0.46%  97.72%
+[ 23, 24)  0   0.00%  97.72%
+[ 24, 25)  0   0.00%  97.72%
+[ 25, 27)  0   0.00%  97.72%
+[ 27, 28)  0   0.00%  97.72%
+[ 28, 29)  0   0.00%  97.72%
+[ 29, 30]  5   2.28% 100.00% #
+
+Attribute in nodes:
+	42 : f2.0_of_3 [NUMERICAL]
+	31 : f2.1_of_3 [NUMERICAL]
+	27 : f2.2_of_3 [NUMERICAL]
+	26 : f1.4_of_5 [NUMERICAL]
+	25 : f1.1_of_5 [NUMERICAL]
+	24 : f1.3_of_5 [NUMERICAL]
+	17 : f1.2_of_5 [NUMERICAL]
+	9 : f1.0_of_5 [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+	18 : f2.0_of_3 [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	19 : f2.0_of_3 [NUMERICAL]
+	15 : f2.2_of_3 [NUMERICAL]
+	10 : f1.1_of_5 [NUMERICAL]
+	7 : f2.1_of_3 [NUMERICAL]
+	3 : f1.4_of_5 [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	29 : f2.0_of_3 [NUMERICAL]
+	20 : f1.4_of_5 [NUMERICAL]
+	17 : f2.2_of_3 [NUMERICAL]
+	14 : f1.1_of_5 [NUMERICAL]
+	12 : f2.1_of_3 [NUMERICAL]
+	7 : f1.2_of_5 [NUMERICAL]
+	4 : f1.3_of_5 [NUMERICAL]
+	1 : f1.0_of_5 [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	33 : f2.0_of_3 [NUMERICAL]
+	26 : f2.1_of_3 [NUMERICAL]
+	24 : f2.2_of_3 [NUMERICAL]
+	22 : f1.4_of_5 [NUMERICAL]
+	16 : f1.1_of_5 [NUMERICAL]
+	13 : f1.3_of_5 [NUMERICAL]
+	12 : f1.2_of_5 [NUMERICAL]
+	2 : f1.0_of_5 [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	42 : f2.0_of_3 [NUMERICAL]
+	31 : f2.1_of_3 [NUMERICAL]
+	27 : f2.2_of_3 [NUMERICAL]
+	26 : f1.4_of_5 [NUMERICAL]
+	25 : f1.1_of_5 [NUMERICAL]
+	24 : f1.3_of_5 [NUMERICAL]
+	17 : f1.2_of_5 [NUMERICAL]
+	9 : f1.0_of_5 [NUMERICAL]
+
+Condition type in nodes:
+	201 : HigherCondition
+Condition type in nodes with depth <= 0:
+	18 : HigherCondition
+Condition type in nodes with depth <= 1:
+	54 : HigherCondition
+Condition type in nodes with depth <= 2:
+	104 : HigherCondition
+Condition type in nodes with depth <= 3:
+	148 : HigherCondition
+Condition type in nodes with depth <= 5:
+	201 : HigherCondition
+
+Training logs:
+Number of iteration to final model: 18
+	Iter:1 train-loss:0.452367 valid-loss:0.547196  train-rmse:0.452367 valid-rmse:0.547196
+	Iter:2 train-loss:0.420561 valid-loss:0.522873  train-rmse:0.420561 valid-rmse:0.522873
+	Iter:3 train-loss:0.393404 valid-loss:0.513998  train-rmse:0.393404 valid-rmse:0.513998
+	Iter:4 train-loss:0.368284 valid-loss:0.487907  train-rmse:0.368284 valid-rmse:0.487907
+	Iter:5 train-loss:0.345215 valid-loss:0.484386  train-rmse:0.345215 valid-rmse:0.484386
+	Iter:6 train-loss:0.315164 valid-loss:0.463070  train-rmse:0.315164 valid-rmse:0.463070
+	Iter:16 train-loss:0.152276 valid-loss:0.400808  train-rmse:0.152276 valid-rmse:0.400808
+	Iter:26 train-loss:0.088571 valid-loss:0.394930  train-rmse:0.088571 valid-rmse:0.394930
+	Iter:36 train-loss:0.058760 valid-loss:0.404539  train-rmse:0.058760 valid-rmse:0.404539
+	Iter:46 train-loss:0.038714 valid-loss:0.409647  train-rmse:0.038714 valid-rmse:0.409647
+
+DATASPEC:
+
+Number of records: 100
+Number of columns: 9
+
+Number of columns by type:
+	NUMERICAL: 9 (100%)
+
+Columns:
+
+NUMERICAL: 9 (100%)
+	0: "label" NUMERICAL mean:0.42 min:0 max:1 sd:0.493559 dtype:DTYPE_BOOL
+	1: "f1.0_of_5" NUMERICAL mean:0.0919861 min:0.000571401 max:0.194081 sd:0.0570757 dtype:DTYPE_FLOAT64
+	2: "f1.1_of_5" NUMERICAL mean:0.0977874 min:0.000693184 max:0.199769 sd:0.0565687 dtype:DTYPE_FLOAT64
+	3: "f1.2_of_5" NUMERICAL mean:0.100491 min:0.000663755 max:0.19879 sd:0.059822 dtype:DTYPE_FLOAT64
+	4: "f1.3_of_5" NUMERICAL mean:0.107308 min:0.00394003 max:0.199755 sd:0.0522711 dtype:DTYPE_FLOAT64
+	5: "f1.4_of_5" NUMERICAL mean:0.0880915 min:0.000188924 max:0.19935 sd:0.0577468 dtype:DTYPE_FLOAT64
+	6: "f2.0_of_3" NUMERICAL mean:0.192086 min:0.000369166 max:0.332705 sd:0.0976165 dtype:DTYPE_FLOAT64
+	7: "f2.1_of_3" NUMERICAL mean:0.153499 min:0.000483617 max:0.331171 sd:0.0971401 dtype:DTYPE_FLOAT64
+	8: "f2.2_of_3" NUMERICAL mean:0.156837 min:0.0131151 max:0.333041 sd:0.0994799 dtype:DTYPE_FLOAT64
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
