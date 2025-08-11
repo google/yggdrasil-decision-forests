@@ -1043,24 +1043,24 @@ void InternalExportMetricCondition(const absl::string_view test,
     CHECK_OK(file::SetContent(path, content));
   } else {
     if (!success_margin) {
-      CHECK(false) << "Non satisfied range condition for " << metric << " in "
-                   << test << "\ndefined at\n"
-                   << file << ":" << line << "\nThe metric value " << value
-                   << " is not in " << center << " +- " << margin
-                   << ".\ni.e. not in [" << (center - margin) << " , "
-                   << (center + margin)
-                   << "].\nThe absolute value of the difference is "
-                   << abs_diff_margin << ".";
+      ADD_FAILURE() << "Non satisfied range condition for " << metric << " in "
+                    << test << "\ndefined at\n"
+                    << file << ":" << line << "\nThe metric value " << value
+                    << " is not in " << center << " +- " << margin
+                    << ".\ni.e. not in [" << (center - margin) << " , "
+                    << (center + margin)
+                    << "].\nThe absolute value of the difference is "
+                    << abs_diff_margin << ".";
     }
 
     if (golden_test && !success_golden) {
-      CHECK(false) << "Non satisfied golden value condition for " << metric
-                   << " in " << test << "\ndefined at\n"
-                   << file << ":" << line << "\nThe metric value " << value
-                   << " is different from " << golden
-                   << " (margin:" << kGoldenMargin
-                   << ").\nThe absolute value of the difference is "
-                   << abs_diff_golden << ".";
+      ADD_FAILURE() << "Non satisfied golden value condition for " << metric
+                    << " in " << test << "\ndefined at\n"
+                    << file << ":" << line << "\nThe metric value " << value
+                    << " is different from " << golden
+                    << " (margin:" << kGoldenMargin
+                    << ").\nThe absolute value of the difference is "
+                    << abs_diff_golden << ".";
     }
   }
 }
