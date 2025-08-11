@@ -683,8 +683,8 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8641, 0.009, 0.8627);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2972, 0.0181, 0.2902);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8672, 0.0122, 0.8664);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2948, 0.0125, 0.2912);
 
   // Show the tree structure.
   std::string description;
@@ -722,8 +722,8 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraintsPure) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8641, 0.009, 0.8627);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2972, 0.0181, 0.2902);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8672, 0.0104, 0.8664);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2955, 0.0145, 0.2912);
 
   // Show the tree structure.
   std::string description;
@@ -760,8 +760,8 @@ TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8586, 0.0094, 0.8587);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.309, 0.0156, 0.3028);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8558, 0.0131, 0.8544);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3101, 0.0129, 0.3093);
 
   // Show the tree structure.
   std::string description;
@@ -797,8 +797,8 @@ TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8616, 0.0099, 0.8627);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3049, 0.0195, 0.3017);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8623, 0.0099, 0.8658);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3034, 0.0157, 0.2997);
 
   // Show the tree structure.
   std::string description;
@@ -1482,8 +1482,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianAndSubsampling) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8664, 0.0101, 0.8661);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2962, 0.0159, 0.2907);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8633, 0.0078, 0.8612);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2952, 0.0104, 0.2924);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, CustomLossHessian) {
@@ -1497,8 +1497,8 @@ TEST_F(GradientBoostedTreesOnAdult, CustomLossHessian) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8664, 0.0101, 0.8661);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2962, 0.0159, 0.2907);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8635, 0.0085, 0.8612);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2965, 0.0123, 0.2924);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
@@ -1512,8 +1512,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8636, 0.0092, 0.859);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2924, 0.0112, 0.2934);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0085, 0.859);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2945, 0.0103, 0.2934);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
@@ -1527,8 +1527,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8662, 0.0104, 0.8642);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2938, 0.0116, 0.2930);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.863, 0.0092, 0.8624);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2953, 0.0123, 0.2936);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianL2Categorical) {
@@ -1542,8 +1542,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianL2Categorical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8652, 0.0124, 0.867);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2962, 0.0125, 0.2922);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0099, 0.8627);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2948, 0.0127, 0.2901);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, PureServingModel) {
@@ -1707,8 +1707,8 @@ TEST_F(GradientBoostedTreesOnAbalone, MonotonicConstraintsPure) {
   constrain_2->set_direction(model::proto::MonotonicConstraint::INCREASING);
 
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::MAE(evaluation_), 1.5155, 0.0599, 1.51869);
-  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.2608, 0.1464, 2.14822);
+YDF_TEST_METRIC(metric::MAE(evaluation_), 1.5284, 0.054, 1.5188);
+YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1558, 0.059, 2.1499);
 
   // Show the tree structure.
   std::string description;
@@ -1755,8 +1755,8 @@ TEST_F(GradientBoostedTreesOnIris, Hessian) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.94, 0.05, 0.9733);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3225, 0.3002, 0.1462);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9533, 0.03, 0.9733);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3628, 0.3514, 0.1462);
   utils::ExpectEqualGoldenModel(*model_, "gbt_iris_hessian");
 }
 
@@ -1767,8 +1767,8 @@ TEST_F(GradientBoostedTreesOnIris, CustomLossHessian) {
   gbt_config->set_use_hessian_gain(true);
   custom_loss_ = Multinomial3CustomLoss();
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.94, 0.05, 0.9733);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3225, 0.3002, 0.1462);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9533, 0.03, 0.9733);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.36, 0.3525, 0.1462);
 }
 
 TEST_F(GradientBoostedTreesOnIris, Dart) {
@@ -1809,8 +1809,8 @@ TEST_F(GradientBoostedTreesOnDNA, Hessian) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9539, 0.0099, 0.9554);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1831, 0.0743, 0.1442);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9545, 0.0099, 0.9554);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1733, 0.0596, 0.1442);
 }
 
 TEST_F(GradientBoostedTreesOnDNA, BaseBooleanAsNumerical) {
@@ -1827,8 +1827,8 @@ TEST_F(GradientBoostedTreesOnDNA, HessianBooleanAsNumerical) {
   gbt_config->set_use_hessian_gain(true);
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9532, 0.0118, 0.9567);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1813, 0.0716, 0.1442);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9529, 0.0104, 0.9567);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.164, 0.0487, 0.1442);
 }
 
 TEST(GradientBoostedTrees, SetHyperParameters) {
