@@ -30,6 +30,7 @@
 #include <unordered_set>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -41,11 +42,13 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
+#include "yggdrasil_decision_forests/learner/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
 #include "ydf/learner/custom_loss.h"
@@ -224,6 +227,18 @@ class GenericCCLearner {
     return evaluation;
   }
 
+  absl::StatusOr<std::vector<dataset::UnsignedExampleIdx>> BootstrappingIndices(
+      const dataset::UnsignedExampleIdx num_examples, const int tree_idx) {
+    auto* rf_learner = dynamic_cast<model::random_forest::RandomForestLearner*>(
+        learner_.get());
+    if (rf_learner == nullptr) {
+      return absl::InvalidArgumentError(
+          "Bootstrapping indices are only available for Random Forest "
+          "Learners");
+    }
+    return rf_learner->GetTrainingExampleIndices(num_examples, tree_idx);
+  }
+
  protected:
   std::unique_ptr<model::AbstractLearner> learner_;
 };
@@ -335,7 +350,10 @@ void init_learner(py::module_& m) {
            py::arg("validation_dataset_path"))
       .def("Evaluate", WithStatusOr(&GenericCCLearner::Evaluate),
            py::arg("dataset"), py::arg("fold_generator"),
-           py::arg("evaluation_options"), py::arg("deployment_evaluation"));
+           py::arg("evaluation_options"), py::arg("deployment_evaluation"))
+      .def("BootstrappingIndices",
+           WithStatusOr(&GenericCCLearner::BootstrappingIndices),
+           py::arg("num_examples"), py::arg("tree_idx"));
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

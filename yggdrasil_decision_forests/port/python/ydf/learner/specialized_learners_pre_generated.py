@@ -32,10 +32,11 @@ compilation.
 
 # pytype: skip-file
 # TODO: b/362480899 - Re-enable typing after pytype issue is fixed.
-from typing import Dict, Optional, Sequence, Set, Union
+from typing import Dict, List, Optional, Sequence, Set, Union
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
+from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
@@ -728,6 +729,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=True,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=True,
     )
 
   @classmethod
@@ -779,6 +781,62 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             },
         ),
     }
+
+  def in_bag_example_indices(
+      self, *, num_examples: int, tree_idx: int
+  ) -> List[int]:
+    r"""Returns the indices of the in-bag samples used for training a specific tree.
+
+    During the training of a Random Forest model, each tree is typically trained
+    on a bootstrap sample (a random sample with replacement) of the original
+    training dataset. This function allows you to retrieve the indices of the
+    examples from the original dataset that were included in the bootstrap
+    sample used to train the tree at the given index `tree_idx`.
+
+    Note that this method only returns reliable results when it is run with the
+    same YDF build on the same machine as used when training the model. The
+    sequence of indices depends on the random seed used during training as
+    configured in the `random_seed` hyperparameter.
+
+    Usage example:
+    ```python
+    import ydf
+    import pandas as pd
+
+    dataset = pd.read_csv("data.csv")
+    # Train a Random Forest model with 10 trees.
+    learner = ydf.RandomForestLearner(label="label", num_trees=10,
+    random_seed=1234)
+    model = learner.train(dataset)
+
+    # Get the indices for the 3rd tree (index 2).
+    indices = learner.in_bag_example_indices(
+        num_examples=dataset.shape[0], tree_idx=2
+    )
+    print(f"Indices for tree 2: {indices}")
+    ```
+
+    Args:
+      num_examples: The total number of examples in the training dataset that
+        the model is trained on. This should match the number of rows in the
+        training data.
+      tree_idx: The 0-based index of the tree within the forest for which to
+        retrieve the in-bag indices. This must be between 0 and `num_trees - 1`.
+
+    Returns:
+      A sorted list of integers representing the 0-based indices of the training
+      examples that were sampled to form the training set for the specified
+      tree.
+      The list will contain duplicates if an example was sampled multiple times.
+    """
+    if num_examples <= 0:
+      raise ValueError(
+          f"The number of examples must be positive, got {num_examples}"
+      )
+    if tree_idx < 0:
+      raise ValueError(f"The tree index must not be negative, got {tree_idx}")
+    learner = self._get_learner()
+    return learner.BootstrappingIndices(num_examples, tree_idx)
 
 
 class IsolationForestLearner(generic_learner.GenericCCLearner):
@@ -1152,6 +1210,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=False,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod
@@ -1647,7 +1706,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       term i.e. optimizes the splits to minimize the variance of "gradient /
       hessian. Available for all losses except regression. Default: False.
     validation_interval_in_trees: Evaluate the model on the validation set every
-      "validation_interval_in_trees" trees. Increasing this value reduce the
+      "validation_interval_in_trees" trees. Increasing this value reduces the
       cost of validation and can impact the early stopping policy (as early
       stopping is only tested during the validation). Default: 1.
     validation_ratio: Fraction of the training dataset used for validation if
@@ -2004,6 +2063,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=True,
         require_label=True,
         support_custom_loss=True,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod
@@ -2446,6 +2506,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=True,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod
@@ -3081,6 +3142,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=True,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod

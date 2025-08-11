@@ -64,7 +64,6 @@ cc_test(
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
-        "@ydf_cc//yggdrasil_decision_forests/utils:test",
         "@ydf_cc//yggdrasil_decision_forests/utils:testing_macros",
     ],
 )

@@ -972,6 +972,13 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     self.assertEqual(model.label_col_idx(), 0)
     self.assertEqual(model.label(), "my_label")
 
+  def test_in_bag_example_indices(self):
+    learner = specialized_learners.RandomForestLearner(label="income")
+    in_bag_indices = learner.in_bag_example_indices(
+        num_examples=500, tree_idx=4
+    )
+    self.assertLen(in_bag_indices, 500)
+
 
 if __name__ == "__main__":
   absltest.main()

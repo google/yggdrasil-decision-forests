@@ -34,6 +34,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -74,6 +75,34 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace random_forest {
+
+namespace {
+
+absl::StatusOr<std::vector<int64_t>> GenerateTreeSeeds(
+    const uint64_t random_seed,
+    const proto::RandomForestTrainingConfig& rf_config) {
+  std::vector<int64_t> tree_seeds;
+  int num_trees = rf_config.num_trees();
+  if (!rf_config.internal().individual_tree_seeds().empty()) {
+    if (rf_config.internal().individual_tree_seeds().size() !=
+        rf_config.num_trees()) {
+      return absl::InternalError(
+          "The number of tree seeds in the internal learner configuration does "
+          "not match the number of trees.");
+    }
+    tree_seeds = {rf_config.internal().individual_tree_seeds().begin(),
+                  rf_config.internal().individual_tree_seeds().end()};
+  } else {
+    auto random_engine = utils::RandomEngine(random_seed);
+    tree_seeds.reserve(num_trees);
+    for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
+      tree_seeds.push_back((random_engine)());
+    }
+  }
+  return tree_seeds;
+}
+
+}  // namespace
 
 constexpr double kAdaptativeWarmUpSeconds = 5.0;
 
@@ -396,6 +425,10 @@ RandomForestLearner::TrainWithStatusImpl(
       random_forest::proto::random_forest_config);
   RETURN_IF_ERROR(internal::SetDefaultHyperParameters(&rf_config));
 
+  ASSIGN_OR_RETURN(
+      const auto tree_seeds,
+      GenerateTreeSeeds(config_with_default.random_seed(), rf_config));
+
   // If the maximum model size is limited, "keep_non_leaf_label_distribution"
   // defaults to false.
   if (!rf_config.decision_tree().has_keep_non_leaf_label_distribution() &&
@@ -463,24 +496,6 @@ RandomForestLearner::TrainWithStatusImpl(
         vector_sequence_computer,
         decision_tree::gpu::VectorSequenceComputer::Create(
             vector_sequence_columns, /*use_gpu=*/deployment_.use_gpu()));
-  }
-
-  utils::RandomEngine global_random(config_with_default.random_seed());
-  // Individual seeds for each tree.
-  std::vector<int64_t> tree_seeds;
-  tree_seeds.reserve(rf_config.num_trees());
-
-  if (!rf_config.internal().individual_tree_seeds().empty()) {
-    if (rf_config.internal().individual_tree_seeds().size() !=
-        rf_config.num_trees()) {
-      return absl::InternalError("Wrong number of trees");
-    }
-    tree_seeds = {rf_config.internal().individual_tree_seeds().begin(),
-                  rf_config.internal().individual_tree_seeds().end()};
-  } else {
-    for (int tree_idx = 0; tree_idx < rf_config.num_trees(); tree_idx++) {
-      tree_seeds.push_back(global_random());
-    }
   }
   for (int tree_idx = 0; tree_idx < rf_config.num_trees(); tree_idx++) {
     mdl->AddTree(std::make_unique<decision_tree::DecisionTree>());
@@ -605,7 +620,7 @@ RandomForestLearner::TrainWithStatusImpl(
           return;
         }
 
-        float bootstrap_size_ratio_factor = 1.f;
+        std::optional<double> bootstrap_size_ratio_factor = std::nullopt;
         if (adaptative_work) {
           bootstrap_size_ratio_factor =
               adaptative_work->OptimalApproximationFactor();
@@ -653,41 +668,26 @@ RandomForestLearner::TrainWithStatusImpl(
 
         const absl::Time begin_single_tree = absl::Now();
 
-        utils::RandomEngine random(tree_seeds[tree_idx]);
-        // Examples selected for the training.
-        // Note: This in the inverse of the Out-of-bag (OOB) set.
-
         // TODO: Cache.
         std::vector<UnsignedExampleIdx> selected_examples;
 
         auto& decision_tree = (*mdl->mutable_decision_trees())[tree_idx];
-        if (rf_config.bootstrap_training_dataset()) {
-          if (!rf_config.sampling_with_replacement() &&
-              rf_config.bootstrap_size_ratio() == 1.f) {
-            static bool already_shown = false;
-            if (!already_shown) {
-              already_shown = true;
-              LOG(WARNING)
-                  << "Example sampling without replacement "
-                     "(sampling_with_replacement=false) with a sampling ratio "
-                     "of 1 (bootstrap_size_ratio=1). All the examples "
-                     "will be used for all the trees. You likely want to "
-                     "reduce the sampling ratio e.g. bootstrap_size_ratio=0.5.";
-            }
-          }
+        utils::RandomEngine random(tree_seeds[tree_idx]);
+        // Sample the examples use for training, i.e. the inverse of the
+        // out-of-bag set. It is important that sampling starts with a fresh
+        // random engine to make the OOB set reproducible without re-running the
+        // entire training.
+        auto status_sampling = internal::SampleTrainingExamples(
+            train_dataset.nrow(), rf_config, bootstrap_size_ratio_factor,
+            &random, &selected_examples);
 
-          const auto num_samples = std::max(
-              int64_t{1},
-              static_cast<int64_t>(static_cast<double>(train_dataset.nrow()) *
-                                   rf_config.bootstrap_size_ratio() *
-                                   bootstrap_size_ratio_factor));
-          internal::SampleTrainingExamples(
-              train_dataset.nrow(), num_samples,
-              rf_config.sampling_with_replacement(), &random,
-              &selected_examples);
-        } else {
-          selected_examples.resize(train_dataset.nrow());
-          std::iota(selected_examples.begin(), selected_examples.end(), 0);
+        {
+          utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+          concurrent_fields.status.Update(status_sampling);
+          if (!concurrent_fields.status.ok()) {
+            // Sampling training examples for one of the fields has failed.
+            return;
+          }
         }
 
         decision_tree::InternalTrainConfig internal_config;
@@ -761,7 +761,7 @@ RandomForestLearner::TrainWithStatusImpl(
         // will make the work manager inference more accurate.
         if (adaptative_work) {
           adaptative_work->ReportTaskDone(
-              bootstrap_size_ratio_factor,
+              *bootstrap_size_ratio_factor,
               absl::ToDoubleSeconds(absl::Now() - begin_single_tree));
         }
 
@@ -775,9 +775,9 @@ RandomForestLearner::TrainWithStatusImpl(
 
         const auto build_common_snippet_extra = [&]() -> std::string {
           std::string snippet;
-          if (bootstrap_size_ratio_factor < 1.f) {
+          if (bootstrap_size_ratio_factor.has_value()) {
             absl::StrAppendFormat(&snippet, " work-factor:%f",
-                                  bootstrap_size_ratio_factor);
+                                  *bootstrap_size_ratio_factor);
           }
           if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
             utils::concurrency::MutexLock lock2(&concurrent_fields.mutex);
@@ -960,6 +960,47 @@ RandomForestLearner::TrainWithStatusImpl(
     RETURN_IF_ERROR(vector_sequence_computer->Release());
   }
   return std::move(mdl);
+}
+
+absl::StatusOr<std::vector<UnsignedExampleIdx>>
+RandomForestLearner::GetTrainingExampleIndices(UnsignedExampleIdx dataset_size,
+                                               int tree_idx) const {
+  if (tree_idx < 0) {
+    return absl::InvalidArgumentError(absl::Substitute(
+        "The tree index must be non-negative, but got $0.", tree_idx));
+  }
+  const auto& rf_config =
+      training_config_.GetExtension(random_forest::proto::random_forest_config);
+  const auto num_trees = rf_config.num_trees();
+  if (num_trees < 1) {
+    return absl::InvalidArgumentError(absl::Substitute(
+        "The number of trees in the training configuration must "
+        "be at least 1, but got $0.",
+        num_trees));
+  }
+  if (tree_idx >= num_trees) {
+    return absl::InvalidArgumentError(
+        absl::Substitute("The tree index must be less than the number of trees "
+                         "($0), but got $1.",
+                         num_trees, tree_idx));
+  }
+  if (rf_config.adapt_bootstrap_size_ratio_for_maximum_training_duration()) {
+    return absl::InvalidArgumentError(
+        "The hyperparameter "
+        "`adapt_bootstrap_size_ratio_for_maximum_training_duration` is not "
+        "compatible with GetTrainingExampleIndices. This is because the "
+        "sampling ratio is not known beforehand.");
+  }
+  ASSIGN_OR_RETURN(
+      auto tree_seeds,
+      GenerateTreeSeeds(training_config_.random_seed(), rf_config));
+  std::vector<UnsignedExampleIdx> selected_examples;
+  DCHECK_LT(tree_idx, tree_seeds.size());
+  auto tree_random_engine = utils::RandomEngine(tree_seeds[tree_idx]);
+  RETURN_IF_ERROR(internal::SampleTrainingExamples(
+      dataset_size, rf_config, /*bootstrap_size_ratio_factor=*/
+      std::nullopt, &tree_random_engine, &selected_examples));
+  return selected_examples;
 }
 
 namespace internal {
@@ -1203,26 +1244,62 @@ void InitializeModelWithTrainingConfig(
   model->set_winner_take_all_inference(rf_config.winner_take_all_inference());
 }
 
-void SampleTrainingExamples(const UnsignedExampleIdx num_examples,
-                            const UnsignedExampleIdx num_samples,
-                            const bool with_replacement,
-                            utils::RandomEngine* random,
-                            std::vector<UnsignedExampleIdx>* selected) {
-  selected->resize(num_samples);
+absl::Status SampleTrainingExamples(
+    const UnsignedExampleIdx num_examples,
+    const proto::RandomForestTrainingConfig& rf_config,
+    std::optional<double> bootstrap_size_ratio_factor,
+    utils::RandomEngine* random, std::vector<UnsignedExampleIdx>* selected) {
+  // Early return if no sampling is necessary.
+  if (!rf_config.bootstrap_training_dataset()) {
+    STATUS_CHECK(!bootstrap_size_ratio_factor.has_value());
+    selected->resize(num_examples);
+    std::iota(selected->begin(), selected->end(), 0);
+    return absl::OkStatus();
+  }
 
-  if (with_replacement) {
-    selected->resize(num_samples);
+  double bootstrap_size_ratio = rf_config.bootstrap_size_ratio();
+
+  if (rf_config.adapt_bootstrap_size_ratio_for_maximum_training_duration()) {
+    if (!bootstrap_size_ratio_factor.has_value()) {
+      return absl::InvalidArgumentError(
+          "adapt_bootstrap_size_ratio_for_maximum_training_duration is set, "
+          "but bootstrap_size_ratio_factor is not provided");
+    }
+    bootstrap_size_ratio *= *bootstrap_size_ratio_factor;
+  } else {
+    if (bootstrap_size_ratio_factor.has_value()) {
+      return absl::InvalidArgumentError(
+          "adapt_bootstrap_size_ratio_for_maximum_training_duration is not "
+          "set, but bootstrap_size_ratio_factor is provided");
+    }
+  }
+
+  if (!rf_config.sampling_with_replacement() &&
+      rf_config.bootstrap_size_ratio() == 1.f) {
+    LOG_FIRST_N(WARNING, 1)
+        << "Example sampling without replacement "
+           "(sampling_with_replacement=false) with a sampling ratio "
+           "of 1 (bootstrap_size_ratio=1). All the examples "
+           "will be used for all the trees. You likely want to "
+           "reduce the sampling ratio e.g. bootstrap_size_ratio=0.5.";
+  }
+
+  const auto num_samples = std::max(
+      int64_t{1}, static_cast<int64_t>(static_cast<double>(num_examples) *
+                                       bootstrap_size_ratio));
+  selected->clear();
+  selected->reserve(num_samples);
+
+  if (rf_config.sampling_with_replacement()) {
     // Sampling with replacement.
     std::uniform_int_distribution<UnsignedExampleIdx> example_idx_distrib(
         0, num_examples - 1);
     for (UnsignedExampleIdx sample_idx = 0; sample_idx < num_samples;
          sample_idx++) {
-      (*selected)[sample_idx] = example_idx_distrib(*random);
+      selected->push_back(example_idx_distrib(*random));
     }
     std::sort(selected->begin(), selected->end());
   } else {
-    selected->clear();
-    selected->reserve(num_samples);
     // Sampling without replacement.
     std::uniform_real_distribution<float> dist_01;
     for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
@@ -1237,6 +1314,7 @@ void SampleTrainingExamples(const UnsignedExampleIdx num_examples,
       }
     }
   }
+  return absl::OkStatus();
 }
 
 absl::Status ExportOOBPredictions(
