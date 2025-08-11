@@ -368,6 +368,9 @@ Class: ydf.{self.__class__.__name__}
 Hyper-parameters: ydf.{self._hyperparameters}
 """
 
+  def __repr__(self) -> str:
+    return f"<ydf.{self.__class__.__name__}>"
+
   def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
     """Builds DS args with user inputs and guides for labels / special columns.
 

@@ -195,6 +195,9 @@ Class: ydf.{self.__class__.__name__}
 Use `model.describe()` for more details.
 """
 
+  def __repr__(self) -> str:
+    return f"<ydf.{self.__class__.__name__}>"
+
   @abc.abstractmethod
   def name(self) -> str:
     """Returns the name of the model type."""
