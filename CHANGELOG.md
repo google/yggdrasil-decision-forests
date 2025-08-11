@@ -3,6 +3,12 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
+## HEAD
+
+### Features
+
+-   Allow custom fields in model metadata.
+
 ## 1.11.0 - 2025-03-12
 
 ### Features

@@ -187,6 +187,19 @@ absl::Status GetGenericHyperParameterSpecification(
   }
 
   {
+    ASSIGN_OR_RETURN(
+        auto param,
+        get_params(kHParamCategoricalSetSplitGreedyMaximumMaskSize));
+    param->mutable_integer()->set_default_value(
+        config.categorical_set_greedy_forward().max_selected_items());
+    param->mutable_integer()->set_minimum(-1);
+    param->mutable_documentation()->set_proto_field(
+        "categorical_set_greedy_forward");
+    param->mutable_documentation()->set_description(
+        R"(For categorical set splits e.g. texts. Maximum number of attribute values on the positive side of the split mask. Smaller values might improve training speed but lead to worse models. Setting this parameter to 1 is equal to one-hot encoding the attribute values. Set to -1 for no maximum (default).)");
+  }
+
+  {
     ASSIGN_OR_RETURN(auto param,
                      get_params(kHParamCategoricalSetSplitMaxNumItems));
     param->mutable_integer()->set_default_value(
@@ -605,6 +618,36 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
         R"(For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical vectors). The number of randomly generated anchor values. A larger value can improve the model quality but takes longer to train.)");
   }
 
+  {
+    ASSIGN_OR_RETURN(
+        auto param,
+        get_params(kHParamNumericalVectorSequenceEnableCloserThanConditions));
+    param->mutable_categorical()->set_default_value(
+        config.numerical_vector_sequence().enable_closer_than_conditions()
+            ? kTrue
+            : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
+    param->mutable_documentation()->set_description(
+        R"(For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical vectors). If true, enable conditions of type |x-A|^2 <= T for learned anchor A and threshold T, and any vector x in the sequence.)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(
+        auto param,
+        get_params(
+            kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions));
+    param->mutable_categorical()->set_default_value(
+        config.numerical_vector_sequence()
+                .enable_projected_more_than_conditions()
+            ? kTrue
+            : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
+    param->mutable_documentation()->set_description(
+        R"(For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical vectors). If true, enable conditions of type x*A >= T for learned anchor A and threshold T, and any vector x in the sequence.)");
+  }
+
   RETURN_IF_ERROR(PruneInvalidHyperparameters(hparam_def, valid_hyperparameters,
                                               invalid_hyperparameters));
 
@@ -698,6 +741,15 @@ absl::Status SetHyperParameters(
     if (hparam.has_value()) {
       dt_config->mutable_categorical_set_greedy_forward()->set_sampling(
           hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamCategoricalSetSplitGreedyMaximumMaskSize);
+    if (hparam.has_value()) {
+      dt_config->mutable_categorical_set_greedy_forward()
+          ->set_max_selected_items(hparam.value().value().integer());
     }
   }
 
@@ -1156,6 +1208,26 @@ absl::Status SetHyperParameters(
     if (hparam.has_value()) {
       dt_config->mutable_numerical_vector_sequence()
           ->set_num_random_selected_anchors(hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamNumericalVectorSequenceEnableCloserThanConditions);
+    if (hparam.has_value()) {
+      dt_config->mutable_numerical_vector_sequence()
+          ->set_enable_closer_than_conditions(
+              hparam.value().value().categorical() == kTrue);
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions);
+    if (hparam.has_value()) {
+      dt_config->mutable_numerical_vector_sequence()
+          ->set_enable_projected_more_than_conditions(
+              hparam.value().value().categorical() == kTrue);
     }
   }
 

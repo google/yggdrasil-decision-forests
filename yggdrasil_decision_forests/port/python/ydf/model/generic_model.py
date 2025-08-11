@@ -38,6 +38,7 @@ from ydf.model import template_cpp_export
 from ydf.utils import concurrency
 from ydf.utils import html
 from ydf.utils import log
+from yggdrasil_decision_forests.serving.embed import embed_pb2
 from yggdrasil_decision_forests.utils import model_analysis_pb2
 
 
@@ -59,9 +60,10 @@ class Task(enum.Enum):
 
 
   Attributes:
-    CLASSIFICATION: Predict a categorical label i.e., an item of an enumeration.
-    REGRESSION: Predict a numerical label i.e., a quantity.
-    RANKING: Rank items by label values. When using default NDCG settings, the
+    CLASSIFICATION: Predicts a categorical label (i.e., an item of an
+      enumeration).
+    REGRESSION: Predicts a numerical label (i.e., a quantity).
+    RANKING: Ranks items by label values. When using default NDCG settings, the
       label is expected to be between 0 and 4 with NDCG semantic (0: completely
       unrelated, 4: perfect match).
     CATEGORICAL_UPLIFT: Predicts the incremental impact of a treatment on a
@@ -70,8 +72,9 @@ class Task(enum.Enum):
       numerical outcome.
     ANOMALY_DETECTION: Predicts if an instance is similar to the majority of the
       training data or anomalous (a.k.a. an outlier). An anomaly detection
-      prediction is a value between 0 and 1, where 0 indicates the possible most
-      normal instance and 1 indicates the most possible anomalous instance.
+      prediction is a value between 0 and 1, where 0 indicates the most normal
+      instance possible and 1 indicates the most anomalous instance possible.
+    SURVIVAL_ANALYSIS: Predicts the survival probability of an individual.
   """
 
   CLASSIFICATION = "CLASSIFICATION"
@@ -80,6 +83,7 @@ class Task(enum.Enum):
   CATEGORICAL_UPLIFT = "CATEGORICAL_UPLIFT"
   NUMERICAL_UPLIFT = "NUMERICAL_UPLIFT"
   ANOMALY_DETECTION = "ANOMALY_DETECTION"
+  SURVIVAL_ANALYSIS = "SURVIVAL_ANALYSIS"
 
   def _to_proto_type(self) -> abstract_model_pb2.Task:
     if self in TASK_TO_PROTO:
@@ -103,6 +107,7 @@ TASK_TO_PROTO = {
     Task.CATEGORICAL_UPLIFT: abstract_model_pb2.CATEGORICAL_UPLIFT,
     Task.NUMERICAL_UPLIFT: abstract_model_pb2.NUMERICAL_UPLIFT,
     Task.ANOMALY_DETECTION: abstract_model_pb2.ANOMALY_DETECTION,
+    Task.SURVIVAL_ANALYSIS: abstract_model_pb2.SURVIVAL_ANALYSIS,
 }
 PROTO_TO_TASK = {v: k for k, v in TASK_TO_PROTO.items()}
 
@@ -116,7 +121,7 @@ class ModelIOOptions:
       models to exist in the same folder. Doing so is heavily DISCOURAGED
       outside of edge cases. When loading a model, the prefix, if not specified,
       is auto-detected if possible. When saving a model, the empty string is
-      used as file prefix unless it is explicitly specified.
+      used as a file prefix unless it is explicitly specified.
   """
 
   file_prefix: Optional[str] = None
@@ -154,6 +159,31 @@ class InputFeature:
   column_idx: int
 
 
+@dataclasses.dataclass(frozen=True)
+class TrainingLogEntry:
+  """Evaluation metrics computed during the training of the model.
+
+  This structure is returned by `model.training_logs()`. It contains the
+  evaluation metrics of the model at a specific point during the training (e.g.,
+  after a given number of trees have been trained).
+
+  Attributes:
+    iteration: Training iteration when the evaluation was created. For many
+      models, this is equal to the number of trees.
+    evaluation: Evaluation metrics at the given training iteration. For Gradient
+      Boosted Trees, this is the evaluation on the validation dataset. For
+      Random Forests, this is the out-of-bag evaluation.
+    training_evaluation: Evaluation metrics computed on the training dataset at
+      the given iteration. The training evaluation is generally less insightful
+      than the main evaluation (which is computed on a validation or OOB
+      dataset), but it can be helpful for model debugging.
+  """
+
+  iteration: int
+  evaluation: metric.Evaluation
+  training_evaluation: Optional[metric.Evaluation]
+
+
 class GenericModel(abc.ABC):
   """Abstract superclass for all YDF models."""
 
@@ -162,8 +192,11 @@ class GenericModel(abc.ABC):
 Model: {self.name()}
 Task: {self.task().name}
 Class: ydf.{self.__class__.__name__}
-Use `model.describe()` for more details
+Use `model.describe()` for more details.
 """
+
+  def __repr__(self) -> str:
+    return f"<ydf.{self.__class__.__name__}>"
 
   @abc.abstractmethod
   def name(self) -> str:
@@ -188,8 +221,8 @@ Use `model.describe()` for more details
     """Metadata associated with the model.
 
     A model's metadata contains information stored with the model that does not
-    influence the model's predictions (e.g. data created). When distributing a
-    model for wide release, it may be useful to clear / modify the model
+    influence the model's predictions (e.g., creation time). When distributing a
+    model for wide release, it may be useful to clear or modify the model
     metadata with `model.set_metadata(ydf.ModelMetadata())`.
 
     Returns:
@@ -224,12 +257,12 @@ Use `model.describe()` for more details
     """Description of the model.
 
     Args:
-      output_format: Format of the display: - auto: Use the "notebook" format if
-        executed in an IPython notebook / Colab. Otherwise, use the "text"
-        format. - text: Text description of the model. - html: Html description
-        of the model. - notebook: Html description of the model displayed in a
-        notebook cell.
-      full_details: Should the full model be printed. This can be large.
+      output_format: Format of the display: - "auto": Use "notebook" format if
+        in an IPython notebook/Colab, otherwise use "text". - "text": Text
+        description. - "html": HTML description. - "notebook": HTML description
+        displayed in a notebook cell.
+      full_details: If true, prints the full model structure, which can be very
+        large.
 
     Returns:
       The model description.
@@ -238,7 +271,7 @@ Use `model.describe()` for more details
 
   @abc.abstractmethod
   def data_spec(self) -> data_spec_pb2.DataSpecification:
-    """Returns the data spec used for train the model."""
+    """Returns the data spec used to train the model."""
     raise NotImplementedError
 
   def set_data_spec(self, data_spec: data_spec_pb2.DataSpecification) -> None:
@@ -250,7 +283,7 @@ Use `model.describe()` for more details
       data_spec: New dataspec.
     """
     raise NotImplementedError(
-        "This model does not support for the dataspec to be updated"
+        "This model does not support updating the dataspec."
     )
 
   @abc.abstractmethod
@@ -282,7 +315,8 @@ Use `model.describe()` for more details
         engines. The impact of this parameter on the results depends on the
         architecture running the benchmark (notably, cache sizes).
       num_threads: Number of threads used for the multi-threaded benchmark. If
-        not specified, the number of threads is set to the number of cpu cores.
+        not specified, the number of threads is set to the number of available
+        CPU cores.
 
     Returns:
       Benchmark results.
@@ -319,7 +353,8 @@ Use `model.describe()` for more details
 
     # Train a Random Forest model
     df = pd.read_csv("my_dataset.csv")
-    model = ydf.RandomForestLearner().train(df)
+    # This assumes "my_dataset.csv" contains a column named "label".
+    model = ydf.RandomForestLearner(label="label").train(df)
 
     # Save the model to disk
     model.save("/models/my_model")
@@ -328,10 +363,10 @@ Use `model.describe()` for more details
     Args:
       path: Path to directory to store the model in.
       advanced_options: Advanced options for saving models.
-      pure_serving: If true, save the model without debug information to save
-        disk space. Note that this option might require additional memory during
-        saving, even though the resulting model can be significantly smaller on
-        disk.
+      pure_serving: If true, saves the model without training-specific metadata
+        and debug information to reduce disk space. Note that this option might
+        require additional memory during saving, even though the resulting model
+        can be significantly smaller on disk.
     """
     raise NotImplementedError
 
@@ -339,9 +374,9 @@ Use `model.describe()` for more details
   def serialize(self) -> bytes:
     """Serializes a model to a sequence of bytes (i.e. `bytes`).
 
-    A serialized model is equivalent to model saved with `model.save`. It can
+    A serialized model is equivalent to a model saved with `model.save`. It can
     possibly contain meta-data related to model training and interpretation. To
-    minimize the size of a serialized model, removes this meta-data by passing
+    minimize the size of a serialized model, remove this meta-data by passing
     the argument `pure_serving_model=True` to the `train` method.
 
     Usage example:
@@ -356,7 +391,7 @@ Use `model.describe()` for more details
     model = learner.train(dataset)
 
     # Serialize model
-    # Note: serialized_model is a bytes.
+    # Note: serialized_model is a bytes object.
     serialized_model = model.serialize()
 
     # Deserialize model
@@ -404,15 +439,14 @@ Use `model.describe()` for more details
     * *Binary Classification:* For models with two classes
     (`len(model.label_classes()) == 2`), the output is an array of shape
     `[num_examples]`. Each value represents the predicted probability of the
-    positive class ( `model.label_classes()[1]` ).  To get the probability of
+    positive class (`model.label_classes()[1]`). To get the probability of
     the negative class, use `1 - model.predict(dataset)`.
 
-    Here is an example of how to get the most probably class:
+    Here is an example of how to get the most probable class:
 
     ```python
     prediction_proba = model.predict(test_ds)
-    predicted_classes = np.take(model.label_classes(), prediction_proba
-    >= 0.5)
+    predicted_classes = np.take(model.label_classes(), prediction_proba >= 0.5)
 
     # Or simply
     predicted_classes = model.predict_class(test_ds)
@@ -420,9 +454,9 @@ Use `model.describe()` for more details
 
     * *Multi-class Classification:* For models with more than two classes, the
     output is an array of shape `[num_examples, num_classes]`. The value at
-    index `[i, j]`  is the probability of class `j` for example `i`.
+    index `[i, j]` is the probability of class `j` for example `i`.
 
-    Here is an example of how to get the most probably class:
+    Here is an example of how to get the most probable class:
 
     ```python
     prediction_proba = model.predict(test_ds)
@@ -448,14 +482,14 @@ Use `model.describe()` for more details
     **Categorical Uplift (`model.task() == ydf.Task.CATEGORICAL_UPLIFT`)**
 
     The output is an array of shape `[num_examples]`, where each value
-    represents the predicted uplift.  Positive values indicate a positive
+    represents the predicted uplift. Positive values indicate a positive
     effect of the treatment on the outcome, while values close to zero
     indicate little to no effect.
 
     **Numerical Uplift (`model.task() == ydf.Task.NUMERICAL_UPLIFT`)**
 
-    The output is an array of shape `[num_examples]`, with the
-    interpretation being the same as for Categorical Uplift.
+    The output is an array of shape `[num_examples]`, and the
+    interpretation is the same as for Categorical Uplift.
 
     **Anomaly Detection (`model.task() == ydf.Task.ANOMALY_DETECTION`)**
 
@@ -473,7 +507,7 @@ Use `model.describe()` for more details
         slow engine of YDF is an order of magnitude slower than the other
         prediction engines. There exist very rare edge cases where predictions
         with the regular engines fail, e.g., models with a very large number of
-        categorical conditions. It is only in these cases, that users should use
+        categorical conditions. It is only in these cases that users should use
         the slow engine and report the issue to the YDF developers.
       num_threads: Number of threads used to run the model.
 
@@ -481,6 +515,60 @@ Use `model.describe()` for more details
       The predictions of the model on the given dataset.
     """
     raise NotImplementedError
+
+  def predict_shap(
+      self,
+      data: dataset.InputDataset,
+      *,
+      num_threads: Optional[int] = None,
+  ) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+    """Returns the SHAP value of the model for each example in the dataset.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.RandomForestLearner(label="label").train(train_ds)
+
+    # Computes the SHAP values on the test dataset.
+    test_ds = pd.read_csv("test.csv")
+    shap_values, initial_value = model.predict_shap(test_ds)
+    ```
+
+    The shap values (`shap_values`) is a dictionary mapping feature names to a
+    float32 Numpy array of shape [num examples, num output] or [num examples]
+    (if the model has a single output).
+
+    The second returned value `initial_value` is a float32 Numpy array of shape
+    [num output] or [] (if the model has a single output) with the initial
+    (a.k.a. offset) predictions.
+
+    The prediction of the model (computed with `model.predict`) is equal to
+    the `initial_value` plus all the SHAP values `shap_values`. Note that for
+    models with an activation function (a.k.a. linkage function, e.g., a
+    sigmoid), the SHAP values are computed before the activation function
+    (e.g., on the logits).
+
+    The SHAP `initial_value` is generally not equal to the "initial prediction"
+    of some models (e.g. gradient boosted trees).
+
+    Args:
+      data: Dataset. Supported formats: VerticalDataset, (typed) path, list of
+        (typed) paths, Pandas DataFrame, Xarray Dataset, TensorFlow Dataset,
+        PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
+        string to NumPy array or lists. If the dataset contains the label
+        column, that column is ignored.
+      num_threads: Number of threads used to run the model.
+
+    Returns:
+      A tuple containing a dictionary of SHAP values and the initial model
+      value.
+    """
+    raise NotImplementedError("SHAP is not implemented for this model")
 
   @abc.abstractmethod
   def evaluate(
@@ -494,7 +582,7 @@ Use `model.describe()` for more details
       bootstrapping: Union[bool, int] = False,
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
-      evaluation_task: Optional[Task] = None,
+      map_truncation: int = 5,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> metric.Evaluation:
@@ -515,13 +603,12 @@ Use `model.describe()` for more details
     ```
 
     In a notebook, if a cell returns an evaluation object, this evaluation will
-    be as a rich html with plots:
+    be rendered as a rich HTML with plots:
 
-    ```
+    ```python
     evaluation = model.evaluate(test_ds)
     # If model is an anomaly detection model:
-    # evaluation = model.evaluate(test_ds,
-                                  evaluation_task=ydf.Task.CLASSIFICATION)
+    # evaluation = model.evaluate(test_ds, task=ydf.Task.CLASSIFICATION)
     evaluation
     ```
 
@@ -534,11 +621,11 @@ Use `model.describe()` for more details
     model = ydf.RandomForestLearner(label="label",
     task=ydf.Task.REGRESSION).train(train_ds)
 
-    # Evaluate the model as a regressive model
-    regressive_evaluation = model.evaluate(test_ds)
+    # Evaluate the model as a regression model
+    regression_evaluation = model.evaluate(test_ds)
 
-    # Evaluate the model as a ranking model model
-    regressive_evaluation = model.evaluate(test_ds,
+    # Evaluate the model as a ranking model
+    ranking_evaluation = model.evaluate(test_ds,
       task=ydf.Task.RANKING, group="group_column")
     ```
 
@@ -548,8 +635,8 @@ Use `model.describe()` for more details
         PyGrain DataLoader and Dataset (experimental, Linux only), dictionary of
         string to NumPy array or lists.
       weighted: If true, the evaluation is weighted according to the training
-        weights. If false, the evaluation is non-weighted. b/351279797: Change
-        default to weights=True.
+        weights. If false, the evaluation is non-weighted. The default value
+        will change to `True` in a future version.
       task: Override the task of the model during the evaluation. If None
         (default), the model is evaluated according to its training task.
       label: Override the label used to evaluate the model. If None (default),
@@ -565,14 +652,15 @@ Use `model.describe()` for more details
         bootstrapping will not yield useful results.
       ndcg_truncation: Controls at which ranking position the NDCG metric should
         be truncated. Default to 5. Ignored for non-ranking models.
-      mrr_truncation: Controls at which ranking position the MRR metric loss
-        should be truncated. Default to 5. Ignored for non-ranking models.
-      evaluation_task: Deprecated. Use `task` instead.
+      mrr_truncation: Controls at which ranking position the MRR metric should
+        be truncated. Default to 5. Ignored for non-ranking models.
+      map_truncation: Controls at which ranking position the MAP metric should
+        be truncated. Default to 5. Ignored for non-ranking models.
       use_slow_engine: If true, uses the slow engine for making predictions. The
         slow engine of YDF is an order of magnitude slower than the other
         prediction engines. There exist very rare edge cases where predictions
         with the regular engines fail, e.g., models with a very large number of
-        categorical conditions. It is only in these cases, that users should use
+        categorical conditions. It is only in these cases that users should use
         the slow engine and report the issue to the YDF developers.
       num_threads: Number of threads used to run the model.
 
@@ -606,10 +694,10 @@ Use `model.describe()` for more details
     # We want to explain the model prediction on the first test example.
     selected_example = test_ds.iloc[:1]
 
-    analysis = model.analyze_prediction(selected_example, test_ds)
+    explanation = model.analyze_prediction(selected_example)
 
-    # Display the analysis in a notebook.
-    analysis
+    # Display the explanation in a notebook.
+    explanation
     ```
 
     Args:
@@ -617,7 +705,7 @@ Use `model.describe()` for more details
         (typed) path, list of (typed) paths, Pandas DataFrame, Xarray Dataset,
         TensorFlow Dataset, PyGrain DataLoader and Dataset (experimental, Linux
         only), dictionary of string to NumPy array or lists.
-      features: If specified, only analyse the following features and display
+      features: If specified, only analyze the following features and display
         the features in this order.
 
     Returns:
@@ -633,6 +721,8 @@ Use `model.describe()` for more details
       num_bins: int = 50,
       partial_dependence_plot: bool = True,
       conditional_expectation_plot: bool = True,
+      permutation_variable_importance: bool = True,
+      shap_values: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
@@ -676,14 +766,16 @@ Use `model.describe()` for more details
         expensive to compute. On large datasets, use a small sampling value e.g.
         0.01.
       num_bins: Number of bins used to accumulate statistics. A large value
-        increase the resolution of the plots but takes more time to compute.
+        increases the resolution of the plots but takes more time to compute.
       partial_dependence_plot: Compute partial dependency plots a.k.a PDPs.
         Expensive to compute.
       conditional_expectation_plot: Compute the conditional expectation plots
         a.k.a. CEP. Cheap to compute.
+      permutation_variable_importance: Compute permutation variable importances.
+      shap_values: Compute SHAP values based metrics.
       permutation_variable_importance_rounds: If >1, computes permutation
         variable importances using "permutation_variable_importance_rounds"
-        rounds. The most rounds the more accurate the results. Using a single
+        rounds. The more rounds the more accurate the results. Using a single
         round is often acceptable i.e. permutation_variable_importance_rounds=1.
         If permutation_variable_importance_rounds=0, disables the computation of
         permutation variable importances.
@@ -701,6 +793,17 @@ Use `model.describe()` for more details
   @abc.abstractmethod
   def to_cpp(self, key: str = "my_model") -> str:
     """Generates the code of a .h file to run the model in C++.
+
+    Relation to "to_standalone_cc": The "to_cpp" method is currently the
+    generally
+    recommended, fastest and most model compatible one to productionize models
+    in C++. The alternative function "to_standalone_cc" aims to replace it, but
+    it
+    currently slower and has worst compatbility. However, "to_standalone_cc"
+    produces already much smaller binaries (up to 1000x smaller for the same
+    model) and has zero dependencies make it suited for size-critical and
+    non-google3 develoment. See the "to_standalone_cc" documentation for a
+    comparison of both approach.
 
     How to use this function:
 
@@ -728,10 +831,83 @@ Use `model.describe()` for more details
     for more details.
 
     Args:
-      key: Name of the model. Used to define the c++ namespace of the model.
+      key: Name of the model. Used to define the C++ namespace of the model.
 
     Returns:
       String containing an example header for running the model in C++.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def to_standalone_cc(
+      self,
+      name: str = "ydf_model",
+      algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      categorical_from_string: bool = False,
+  ) -> Union[str, Dict[str, str]]:
+    """Generates the standalone code of a .h file to run the model in C++.
+
+    How to use this function:
+
+    1. Copy the output of this function in a new .h file.
+    2. In your library, call the model as follows:
+      ```c++
+      using namespace <name>;
+      const auto pred = Prediction(Instance{.f1=5, f2=F2:kRed});
+      ```
+      Note: The function is thread safe.
+
+    Alternatively, instead of generating and copy/pasting the C++ code
+    manually, you can use the "cc_ydf_standalone_model " equivalent build rule.
+
+    1. Save the model with `model.save(...)` in a directory in Google3.
+    2. Create a BUILD file with a filegroup in the model directory e.g.:
+      ```
+      filegroup(
+        name = "model",
+        srcs = glob(["**"]),
+      )
+      ```
+    3. In your library's BUILD, create a "cc_ydf_standalone_model " build rule.
+      ```
+      load("//external/ydf_cc/yggdrasil_decision_forests/serving/embed:embed.bzl",
+        "cc_ydf_standalone_model ")
+      cc_ydf_standalone_model (
+        name = "my_model",
+        classification_output = "SCORE",
+        data = "<path to filegroup>",
+      )
+      ```
+    4. In your cc_binary or cc_library, add ":my_model" as a dependency.
+    5. In your C++ code, inlcude:
+      ```c++
+      #include "<path to BUILD>/my_model.h"
+      ```
+      Then call:
+      ```c++
+      using namespace <name>;
+      const auto pred = Prediction(Instance{.f1=5, f2=F2:kRed});
+      ```
+
+    Args:
+      name: Name of the model. Used to define the C++ namespace of the model.
+      algorithm: Underlying algorithm used to compute the predictions. Can be
+        "ROUTING" (default; faster and smaller binary) or "IF_ELSE" (redable
+        if-else conditions).
+      classification_output: Output of the model if the model is a
+        classification model. Can be "CLASS" (default; fast), "SCORE" (raw score
+        of all the classes, e.g. logits), "PROBABILITY" (probability of all the
+        classes; slower than other approaches as it requires the evaluation of a
+        soft-max or equivalent).
+      categorical_from_string: If true, generates functions to create
+        categorical feature values from strings. For example, for a categorical
+        feature "X" with an associated "FeatureX" enum class, the method
+        "FeatureXFromString(absl::string_view name) -> FeatureX" is created.
+
+    Returns:
+      Source code content (if there is only one file) or dictionary of filename
+      to source code content.
     """
     raise NotImplementedError
 
@@ -741,7 +917,7 @@ Use `model.describe()` for more details
       path: str,
       input_model_signature_fn: Any = None,
       *,
-      mode: Literal["keras", "tf"] = "keras",
+      mode: Literal["keras", "tf"] = "tf",
       feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
       servo_api: bool = False,
       feed_example_proto: bool = False,
@@ -794,7 +970,7 @@ Use `model.describe()` for more details
     })
     ```
 
-    TensorFlow SavedModel do not cast automatically feature values. For
+    TensorFlow SavedModels do not automatically cast feature values. For
     instance, a model trained with a dtype=float32 semantic=numerical feature,
     will require for this feature to be fed as float32 numbers during inference.
     You can override the dtype of a feature with the `feature_dtypes` argument:
@@ -862,7 +1038,7 @@ Use `model.describe()` for more details
     )
 
     # Train a model on the pre-processed dataset.
-    ydf_model = specialized_learners.RandomForestLearner(
+    ydf_model = ydf.RandomForestLearner(
         label="l",
         task=generic_learner.Task.CLASSIFICATION,
     ).train(processed_dataset)
@@ -873,7 +1049,7 @@ Use `model.describe()` for more details
         mode="tf",
         feed_example_proto=False,
         pre_processing=pre_processing,
-        tensor_specs{
+        tensor_specs={
             "f1": tf.TensorSpec(shape=[None], name="f1", dtype=tf.float64),
             "f2": tf.TensorSpec(shape=[None], name="f2", dtype=tf.float64),
         }
@@ -899,6 +1075,9 @@ Use `model.describe()` for more details
 
     For more flexibility, use the method `to_tensorflow_function` instead of
     `to_tensorflow_saved_model`.
+
+    Note that export to Tensorflow is not yet available for Isolation Forest
+    models.
 
     Args:
       path: Path to store the Tensorflow Decision Forests model.
@@ -928,7 +1107,7 @@ Use `model.describe()` for more details
         with mode="tf". If false, outputs the raw model predictions.
       feed_example_proto: If false, the model expects for the input features to
         be provided as TensorFlow values. This is most efficient way to make
-        predictions. If true, the model expects for the input featurs to be
+        predictions. If true, the model expects for the input features to be
         provided as a binary serialized TensorFlow Example proto. This is the
         format expected by VertexAI and most TensorFlow Serving pipelines.
       pre_processing: Optional TensorFlow function or module to apply on the
@@ -983,6 +1162,9 @@ Use `model.describe()` for more details
     default in various platforms such as Servomatic, TensorFlow Serving, Vertex
     AI, and TensorFlow.js.
 
+    Note that export to Tensorflow is not yet available for Isolation Forest
+    models.
+
     Usage example:
 
     ```python
@@ -1015,7 +1197,7 @@ Use `model.describe()` for more details
       can_be_saved: If can_be_saved = True (default), the returned module can be
         saved using `tf.saved_model.save`. In this case, files created in
         temporary directory during the conversion are not removed when
-        `to_tensorflow_function` exit, and those files should still be present
+        `to_tensorflow_function` exits, and those files should still be present
         when calling `tf.saved_model.save`. If can_be_saved = False, the files
         created in the temporary directory during conversion are immediately
         removed, and the returned object cannot be serialized with
@@ -1159,7 +1341,7 @@ Use `model.describe()` for more details
     ```python
     # Train a Random Forest. Enable the computation of OOB (out-of-bag) variable
     # importances.
-    model = ydf.RandomForestModel(compute_oob_variable_importances=True,
+    model = ydf.RandomForestLearner(compute_oob_variable_importances=True,
                                   label=...).train(ds)
     # List the available variable importances.
     print(model.variable_importances().keys())
@@ -1179,6 +1361,10 @@ Use `model.describe()` for more details
 
   @abc.abstractmethod
   def label_col_idx(self) -> int:
+    """Returns the index of the label column in the dataspec or -1.
+
+    If the model has been trained without a label, returns -1.
+    """
     raise NotImplementedError
 
   @abc.abstractmethod
@@ -1240,6 +1426,44 @@ Use `model.describe()` for more details
     """
     raise NotImplementedError
 
+  def training_logs(self) -> List[TrainingLogEntry]:
+    """Returns the model's training logs.
+
+    The training logs contain performance metrics calculated periodically during
+    the model's training. The content of the logs depends on the model type.
+
+    The method used for evaluation depends on the model type and
+    hyperparameters. Notably, Random Forests use OOB evaluation and Gradient
+    Boosted Trees use evaluation on the validation dataset. Therefore,
+    training logs are not comparable between different model types.
+
+    For some model types, the training logs may also contain an evalution on the
+    training dataset.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.GradientBoostedTreesLearner(label="label").train(train_ds)
+
+    # Get the training logs
+    logs = model.training_logs()
+
+    # Plot the accuracy
+    plt.plot(
+        [log.iteration for log in logs],
+        [log.evaluation.accuracy for log in logs]
+    )
+    ```
+    """
+    raise NotImplementedError(
+        "Training logs are not available for this model type."
+    )
+
   def input_features(self) -> Sequence[InputFeature]:
     """Returns the input features of the model.
 
@@ -1265,8 +1489,16 @@ Use `model.describe()` for more details
 
     return [f.name for f in self.input_features()]
 
-  def label(self) -> str:
-    """Name of the label column."""
+  def label(self) -> Optional[str]:
+    """Name of the label column or None if the model has no label column."""
+    label_col_idx = self.label_col_idx()
+    if label_col_idx < -1:
+      raise ValueError(
+          f"Invalid label column index {label_col_idx}. This model might be"
+          " corrupted."
+      )
+    if label_col_idx == -1:
+      return None
     return self.data_spec().columns[self.label_col_idx()].name
 
   def label_classes(self) -> List[str]:
@@ -1520,6 +1752,27 @@ class GenericCCModel(GenericModel):
       )
     return result
 
+  def predict_shap(
+      self,
+      data: dataset.InputDataset,
+      *,
+      num_threads: Optional[int] = None,
+  ) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+    if num_threads is None:
+      num_threads = concurrency.determine_optimal_num_threads(training=False)
+
+    with log.cc_log_context():
+      # The data spec contains the label / weights /  ranking group / uplift
+      # treatment column, but those are not required for making predictions.
+      ds = dataset.create_vertical_dataset(
+          data,
+          data_spec=self._model.data_spec(),
+          required_columns=self.input_feature_names(),
+      )
+      return self._model.PredictShap(
+          ds._dataset, num_threads=num_threads  # pylint: disable=protected-access
+      )
+
   def evaluate(
       self,
       data: dataset.InputDataset,
@@ -1531,22 +1784,12 @@ class GenericCCModel(GenericModel):
       bootstrapping: Union[bool, int] = False,
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
-      evaluation_task: Optional[Task] = None,
+      map_truncation: int = 5,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> metric.Evaluation:
     if num_threads is None:
       num_threads = concurrency.determine_optimal_num_threads(training=False)
-
-    # Warning about deprecation of "evaluation_task"
-    if evaluation_task is not None:
-      log.warning(
-          "The `evaluation_task` argument is deprecated. Use `task` instead.",
-          message_id=log.WarningMessage.DEPRECATED_EVALUATION_TASK,
-      )
-      if task is not None:
-        raise ValueError("Cannot specify both `task` and `evaluation_task`")
-      task = evaluation_task
 
     # Warning about change default value of "weighted")
     if weighted is None:
@@ -1574,6 +1817,20 @@ class GenericCCModel(GenericModel):
           " is evaluated the same way it was trained.",
           message_id=log.WarningMessage.UNNECESSARY_LABEL_ARGUMENT,
       )
+
+    if self.label() is None:
+      if self.task() == Task.ANOMALY_DETECTION:
+        raise ValueError(
+            "This Anomaly Detection model has been trained without specifying"
+            " the label column during training. Set `label=` in the learner"
+            " before training to enable model evaluation. Alternatively, use"
+            " `ydf.evaluate_predictions()` to evaluate the model without"
+            " specifying a label.",
+        )
+      else:
+        raise ValueError(
+            "This model does not have a label and cannot be evaluated."
+        )
 
     if isinstance(bootstrapping, bool):
       bootstrapping_samples = 2000 if bootstrapping else -1
@@ -1607,7 +1864,9 @@ class GenericCCModel(GenericModel):
           bootstrapping_samples=bootstrapping_samples,
           task=task._to_proto_type(),  # pylint: disable=protected-access
           ranking=metric_pb2.EvaluationOptions.Ranking(
-              ndcg_truncation=ndcg_truncation, mrr_truncation=mrr_truncation
+              ndcg_truncation=ndcg_truncation,
+              mrr_truncation=mrr_truncation,
+              map_truncation=map_truncation,
           )
           if task == Task.RANKING
           else None,
@@ -1648,6 +1907,8 @@ class GenericCCModel(GenericModel):
       num_bins: int = 50,
       partial_dependence_plot: bool = True,
       conditional_expectation_plot: bool = True,
+      permutation_variable_importance: bool = True,
+      shap_values: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
@@ -1658,7 +1919,7 @@ class GenericCCModel(GenericModel):
 
     enable_permutation_variable_importances = (
         permutation_variable_importance_rounds > 0
-    )
+    ) and permutation_variable_importance
     if (
         enable_permutation_variable_importances
         and self.task() == Task.ANOMALY_DETECTION
@@ -1694,8 +1955,13 @@ class GenericCCModel(GenericModel):
               enabled=enable_permutation_variable_importances,
               num_rounds=permutation_variable_importance_rounds,
           ),
+          shap_variable_importance=model_analysis_pb2.Options.ShapVariableImportance(
+              enabled=shap_values,
+              example_sampling=sampling,
+          ),
           include_model_structural_variable_importances=True,
       )
+      # TODO: Use "shap_values" to enable other SHAP based analyses.
       if features is not None:
         options_proto.features.extend(features)
 
@@ -1707,13 +1973,34 @@ class GenericCCModel(GenericModel):
         key, self._model.data_spec(), self._model.input_features()
     )
 
+  def to_standalone_cc(
+      self,
+      name: str = "ydf_model",
+      algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      categorical_from_string: bool = False,
+  ) -> Union[str, Dict[str, str]]:
+    options = embed_pb2.Options(
+        name=name,
+        classification_output=embed_pb2.ClassificationOutput.Enum.Value(
+            classification_output
+        ),
+        algorithm=embed_pb2.Algorithm.Enum.Value(algorithm),
+        categorical_from_string=categorical_from_string,
+    )
+    results = self._model.EmbedModel(options)
+    if len(results) == 1:
+      return list(results.values())[0]
+    else:
+      return results
+
   # TODO: Change default value of "mode" before 1.0 release.
   def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value
       self,
       path: str,
       input_model_signature_fn: Any = None,
       *,
-      mode: Literal["keras", "tf"] = "keras",
+      mode: Literal["keras", "tf"] = "tf",
       feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
       servo_api: bool = False,
       feed_example_proto: bool = False,
@@ -1724,12 +2011,18 @@ class GenericCCModel(GenericModel):
       feature_specs: Optional[Dict[str, Any]] = None,
       force: bool = False,
   ) -> None:
+
+    # TODO: Add tensorflow support for anomaly detection.
+    if self.task() == Task.ANOMALY_DETECTION:
+      raise ValueError(
+          "Anomaly Detection models are not yet supported for export to"
+          " Tensorflow."
+      )
     if mode == "keras":
       log.warning(
           "Calling `to_tensorflow_saved_model(mode='keras', ...)`. Use"
           " `to_tensorflow_saved_model(mode='tf', ...)` instead. mode='tf' is"
-          " more efficient, has better compatibility, and offers more options."
-          " Starting June 2024, `mode='tf'` will become the default value.",
+          " more efficient, has better compatibility, and offers more options.",
           message_id=log.WarningMessage.TO_TF_SAVED_MODEL_KERAS_MODE,
       )
 
@@ -1755,6 +2048,13 @@ class GenericCCModel(GenericModel):
       squeeze_binary_classification: bool = True,
       force: bool = False,
   ) -> "tensorflow.Module":  # pylint: disable=undefined-variable
+
+    # TODO: Add tensorflow support for anomaly detection.
+    if self.task() == Task.ANOMALY_DETECTION:
+      raise ValueError(
+          "Anomaly Detection models are not yet supported for export to"
+          " Tensorflow."
+      )
     return _get_export_tf().ydf_model_to_tf_function(
         ydf_model=self,
         temp_dir=temp_dir,
@@ -2055,8 +2355,8 @@ def from_sklearn(
 
   Args:
     sklearn_model: the scikit-learn tree based model to be converted.
-    label_name: Name of the multi-dimensional feature in the output YDF model.
-    feature_name: Name of the label in the output YDF model.
+    label_name: Name of the label in the output YDF model.
+    feature_name: Name of the multi-dimensional feature in the output YDF model.
 
   Returns:
     a YDF Model that emulates the provided scikit-learn model.

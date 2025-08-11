@@ -94,66 +94,11 @@ TEST(Plot, Base) {
   plot.x_axis.manual_tick_texts->push_back("v2");
 
   const auto html_plot = ExportToHtml(plot).value();
-  const auto path = file::JoinPath(test::TmpDirectory(), "plot.html");
-  LOG(INFO) << "path: " << path;
-  CHECK_OK(file::SetContent(path, html_plot));
 
   // The plot has been checked by hand.
-  EXPECT_EQ(
-      html_plot,
-      R"(<script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
-<div id="chard_1" style="display: inline-block;" ></div>
-<script>
-  Plotly.newPlot(
-    'chard_1',
-    [{
-x: [1,2,3],
-y: [2,0.5,4],
-type: 'scatter',
-mode: 'lines',
-line: {
-  dash: 'solid',
-  width: 1
-},
-name: 'curve 1',
-},
-],
-    {
-      width: 600,
-      height: 400,
-      title: 'Hello world',
-      showlegend: true,
-      xaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: 'x label', type: 'log',tickvals: [1,2],ticktext: ["v1","v2",],
-        },
-      font: {
-        size: 10,
-        },
-      yaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: '',
-        },
-      margin: {
-        l: 50,
-        r: 50,
-        b: 50,
-        t: 50,
-      },
-    },
-    {
-      modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,displayModeBar: false,
-    }
-  );
-</script>
-)");
+  test::ExpectEqualGolden(html_plot,
+                          "yggdrasil_decision_forests/test_data/"
+                          "golden/plot/plot.html.golden");
 }
 
 // Basic multi-plotting.
@@ -210,165 +155,11 @@ TEST(MultiPlot, Base) {
   }
 
   const auto html_plot = ExportToHtml(multiplot).value();
-  const auto path = file::JoinPath(test::TmpDirectory(), "multiplot.html");
-  LOG(INFO) << "path: " << path;
-  CHECK_OK(file::SetContent(path, html_plot));
 
   // The plot has been checked by hand.
-  EXPECT_EQ(
-      html_plot,
-      R"(<div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
-<div id="chard_1" style="display: inline-block;" ></div>
-<script>
-  Plotly.newPlot(
-    'chard_1',
-    [{
-x: [1,2,3],
-y: [2,0.5,4],
-type: 'scatter',
-mode: 'lines',
-line: {
-  dash: 'solid',
-  width: 1
-},
-name: 'curve 1',
-},
-],
-    {
-      width: 600,
-      height: 400,
-      title: 'Plot 1',
-      showlegend: true,
-      xaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: 'x axis',
-        },
-      font: {
-        size: 10,
-        },
-      yaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: 'y axis',
-        },
-      margin: {
-        l: 50,
-        r: 50,
-        b: 50,
-        t: 50,
-      },
-    },
-    {
-      modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,displayModeBar: false,
-    }
-  );
-</script>
-</div><div style='grid-row:1 / span 1; grid-column:2 / span 1;'>
-<div id="chard_2" style="display: inline-block;" ></div>
-<script>
-  Plotly.newPlot(
-    'chard_2',
-    [{
-x: [10,11,15],
-y: [7,9,2],
-type: 'scatter',
-mode: 'lines',
-line: {
-  dash: 'solid',
-  width: 1
-},
-name: 'curve 2',
-},
-],
-    {
-      width: 600,
-      height: 400,
-      title: 'Plot 2',
-      showlegend: true,
-      xaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: '',
-        },
-      font: {
-        size: 10,
-        },
-      yaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: '',
-        },
-      margin: {
-        l: 50,
-        r: 50,
-        b: 50,
-        t: 50,
-      },
-    },
-    {
-      modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,displayModeBar: false,
-    }
-  );
-</script>
-</div><div style='grid-row:2 / span 1; grid-column:1 / span 2;'>
-<div id="chard_3" style="display: inline-block;" ></div>
-<script>
-  Plotly.newPlot(
-    'chard_3',
-    [{
-x: [10,11,15],
-y: [7,9,2],
-type: 'bar',
-name: 'bars 3',
-},
-],
-    {
-      width: 600,
-      height: 400,
-      title: 'Plot 3',
-      showlegend: true,
-      xaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: '',
-        },
-      font: {
-        size: 10,
-        },
-      yaxis: {
-        ticks: 'outside',
-        showgrid: true,
-        zeroline: false,
-        showline: true,
-        title: '',
-        },
-      margin: {
-        l: 50,
-        r: 50,
-        b: 50,
-        t: 50,
-      },
-    },
-    {
-      modeBarButtonsToRemove: ['sendDataToCloud'],
-      displaylogo: false,displayModeBar: false,
-    }
-  );
-</script>
-</div></div>)");
+  test::ExpectEqualGolden(html_plot,
+                          "yggdrasil_decision_forests/test_data/"
+                          "golden/plot/multiplot.html.golden");
 }
 
 TEST(Bars, FromHistogram) {

@@ -1,0 +1,403 @@
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <stdint.h>
+#include <cstring>
+#include <array>
+#include <algorithm>
+#include <cmath>
+#include <bitset>
+#include <cassert>
+
+namespace ydf_model {
+
+enum class Label : uint32_t {
+  kLt50K = 0,
+  kGt50K = 1,
+};
+
+enum class FeatureWorkclass : uint32_t {
+  kOutOfVocabulary = 0,
+  kPrivate = 1,
+  kSelfEmpNotInc = 2,
+  kLocalGov = 3,
+  kStateGov = 4,
+  kSelfEmpInc = 5,
+  kFederalGov = 6,
+  kWithoutPay = 7,
+};
+
+enum class FeatureEducation : uint32_t {
+  kOutOfVocabulary = 0,
+  kHsGrad = 1,
+  kSomeCollege = 2,
+  kBachelors = 3,
+  kMasters = 4,
+  kAssocVoc = 5,
+  k11th = 6,
+  kAssocAcdm = 7,
+  k10th = 8,
+  k7th8th = 9,
+  kProfSchool = 10,
+  k9th = 11,
+  k12th = 12,
+  kDoctorate = 13,
+  k5th6th = 14,
+  k1st4th = 15,
+  kPreschool = 16,
+};
+
+enum class FeatureMaritalStatus : uint32_t {
+  kOutOfVocabulary = 0,
+  kMarriedCivSpouse = 1,
+  kNeverMarried = 2,
+  kDivorced = 3,
+  kWidowed = 4,
+  kSeparated = 5,
+  kMarriedSpouseAbsent = 6,
+  kMarriedAfSpouse = 7,
+};
+
+enum class FeatureOccupation : uint32_t {
+  kOutOfVocabulary = 0,
+  kProfSpecialty = 1,
+  kExecManagerial = 2,
+  kCraftRepair = 3,
+  kAdmClerical = 4,
+  kSales = 5,
+  kOtherService = 6,
+  kMachineOpInspct = 7,
+  kTransportMoving = 8,
+  kHandlersCleaners = 9,
+  kFarmingFishing = 10,
+  kTechSupport = 11,
+  kProtectiveServ = 12,
+  kPrivHouseServ = 13,
+};
+
+enum class FeatureRelationship : uint32_t {
+  kOutOfVocabulary = 0,
+  kHusband = 1,
+  kNotInFamily = 2,
+  kOwnChild = 3,
+  kUnmarried = 4,
+  kWife = 5,
+  kOtherRelative = 6,
+};
+
+enum class FeatureRace : uint32_t {
+  kOutOfVocabulary = 0,
+  kWhite = 1,
+  kBlack = 2,
+  kAsianPacIslander = 3,
+  kAmerIndianEskimo = 4,
+  kOther = 5,
+};
+
+enum class FeatureSex : uint32_t {
+  kOutOfVocabulary = 0,
+  kMale = 1,
+  kFemale = 2,
+};
+
+enum class FeatureNativeCountry : uint32_t {
+  kOutOfVocabulary = 0,
+  kUnitedStates = 1,
+  kMexico = 2,
+  kPhilippines = 3,
+  kGermany = 4,
+  kCanada = 5,
+  kPuertoRico = 6,
+  kIndia = 7,
+  kElSalvador = 8,
+  kCuba = 9,
+  kEngland = 10,
+  kJamaica = 11,
+  kDominicanRepublic = 12,
+  kSouth = 13,
+  kChina = 14,
+  kItaly = 15,
+  kColumbia = 16,
+  kGuatemala = 17,
+  kJapan = 18,
+  kVietnam = 19,
+  kTaiwan = 20,
+  kIran = 21,
+  kPoland = 22,
+  kHaiti = 23,
+  kNicaragua = 24,
+  kGreece = 25,
+  kPortugal = 26,
+  kEcuador = 27,
+  kFrance = 28,
+  kPeru = 29,
+  kThailand = 30,
+  kCambodia = 31,
+  kIreland = 32,
+  kLaos = 33,
+  kYugoslavia = 34,
+  kTrinadadTobago = 35,
+  kHonduras = 36,
+  kHong = 37,
+  kHungary = 38,
+  kScotland = 39,
+  kOutlyingUsGuamUsviEtc = 40,
+};
+
+constexpr const int kNumFeatures = 14;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  typedef int32_t Numerical;
+
+  Numerical age;
+  FeatureWorkclass workclass;
+  Numerical fnlwgt;
+  FeatureEducation education;
+  Numerical education_num;
+  FeatureMaritalStatus marital_status;
+  FeatureOccupation occupation;
+  FeatureRelationship relationship;
+  FeatureRace race;
+  FeatureSex sex;
+  Numerical capital_gain;
+  Numerical capital_loss;
+  Numerical hours_per_week;
+  FeatureNativeCountry native_country;
+};
+
+struct __attribute__((packed)) Node {
+  uint8_t pos = 0;
+  union {
+    struct __attribute__((packed)) {
+      uint8_t feat;
+      union {
+        int32_t thr;
+        uint16_t cat;
+        uint8_t obl;
+      };
+    } cond;
+    struct __attribute__((packed)) {
+      float val;
+    } leaf;
+  };
+};
+static const Node nodes[] = {
+{.pos=27,.cond={.feat=7,.cat=28}},
+{.pos=15,.cond={.feat=255,.obl=19}},
+{.pos=7,.cond={.feat=255,.obl=6}},
+{.pos=3,.cond={.feat=6,.cat=0}},
+{.pos=1,.cond={.feat=255,.obl=0}},
+{.leaf={.val=-0.0991408}},
+{.leaf={.val=0.0942537}},
+{.pos=1,.cond={.feat=255,.obl=3}},
+{.leaf={.val=0.389359}},
+{.leaf={.val=0.00215018}},
+{.pos=3,.cond={.feat=255,.obl=12}},
+{.pos=1,.cond={.feat=255,.obl=10}},
+{.leaf={.val=-0.123387}},
+{.leaf={.val=0.0807619}},
+{.pos=1,.cond={.feat=255,.obl=16}},
+{.leaf={.val=-0.0841764}},
+{.leaf={.val=0.262488}},
+{.pos=5,.cond={.feat=255,.obl=28}},
+{.pos=3,.cond={.feat=255,.obl=25}},
+{.pos=1,.cond={.feat=255,.obl=21}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.309737}},
+{.pos=3,.cond={.feat=6,.cat=14}},
+{.pos=1,.cond={.feat=255,.obl=33}},
+{.leaf={.val=0.19949}},
+{.leaf={.val=-0.131252}},
+{.leaf={.val=0.419984}},
+{.pos=13,.cond={.feat=255,.obl=48}},
+{.pos=7,.cond={.feat=255,.obl=43}},
+{.pos=3,.cond={.feat=6,.cat=35}},
+{.pos=1,.cond={.feat=255,.obl=37}},
+{.leaf={.val=0.166177}},
+{.leaf={.val=0.0374939}},
+{.pos=1,.cond={.feat=255,.obl=41}},
+{.leaf={.val=0.255586}},
+{.leaf={.val=0.383011}},
+{.pos=3,.cond={.feat=255,.obl=45}},
+{.pos=1,.cond={.feat=6,.cat=49}},
+{.leaf={.val=0.309737}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.309737}},
+{.pos=7,.cond={.feat=255,.obl=61}},
+{.pos=3,.cond={.feat=255,.obl=56}},
+{.pos=1,.cond={.feat=255,.obl=52}},
+{.leaf={.val=-0.0898212}},
+{.leaf={.val=-0.0308532}},
+{.pos=1,.cond={.feat=6,.cat=63}},
+{.leaf={.val=-0.00339856}},
+{.leaf={.val=0.0982247}},
+{.pos=3,.cond={.feat=255,.obl=67}},
+{.pos=1,.cond={.feat=255,.obl=63}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.309737}},
+{.pos=1,.cond={.feat=6,.cat=77}},
+{.leaf={.val=-0.0210046}},
+{.leaf={.val=0.344815}},
+{.pos=23,.cond={.feat=7,.cat=119}},
+{.pos=15,.cond={.feat=255,.obl=87}},
+{.pos=7,.cond={.feat=255,.obl=78}},
+{.pos=3,.cond={.feat=255,.obl=70}},
+{.pos=1,.cond={.feat=6,.cat=91}},
+{.leaf={.val=-0.113028}},
+{.leaf={.val=-0.0510374}},
+{.pos=1,.cond={.feat=255,.obl=74}},
+{.leaf={.val=-0.119126}},
+{.leaf={.val=0.0646254}},
+{.pos=3,.cond={.feat=255,.obl=81}},
+{.pos=1,.cond={.feat=6,.cat=105}},
+{.leaf={.val=-0.0564977}},
+{.leaf={.val=0.0547216}},
+{.pos=1,.cond={.feat=255,.obl=84}},
+{.leaf={.val=-0.129776}},
+{.leaf={.val=0.165322}},
+{.pos=1,.cond={.feat=255,.obl=89}},
+{.leaf={.val=0.0752609}},
+{.pos=1,.cond={.feat=255,.obl=93}},
+{.leaf={.val=0.131493}},
+{.pos=1,.cond={.feat=255,.obl=95}},
+{.leaf={.val=0.311433}},
+{.leaf={.val=0.226719}},
+{.pos=13,.cond={.feat=255,.obl=111}},
+{.pos=7,.cond={.feat=255,.obl=104}},
+{.pos=3,.cond={.feat=6,.cat=126}},
+{.pos=1,.cond={.feat=255,.obl=99}},
+{.leaf={.val=-0.0774895}},
+{.leaf={.val=0.00716627}},
+{.pos=1,.cond={.feat=255,.obl=101}},
+{.leaf={.val=0.121947}},
+{.leaf={.val=-0.00945509}},
+{.pos=3,.cond={.feat=255,.obl=108}},
+{.pos=1,.cond={.feat=255,.obl=106}},
+{.leaf={.val=0.310429}},
+{.leaf={.val=0.264424}},
+{.leaf={.val=0.0711064}},
+{.pos=7,.cond={.feat=255,.obl=124}},
+{.pos=3,.cond={.feat=255,.obl=117}},
+{.pos=1,.cond={.feat=255,.obl=113}},
+{.leaf={.val=0.0689106}},
+{.leaf={.val=0.328077}},
+{.pos=1,.cond={.feat=255,.obl=121}},
+{.leaf={.val=0.291686}},
+{.leaf={.val=0.309933}},
+{.pos=3,.cond={.feat=6,.cat=181}},
+{.pos=1,.cond={.feat=13,.cat=140}},
+{.leaf={.val=0.0672693}},
+{.leaf={.val=0.370993}},
+{.pos=1,.cond={.feat=255,.obl=127}},
+{.leaf={.val=0.205867}},
+{.leaf={.val=-0.0652492}},
+{.pos=23,.cond={.feat=7,.cat=195}},
+{.pos=15,.cond={.feat=255,.obl=151}},
+{.pos=7,.cond={.feat=255,.obl=140}},
+{.pos=3,.cond={.feat=255,.obl=132}},
+{.pos=1,.cond={.feat=255,.obl=129}},
+{.leaf={.val=0.158489}},
+{.leaf={.val=0.0139145}},
+{.pos=1,.cond={.feat=255,.obl=136}},
+{.leaf={.val=-0.0255225}},
+{.leaf={.val=-0.0900962}},
+{.pos=3,.cond={.feat=255,.obl=146}},
+{.pos=1,.cond={.feat=255,.obl=144}},
+{.leaf={.val=-0.110397}},
+{.leaf={.val=0.0423275}},
+{.pos=1,.cond={.feat=255,.obl=149}},
+{.leaf={.val=0.275216}},
+{.leaf={.val=-0.0105495}},
+{.pos=1,.cond={.feat=255,.obl=153}},
+{.leaf={.val=0.0901531}},
+{.pos=1,.cond={.feat=255,.obl=157}},
+{.leaf={.val=0.116682}},
+{.pos=1,.cond={.feat=255,.obl=162}},
+{.leaf={.val=0.183824}},
+{.leaf={.val=0.254308}},
+{.pos=15,.cond={.feat=255,.obl=182}},
+{.pos=7,.cond={.feat=255,.obl=173}},
+{.pos=3,.cond={.feat=6,.cat=202}},
+{.pos=1,.cond={.feat=255,.obl=167}},
+{.leaf={.val=0.116391}},
+{.leaf={.val=-0.00890938}},
+{.pos=1,.cond={.feat=255,.obl=171}},
+{.leaf={.val=0.181507}},
+{.leaf={.val=-0.0522977}},
+{.pos=3,.cond={.feat=255,.obl=175}},
+{.pos=1,.cond={.feat=6,.cat=216}},
+{.leaf={.val=0.176257}},
+{.leaf={.val=0.252977}},
+{.pos=1,.cond={.feat=255,.obl=180}},
+{.leaf={.val=-0.0482188}},
+{.leaf={.val=0.272084}},
+{.pos=7,.cond={.feat=255,.obl=195}},
+{.pos=3,.cond={.feat=6,.cat=230}},
+{.pos=1,.cond={.feat=255,.obl=186}},
+{.leaf={.val=-0.0945367}},
+{.leaf={.val=-0.0246615}},
+{.pos=1,.cond={.feat=255,.obl=191}},
+{.leaf={.val=-0.0313654}},
+{.leaf={.val=0.0799974}},
+{.pos=3,.cond={.feat=255,.obl=200}},
+{.pos=1,.cond={.feat=13,.cat=244}},
+{.leaf={.val=-0.0967573}},
+{.leaf={.val=0.171455}},
+{.pos=1,.cond={.feat=13,.cat=285}},
+{.leaf={.val=-0.0286497}},
+{.leaf={.val=0.413736}},
+};
+
+static const uint8_t condition_types[] = {0,1,0,1,0,1,1,1,1,1,0,0,0,1};
+
+
+static const uint8_t root_deltas[] = {57,53,55};
+
+
+static const std::bitset<326> categorical_bank {"00000010100000000001100000000000000100000000001100000000001000110000000000000000000110011011111001101111111111011000001001100100011011000001101100000000001000000011100000100000000001000001100000110110010001100001000100100011001001011100001011011011101100000111110011011111111110110000010011001000110011000010101001100000100110"};
+
+static const float oblique_weights[] = {0.875222,0.0589885,0.000130299,-2.82861,-0.00110184,-0.00391027,-4.39274,-0.030971,-0.0950091,-0.045673,2218.5,1,6.131,0.0253274,0.208307,0.0660617,0.221025,4.73438e-05,-0.00103273,7073.5,1,1.23801,0.0503401,-3.15151e-05,0.00157436,-1.3714,-0.337004,0.0325812,-4.87832,-0.0487011,-3.45733e-06,-0.116549,-0.0406906,0.199635,9.0964e-06,-0.000473765,-0.0446421,-2.72891,-0.0268237,-0.0492184,-0.0287724,1782.5,1,5095.5,1,0.912029,0.0203875,-0.0183571,-3.46664,-0.253348,-0.00177869,-0.00509135,1.99557,0.0454592,0.000703983,0.0410716,2.83912,0.0130462,0.263606,-8.90169e-05,-0.00206909,5095.5,1,2.11646,0.0584315,0.000945858,-0.0445074,4.11294,0.0731134,-4.55677e-06,-4.5089,-0.0342588,4.595e-05,-0.0721305,5.69044,0.104668,0.000104302,0.00210441,4.72543,0.00909707,0.336553,3.14058,0.21334,-0.000115206,1.83417,0.0580332,1.78927e-07,7073.5,1,2.26767,0.0405766,-3.28583e-06,0.0769774,7565.5,1,-0.299833,-5.23652e-06,-0.260057,0.0506563,8.5,1,-1.77219,-0.00722983,-0.038197,5095.5,1,60.5,1,3.40626,0.0622691,-0.000122705,12.5,1,0.498856,9.33045e-05,-0.00206049,-0.00978286,-3.17909,-0.0418459,-0.113679,0.0412746,-2.66861,-5.33752e-06,-0.0012442,-0.526749,-0.000103375,-0.0016021,3120,1,-1.20759,-0.082737,-1.04432e-05,-1.33648,-0.001709,-0.000754278,-0.028782,-2.48412,-0.00224747,-9.78004e-05,-0.0602208,-4.73801,-0.0136335,-0.333568,0.000124826,4668.5,1,4.525,-9.15817e-05,0.00203967,125450,1,7073.5,1,4.26781,0.0991027,7.59452e-05,0.0693224,5.24286,0.0528021,9.21215e-06,0.0841194,0.0537783,-2.30813,-0.0110387,0.276692,-0.000969926,-0.0743734,-3.55391,-0.0112707,-0.108756,-0.0516706,3120,1,5095.5,1,0.635133,0.016452,-2.72883e-07,-0.00107603,-0.0186576,8076.5,1,-1.64929,-0.127004,-0.000132137,-0.00160587,0.922287,6.82072e-07,0.0489917,-0.000383971,0.0130997,2.67543,0.00998518,-0.00184372,0.0605607,-3.7964,-0.0331518,-0.290143,-4.97571e-05,-0.000704097,2.88565,0.0109421,0.0539681,9.43172e-05,0.0520747};
+
+static const uint8_t oblique_features[] = {2,4,11,2,11,12,3,0,4,12,1,11,3,0,4,12,2,10,11,1,10,3,0,10,11,2,4,12,4,0,2,4,12,3,2,4,12,3,0,4,12,1,11,1,10,2,0,12,3,4,11,12,3,4,11,12,4,0,4,10,11,1,10,3,0,11,12,2,0,2,3,0,10,12,3,4,10,11,2,0,4,2,4,10,2,0,2,1,10,3,0,2,12,1,10,3,2,4,12,1,4,2,0,12,1,10,1,0,2,0,10,1,4,3,10,11,12,3,0,4,12,2,2,11,2,10,11,1,10,2,4,10,3,0,11,12,3,0,10,12,3,0,4,10,1,10,2,10,11,1,2,1,10,3,4,10,12,4,0,2,4,12,4,0,4,11,12,3,0,4,12,1,10,1,10,4,0,2,11,12,1,10,3,4,10,11,4,2,4,11,12,3,0,11,12,4,0,4,10,11,4,0,4,10,12};
+
+inline float Predict(const Instance& instance) {
+  float accumulator {-1.1631};
+
+  const Node* root = nodes;
+  const Node* node;
+  const char* raw_instance = (const char*)(&instance);
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+      if (node->cond.feat == 255) {
+        const uint8_t num_projs = oblique_features[node->cond.obl];
+        float obl_acc = -oblique_weights[node->cond.obl];
+        for (uint8_t proj_idx=0; proj_idx<num_projs; proj_idx++){
+          const auto off = node->cond.obl + proj_idx + 1;
+          int32_t numerical_feature;
+          std::memcpy(&numerical_feature, raw_instance + oblique_features[off] * sizeof(int32_t), sizeof(int32_t));
+          obl_acc += numerical_feature * oblique_weights[off];
+        }
+        eval = obl_acc >= 0;
+      } else if (condition_types[node->cond.feat] == 1) {
+        uint32_t categorical_feature;
+        std::memcpy(&categorical_feature, raw_instance + node->cond.feat * sizeof(uint32_t), sizeof(uint32_t));
+        eval = categorical_bank[categorical_feature + node->cond.cat];
+      } else {
+        assert(false);
+      }
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator += node->leaf.val;
+    root += root_deltas[tree_idx];
+  }
+
+  // Sigmoid
+  return 1.f / (1.f + std::exp(-accumulator));
+}
+
+}  // namespace ydf_model
+#endif

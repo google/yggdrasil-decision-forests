@@ -197,6 +197,13 @@ absl::StatusOr<bool> FileExists(absl::string_view path);
 //   EXPECT_EQ(basename, "file.txt");
 std::string GetBasename(absl::string_view path);
 
+// Gets the dirname of the path.
+//
+// Usage example:
+//   std::string dirname = GetDirname("/path/to/my/file.txt");
+//   EXPECT_EQ(dirname, "/path/to/my");
+std::string GetDirname(absl::string_view path);
+
 // Sets a file as immutable. An immutable file cannot be modified (only
 // removed). Some distributed file systems can share immutable files more
 // efficiently.

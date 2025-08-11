@@ -102,7 +102,7 @@ function ydfShowVariableImportance(block_id) {
 }
 
 </script>
-  <div class="tab_block" id="123"><div class="header"><a id="123_model" class="tab selected" onclick="ydfShowTab('123', 'model')">Model</a><a id="123_dataspec" class="tab" onclick="ydfShowTab('123', 'dataspec')">Dataspec</a><a id="123_tuning" class="tab" onclick="ydfShowTab('123', 'tuning')">Tuning</a><a id="123_training" class="tab" onclick="ydfShowTab('123', 'training')">Training</a><a id="123_variable_importance" class="tab" onclick="ydfShowTab('123', 'variable_importance')">Variable importances</a><a id="123_structure" class="tab" onclick="ydfShowTab('123', 'structure')">Structure</a></div><div class="body"><div id="123_body_model" class="tab_content selected"><b>Name</b> : GRADIENT_BOOSTED_TREES<br><b>Task</b> : CLASSIFICATION<br><b>Label</b> : income<br><b>Features (14)</b> : age workclass fnlwgt education education_num marital_status occupation relationship race sex capital_gain capital_loss hours_per_week native_country<br><b>Weights</b> : None<br><b>Trained with tuner</b> : Yes<br><b>Model size</b> : ${MODEL_SIZE}<br></div><div id="123_body_dataspec" class="tab_content"><pre class="ydf_pre">Number of records: 22792
+  <div class="tab_block" id="123"><div class="header"><a id="123_model" class="tab selected" onclick="ydfShowTab('123', 'model')">Model</a><a id="123_dataspec" class="tab" onclick="ydfShowTab('123', 'dataspec')">Dataspec</a><a id="123_tuning" class="tab" onclick="ydfShowTab('123', 'tuning')">Tuning</a><a id="123_training" class="tab" onclick="ydfShowTab('123', 'training')">Training</a><a id="123_variable_importance" class="tab" onclick="ydfShowTab('123', 'variable_importance')">Variable importances</a><a id="123_structure" class="tab" onclick="ydfShowTab('123', 'structure')">Structure</a></div><div class="body"><div id="123_body_model" class="tab_content selected"><b>Name</b> : GRADIENT_BOOSTED_TREES<br><b>Task</b> : CLASSIFICATION<br><b>Label</b> : income<br><b>Features (14)</b> : age workclass fnlwgt education education_num marital_status occupation relationship race sex capital_gain capital_loss hours_per_week native_country<br><b>Weights</b> : None<br><b>Trained with tuner</b> : Yes<br><b>Trained with Feature Selection</b> : No<br><b>Model size</b> : ${MODEL_SIZE}<br></div><div id="123_body_dataspec" class="tab_content"><pre class="ydf_pre">Number of records: 22792
 Number of columns: 15
 
 Number of columns by type:
@@ -152,9 +152,11 @@ truth\prediction
  &gt;50K    207   388
 Total: 2259
 
-</pre><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script>
-<div id="chart_123self_eval_item0" style="display: inline-block;" ></div>
-<script>
+</pre><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_123self_eval_item0" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
   Plotly.newPlot(
     'chart_123self_eval_item0',
     [{
@@ -214,10 +216,50 @@ name: 'validation',
       displaylogo: false,displayModeBar: false,
     }
   );
-</script>
-</div><div style='grid-row:2 / span 1; grid-column:1 / span 1;'>
-<div id="chart_123self_eval_item1" style="display: inline-block;" ></div>
-<script>
+
+    }
+    function show_error(err) {
+      document.getElementById("chart_123self_eval_item0").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script></div><div style='grid-row:2 / span 1; grid-column:1 / span 1;'><div id="chart_123self_eval_item1" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
   Plotly.newPlot(
     'chart_123self_eval_item1',
     [{
@@ -277,8 +319,46 @@ name: 'validation',
       displaylogo: false,displayModeBar: false,
     }
   );
-</script>
-</div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.            &quot;age&quot;  0.330045 ################
+
+    }
+    function show_error(err) {
+      document.getElementById("chart_123self_eval_item1").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script></div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.            &quot;age&quot;  0.330045 ################
     2.  &quot;education_num&quot;  0.267094 ##########
     3. &quot;marital_status&quot;  0.195952 #####
     4.   &quot;relationship&quot;  0.195614 #####
@@ -326,8 +406,7 @@ name: 'validation',
    12.            &quot;sex&quot; 46.141988 
    13.           &quot;race&quot; 17.084685 
    14. &quot;hours_per_week&quot;  9.012740 
-</pre></div></div><p>Those variable importances are computed during training. More, and possibly more informative, variable importances are available when analyzing a model on a test dataset.</p></div><div id="123_body_structure" class="tab_content"><b>Num trees</b> : 47<br><p>Only printing the first tree.</p><pre class="ydf_pre">Tree #0:
-    &quot;age&quot;x-1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-5167 [s:0.0248946 n:20533 np:19560 miss:0] ; pred:-4.15883e-09
+</pre></div></div><p>Those variable importances are computed during training. More, and possibly more informative, variable importances are available when analyzing a model on a test dataset.</p></div><div id="123_body_structure" class="tab_content"><b>Number of trees</b> : 47<br><p>Below is the first tree of the model. The model contains 47 trees, which jointly make the prediction. Other trees can be printed with `model.print_tree(tree_idx)` or plotted with `model.plot_tree(tree_idx)`</p><pre class="ydf_pre">    &quot;age&quot;x-1+&quot;education_num&quot;x1+&quot;capital_gain&quot;x-1+&quot;capital_loss&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-5167 [s:0.0248946 n:20533 np:19560 miss:0] ; pred:-4.15883e-09
         ├─(pos)─ &quot;relationship&quot; is in [BITMAP] {Not-in-family, Own-child, Unmarried, Other-relative} [s:0.0308378 n:19560 np:11084 miss:0] ; pred:-0.0193982
         |        ├─(pos)─ &quot;education_num&quot;x-1+&quot;hours_per_week&quot;x-1&gt;=-52.5 [s:0.00254457 n:11084 np:7929 miss:0] ; pred:-0.104048
         |        |        ├─(pos)─ &quot;age&quot;x-1+&quot;education_num&quot;x1+&quot;capital_loss&quot;x1+&quot;hours_per_week&quot;x1&gt;=2225 [s:0.000500639 n:7929 np:33 miss:0] ; pred:-0.121588

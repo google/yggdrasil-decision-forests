@@ -126,19 +126,34 @@ struct CheckStructureOptions {
   // combined with other options.
   bool check_no_na_conditions = false;
 
+  // Check if the model does not contain any oblique condition. Should not be
+  // combined with other options.
+  bool check_no_oblique_conditions = false;
+
   static CheckStructureOptions GlobalImputation() {
     return {
-        /*.global_imputation_is_higher =*/true,
-        /*.global_imputation_others =*/true,
-        /*.check_no_na_conditions =*/false,
+        .global_imputation_is_higher = true,
+        .global_imputation_others = true,
+        .check_no_na_conditions = false,
+        .check_no_oblique_conditions = false,
     };
   }
 
   static CheckStructureOptions NACondition() {
     return {
-        /*.global_imputation_is_higher =*/false,
-        /*.global_imputation_others =*/false,
-        /*.check_no_na_conditions =*/true,
+        .global_imputation_is_higher = false,
+        .global_imputation_others = false,
+        .check_no_na_conditions = true,
+        .check_no_oblique_conditions = false,
+    };
+  }
+
+  static CheckStructureOptions NoObliqueConditions() {
+    return {
+        .global_imputation_is_higher = false,
+        .global_imputation_others = false,
+        .check_no_na_conditions = false,
+        .check_no_oblique_conditions = true,
     };
   }
 };

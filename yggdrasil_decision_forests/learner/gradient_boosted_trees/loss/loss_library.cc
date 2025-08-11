@@ -18,6 +18,7 @@
 #include <memory>
 #include <utility>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/variant.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -38,30 +39,28 @@ namespace gradient_boosted_trees {
 namespace {
 
 absl::StatusOr<std::unique_ptr<AbstractLoss>> CreateCustomLoss(
-    model::proto::Task task, const dataset::proto::Column& label_column,
-    const proto::GradientBoostedTreesTrainingConfig& config,
+    const AbstractLoss::ConstructorArgs& args,
     CustomLossFunctions loss_functions) {
-  std::unique_ptr<AbstractLoss> custom_loss;
   if (absl::holds_alternative<CustomBinaryClassificationLossFunctions>(
           loss_functions)) {
-    custom_loss = std::make_unique<CustomBinaryClassificationLoss>(
-        config, task, label_column,
+    return CustomBinaryClassificationLoss::RegistrationCreate(
+        args,
         absl::get<CustomBinaryClassificationLossFunctions>(loss_functions));
-  } else if (absl::holds_alternative<CustomMultiClassificationLossFunctions>(
-                 loss_functions)) {
-    custom_loss = std::make_unique<CustomMultiClassificationLoss>(
-        config, task, label_column,
-        absl::get<CustomMultiClassificationLossFunctions>(loss_functions));
-  } else if (absl::holds_alternative<CustomRegressionLossFunctions>(
-                 loss_functions)) {
-    custom_loss = std::make_unique<CustomRegressionLoss>(
-        config, task, label_column,
-        absl::get<CustomRegressionLossFunctions>(loss_functions));
-  } else {
-    NOTREACHED();
   }
-  RETURN_IF_ERROR(custom_loss->Status());
-  return custom_loss;
+
+  if (absl::holds_alternative<CustomMultiClassificationLossFunctions>(
+          loss_functions)) {
+    return CustomMultiClassificationLoss::RegistrationCreate(
+        args,
+        absl::get<CustomMultiClassificationLossFunctions>(loss_functions));
+  }
+
+  if (absl::holds_alternative<CustomRegressionLossFunctions>(loss_functions)) {
+    return CustomRegressionLoss::RegistrationCreate(
+        args, absl::get<CustomRegressionLossFunctions>(loss_functions));
+  }
+
+  return absl::InvalidArgumentError("Non existing custom loss");
 }
 
 }  // namespace
@@ -70,19 +69,19 @@ absl::StatusOr<std::unique_ptr<AbstractLoss>> CreateLoss(
     proto::Loss loss, model::proto::Task task,
     const dataset::proto::Column& label_column,
     const proto::GradientBoostedTreesTrainingConfig& config,
+    const model::proto::TrainingConfigLinking& train_config_link,
     CustomLossFunctions custom_loss_functions) {
+  AbstractLoss::ConstructorArgs args{train_config_link, config, task,
+                                     label_column};
   if (custom_loss_functions.index() != 0) {
-    return CreateCustomLoss(task, label_column, config, custom_loss_functions);
+    return CreateCustomLoss(args, custom_loss_functions);
   }
 
   auto loss_key = proto::Loss_Name(loss);
   if (loss == proto::LAMBDA_MART_NDCG5) {
     loss_key = "LAMBDA_MART_NDCG";
   }
-  ASSIGN_OR_RETURN(auto loss_imp, AbstractLossRegisterer::Create(
-                                      loss_key, config, task, label_column));
-  RETURN_IF_ERROR(loss_imp->Status());
-  return loss_imp;
+  return AbstractLossRegisterer::Create(loss_key, args);
 }
 
 }  // namespace gradient_boosted_trees

@@ -1718,7 +1718,7 @@ TEST(DecisionTree, GenerateRandomImputation) {
 TEST(DecisionTree,
      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward) {
   std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
-  std::vector<float> weights = {1, 1, 1, 1, 1, 1, 1, 1};
+  std::vector<float> weights;
   std::vector<int32_t> labels = {0, 0, 0, 0, 1, 1, 1, 1};
 
   // A good attribute that perfectly separate the labels.
@@ -1765,7 +1765,7 @@ TEST(DecisionTree,
   utils::IntegerDistributionDouble label_distribution;
   label_distribution.SetNumClasses(num_label_classes);
   for (const auto example_idx : selected) {
-    label_distribution.Add(labels[example_idx], weights[example_idx]);
+    label_distribution.Add(labels[example_idx]);
   }
 
   utils::RandomEngine rnd(1234);
@@ -1773,26 +1773,29 @@ TEST(DecisionTree,
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
 
-  EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
-                selected, weights, attributes_bad, labels,
-                num_attribute_classes, num_label_classes, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &rnd)
-                .value(),
-            SplitSearchResult::kNoBetterSplitFound);
+  EXPECT_EQ(
+      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
+          selected, weights, attributes_bad, labels, num_attribute_classes,
+          num_label_classes, min_num_obs, dt_config, label_distribution, -1,
+          &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kNoBetterSplitFound);
 
-  EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
-                selected, weights, attributes_non_valid, labels,
-                num_attribute_classes, num_label_classes, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &rnd)
-                .value(),
-            SplitSearchResult::kInvalidAttribute);
+  EXPECT_EQ(
+      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
+          selected, weights, attributes_non_valid, labels,
+          num_attribute_classes, num_label_classes, min_num_obs, dt_config,
+          label_distribution, -1, &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kInvalidAttribute);
 
-  EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
-                selected, weights, attributes_perfect, labels,
-                num_attribute_classes, num_label_classes, min_num_obs,
-                dt_config, label_distribution, -1, &best_condition, &rnd)
-                .value(),
-            SplitSearchResult::kBetterSplitFound);
+  EXPECT_EQ(
+      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
+          selected, weights, attributes_perfect, labels, num_attribute_classes,
+          num_label_classes, min_num_obs, dt_config, label_distribution, -1,
+          &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
             proto::Condition::kContainsBitmapConditionFieldNumber);
@@ -1811,7 +1814,7 @@ TEST(DecisionTree,
 
 TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
   std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
-  std::vector<float> weights = {1, 1, 1, 1, 1, 1, 1, 1};
+  std::vector<float> weights;
   std::vector<int32_t> labels = {0, 0, 0, 0, 1, 1, 1, 1};
 
   // A attribute that does not perfectly separate the labels.
@@ -1836,7 +1839,7 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
   utils::IntegerDistributionDouble label_distribution;
   label_distribution.SetNumClasses(num_label_classes);
   for (const auto example_idx : selected) {
-    label_distribution.Add(labels[example_idx], weights[example_idx]);
+    label_distribution.Add(labels[example_idx]);
   }
 
   utils::RandomEngine rnd(1234);
@@ -1844,12 +1847,13 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
 
-  EXPECT_EQ(FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
-                selected, weights, attributes, labels, num_attribute_classes,
-                num_label_classes, min_num_obs, dt_config, label_distribution,
-                -1, &best_condition, &rnd)
-                .value(),
-            SplitSearchResult::kBetterSplitFound);
+  EXPECT_EQ(
+      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
+          selected, weights, attributes, labels, num_attribute_classes,
+          num_label_classes, min_num_obs, dt_config, label_distribution, -1,
+          &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
 
   EXPECT_EQ(best_condition.condition().type_case(),
             proto::Condition::kContainsBitmapConditionFieldNumber);
@@ -1864,6 +1868,125 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
   EXPECT_EQ(best_condition.na_value(), false);
   // R> entropy(c(4,4)) - 6/8 * entropy(c(4,2)) = 0.2157616
   EXPECT_NEAR(best_condition.split_score(), 0.2157616, 0.0001);
+}
+
+TEST(
+    DecisionTree,
+    FindSplitLabelClassificationFeatureCategoricalSetGreedyForwardMaxIterations) {
+  std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<float> weights;
+  std::vector<int32_t> labels = {0, 0, 0, 0, 1, 1, 1, 1};
+
+  // A good attribute that can perfectly separate the labels if max_iterations
+  // is not limited.
+  // The order is: First, add 0, then 1, then 2 (as attribute values are not
+  // shuffled).
+  dataset::VerticalDataset::CategoricalSetColumn attributes_perfect;
+  attributes_perfect.AddVector({0});
+  attributes_perfect.AddVector({1, 3});
+  attributes_perfect.AddVector({2, 4});
+  attributes_perfect.AddVector({0, 1, 4});
+  attributes_perfect.AddVector({3});
+  attributes_perfect.AddVector({4});
+  attributes_perfect.AddVector({3, 5});
+  attributes_perfect.AddVector({4, 5});
+
+  int num_attribute_classes = 6;
+  int num_label_classes = 3;
+  int min_num_obs = 1;
+
+  // Compute the label distribution.
+  utils::IntegerDistributionDouble label_distribution;
+  label_distribution.SetNumClasses(num_label_classes);
+  for (const auto example_idx : selected) {
+    label_distribution.Add(labels[example_idx]);
+  }
+
+  utils::RandomEngine rnd(1234);
+  proto::NodeCondition best_condition;
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
+  dt_config.mutable_categorical_set_greedy_forward()->set_max_selected_items(1);
+
+  EXPECT_EQ(
+      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
+          selected, weights, attributes_perfect, labels, num_attribute_classes,
+          num_label_classes, min_num_obs, dt_config, label_distribution, -1,
+          &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.condition().type_case(),
+            proto::Condition::kContainsBitmapConditionFieldNumber);
+  // The expected element map is "000001".
+  EXPECT_EQ(
+      best_condition.condition().contains_bitmap_condition().elements_bitmap(),
+      "\01");
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
+  EXPECT_EQ(best_condition.na_value(), false);
+  // R> entropy(c(4,4)) - 6/8 * entropy(c(4,2)) = 0.2157616
+  EXPECT_NEAR(best_condition.split_score(), 0.2157616, 0.0001);
+}
+
+TEST(DecisionTree,
+     FindSplitLabelClassificationFeatureCategoricalSetGreedyForwardWeighted) {
+  std::vector<UnsignedExampleIdx> selected{0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<float> weights{1.f, 2.f, 3.f, 4.f, 5.f, 6.f, 7.f, 8.f};
+  std::vector<int32_t> labels{0, 0, 0, 0, 1, 1, 1, 1};
+
+  // A good attribute that perfectly separate the labels.
+  dataset::VerticalDataset::CategoricalSetColumn attributes_perfect;
+  // Will end up in the positive set.
+  attributes_perfect.AddVector({0});
+  attributes_perfect.AddVector({1, 3});
+  attributes_perfect.AddVector({2, 4});
+  attributes_perfect.AddVector({0, 1, 4});
+  // Will end up in the negative set.
+  attributes_perfect.AddVector({3});
+  attributes_perfect.AddVector({4});
+  attributes_perfect.AddVector({3, 5});
+  attributes_perfect.AddVector({4, 5});
+
+  int num_attribute_classes = 6;
+  int num_label_classes = 3;
+  int min_num_obs = 1;
+
+  // Compute the label distribution.
+  utils::IntegerDistributionDouble label_distribution;
+  label_distribution.SetNumClasses(num_label_classes);
+  for (const auto example_idx : selected) {
+    label_distribution.Add(labels[example_idx], weights[example_idx]);
+  }
+
+  utils::RandomEngine rnd(1234);
+  proto::NodeCondition best_condition;
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
+
+  EXPECT_EQ(
+      FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<true>(
+          selected, weights, attributes_perfect, labels, num_attribute_classes,
+          num_label_classes, min_num_obs, dt_config, label_distribution, -1,
+          &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.condition().type_case(),
+            proto::Condition::kContainsBitmapConditionFieldNumber);
+  // The expected element map is "000111".
+  EXPECT_EQ(
+      best_condition.condition().contains_bitmap_condition().elements_bitmap(),
+      "\07");
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 36);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 4);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 10);
+  EXPECT_EQ(best_condition.na_value(), false);
+  // R> entropy(c(10,26)) = 0.590842247
+  EXPECT_NEAR(best_condition.split_score(), 0.590842247, 0.0001);
 }
 
 TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
@@ -2014,6 +2137,68 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
   }
 }
 
+TEST(FindBestSplitTest,
+     FindBestCategoricalSetSplitCartForRegressionMaxIterations) {
+  std::vector<UnsignedExampleIdx> selected = {0, 1, 2, 3, 4, 5, 6, 7};
+  // The global optimal split separates the first 4 examples from the remaining
+  // ones.
+  std::vector<float> labels = {1, 3, 4, 2, 13, 12, 11, 14};
+
+  // The attribute values. The greedy forward algorithm first adds attribute
+  // values 0, then 1 and finally 2. This test stops after adding attribute
+  // value 1 since max_iterations=2.
+  dataset::VerticalDataset::CategoricalSetColumn attributes;
+
+  // Will end up in the positive set.
+  attributes.AddVector({0});
+  attributes.AddVector({1, 3});
+  attributes.AddVector({2, 4});
+  attributes.AddVector({0, 1, 4});
+  // Will end up in the negative set.
+  attributes.AddVector({3});
+  attributes.AddVector({4});
+  attributes.AddVector({3, 5});
+  attributes.AddVector({4, 5});
+
+  int num_attribute_classes = 6;
+  int min_num_obs = 1;
+
+  // Compute the label distribution.
+  utils::NormalDistributionDouble label_distribution;
+  for (const auto example_idx : selected) {
+    label_distribution.Add(labels[example_idx]);
+  }
+
+  utils::RandomEngine rnd(1234);
+  proto::NodeCondition best_condition;
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
+  dt_config.mutable_categorical_set_greedy_forward()->set_max_selected_items(2);
+
+  EXPECT_EQ(
+      FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<false>(
+          selected, {}, attributes, labels, num_attribute_classes, min_num_obs,
+          dt_config, label_distribution, -1, &best_condition, &rnd)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
+
+  EXPECT_EQ(best_condition.condition().type_case(),
+            proto::Condition::kContainsBitmapConditionFieldNumber);
+  // The expected element map is "000011".
+  EXPECT_EQ(
+      best_condition.condition().contains_bitmap_condition().elements_bitmap(),
+      "\x03");
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 3);
+  EXPECT_EQ(best_condition.num_training_examples_with_weight(), 8);
+  EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 3);
+  EXPECT_EQ(best_condition.na_value(), false);
+  // R>   var(c(1,2,3,4,11,12,13,14)) - (var(c(1,2,3)) * (3/8) +
+  // var(c(4,11,12,13,14)) * (5/8)) = 18.15
+  // With "var" the variance (not the sampling variance).
+  EXPECT_NEAR(best_condition.split_score(), 18.15, 0.0001);
+}
+
 TEST(DecisionTree, MaskItemsForCategoricalForSetGreedySelection) {
   utils::RandomEngine random;
 
@@ -2124,14 +2309,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_NoFeatures) {
   proto::DecisionTreeTrainingConfig dt_config;
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerMultiplicative);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2163,14 +2348,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_AlwaysInvalid) {
   proto::DecisionTreeTrainingConfig dt_config;
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerAlwaysInvalid);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2202,14 +2387,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Multiplicative) {
   dt_config.set_num_candidate_attributes(-1);
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerMultiplicative);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2254,14 +2439,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManager_Alternate) {
   dt_config.set_num_candidate_attributes(-1);
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 2;
+  const int num_threads = 2;
   FakeLabelStats label_stats;
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerAlternate);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2293,14 +2478,14 @@ TEST(DecisionTree, FindBestConditionConcurrentManagerScaled) {
   dt_config.set_num_candidate_attributes(-1);
   proto::Node parent;
   InternalTrainConfig internal_config;
-  internal_config.num_threads = 10;
+  const int num_threads = 10;
   FakeLabelStats label_stats{};
   PerThreadCache cache;
 
   proto::NodeCondition best_condition;
 
   auto split_finder_processor = std::make_unique<SplitterFinderStreamProcessor>(
-      "SplitFinder", internal_config.num_threads,
+      "SplitFinder", num_threads,
       FakeFindBestConditionConcurrentConsumerAlternate);
   split_finder_processor->StartWorkers();
   internal_config.split_finder_processor = split_finder_processor.get();
@@ -2789,6 +2974,79 @@ TEST(DecisionTree, MinNumExamplePerTreatment) {
                   .value(),
               SplitSearchResult::kNoBetterSplitFound);
   }
+}
+
+TEST(DecisionTree, NumPosTrainingExamplesLocalGrowth) {
+  const std::string ds_typed_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
+  dataset::proto::DataSpecification data_spec;
+  dataset::proto::DataSpecificationGuide guide;
+  dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
+
+  dataset::VerticalDataset train_dataset;
+  ASSERT_OK(LoadVerticalDataset(ds_typed_path, data_spec, &train_dataset));
+
+  std::vector<UnsignedExampleIdx> selected_examples(train_dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+
+  const std::vector<float> weights(train_dataset.nrow(), 1.f);
+
+  model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::CLASSIFICATION);
+  config.set_label("income");
+  config.add_features(".*");
+
+  const model::proto::DeploymentConfig deployment;
+
+  model::proto::TrainingConfigLinking config_link;
+  ASSERT_OK(
+      AbstractLearner::LinkTrainingConfig(config, data_spec, &config_link));
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_growing_strategy_local();
+
+  utils::RandomEngine random;
+  DecisionTree dt;
+  ASSERT_OK(Train(train_dataset, selected_examples, config, config_link,
+                  dt_config, deployment, weights, &random, &dt, {}));
+  ASSERT_TRUE(dt.root().node().has_num_pos_training_examples_without_weight());
+}
+
+TEST(DecisionTree, NumPosTrainingExamplesGlobalGrowth) {
+  const std::string ds_typed_path =
+      absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult.csv"));
+  dataset::proto::DataSpecification data_spec;
+  dataset::proto::DataSpecificationGuide guide;
+  dataset::CreateDataSpec(ds_typed_path, false, guide, &data_spec);
+
+  dataset::VerticalDataset train_dataset;
+  ASSERT_OK(LoadVerticalDataset(ds_typed_path, data_spec, &train_dataset));
+
+  std::vector<UnsignedExampleIdx> selected_examples(train_dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+
+  const std::vector<float> weights(train_dataset.nrow(), 1.f);
+
+  model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::CLASSIFICATION);
+  config.set_label("income");
+  config.add_features(".*");
+
+  const model::proto::DeploymentConfig deployment;
+
+  model::proto::TrainingConfigLinking config_link;
+  ASSERT_OK(
+      AbstractLearner::LinkTrainingConfig(config, data_spec, &config_link));
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.set_internal_error_on_wrong_splitter_statistics(true);
+  dt_config.mutable_growing_strategy_best_first_global();
+
+  utils::RandomEngine random;
+  DecisionTree dt;
+  ASSERT_OK(Train(train_dataset, selected_examples, config, config_link,
+                  dt_config, deployment, weights, &random, &dt, {}));
+  ASSERT_TRUE(dt.root().node().has_num_pos_training_examples_without_weight());
 }
 
 TEST(Monotonic, FindSplitLabelHessianRegressionFeatureNumericalCart) {

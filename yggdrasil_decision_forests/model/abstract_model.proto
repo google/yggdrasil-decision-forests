@@ -45,6 +45,20 @@ enum Task {
   // between 0 and 1, where 0 indicates the possible most normal instance and 1
   // indicates the most possible anomalous instance.
   ANOMALY_DETECTION = 6;
+
+  // Predicts the time until a specific event (e.g., death of a patient, or
+  // onset of a disease, or the deletion of a file), using training examples
+  // where the event have been "observed", has not yet been observed (right
+  // censoring) or would be unreported if it happened before a "entry age"
+  // (left censoring).
+  //
+  // The main label is a NUMERICAL column reporting the age of the individual
+  // when the event was observed, or of right-censoring if the event was not
+  // observed. The model expects a boolean "event_observed" column. Optionally,
+  // a numerical "entry_age" label can be provided for the left censoring. Not
+  // providing the "entry_age" column is equivalent as providing a column filled
+  // with zeroes.
+  SURVIVAL_ANALYSIS = 7;
 }
 
 // Contains the same information as a model::AbstractModel (without the
@@ -83,6 +97,11 @@ message AbstractModel {
   // Index of the "treatment" attribute in the dataspec for uplift problems.
   optional int32 uplift_treatment_col_idx = 9 [default = -1];
 
+  // Index of the label column for the entry age and event_observed in a
+  // SURVIVAL_ANALYSIS task.
+  optional int32 label_entry_age_col_idx = 14 [default = -1];
+  optional int32 label_event_observed_col_idx = 15 [default = -1];
+
   optional Metadata metadata = 10;
 
   // Logs of the automated hyper-parameter tuning of the model.
@@ -110,6 +129,12 @@ message Metadata {
 
   // Framework used to create the model.
   optional string framework = 4;
+
+  message CustomField {
+    optional string key = 1;
+    optional bytes value = 2;
+  }
+  repeated CustomField custom_fields = 5;
 }
 
 // Description of the importance of a given attribute. The semantic of

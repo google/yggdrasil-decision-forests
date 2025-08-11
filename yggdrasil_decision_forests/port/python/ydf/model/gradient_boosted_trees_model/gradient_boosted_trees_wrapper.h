@@ -20,8 +20,10 @@
 
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "absl/status/statusor.h"
+#include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
@@ -29,6 +31,13 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests::port::python {
+
+// This class is a pybind-compatible container for the GBT training logs.
+struct GBTCCTrainingLogEntry {
+  int iteration;
+  metric::proto::EvaluationResults validation_evaluation;
+  metric::proto::EvaluationResults training_evaluation;
+};
 
 class GradientBoostedTreesCCModel : public DecisionForestCCModel {
   using YDFModel = ::yggdrasil_decision_forests::model::gradient_boosted_trees::
@@ -60,6 +69,8 @@ class GradientBoostedTreesCCModel : public DecisionForestCCModel {
   metric::proto::EvaluationResults validation_evaluation() const {
     return gbt_model_->ValidationEvaluation();
   }
+
+  std::vector<GBTCCTrainingLogEntry> training_logs() const;
 
   py::array_t<float> initial_predictions() const;
 

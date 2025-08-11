@@ -20,6 +20,7 @@ package yggdrasil_decision_forests.model.hyperparameters_optimizer_v2.proto;
 import "yggdrasil_decision_forests/learner/abstract_learner.proto";
 import "yggdrasil_decision_forests/metric/metric.proto";
 import "yggdrasil_decision_forests/model/hyperparameter.proto";
+import "yggdrasil_decision_forests/utils/fold_generator.proto";
 
 message HyperParametersOptimizerLearnerTrainingConfig {
   // Definition of the machine learning algorithm to tune as well as the value
@@ -83,9 +84,17 @@ message Evaluation {
     // Uses the self reported model evaluation e.g. validation score or OOB
     // evaluation. Default.
     SelfEvaluation self_model_evaluation = 3;
+    // Uses cross-validation on the training dataset.
+    CrossValidation cross_validation = 4;
   }
 
   message SelfEvaluation {}
+
+  message CrossValidation {
+    optional utils.proto.FoldGenerator.CrossValidation fold_generator = 1;
+
+    optional int32 num_threads = 2 [default = 10];
+  }
 }
 
 message Optimizer {

@@ -18,6 +18,7 @@
 #include <atomic>
 #include <memory>
 #include <optional>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -44,7 +45,6 @@ TEST(ThreadPool, Simple) {
   const int n = 100;
   {
     ThreadPool pool(1, {.name_prefix = std::string("MyPool")});
-    pool.StartWorkers();
     for (int i = 1; i <= n; i++) {
       pool.Schedule([&, i]() { counter += i; });
     }
@@ -149,7 +149,6 @@ TEST(Utils, ConcurrentForLoop) {
   std::vector<int> items(500, 2);
   {
     ThreadPool pool(5, {.name_prefix = std::string("")});
-    pool.StartWorkers();
     ConcurrentForLoop(
         4, &pool, items.size(),
         [&sum, &items](size_t block_idx, size_t begin_idx, size_t end_idx) {
@@ -168,7 +167,6 @@ TEST(Utils, ConcurrentForLoopFewItemsManyBlocks) {
   std::vector<int> items(5, 2);
   {
     ThreadPool pool(20, {.name_prefix = std::string("")});
-    pool.StartWorkers();
     ConcurrentForLoop(
         pool.num_threads(), &pool, items.size(),
         [&sum, &items](size_t block_idx, size_t begin_idx, size_t end_idx) {

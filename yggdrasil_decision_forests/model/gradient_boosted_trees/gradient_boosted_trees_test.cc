@@ -202,6 +202,19 @@ TEST(GradientBoostedTrees, NDCGTruncationLegacyModel) {
   EXPECT_THAT(description, testing::HasSubstr("LAMBDA_MART_NDCG5@5"));
 }
 
+TEST(GradientBoostedTrees, XENDCGTruncation) {
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "synthetic_ranking_gbdt_xe_ndcg"),
+      &model));
+  const auto* gbt_model = dynamic_cast<
+      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+      model.get());
+  ASSERT_EQ(gbt_model->loss(), proto::XE_NDCG_MART);
+  std::string description = gbt_model->DescriptionAndStatistics();
+  EXPECT_THAT(description, testing::HasSubstr("XE_NDCG_MART@5"));
+}
+
 TEST(GradientBoostedTrees, NDCGTruncationNonRankingModel) {
   std::unique_ptr<model::AbstractModel> model;
   EXPECT_OK(model::LoadModel(
@@ -250,6 +263,30 @@ TEST(GradientBoostedTrees, PoissonLossWithClassificationTaskOnDataset) {
   model::proto::Prediction prediction;
   EXPECT_DEATH(model.Predict(dataset, 0, &prediction),
                "Only regression is supported with poison loss");
+}
+
+TEST(GradientBoostedTrees, GetLossName) {
+  GradientBoostedTreesModel model;
+
+  // Default loss
+  EXPECT_EQ(model.GetLossName(), "DEFAULT");
+
+  // Loss without configuration
+  model.set_loss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD, {});
+  EXPECT_EQ(model.GetLossName(), "BINOMIAL_LOG_LIKELIHOOD");
+
+  // Loss with configuration
+  proto::LossConfiguration loss_config;
+  loss_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(5);
+  model.set_loss(proto::Loss::LAMBDA_MART_NDCG5, loss_config);
+  EXPECT_EQ(model.GetLossName(), "LAMBDA_MART_NDCG5@5");
+
+  loss_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(10);
+  model.set_loss(proto::Loss::LAMBDA_MART_NDCG5, loss_config);
+  EXPECT_EQ(model.GetLossName(), "LAMBDA_MART_NDCG5@10");
+
+  model.set_loss(proto::Loss::XE_NDCG_MART, loss_config);
+  EXPECT_EQ(model.GetLossName(), "XE_NDCG_MART@10");
 }
 
 }  // namespace

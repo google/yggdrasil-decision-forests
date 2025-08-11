@@ -55,6 +55,8 @@ class FileSystemInterface {
 
   virtual std::string GetBasename(absl::string_view path) = 0;
 
+  virtual std::string GetDirname(absl::string_view path) = 0;
+
   virtual std::unique_ptr<FileInputByteStream> CreateInputByteStream() = 0;
 
   virtual std::unique_ptr<FileOutputByteStream> CreateOutputByteStream() = 0;

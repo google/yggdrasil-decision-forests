@@ -15,15 +15,21 @@
 
 #include "yggdrasil_decision_forests/metric/report.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -33,6 +39,7 @@
 #include "yggdrasil_decision_forests/utils/histogram.h"
 #include "yggdrasil_decision_forests/utils/html.h"
 #include "yggdrasil_decision_forests/utils/plot.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
@@ -70,17 +77,27 @@ absl::Status PlotClassificationCurves(const proto::Roc& roc,
   ta_curve->label = std::string(label);
 
   for (const auto& point : roc.curve()) {
+    // Clamp thresholds for a simpler visual presentation.
+    float sanitized_threshold = std::clamp(point.threshold(), 0.f, 1.f);
     roc_curve->xs.push_back(internal::RocFPR(point));
     roc_curve->ys.push_back(internal::RocTPR(point));
+    roc_curve->point_labels.push_back(
+        absl::StrFormat("Threshold: %.3f", sanitized_threshold));
 
     pr_curve->xs.push_back(internal::RocTPR(point));
     pr_curve->ys.push_back(internal::RocPrecision(point));
+    pr_curve->point_labels.push_back(
+        absl::StrFormat("Threshold: %.3f", sanitized_threshold));
 
     tv_curve->xs.push_back(point.threshold());
     tv_curve->ys.push_back(internal::RocPositiveRatio(point));
+    tv_curve->point_labels.push_back(
+        absl::StrFormat("Threshold: %.3f", sanitized_threshold));
 
     ta_curve->xs.push_back(point.threshold());
     ta_curve->ys.push_back(internal::RocAccuracy(point));
+    ta_curve->point_labels.push_back(
+        absl::StrFormat("Threshold: %.3f", sanitized_threshold));
   }
 
   roc_plot->items.push_back(std::move(roc_curve));
@@ -90,7 +107,7 @@ absl::Status PlotClassificationCurves(const proto::Roc& roc,
   return absl::OkStatus();
 }
 
-// Creates the HTML report for a classication evaluation.
+// Creates the HTML report for a classfication evaluation.
 absl::Status AppendHtmlReportClassiciation(const proto::EvaluationResults& eval,
                                            const HtmlReportOptions& options,
                                            utils::html::Html* html) {
@@ -389,6 +406,9 @@ absl::Status AppendTextReportWithStatus(const proto::EvaluationResults& eval,
     case proto::EvaluationResults::TypeCase::kAnomalyDetection:
       RETURN_IF_ERROR(AppendTextReportAnomalyDetection(eval, report));
       break;
+    case proto::EvaluationResults::TypeCase::kSurvivalAnalysis:
+      RETURN_IF_ERROR(AppendTextReportSurvivalAnalysis(eval, report));
+      break;
     default:
       STATUS_FATAL("This model does not support evaluation reports.");
   }
@@ -554,6 +574,16 @@ absl::Status AppendTextReportRanking(const proto::EvaluationResults& eval,
   }
   absl::StrAppend(report, "\n");
 
+  absl::StrAppend(report, "MAP@", eval.ranking().map_truncation(), ": ",
+                  MAP(eval));
+  if (eval.ranking().map().has_bootstrap_based_95p()) {
+    absl::SubstituteAndAppend(
+        report, " CI95[B][$0 $1]",
+        eval.ranking().map().bootstrap_based_95p().lower(),
+        eval.ranking().map().bootstrap_based_95p().upper());
+  }
+  absl::StrAppend(report, "\n");
+
   absl::StrAppend(report, "Precision@1: ", PrecisionAt1(eval));
   if (eval.ranking().precision_at_1().has_bootstrap_based_95p()) {
     absl::SubstituteAndAppend(
@@ -586,6 +616,12 @@ absl::Status AppendTextReportUplift(const proto::EvaluationResults& eval,
 absl::Status AppendTextReportAnomalyDetection(
     const proto::EvaluationResults& eval, std::string* report) {
   absl::StrAppend(report, "No report for anomaly detection\n");
+  return absl::OkStatus();
+}
+
+absl::Status AppendTextReportSurvivalAnalysis(
+    const proto::EvaluationResults& eval, std::string* report) {
+  absl::StrAppend(report, "No report for survival analysis\n");
   return absl::OkStatus();
 }
 

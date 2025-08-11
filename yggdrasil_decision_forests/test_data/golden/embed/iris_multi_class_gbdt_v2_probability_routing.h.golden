@@ -1,0 +1,106 @@
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <stdint.h>
+#include <cstring>
+#include <array>
+#include <algorithm>
+#include <bitset>
+#include <cassert>
+
+namespace ydf_model {
+
+enum class Label : uint32_t {
+  kSetosa = 0,
+  kVersicolor = 1,
+  kVirginica = 2,
+};
+
+constexpr const int kNumFeatures = 4;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  typedef float Numerical;
+
+  Numerical sepal_length;
+  Numerical sepal_width;
+  Numerical petal_length;
+  Numerical petal_width;
+};
+
+struct __attribute__((packed)) Node {
+  uint8_t pos = 0;
+  union {
+    struct __attribute__((packed)) {
+      uint8_t feat;
+      union {
+        float thr;
+      };
+    } cond;
+    struct __attribute__((packed)) {
+      float val;
+    } leaf;
+  };
+};
+static const Node nodes[] = {
+{.pos=1,.cond={.feat=3,.thr=0.8}},
+{.leaf={.val=0.3}},
+{.pos=1,.cond={.feat=2,.thr=3.65}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.pos=3,.cond={.feat=3,.thr=0.8}},
+{.pos=1,.cond={.feat=2,.thr=1.45}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.pos=5,.cond={.feat=3,.thr=1.75}},
+{.pos=3,.cond={.feat=2,.thr=4.95}},
+{.pos=1,.cond={.feat=0,.thr=5.3}},
+{.leaf={.val=0.21}},
+{.leaf={.val=0.3}},
+{.leaf={.val=0.03}},
+{.pos=1,.cond={.feat=2,.thr=4.95}},
+{.leaf={.val=-0.06}},
+{.pos=1,.cond={.feat=0,.thr=7.25}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.pos=7,.cond={.feat=3,.thr=1.65}},
+{.pos=5,.cond={.feat=2,.thr=4.85}},
+{.pos=3,.cond={.feat=3,.thr=0.35}},
+{.pos=1,.cond={.feat=1,.thr=3.45}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=-0.15}},
+{.leaf={.val=0.075}},
+{.pos=1,.cond={.feat=2,.thr=5.05}},
+{.leaf={.val=0.2}},
+{.leaf={.val=0.3}},
+};
+
+static const uint8_t root_deltas[] = {5,15,11};
+
+
+inline Label Predict(const Instance& instance) {
+  std::array<float, 3> accumulator {0, 0, 0};
+
+  const Node* root = nodes;
+  const Node* node;
+  const char* raw_instance = (const char*)(&instance);
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+        float numerical_feature;
+        std::memcpy(&numerical_feature, raw_instance + node->cond.feat * sizeof(float), sizeof(float));
+        eval = numerical_feature >= node->cond.thr;
+
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator[tree_idx % 3] += node->leaf.val;
+    root += root_deltas[tree_idx];
+  }
+
+  return static_cast<Label>(std::distance(accumulator.begin(), std::max_element(accumulator.begin(), accumulator.end())));
+}
+
+}  // namespace ydf_model
+#endif

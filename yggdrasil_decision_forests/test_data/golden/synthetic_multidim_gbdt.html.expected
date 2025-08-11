@@ -1,0 +1,383 @@
+
+<style>
+
+.tab_block .header {
+    flex-direction: row;
+    display: flex;
+}
+
+.tab_block .header .tab {
+    cursor: pointer;
+    background-color: #F6F5F5;
+    text-decoration: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: black;
+}
+
+.tab_block .header .tab.selected {
+    border-bottom: 2px solid #2F80ED;
+}
+
+.tab_block .header .tab:hover {
+    text-decoration: none;
+    background-color: #DCDCDC;
+}
+
+.tab_block .body .tab_content {
+    display: none;
+    padding: 5px;
+}
+
+.tab_block .body .tab_content.selected {
+    display: block;
+}
+
+.ydf_pre {
+    font-size: medium;
+}
+
+
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+
+function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    
+    
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+  
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  <div class="tab_block" id="123"><div class="header"><a id="123_model" class="tab selected" onclick="ydfShowTab('123', 'model')">Model</a><a id="123_dataspec" class="tab" onclick="ydfShowTab('123', 'dataspec')">Dataspec</a><a id="123_training" class="tab" onclick="ydfShowTab('123', 'training')">Training</a><a id="123_variable_importance" class="tab" onclick="ydfShowTab('123', 'variable_importance')">Variable importances</a><a id="123_structure" class="tab" onclick="ydfShowTab('123', 'structure')">Structure</a></div><div class="body"><div id="123_body_model" class="tab_content selected"><b>Name</b> : GRADIENT_BOOSTED_TREES<br><b>Task</b> : REGRESSION<br><b>Label</b> : label<br><b>Features (8)</b> : f1[5]     f2[3]  <br><b>Weights</b> : None<br><b>Trained with tuner</b> : No<br><b>Trained with Feature Selection</b> : No<br><b>Model size</b> : 101 kB<br></div><div id="123_body_dataspec" class="tab_content"><pre class="ydf_pre">Number of records: 100
+Number of columns: 9
+
+Number of columns by type:
+	NUMERICAL: 9 (100%)
+
+Columns:
+
+NUMERICAL: 9 (100%)
+	0: &quot;label&quot; NUMERICAL mean:0.42 min:0 max:1 sd:0.493559 dtype:DTYPE_BOOL
+	1: &quot;f1.0_of_5&quot; NUMERICAL mean:0.0919861 min:0.000571401 max:0.194081 sd:0.0570757 dtype:DTYPE_FLOAT64
+	2: &quot;f1.1_of_5&quot; NUMERICAL mean:0.0977874 min:0.000693184 max:0.199769 sd:0.0565687 dtype:DTYPE_FLOAT64
+	3: &quot;f1.2_of_5&quot; NUMERICAL mean:0.100491 min:0.000663755 max:0.19879 sd:0.059822 dtype:DTYPE_FLOAT64
+	4: &quot;f1.3_of_5&quot; NUMERICAL mean:0.107308 min:0.00394003 max:0.199755 sd:0.0522711 dtype:DTYPE_FLOAT64
+	5: &quot;f1.4_of_5&quot; NUMERICAL mean:0.0880915 min:0.000188924 max:0.19935 sd:0.0577468 dtype:DTYPE_FLOAT64
+	6: &quot;f2.0_of_3&quot; NUMERICAL mean:0.192086 min:0.000369166 max:0.332705 sd:0.0976165 dtype:DTYPE_FLOAT64
+	7: &quot;f2.1_of_3&quot; NUMERICAL mean:0.153499 min:0.000483617 max:0.331171 sd:0.0971401 dtype:DTYPE_FLOAT64
+	8: &quot;f2.2_of_3&quot; NUMERICAL mean:0.156837 min:0.0131151 max:0.333041 sd:0.0994799 dtype:DTYPE_FLOAT64
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
+</pre></div><div id="123_body_training" class="tab_content"><p>The following evaluation is computed on the validation or out-of-bag dataset.</p><pre class="ydf_pre">Number of predictions (with weights): 1
+Task: REGRESSION
+Loss (SQUARED_ERROR): 0.393557
+
+RMSE: 0.627341
+Default RMSE: : 0
+</pre><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_123self_eval_item0" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
+  Plotly.newPlot(
+    'chart_123self_eval_item0',
+    [{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48],
+y: [0.452367,0.420561,0.393404,0.368284,0.345215,0.315164,0.2968,0.271611,0.249314,0.234196,0.216112,0.199855,0.188317,0.174348,0.162303,0.152276,0.14362,0.13624,0.128262,0.121062,0.114832,0.109351,0.104336,0.099344,0.093936,0.0885711,0.0843988,0.0810183,0.0778753,0.0743187,0.0707592,0.0682846,0.0654061,0.0633698,0.0614959,0.0587599,0.0568235,0.0552481,0.0527163,0.0502181,0.0482326,0.0463858,0.0445037,0.0424802,0.0405175,0.0387142,0.037778,0.0363319],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'training',
+},
+{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48],
+y: [0.547196,0.522873,0.513998,0.487907,0.484386,0.46307,0.460222,0.44781,0.434513,0.421872,0.416322,0.412405,0.403657,0.398658,0.396447,0.400808,0.396042,0.393557,0.398649,0.399464,0.394372,0.397134,0.399658,0.400592,0.398136,0.39493,0.395052,0.397934,0.398491,0.399052,0.395827,0.399402,0.397856,0.401688,0.404657,0.404539,0.403534,0.406617,0.408622,0.409517,0.409843,0.410088,0.411317,0.411446,0.410283,0.409647,0.410527,0.411402],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'validation',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'iteration',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'loss',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+
+    }
+    function show_error(err) {
+      document.getElementById("chart_123self_eval_item0").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script></div><div style='grid-row:2 / span 1; grid-column:1 / span 1;'><div id="chart_123self_eval_item1" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
+  Plotly.newPlot(
+    'chart_123self_eval_item1',
+    [{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48],
+y: [0.452367,0.420561,0.393404,0.368284,0.345215,0.315164,0.2968,0.271611,0.249314,0.234196,0.216112,0.199855,0.188317,0.174348,0.162303,0.152276,0.14362,0.13624,0.128262,0.121062,0.114832,0.109351,0.104336,0.099344,0.093936,0.0885711,0.0843988,0.0810183,0.0778753,0.0743187,0.0707592,0.0682846,0.0654061,0.0633698,0.0614959,0.0587599,0.0568235,0.0552481,0.0527163,0.0502181,0.0482326,0.0463858,0.0445037,0.0424802,0.0405175,0.0387142,0.037778,0.0363319],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'training',
+},
+{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48],
+y: [0.547196,0.522873,0.513998,0.487907,0.484386,0.46307,0.460222,0.44781,0.434513,0.421872,0.416322,0.412405,0.403657,0.398658,0.396447,0.400808,0.396042,0.393557,0.398649,0.399464,0.394372,0.397134,0.399658,0.400592,0.398136,0.39493,0.395052,0.397934,0.398491,0.399052,0.395827,0.399402,0.397856,0.401688,0.404657,0.404539,0.403534,0.406617,0.408622,0.409517,0.409843,0.410088,0.411317,0.411446,0.410283,0.409647,0.410527,0.411402],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'validation',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'iteration',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'rmse',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+
+    }
+    function show_error(err) {
+      document.getElementById("chart_123self_eval_item1").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script></div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1. &quot;f2.0_of_3&quot;  1.000000 ################
+    2. &quot;f2.2_of_3&quot;  0.278529 #
+    3. &quot;f1.1_of_5&quot;  0.275493 #
+    4. &quot;f1.4_of_5&quot;  0.273035 #
+    5. &quot;f2.1_of_3&quot;  0.242291 
+    6. &quot;f1.2_of_5&quot;  0.229392 
+    7. &quot;f1.3_of_5&quot;  0.211068 
+    8. &quot;f1.0_of_5&quot;  0.205818 
+</pre></div><div id="123_vi_body_NUM_AS_ROOT" class="content"><pre class="ydf_pre">    1. &quot;f2.0_of_3&quot; 18.000000 
+</pre></div><div id="123_vi_body_NUM_NODES" class="content"><pre class="ydf_pre">    1. &quot;f2.0_of_3&quot; 42.000000 ################
+    2. &quot;f2.1_of_3&quot; 31.000000 ##########
+    3. &quot;f2.2_of_3&quot; 27.000000 ########
+    4. &quot;f1.4_of_5&quot; 26.000000 ########
+    5. &quot;f1.1_of_5&quot; 25.000000 #######
+    6. &quot;f1.3_of_5&quot; 24.000000 #######
+    7. &quot;f1.2_of_5&quot; 17.000000 ###
+    8. &quot;f1.0_of_5&quot;  9.000000 
+</pre></div><div id="123_vi_body_SUM_SCORE" class="content"><pre class="ydf_pre">    1. &quot;f2.0_of_3&quot; 30.487660 ################
+    2. &quot;f1.4_of_5&quot; 18.689637 #########
+    3. &quot;f2.2_of_3&quot; 15.432474 #######
+    4. &quot;f1.1_of_5&quot; 13.307686 ######
+    5. &quot;f2.1_of_3&quot; 11.557981 #####
+    6. &quot;f1.2_of_5&quot;  9.676942 ####
+    7. &quot;f1.3_of_5&quot;  9.185909 ####
+    8. &quot;f1.0_of_5&quot;  0.563885 
+</pre></div></div><p>Those variable importances are computed during training. More, and possibly more informative, variable importances are available when analyzing a model on a test dataset.</p></div><div id="123_body_structure" class="tab_content"><b>Number of trees</b> : 18<br><p>Below is the first tree of the model. The model contains 18 trees, which jointly make the prediction. Other trees can be printed with `model.print_tree(tree_idx)` or plotted with `model.plot_tree(tree_idx)`</p><pre class="ydf_pre">    &quot;f2.0_of_3&quot;&gt;=0.0719065 [s:0.0527359 n:94 np:77 miss:1] ; pred:-1.26818e-09
+        ├─(pos)─ &quot;f2.2_of_3&quot;&gt;=0.154215 [s:0.0435374 n:77 np:35 miss:1] ; pred:-0.0107903
+        |        ├─(pos)─ &quot;f2.0_of_3&quot;&gt;=0.103618 [s:0.0195918 n:35 np:30 miss:1] ; pred:-0.0336474
+        |        |        ├─(pos)─ pred:-0.0393617
+        |        |        └─(neg)─ pred:0.000638297
+        |        └─(neg)─ &quot;f1.4_of_5&quot;&gt;=0.045217 [s:0.0804623 n:42 np:31 miss:1] ; pred:0.00825734
+        |                 ├─(pos)─ &quot;f2.1_of_3&quot;&gt;=0.117699 [s:0.0692508 n:31 np:20 miss:1] ; pred:0.0251544
+        |                 |        ├─(pos)─ &quot;f1.1_of_5&quot;&gt;=0.109292 [s:0.087904 n:20 np:9 miss:0] ; pred:0.0056383
+        |                 |        |        ├─(pos)─ pred:0.0384161
+        |                 |        |        └─(neg)─ pred:-0.0211799
+        |                 |        └─(neg)─ pred:0.0606383
+        |                 └─(neg)─ pred:-0.0393617
+        └─(neg)─ &quot;f1.1_of_5&quot;&gt;=0.0999012 [s:0.033218 n:17 np:12 miss:0] ; pred:0.0488736
+                 ├─(pos)─ pred:0.0606383
+                 └─(neg)─ pred:0.0206383
+</pre></div></div></div>

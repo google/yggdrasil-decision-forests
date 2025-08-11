@@ -69,6 +69,9 @@ class StreamProcessor {
   // Called by the destructor.
   void JoinAllAndStopThreads();
 
+  // Return the number of threads, i.e. the number of workers in this processor.
+  int num_threads() const { return num_threads_; }
+
  private:
   // Running loop for the threads.
   void ThreadLoop(int thread_idx);

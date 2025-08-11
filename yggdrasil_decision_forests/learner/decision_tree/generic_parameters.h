@@ -50,6 +50,8 @@ constexpr char kHParamCategoricalSetSplitMaxNumItems[] =
     "categorical_set_split_max_num_items";
 constexpr char kHParamCategoricalSetSplitMinItemFrequency[] =
     "categorical_set_split_min_item_frequency";
+constexpr char kHParamCategoricalSetSplitGreedyMaximumMaskSize[] =
+    "categorical_set_split_greedy_maximum_mask_size";
 
 // Categorical splitter
 constexpr char kHParamCategoricalAlgorithm[] = "categorical_algorithm";
@@ -131,6 +133,11 @@ constexpr char kHParamNumericalVectorSequenceNumExamples[] =
     "numerical_vector_sequence_num_examples";
 constexpr char kHParamNumericalVectorSequenceNumRandomAnchors[] =
     "numerical_vector_sequence_num_random_anchors";
+constexpr char kHParamNumericalVectorSequenceEnableCloserThanConditions[] =
+    "numerical_vector_sequence_enable_closer_than_conditions";
+constexpr char
+    kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions[] =
+        "numerical_vector_sequence_enable_projected_more_than_conditions";
 
 // Fill decision tree specific generic hyper parameter specifications.
 // This function is designed to be called by the learners using decision tree

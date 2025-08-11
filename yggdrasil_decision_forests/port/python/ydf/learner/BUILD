@@ -73,6 +73,7 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_inference",
         "@ydf_cc//yggdrasil_decision_forests/dataset:formats",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:types",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
@@ -192,6 +193,7 @@ py_library(
         ":generic_learner",
         ":hyperparameters",
         ":tuner",
+        "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
         "//ydf/model/gradient_boosted_trees_model",
@@ -301,6 +303,8 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/model/decision_forest_model",
+        "//ydf/model/tree:condition",
+        "//ydf/model/tree:node",
         "//ydf/utils:test_utils",
     ],
 )
@@ -379,6 +383,7 @@ py_test(
         ":custom_loss_py",
         ":generic_learner",
         ":specialized_learners",
+        ":tuner",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
@@ -462,6 +467,7 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
         "//ydf/utils:test_utils",
+        "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
     ],
 )
 

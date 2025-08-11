@@ -128,12 +128,6 @@ bool IsNumerical(ColumnType type) {
          type == ColumnType::NUMERICAL_VECTOR_SEQUENCE;
 }
 
-int32_t CategoricalStringToValue(const std::string& value,
-                                 const proto::Column& col_spec) {
-  // TODO: Update.
-  return CategoricalStringToValueWithStatus(value, col_spec).value();
-}
-
 int32_t NonintegerizedCategoricalStringToValue(absl::string_view value,
                                                const proto::Column& col_spec) {
   DCHECK(!col_spec.categorical().is_already_integerized());
@@ -803,12 +797,16 @@ proto::Column* AddColumn(const absl::string_view name,
 
 proto::Column* AddNumericalColumn(const absl::string_view name,
                                   proto::DataSpecification* data_spec) {
-  return AddColumn(name, proto::ColumnType::NUMERICAL, data_spec);
+  auto col = AddColumn(name, proto::ColumnType::NUMERICAL, data_spec);
+  col->mutable_numerical();
+  return col;
 }
 
 proto::Column* AddBooleanColumn(const absl::string_view name,
                                 proto::DataSpecification* data_spec) {
-  return AddColumn(name, proto::ColumnType::BOOLEAN, data_spec);
+  auto col = AddColumn(name, proto::ColumnType::BOOLEAN, data_spec);
+  col->mutable_boolean();
+  return col;
 }
 
 proto::Column* AddCategoricalColumn(const absl::string_view name,

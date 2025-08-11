@@ -116,6 +116,7 @@ class EvaluatePredictionTest(parameterized.TestCase):
     )
     self.assertAlmostEqual(model_evaluation.ndcg, standalone_evaluation.ndcg)
     self.assertAlmostEqual(model_evaluation.mrr, standalone_evaluation.mrr)
+    self.assertAlmostEqual(model_evaluation.map, standalone_evaluation.map)
 
   @parameterized.parameters(
       (generic_model.Task.CATEGORICAL_UPLIFT,),

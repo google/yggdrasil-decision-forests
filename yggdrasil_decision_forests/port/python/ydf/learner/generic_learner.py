@@ -124,6 +124,7 @@ class GenericLearner(abc.ABC):
       )
     if tuner:
       tuner.set_base_learner(learner_name)
+      tuner.set_base_learner_num_threads(self._deployment_config.num_threads)
 
     self._post_init()
 
@@ -367,6 +368,9 @@ Class: ydf.{self.__class__.__name__}
 Hyper-parameters: ydf.{self._hyperparameters}
 """
 
+  def __repr__(self) -> str:
+    return f"<ydf.{self.__class__.__name__}>"
+
   def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
     """Builds DS args with user inputs and guides for labels / special columns.
 
@@ -393,7 +397,12 @@ Hyper-parameters: ydf.{self._hyperparameters}
             max_vocab_count=-1,
             min_vocab_frequency=1,
         )
-      elif task in [Task.REGRESSION, Task.RANKING, Task.NUMERICAL_UPLIFT]:
+      elif task in [
+          Task.REGRESSION,
+          Task.RANKING,
+          Task.NUMERICAL_UPLIFT,
+          Task.SURVIVAL_ANALYSIS,
+      ]:
         return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
       elif task in [Task.ANOMALY_DETECTION]:
         if name is None:
@@ -625,6 +634,10 @@ class GenericCCLearner(GenericLearner):
     if "loss" in self._hyperparameters and isinstance(
         self._hyperparameters["loss"], custom_loss.AbstractCustomLoss
     ):
+      if self._tuner:
+        raise ValueError(
+            "Custom losses are not supported for hyperparameter tuning."
+        )
       log.info(
           "Using a custom loss. Note when using custom losses, hyperparameter"
           " `apply_link_function` is ignored. Use the losses' activation"

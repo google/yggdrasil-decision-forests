@@ -158,8 +158,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
     auc = metrics.roc_auc_score(test_labels, sklearn_predictions)
     self.assertAlmostEqual(auc, 0.99333, delta=0.0001)
 
-    # TODO: Remove the pytype disable once the bug is fixed.
-    ydf_model = export_sklearn.from_sklearn(sklearn_model)  # pytype: disable=wrong-arg-types
+    ydf_model = export_sklearn.from_sklearn(sklearn_model)
     self.assertSequenceEqual(
         ydf_model.input_feature_names(),
         [
@@ -193,8 +192,7 @@ class ScikitLearnModelConverterTest(parameterized.TestCase):
         ValueError,
         "Scikit-Learn model must be fit to data before converting",
     ):
-      # TODO: Remove the pytype disable once the bug is fixed.
-      _ = export_sklearn.from_sklearn(tree.DecisionTreeRegressor())  # pytype: disable=wrong-arg-types
+      _ = export_sklearn.from_sklearn(tree.DecisionTreeRegressor())
 
   def test_import_raises_when_regression_target_is_multivariate(self):
     features, labels = datasets.make_regression(

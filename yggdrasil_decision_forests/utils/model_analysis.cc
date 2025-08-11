@@ -31,6 +31,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -52,6 +53,7 @@
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.h"
 #include "yggdrasil_decision_forests/utils/partial_dependence_plot.pb.h"
 #include "yggdrasil_decision_forests/utils/plot.h"
+#include "yggdrasil_decision_forests/utils/shap.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
@@ -712,6 +714,26 @@ absl::StatusOr<RequestedFeatures> GetRequestedFeatures(
 }  // namespace
 
 namespace internal {
+
+std::string ShapRepr(float range, float value, const int bar_len) {
+  if (range <= 0.f) {
+    range = 1.f;
+  }
+  if (value > 0.f) {
+    const float relative_value = value / range;
+    const int num_plus = std::round(relative_value * bar_len);
+    return absl::StrCat(std::string(bar_len, ' '), "|",
+                        std::string(num_plus, '+'),
+                        std::string(bar_len - num_plus, ' '));
+  } else {
+    const float relative_value = -value / range;
+    const int num_minus = std::round(relative_value * bar_len);
+    return absl::StrCat(std::string(bar_len - num_minus, ' '),
+                        std::string(num_minus, '-'), "|",
+                        std::string(bar_len, ' '));
+  }
+}
+
 absl::StatusOr<utils::plot::MultiPlot> PlotConditionalExpectationPlotSet(
     const dataset::proto::DataSpecification& data_spec,
     const ConditionalExpectationPlotSet& cond_set,
@@ -831,6 +853,14 @@ absl::StatusOr<proto::AnalysisResult> Analyse(
         dataset, &model, analysis.mutable_variable_importances(),
         {options.num_threads(),
          options.permuted_variable_importance().num_rounds()}));
+  }
+
+  if (options.shap_variable_importance().enabled()) {
+    RETURN_IF_ERROR(ComputeShapFeatureImportance(
+        dataset, &model, analysis.mutable_variable_importances(),
+        {.num_threads = options.num_threads(),
+         .max_duration_seconds = maximum_duration_seconds,
+         .sampling = options.shap_variable_importance().example_sampling()}));
   }
 
   if (options.include_model_structural_variable_importances()) {
@@ -1084,9 +1114,93 @@ absl::StatusOr<proto::FeatureVariationItem> FeatureVariationCategorical(
   return item;
 }
 
+absl::Status AnalyzePredictionShapValues(
+    const model::AbstractModel& model, const dataset::proto::Example& example,
+    const proto::PredictionAnalysisOptions& options,
+    const std::vector<int>& input_features,
+    proto::PredictionAnalysisResult* analysis) {
+  shap::ExampleShapValues shap_values;
+  auto shap_status = shap::tree_shap(model, example, &shap_values);
+  if (!shap_status.ok()) {
+    // Note: Not all models support shap values.
+    return absl::OkStatus();
+  }
+  auto* dst_shap_values = analysis->mutable_shap_values();
+
+  // Set the output names
+  if (model.task() == model::proto::Task::CLASSIFICATION) {
+    for (int output_idx = 0; output_idx < shap_values.num_outputs();
+         output_idx++) {
+      // For binary classification, a single shap value is returned (for the
+      // positive class). For multi-class classification, a shap value is
+      // returned for each class.
+      int item_idx;
+      if (shap_values.num_outputs() == 1) {
+        item_idx = 2;  // Positive label
+      } else {
+        item_idx = output_idx + 1;
+      }
+      const auto item_name = dataset::CategoricalIdxToRepresentation(
+          model.LabelColumnSpec(), item_idx);
+      dst_shap_values->add_outputs(item_name);
+    }
+  } else {
+    if (shap_values.num_outputs() == 1) {
+      dst_shap_values->add_outputs("prediction");
+    } else {
+      for (int output_idx = 0; output_idx < shap_values.num_outputs();
+           output_idx++) {
+        dst_shap_values->add_outputs(absl::StrCat("prediction #", output_idx));
+      }
+    }
+  }
+
+  // Copy the shap values in the proto.
+  float min_value = 0;
+  float max_value = 0;
+
+  // Sum of the abs values of all the shap values per input feature.
+  std::vector<float> sum_abs_values_per_column(model.data_spec().columns_size(),
+                                               0.f);
+
+  for (const auto attribute_idx : input_features) {
+    auto* dst_value = dst_shap_values->add_values();
+    dst_value->set_column_idx(attribute_idx);
+    float sum_abs = 0.f;
+    for (int output_idx = 0; output_idx < shap_values.num_outputs();
+         output_idx++) {
+      const float value =
+          shap_values.values()[shap_values.Index(attribute_idx, output_idx)];
+      dst_value->add_values(value);
+
+      sum_abs += std::abs(value);
+
+      // Keep min/max
+      min_value = std::min(min_value, value);
+      max_value = std::max(max_value, value);
+    }
+
+    sum_abs_values_per_column[attribute_idx] = sum_abs;
+  }
+  dst_shap_values->set_min_shap_value(min_value);
+  dst_shap_values->set_max_shap_value(max_value);
+
+  // Sort the shap values in decreasing order of the sum of absolute values
+  // though all the output dimensions.
+  std::stable_sort(dst_shap_values->mutable_values()->begin(),
+                   dst_shap_values->mutable_values()->end(),
+                   [&](const auto& a, const auto& b) {
+                     return sum_abs_values_per_column[a.column_idx()] >
+                            sum_abs_values_per_column[b.column_idx()];
+                   });
+
+  return absl::OkStatus();
+}
+
 absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
     const model::AbstractModel& model, const dataset::proto::Example& example,
     const proto::PredictionAnalysisOptions& options) {
+  // List the model input features
   ASSIGN_OR_RETURN(const auto features,
                    GetRequestedFeatures(model.input_features(),
                                         model.data_spec(), options.features()));
@@ -1122,6 +1236,9 @@ absl::StatusOr<proto::PredictionAnalysisResult> AnalyzePrediction(
     }
   }
 
+  // Shap values
+  RETURN_IF_ERROR(AnalyzePredictionShapValues(model, example, options, features,
+                                              &analysis));
   return analysis;
 }
 
@@ -1364,6 +1481,48 @@ absl::StatusOr<utils::plot::Plot> FeatureVariationPlotWithBooleanFeature(
   return plot;
 }
 
+absl::StatusOr<utils::html::Html> CreateHtmlReportShapValues(
+    const proto::PredictionAnalysisResult& analysis,
+    const proto::PredictionAnalysisOptions& options,
+    const absl::string_view block_id) {
+  namespace h = utils::html;
+
+  const auto& shap_values = analysis.shap_values();
+
+  // Header
+  h::Html rows;
+  {
+    h::Html row;
+    row.Append(h::Th("Feature"));
+    for (const auto& output : shap_values.outputs()) {
+      row.Append(h::Th(output));
+    }
+    rows.Append(h::Tr(row));
+  }
+
+  // Body
+  const auto range =
+      std::max(shap_values.max_shap_value(), -shap_values.min_shap_value());
+  for (const auto& shap_value : shap_values.values()) {
+    h::Html row;
+    const auto& feature_name =
+        analysis.data_spec().columns(shap_value.column_idx()).name();
+    row.Append(h::Td(feature_name));
+    for (int output_idx = 0; output_idx < shap_values.outputs_size();
+         output_idx++) {
+      const float value = shap_value.values(output_idx);
+      const auto value_repr = internal::ShapRepr(range, value);
+      row.Append(
+          h::Td(h::Pre(absl::StrFormat("%-8f    %s", value, value_repr))));
+    }
+    rows.Append(h::Tr(row));
+  }
+
+  h::Html html;
+  html.Append(h::Table(h::Class("ydf_tuning_table"), rows));
+  return html;
+}
+
 // Create a feature variation plot for each of the features.
 absl::StatusOr<utils::html::Html> CreateHtmlReportFeatureVariation(
     const proto::PredictionAnalysisResult& analysis,
@@ -1433,12 +1592,23 @@ absl::StatusOr<std::string> CreateHtmlReport(
   html.AppendRaw(model::Header());
   utils::TabBarBuilder tabbar(block_id);
 
-  // Feature Variation
-  ASSIGN_OR_RETURN(
-      const auto content,
-      CreateHtmlReportFeatureVariation(
-          analysis, options, absl::StrCat(block_id, "_feature_variation")));
-  tabbar.AddTab("fvar", "Feature Variation", content);
+  {
+    // Feature Variation
+    ASSIGN_OR_RETURN(
+        const auto content,
+        CreateHtmlReportFeatureVariation(
+            analysis, options, absl::StrCat(block_id, "_feature_variation")));
+    tabbar.AddTab("fvar", "Feature Variation", content);
+  }
+
+  if (analysis.has_shap_values()) {
+    // SHAP values
+    ASSIGN_OR_RETURN(
+        const auto content,
+        CreateHtmlReportShapValues(analysis, options,
+                                   absl::StrCat(block_id, "_shap_values")));
+    tabbar.AddTab("shap", "SHAP values", content);
+  }
 
   html.Append(tabbar.Html());
   return std::string(html.content());

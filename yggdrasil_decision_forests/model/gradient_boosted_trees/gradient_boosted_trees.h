@@ -93,7 +93,6 @@ class GradientBoostedTreesModel : public AbstractModel,
   // stopping was triggered, (2) the model is trained with multiple trees per
   // iteration.
   size_t NumTrees() const { return decision_trees_.size(); }
-  int num_trees() const override { return NumTrees(); }
 
   // Number of times each feature is used in the model. Returns a map, indexed
   // by feature index, and counting the number of time a feature is used.
@@ -185,6 +184,9 @@ class GradientBoostedTreesModel : public AbstractModel,
                         const dataset::VerticalDataset& dataset2,
                         absl::Span<float> distances) const override;
 
+  // Full name of the loss, including NDCG truncation where applicable.
+  std::string GetLossName() const;
+
   std::string DebugCompare(const AbstractModel& other) const override;
 
  private:
@@ -269,13 +271,10 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   friend GradientBoostedTreesLearner;
 
- private:
   proto::Header BuildHeaderProto() const;
   void ApplyHeaderProto(const proto::Header& header);
-  // Full name of the loss, including NDCG truncation where applicable.
-  std::string GetLossName() const;
   // Loss used to train the model.
-  proto::Loss loss_;
+  proto::Loss loss_ = proto::Loss::DEFAULT;
   // Options of the loss.
   proto::LossConfiguration loss_config_;
 };
@@ -285,6 +284,16 @@ namespace internal {
 // Average of the absolute value of the leafs weighted by the number of training
 // examples.
 float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree& tree);
+
+enum class TrainingLogEvaluationSet { kTraining, kValidation };
+
+// Converts an entry of the training logs into an evaluation proto.
+metric::proto::EvaluationResults TrainingLogToEvaluationResults(
+    const proto::TrainingLogs::Entry& log_entry,
+    const proto::TrainingLogs& training_logs, const model::proto::Task& task,
+    const dataset::proto::Column& label_col_spec,
+    const proto::LossConfiguration& loss_config,
+    const absl::string_view loss_name, TrainingLogEvaluationSet eval_set);
 
 }  // namespace internal
 

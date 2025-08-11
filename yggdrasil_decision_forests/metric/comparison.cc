@@ -155,6 +155,14 @@ dataset::proto::DataSpecification CreateDataSpecForComparisonTable(
                            dataset::proto::ColumnType::NUMERICAL_SET,
                            &data_spec);
       }
+      dataset::AddColumn(
+          absl::StrCat(kLabelMap, "@", option.ranking().map_truncation()),
+          dataset::proto::ColumnType::NUMERICAL, &data_spec);
+      if (example_of_evaluation.ranking().map().has_bootstrap_based_95p()) {
+        dataset::AddColumn(kLabelMapConfidenceBoundsBootstrap95p,
+                           dataset::proto::ColumnType::NUMERICAL_SET,
+                           &data_spec);
+      }
       break;
     default:
       CHECK(false);

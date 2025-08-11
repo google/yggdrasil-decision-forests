@@ -1,0 +1,104 @@
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <stdint.h>
+#include <cstring>
+#include <array>
+#include <algorithm>
+#include <bitset>
+#include <cassert>
+
+namespace ydf_model {
+
+enum class Label : uint32_t {
+  kSetosa = 0,
+  kVersicolor = 1,
+  kVirginica = 2,
+};
+
+constexpr const int kNumFeatures = 4;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  typedef float Numerical;
+
+  Numerical sepal_length;
+  Numerical sepal_width;
+  Numerical petal_length;
+  Numerical petal_width;
+};
+
+inline Label Predict(const Instance& instance) {
+  std::array<float, 3> accumulator {0};
+  // Tree #0
+  if (instance.petal_width >= 0.75) {
+    if (instance.petal_width >= 1.65) {
+      if (instance.petal_length >= 4.85) {
+        accumulator[2] += 0.333333;
+      } else {
+        accumulator[1] += 0.166667;
+        accumulator[2] += 0.166667;
+      }
+    } else {
+      if (instance.petal_width >= 1.35) {
+        if (instance.sepal_width >= 2.65) {
+          if (instance.sepal_length >= 6.65) {
+            accumulator[1] += 0.266667;
+            accumulator[2] += 0.0666667;
+          } else {
+            accumulator[1] += 0.333333;
+          }
+        } else {
+          accumulator[1] += 0.2;
+          accumulator[2] += 0.133333;
+        }
+      } else {
+        accumulator[1] += 0.333333;
+      }
+    }
+  } else {
+    accumulator[0] += 0.333333;
+  }
+
+  // Tree #1
+  if (instance.petal_width >= 0.8) {
+    if (instance.petal_length >= 4.95) {
+      if (instance.petal_width >= 1.75) {
+        accumulator[2] += 0.333333;
+      } else {
+        accumulator[1] += 0.133333;
+        accumulator[2] += 0.2;
+      }
+    } else {
+      if (instance.petal_width >= 1.65) {
+        accumulator[1] += 0.125;
+        accumulator[2] += 0.208333;
+      } else {
+        accumulator[1] += 0.333333;
+      }
+    }
+  } else {
+    accumulator[0] += 0.333333;
+  }
+
+  // Tree #2
+  if (instance.petal_length >= 2.6) {
+    if (instance.petal_width >= 1.75) {
+      accumulator[2] += 0.333333;
+    } else {
+      if (instance.petal_width >= 1.55) {
+        accumulator[1] += 0.266667;
+        accumulator[2] += 0.0666667;
+      } else {
+        accumulator[1] += 0.333333;
+      }
+    }
+  } else {
+    accumulator[0] += 0.333333;
+  }
+
+  return static_cast<Label>(std::distance(accumulator.begin(), std::max_element(accumulator.begin(), accumulator.end())));
+}
+
+}  // namespace ydf_model
+#endif

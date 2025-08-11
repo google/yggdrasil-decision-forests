@@ -332,6 +332,9 @@ absl::Status TrainAndTestTester::PostTrainingChecks() {
           case model::proto::Task::RANKING:
             CHECK_NEAR(metric::NDCG(e1), metric::NDCG(e2), 0.001);
             break;
+          case model::proto::Task::SURVIVAL_ANALYSIS:
+            // TODO: Add metrics for survival analysis.
+            break;
           case model::proto::Task::CATEGORICAL_UPLIFT:
           case model::proto::Task::NUMERICAL_UPLIFT:
             CHECK_NEAR(metric::AUUC(e1), metric::AUUC(e2), 0.001);
@@ -730,6 +733,11 @@ void ExpectEqualPredictions(const model::proto::Task task,
                  epsilon);
       break;
 
+    case model::proto::Task::SURVIVAL_ANALYSIS:
+      CHECK_NEAR(a.survival_analysis().log_hazard_ratio(),
+                 b.survival_analysis().log_hazard_ratio(), epsilon);
+      break;
+
     default:
       LOG(FATAL) << "Not supported task";
   }
@@ -831,6 +839,12 @@ void ExpectEqualPredictions(
 
       case model::proto::Task::ANOMALY_DETECTION:
         CHECK_NEAR(generic_prediction.anomaly_detection().value(),
+                   predictions[prediction_idx], epsilon)
+            << "row_idx:" << row_idx;
+        break;
+
+      case model::proto::Task::SURVIVAL_ANALYSIS:
+        CHECK_NEAR(generic_prediction.survival_analysis().log_hazard_ratio(),
                    predictions[prediction_idx], epsilon)
             << "row_idx:" << row_idx;
         break;
@@ -1045,24 +1059,24 @@ void InternalExportMetricCondition(const absl::string_view test,
     CHECK_OK(file::SetContent(path, content));
   } else {
     if (!success_margin) {
-      CHECK(false) << "Non satisfied range condition for " << metric << " in "
-                   << test << "\ndefined at\n"
-                   << file << ":" << line << "\nThe metric value " << value
-                   << " is not in " << center << " +- " << margin
-                   << ".\ni.e. not in [" << (center - margin) << " , "
-                   << (center + margin)
-                   << "].\nThe absolute value of the difference is "
-                   << abs_diff_margin << ".";
+      ADD_FAILURE() << "Non satisfied range condition for " << metric << " in "
+                    << test << "\ndefined at\n"
+                    << file << ":" << line << "\nThe metric value " << value
+                    << " is not in " << center << " +- " << margin
+                    << ".\ni.e. not in [" << (center - margin) << " , "
+                    << (center + margin)
+                    << "].\nThe absolute value of the difference is "
+                    << abs_diff_margin << ".";
     }
 
     if (golden_test && !success_golden) {
-      CHECK(false) << "Non satisfied golden value condition for " << metric
-                   << " in " << test << "\ndefined at\n"
-                   << file << ":" << line << "\nThe metric value " << value
-                   << " is different from " << golden
-                   << " (margin:" << kGoldenMargin
-                   << ").\nThe absolute value of the difference is "
-                   << abs_diff_golden << ".";
+      ADD_FAILURE() << "Non satisfied golden value condition for " << metric
+                    << " in " << test << "\ndefined at\n"
+                    << file << ":" << line << "\nThe metric value " << value
+                    << " is different from " << golden
+                    << " (margin:" << kGoldenMargin
+                    << ").\nThe absolute value of the difference is "
+                    << abs_diff_golden << ".";
     }
   }
 }

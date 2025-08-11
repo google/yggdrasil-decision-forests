@@ -14,6 +14,7 @@
 
 import math
 import os
+from typing import Optional
 from absl import logging
 from absl.testing import absltest
 import numpy as np
@@ -33,13 +34,31 @@ class TFExampleTest(absltest.TestCase):
         "f5": np.array(
             [[b"X", b"Y", b"Z"], [b"Z", b"Y", b"X"], [b"Z", b"Y", b"X"]]
         ),
+        "f6": [b"A", b"B", None],
     }
     tmp_dir = self.create_tempdir().full_path
     path = os.path.join(tmp_dir, "file")
     tf_example.write_tf_record(original_ds, path=path)
     read_ds = tf_example.read_tf_record(path)
     logging.info("read_ds:\n%s", read_ds)
-    test_utils.assert_almost_equal(original_ds, read_ds)
+    expected_ds = original_ds.copy()
+    expected_ds["f6"] = np.array([b"A", b"B", b""])
+    test_utils.assert_almost_equal(expected_ds, read_ds)
+
+  def test_read_with_filter(self):
+    original_ds = {"f1": np.array([1, 2, 3])}
+    tmp_dir = self.create_tempdir().full_path
+    path = os.path.join(tmp_dir, "file")
+    tf_example.write_tf_record(original_ds, path=path)
+
+    def process(x: tf.train.Example) -> Optional[tf.train.Example]:
+      if x.features.feature["f1"].int64_list.value[0] >= 2.5:
+        return None
+      return x
+
+    read_ds = tf_example.read_tf_record(path, process=process)
+    expected_ds = {"f1": np.array([1, 2])}
+    test_utils.assert_almost_equal(expected_ds, read_ds)
 
   def test_read_compressed(self):
     ds_path = os.path.join(

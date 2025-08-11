@@ -1,0 +1,112 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.serving.embed.proto;
+
+// High level options to control the model embedding.
+message Options {
+  // Name filename and namespace of the generated library.
+  optional string name = 1 [default = "ydf_model"];
+
+  // What is the Predict function is returning in case of a classification
+  // model.
+  optional ClassificationOutput.Enum classification_output = 2
+      [default = CLASS];
+
+  // If true, integerize the output computation. The model will be smaller and
+  // faster, but the predictions will be less accurate.
+  optional bool integerize_output = 3 [default = false];
+
+  // Precision of the accumulator when integerize_output=true;
+  optional int32 accumulator_precision_bytes = 4 [default = 2];
+
+  // Algorithm used to compute the tree output.
+  optional Algorithm.Enum algorithm = 5 [default = ROUTING];
+
+  // Add a monitor of the library used in the generated code.
+  optional bool monitor_usage = 6 [default = false];
+
+  // If true, generates functions to create categorical feature values from
+  // strings. For example, for a categorical feature "X" with an associated
+  // "FeatureX" enum class, the method "FeatureXFromString(absl::string_view
+  // name) -> FeatureX" is created.
+  //
+  // Enabling this option might increase the binary size.
+  optional bool categorical_from_string = 7 [default = false];
+}
+
+// Output of a classification model.
+message ClassificationOutput {
+  enum Enum {
+    // The model returns an integer representing the predicted class.
+    //
+    // This option is fast and simple to use.
+    CLASS = 0;
+
+    // For a binary classification model, the prediction output is an
+    // accumulator of type "accumulator_precision" where the sign (positive or
+    // negative) indicates the predicted label value. For a multi-class
+    // classification model, the predicted output is an array of accumulators
+    // where the largest value defines the predicted label.
+    //
+    // This option is fast but hard to use.
+    SCORE = 1;
+
+    // For a binary classification model, the prediction output is the
+    // probability of the positive class. For a multi-class classification
+    // model, the predicted output is an array of probabilities for all the
+    // classes.
+    //
+    // Note: This probability might be not calibrated if the model is not
+    // calibrated.
+    //
+    // This option is easy to use but slow.
+    PROBABILITY = 2;
+  }
+}
+
+message DType {
+  enum Enum {
+    UNDEFINED = 0;
+
+    INT8 = 1;
+    INT16 = 2;
+    INT32 = 3;
+
+    UINT8 = 4;
+    UINT16 = 5;
+    UINT32 = 6;
+
+    FLOAT32 = 7;
+
+    BOOL = 8;
+  }
+}
+
+message Algorithm {
+  enum Enum {
+    UNDEFINED = 0;
+    // Generate a large imbricated if-else structure.
+    // This solution is slow, consumes a lot of memory, and is mostly
+    // implemented for experimentation.
+    IF_ELSE = 1;
+    // Compute the prediction with the routing algorithm. This solution has the
+    // best overall complexity, size and speed (though some other methods might
+    // sometime be faster).
+    ROUTING = 2;
+  }
+}

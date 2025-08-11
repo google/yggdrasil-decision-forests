@@ -796,6 +796,7 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamCategoricalSetSplitGreedySampling,
       decision_tree::kHParamCategoricalSetSplitMaxNumItems,
       decision_tree::kHParamCategoricalSetSplitMinItemFrequency,
+      decision_tree::kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent,
       decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections,
       decision_tree::kHParamSplitAxisMhldObliqueMaxNumAttributes,
@@ -810,6 +811,9 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamHonestFixedSeparation,
       decision_tree::kHParamNumericalVectorSequenceNumExamples,
       decision_tree::kHParamNumericalVectorSequenceNumRandomAnchors,
+      decision_tree::kHParamNumericalVectorSequenceEnableCloserThanConditions,
+      decision_tree::
+          kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
   };
 
   ASSIGN_OR_RETURN(auto hparam_def,
@@ -926,7 +930,6 @@ IsolationForestLearner::TrainWithStatusImpl(
   {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         deployment().num_threads(), {.name_prefix = std::string("TrainIF")});
-    pool.StartWorkers();
     const auto num_trees = config.if_config->num_trees();
     model->mutable_decision_trees()->resize(num_trees);
     for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {

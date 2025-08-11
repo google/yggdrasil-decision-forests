@@ -43,8 +43,7 @@ namespace gradient_boosted_trees {
 
 absl::Status AbstractLoss::UpdateGradients(
     const dataset::VerticalDataset& dataset, int label_col_idx,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
     std::vector<GradientData>* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
   GradientDataRef compact_gradient(gradients->size());
@@ -56,18 +55,16 @@ absl::Status AbstractLoss::UpdateGradients(
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::CategoricalColumn>(
           label_col_idx);
   if (categorical_labels) {
-    return UpdateGradients(categorical_labels->values(), predictions,
-                           ranking_index, &compact_gradient, random,
-                           thread_pool);
+    return UpdateGradients(categorical_labels->values(), predictions, cache,
+                           &compact_gradient, random, thread_pool);
   }
 
   const auto* numerical_labels =
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::NumericalColumn>(
           label_col_idx);
   if (numerical_labels) {
-    return UpdateGradients(numerical_labels->values(), predictions,
-                           ranking_index, &compact_gradient, random,
-                           thread_pool);
+    return UpdateGradients(numerical_labels->values(), predictions, cache,
+                           &compact_gradient, random, thread_pool);
   }
 
   return absl::InternalError(
@@ -78,22 +75,21 @@ absl::Status AbstractLoss::UpdateGradients(
 absl::StatusOr<LossResults> AbstractLoss::Loss(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   const auto* categorical_labels =
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::CategoricalColumn>(
           label_col_idx);
   if (categorical_labels) {
-    return Loss(categorical_labels->values(), predictions, weights,
-                ranking_index, thread_pool);
+    return Loss(categorical_labels->values(), predictions, weights, cache,
+                thread_pool);
   }
 
   const auto* numerical_labels =
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::NumericalColumn>(
           label_col_idx);
   if (numerical_labels) {
-    return Loss(numerical_labels->values(), predictions, weights, ranking_index,
+    return Loss(numerical_labels->values(), predictions, weights, cache,
                 thread_pool);
   }
 

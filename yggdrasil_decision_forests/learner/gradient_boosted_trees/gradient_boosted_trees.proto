@@ -125,7 +125,7 @@ message GradientBoostedTreesTrainingConfig {
   // Evaluate the model on the validation set every
   // "validation_interval_in_trees" trees.
   //
-  // Impact the early stopping policy.
+  // Impacts the early stopping policy.
   optional int32 validation_interval_in_trees = 7 [default = 1];
 
   // If set and >0, export the training logs every
@@ -345,6 +345,17 @@ message GradientBoostedTreesTrainingConfig {
   // end of the training using the validation dataset. Enabling this feature can
   // increase the training time significantly.
   optional bool compute_permutation_variable_importance = 35 [default = false];
+
+  // Limit the total number of nodes in the model over all trees.
+  //
+  // This limit is an upper bound that may not be reached exactly. If the value
+  // is smaller than the number of nodes of a single tree according to other
+  // hyperparameter, the learner may return an empty model.
+  //
+  // This hyperparameter is useful for hyperparameter tuning models with very
+  // few nodes. For training individual models, prefer adapting max_num_nodes /
+  // max_depth and num_trees.
+  optional int64 total_max_num_nodes = 40 [default = -1];
 
   message Internal {
     // If true, the optimization for binary labels with a single 1 per query

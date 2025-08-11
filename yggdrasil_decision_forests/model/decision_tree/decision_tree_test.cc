@@ -1070,6 +1070,95 @@ TEST(DecisionTree, CheckStructureNACondition) {
       CheckStructure(CheckStructureOptions::NACondition(), dataspec, trees));
 }
 
+TEST(DecisionTree, CheckStructureObliqueCondition) {
+  // Builds a decision tree with a single higherThan condition and two leaf
+  // nodes.
+  //
+  // attribute >= 0.5
+  //     ├─(neg)─ leaf #0
+  //     └─(pos)─ leaf #1
+  const auto make_tree_without_oblique =
+      []() -> absl::StatusOr<std::unique_ptr<DecisionTree>> {
+    auto tree = std::make_unique<DecisionTree>();
+    tree->CreateRoot();
+    NodeWithChildren* root = tree->mutable_root();
+    STATUS_CHECK(root);
+    tree->mutable_root()->CreateChildren();
+    tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree->mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_higher_condition()
+        ->set_threshold(0.5);
+    tree->SetLeafIndices();
+    return tree;
+  };
+  // Builds a decision tree with a two conditions
+  //
+  // attribute>=0.5
+  //     ├─(pos)─ attribute*1 >= 0.5
+  //     |        ├─(pos)
+  //     |        └─(neg)
+  //     └─(neg)
+  const auto make_tree_with_oblique =
+      []() -> absl::StatusOr<std::unique_ptr<DecisionTree>> {
+    auto tree = std::make_unique<DecisionTree>();
+    tree->CreateRoot();
+    NodeWithChildren* root = tree->mutable_root();
+    STATUS_CHECK(root);
+    tree->mutable_root()->CreateChildren();
+    tree->mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    tree->mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_higher_condition()
+        ->set_threshold(0.5);
+    tree->mutable_root()->mutable_pos_child()->CreateChildren();
+    tree->mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_condition()
+        ->set_attribute(0);
+    auto* oblique_condition = tree->mutable_root()
+                                  ->mutable_pos_child()
+                                  ->mutable_node()
+                                  ->mutable_condition()
+                                  ->mutable_condition()
+                                  ->mutable_oblique_condition();
+    oblique_condition->mutable_attributes()->Add(0);
+    oblique_condition->mutable_weights()->Add(1.);
+    oblique_condition->set_threshold(0.5);
+
+    tree->SetLeafIndices();
+    return tree;
+  };
+
+  // Build a forest with one trees.
+  std::vector<std::unique_ptr<DecisionTree>> trees;
+  {
+    ASSERT_OK_AND_ASSIGN(std::unique_ptr<DecisionTree> tree,
+                         make_tree_without_oblique());
+    trees.push_back(std::move(tree));
+  }
+
+  DataSpecification dataspec;
+  dataset::AddColumn("a", ColumnType::NUMERICAL, &dataspec);
+
+  EXPECT_TRUE(CheckStructure(CheckStructureOptions::NoObliqueConditions(),
+                             dataspec, trees));
+
+  {
+    ASSERT_OK_AND_ASSIGN(std::unique_ptr<DecisionTree> tree,
+                         make_tree_with_oblique());
+    trees.push_back(std::move(tree));
+  }
+
+  EXPECT_FALSE(CheckStructure(CheckStructureOptions::NoObliqueConditions(),
+                              dataspec, trees));
+}
+
 TEST(DecisionTree, InputFeatures) {
   auto tree = std::make_unique<DecisionTree>();
   TreeBuilder builder(tree.get());

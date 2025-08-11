@@ -15,6 +15,9 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <string>
@@ -34,7 +37,11 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_reader.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/label_accessor.h"
+#include "yggdrasil_decision_forests/learner/distributed_decision_tree/splitter.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
@@ -43,11 +50,17 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -55,8 +68,6 @@ namespace model {
 namespace distributed_gradient_boosted_trees {
 
 using ::yggdrasil_decision_forests::model::gradient_boosted_trees::LossResults;
-
-constexpr char DistributedGradientBoostedTreesWorker::kWorkerKey[];
 
 DistributedGradientBoostedTreesWorker::
     ~DistributedGradientBoostedTreesWorker() {
@@ -106,6 +117,14 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     LOG(INFO) << "Initializing DistributedGradientBoostedTreesWorker";
   }
 
+  // Training loss.
+  ASSIGN_OR_RETURN(
+      loss_,
+      gradient_boosted_trees::CreateLoss(
+          spe_config.gbt().loss(), welcome_.train_config().task(),
+          welcome_.dataspec().columns(welcome_.train_config_linking().label()),
+          spe_config.gbt(), welcome_.train_config_linking()));
+
   if (GetWorkerType() == WorkerType::kTRAINER) {
     // Load the dataset.
     const auto& worker_features =
@@ -125,10 +144,10 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
       if (worker_logs_) {
         LOG(INFO) << "Compute ranking groups";
       }
-      train_ranking_index_ =
-          std::make_unique<gradient_boosted_trees::RankingGroupsIndices>();
-      RETURN_IF_ERROR(train_ranking_index_->Initialize(
-          dataset_->ranking_labels(), dataset_->ranking_groups()));
+      ASSIGN_OR_RETURN(train_loss_cache_, loss_->CreateRankingLossCache(
+                                              dataset_->ranking_labels(),
+                                              dataset_->ranking_groups()));
+
       RETURN_IF_ERROR(dataset_->release_ranking_groups());
     }
 
@@ -165,21 +184,10 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     }
 
     if (welcome_.train_config().task() == model::proto::Task::RANKING) {
-      validation_.ranking_index =
-          std::make_unique<gradient_boosted_trees::RankingGroupsIndices>();
-      RETURN_IF_ERROR(validation_.ranking_index->Initialize(
-          *validation_.dataset, welcome_.train_config_linking().label(),
-          welcome_.train_config_linking().ranking_group()));
+      ASSIGN_OR_RETURN(validation_.loss_cache,
+                       loss_->CreateLossCache(*validation_.dataset));
     }
   }
-
-  // Training loss.
-  ASSIGN_OR_RETURN(
-      loss_,
-      gradient_boosted_trees::CreateLoss(
-          spe_config.gbt().loss(), welcome_.train_config().task(),
-          welcome_.dataspec().columns(welcome_.train_config_linking().label()),
-          spe_config.gbt()));
 
   // Threadpool.
   if (worker_logs_) {
@@ -188,7 +196,6 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
   }
   thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>(
       "generic", welcome_.deployment_config().num_threads());
-  thread_pool_->StartWorkers();
 
   return absl::OkStatus();
 }
@@ -202,6 +209,10 @@ DistributedGradientBoostedTreesWorker::RunRequest(
   }
 
   auto status_or = RunRequestImp(std::move(serialized_request));
+  if (!status_or.ok()) {
+    LOG(WARNING) << "Worker #" << WorkerIdx()
+                 << " failed to run request: " << status_or.status().message();
+  }
 
   {
     utils::concurrency::MutexLock l(&mutex_num_running_requests_);
@@ -567,9 +578,9 @@ absl::Status DistributedGradientBoostedTreesWorker::StartNewIter(
           &random_, thread_pool_.get()));
       break;
     case model::proto::Task::RANKING:
-      DCHECK(train_ranking_index_);
+      STATUS_CHECK(train_loss_cache_);
       RETURN_IF_ERROR(loss_->UpdateGradients(
-          dataset_->ranking_labels(), predictions_, train_ranking_index_.get(),
+          dataset_->ranking_labels(), predictions_, train_loss_cache_.get(),
           &gradient_ref_, &random_, thread_pool_.get()));
       break;
     default:
@@ -1201,7 +1212,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
       const LossResults loss_results,
       loss_->Loss(*validation_.dataset, welcome_.train_config_linking().label(),
                   validation_.predictions, validation_.weights,
-                  /*ranking_index=*/validation_.ranking_index.get(),
+                  /*ranking_index=*/validation_.loss_cache.get(),
                   /*thread_pool=*/thread_pool_.get()));
 
   validation_.evaluation.set_loss(loss_results.loss);
@@ -1318,9 +1329,9 @@ absl::StatusOr<LossResults> DistributedGradientBoostedTreesWorker::Loss(
       break;
     }
     case model::proto::Task::RANKING: {
-      DCHECK(train_ranking_index_);
+      STATUS_CHECK(train_loss_cache_);
       return loss_->Loss(dataset->ranking_labels(), predictions,
-                         dataset->weights(), train_ranking_index_.get(),
+                         dataset->weights(), train_loss_cache_.get(),
                          thread_pool_.get());
       break;
     }

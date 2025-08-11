@@ -98,8 +98,9 @@ void AbstractModel::ExportProto(const AbstractModel& model,
   proto->set_label_col_idx(model.label_col_idx_);
   proto->set_ranking_group_col_idx(model.ranking_group_col_idx_);
   proto->set_uplift_treatment_col_idx(model.uplift_treatment_col_idx_);
+  proto->set_label_entry_age_col_idx(model.label_entry_age_col_idx_);
+  proto->set_label_event_observed_col_idx(model.label_event_observed_col_idx_);
   proto->set_is_pure_model(model.is_pure_model_);
-
   *proto->mutable_input_features() = {model.input_features_.begin(),
                                       model.input_features_.end()};
   if (model.weights_.has_value()) {
@@ -131,6 +132,8 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
   model->label_col_idx_ = proto.label_col_idx();
   model->ranking_group_col_idx_ = proto.ranking_group_col_idx();
   model->uplift_treatment_col_idx_ = proto.uplift_treatment_col_idx();
+  model->label_entry_age_col_idx_ = proto.label_entry_age_col_idx();
+  model->label_event_observed_col_idx_ = proto.label_event_observed_col_idx();
   model->is_pure_model_ = proto.is_pure_model();
   model->input_features_.assign(proto.input_features().begin(),
                                 proto.input_features().end());
@@ -395,6 +398,12 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
       dst_prediction->mutable_anomaly_detection()->set_value(
           src_prediction[example_idx]);
       break;
+
+    case proto::SURVIVAL_ANALYSIS:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction->mutable_survival_analysis()->set_log_hazard_ratio(
+          src_prediction[example_idx]);
+      break;
   }
 }
 
@@ -445,6 +454,11 @@ void ProtoToFloatPrediction(const proto::Prediction& src_prediction,
     case proto::ANOMALY_DETECTION:
       DCHECK_EQ(num_prediction_dimensions, 1);
       dst_prediction[0] = src_prediction.anomaly_detection().value();
+      break;
+
+    case proto::SURVIVAL_ANALYSIS:
+      DCHECK_EQ(num_prediction_dimensions, 1);
+      dst_prediction[0] = src_prediction.survival_analysis().log_hazard_ratio();
       break;
   }
 }
@@ -611,9 +625,10 @@ absl::Status AbstractModel::AppendEvaluationOverrideType(
           task(), override_task, original_prediction, &overridden_prediction));
       RETURN_IF_ERROR(model::SetGroundTruth(
           dataset, test_row_idx,
-          model::GroundTruthColumnIndices(override_label_col_idx,
-                                          override_group_col_idx,
-                                          uplift_treatment_col_idx_),
+          model::GroundTruthColumnIndices(
+              override_label_col_idx, override_group_col_idx,
+              uplift_treatment_col_idx_, label_entry_age_col_idx_,
+              label_event_observed_col_idx_),
           override_task, &overridden_prediction));
       if (option.has_weights()) {
         ASSIGN_OR_RETURN(
@@ -674,9 +689,10 @@ absl::Status AbstractModel::AppendEvaluationWithEngineOverrideType(
           task(), override_task, original_prediction, &overridden_prediction));
       RETURN_IF_ERROR(model::SetGroundTruth(
           dataset, begin_example_idx + sub_example_idx,
-          model::GroundTruthColumnIndices(override_label_col_idx,
-                                          override_group_col_idx,
-                                          uplift_treatment_col_idx_),
+          model::GroundTruthColumnIndices(
+              override_label_col_idx, override_group_col_idx,
+              uplift_treatment_col_idx_, label_entry_age_col_idx_,
+              label_event_observed_col_idx_),
           override_task, &overridden_prediction));
 
       if (option.has_weights()) {
@@ -702,8 +718,9 @@ absl::Status AbstractModel::SetGroundTruth(
     proto::Prediction* prediction) const {
   return model::SetGroundTruth(
       dataset, row_idx,
-      GroundTruthColumnIndices(label_col_idx_, ranking_group_col_idx_,
-                               uplift_treatment_col_idx_),
+      GroundTruthColumnIndices(
+          label_col_idx_, ranking_group_col_idx_, uplift_treatment_col_idx_,
+          label_entry_age_col_idx_, label_event_observed_col_idx_),
       task_, prediction);
 }
 
@@ -712,8 +729,9 @@ absl::Status AbstractModel::SetGroundTruth(
     proto::Prediction* prediction) const {
   return model::SetGroundTruth(
       example,
-      GroundTruthColumnIndices(label_col_idx_, ranking_group_col_idx_,
-                               uplift_treatment_col_idx_),
+      GroundTruthColumnIndices(
+          label_col_idx_, ranking_group_col_idx_, uplift_treatment_col_idx_,
+          label_entry_age_col_idx_, label_event_observed_col_idx_),
       task_, prediction);
 }
 
@@ -727,6 +745,8 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
       STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
       STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
                       kNoUpliftTreatmentGroup);
+      STATUS_CHECK_EQ(columns.entry_age_col_idx, -1);
+      STATUS_CHECK_EQ(columns.event_observed_col_idx, -1);
       ASSIGN_OR_RETURN(const auto* classification_labels,
                        dataset.ColumnWithCastWithStatus<
                            dataset::VerticalDataset::CategoricalColumn>(
@@ -738,6 +758,8 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
       STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
       STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
                       kNoUpliftTreatmentGroup);
+      STATUS_CHECK_EQ(columns.entry_age_col_idx, -1);
+      STATUS_CHECK_EQ(columns.event_observed_col_idx, -1);
       ASSIGN_OR_RETURN(const auto* regression_labels,
                        dataset.ColumnWithCastWithStatus<
                            dataset::VerticalDataset::NumericalColumn>(
@@ -749,7 +771,8 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
       STATUS_CHECK_NE(columns.group_col_idx, kNoRankingGroup);
       STATUS_CHECK_EQ(columns.uplift_treatment_col_idx,
                       kNoUpliftTreatmentGroup);
-
+      STATUS_CHECK_EQ(columns.entry_age_col_idx, -1);
+      STATUS_CHECK_EQ(columns.event_observed_col_idx, -1);
       ASSIGN_OR_RETURN(const auto* ranking_labels,
                        dataset.ColumnWithCastWithStatus<
                            dataset::VerticalDataset::NumericalColumn>(
@@ -776,6 +799,8 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
       STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
       STATUS_CHECK_NE(columns.uplift_treatment_col_idx,
                       kNoUpliftTreatmentGroup);
+      STATUS_CHECK_EQ(columns.entry_age_col_idx, -1);
+      STATUS_CHECK_EQ(columns.event_observed_col_idx, -1);
       const auto& numerical_outcomes = dataset.ColumnWithCastOrNull<
           dataset::VerticalDataset::CategoricalColumn>(columns.label_col_idx);
       const auto& categorical_outcomes = dataset.ColumnWithCastOrNull<
@@ -798,8 +823,11 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
     } break;
 
     case proto::Task::NUMERICAL_UPLIFT: {
-      CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
-      CHECK_NE(columns.uplift_treatment_col_idx, kNoUpliftTreatmentGroup);
+      STATUS_CHECK_EQ(columns.group_col_idx, kNoRankingGroup);
+      STATUS_CHECK_NE(columns.uplift_treatment_col_idx,
+                      kNoUpliftTreatmentGroup);
+      STATUS_CHECK_EQ(columns.entry_age_col_idx, -1);
+      STATUS_CHECK_EQ(columns.event_observed_col_idx, -1);
       const auto& numerical_outcomes =
           dataset.ColumnWithCast<dataset::VerticalDataset::NumericalColumn>(
               columns.label_col_idx);
@@ -815,6 +843,11 @@ absl::Status SetGroundTruth(const dataset::VerticalDataset& dataset,
     case proto::Task::ANOMALY_DETECTION:
       // No ground truth to set.
       break;
+
+    case proto::Task::SURVIVAL_ANALYSIS: {
+      STATUS_CHECK_NE(columns.event_observed_col_idx, -1);
+      // No ground truth to set.
+    } break;
 
     default:
       STATUS_FATAL("Non supported task.");
@@ -865,6 +898,12 @@ absl::Status SetGroundTruth(const dataset::proto::Example& example,
     case proto::Task::ANOMALY_DETECTION:
       // No ground truth to set.
       break;
+
+    case proto::Task::SURVIVAL_ANALYSIS: {
+      STATUS_CHECK_NE(columns.event_observed_col_idx, -1);
+      // TODO: Implement.
+      return absl::InvalidArgumentError("Not implemented");
+    } break;
 
     default:
       STATUS_FATAL("Non supported task.");
@@ -1331,6 +1370,28 @@ absl::Status AbstractModel::Validate() const {
             dataset::proto::ColumnType_Name(label_col_spec().type())));
       }
       break;
+    case model::proto::Task::SURVIVAL_ANALYSIS:
+      if (label_col_spec().type() != dataset::proto::NUMERICAL) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label type for regression: ",
+            dataset::proto::ColumnType_Name(label_col_spec().type())));
+      }
+      if (data_spec().columns(label_event_observed_col_idx()).type() !=
+          dataset::proto::BOOLEAN) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label event observed type for survival analysis: ",
+            dataset::proto::ColumnType_Name(
+                data_spec().columns(label_event_observed_col_idx()).type())));
+      }
+      if (label_entry_age_col_idx() != -1 &&
+          data_spec().columns(label_entry_age_col_idx()).type() !=
+              dataset::proto::NUMERICAL) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Invalid label entry age type for survival analysis: ",
+            dataset::proto::ColumnType_Name(
+                data_spec().columns(label_entry_age_col_idx()).type())));
+      }
+      break;
     case model::proto::Task::CATEGORICAL_UPLIFT:
       if (label_col_spec().type() != dataset::proto::CATEGORICAL) {
         return absl::InvalidArgumentError(absl::StrCat(
@@ -1521,6 +1582,9 @@ std::string AbstractModel::DebugCompare(const AbstractModel& other) const {
   STR_CHECK_EQ_NO_PRINT(input_features_, other.input_features_);
   STR_CHECK_EQ(classification_outputs_probabilities_,
                other.classification_outputs_probabilities_);
+  STR_CHECK_EQ(label_entry_age_col_idx_, other.label_entry_age_col_idx_);
+  STR_CHECK_EQ(label_event_observed_col_idx_,
+               other.label_event_observed_col_idx_);
 
   // Note: We don't check for equality of meta-data.
 

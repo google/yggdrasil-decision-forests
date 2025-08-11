@@ -72,6 +72,8 @@ class AbstractTuner:
       automatic_search_space: bool = False,
       parallel_trials: int = 1,
       max_trial_duration: Optional[float] = None,
+      cross_validation: bool = False,
+      cross_validation_num_folds: Optional[int] = None,
   ):
     """Initializes tuner.
 
@@ -93,17 +95,35 @@ class AbstractTuner:
         `maximum_training_duration_seconds` learner parameter that defines the
         maximum total training and tuning duration. Set to None for no time
         limit.
+      cross_validation: Use cross-validation for evaluating the hyperparameter
+        candidates. Cross-validation can provide better evaluation quality but
+        is much slower.
+      cross_validation_num_folds: Number of folds to use for cross-validation.
+        Defaults to 10 if not set.
     """
 
     self._automatic_search_space = automatic_search_space
     self._parallel_trials = parallel_trials
     self._max_trial_duration = max_trial_duration
+    if cross_validation_num_folds is not None and not cross_validation:
+      raise ValueError(
+          "cross_validation_num_folds is only available if"
+          " cross_validation=True."
+      )
 
     self._train_config = TrainingConfig(learner="HYPERPARAMETER_OPTIMIZER")
 
     optimizer_config = self._optimizer_config()
     optimizer_config.optimizer.optimizer_key = optimizer_key
     optimizer_config.optimizer.parallel_trials = parallel_trials
+    if cross_validation:
+      optimizer_config.evaluation.cross_validation.SetInParent()
+      if cross_validation_num_folds is not None:
+        optimizer_config.evaluation.cross_validation.fold_generator.num_folds = (
+            cross_validation_num_folds
+        )
+    else:
+      optimizer_config.evaluation.self_model_evaluation.SetInParent()
 
     if automatic_search_space:
       optimizer_config.predefined_search_space.SetInParent()
@@ -181,6 +201,11 @@ class RandomSearchTuner(AbstractTuner):
       expressed in seconds. This parameter is different from the
       `maximum_training_duration_seconds` learner parameter that define the
       maximum total training and tuning duration. Set to None for no time limit.
+    cross_validation: Use cross-validation for evaluating the hyperparameter
+      candidates. Cross-validation can provide better evaluation quality but is
+      much slower.
+    cross_validation_num_folds: Number of folds to use for cross-validation.
+      Defaults to 10 if not set.
   """
 
   def __init__(
@@ -189,12 +214,17 @@ class RandomSearchTuner(AbstractTuner):
       automatic_search_space: bool = False,
       parallel_trials: int = 1,
       max_trial_duration: Optional[float] = None,
+      *,
+      cross_validation: bool = False,
+      cross_validation_num_folds: Optional[int] = None,
   ):
     super().__init__(
         optimizer_key="RANDOM",
         automatic_search_space=automatic_search_space,
         parallel_trials=parallel_trials,
         max_trial_duration=max_trial_duration,
+        cross_validation=cross_validation,
+        cross_validation_num_folds=cross_validation_num_folds,
     )
     self._random_optimizer_config().num_trials = num_trials
 
@@ -221,6 +251,11 @@ class VizierTuner(AbstractTuner):
       expressed in seconds. This parameter is different from the
       `maximum_training_duration_seconds` learner parameter that define the
       maximum total training and tuning duration. Set to None for no time limit.
+    cross_validation: Use cross-validation for evaluating the hyperparameter
+      candidates. Cross-validation can provide better evaluation quality but is
+      much slower.
+    cross_validation_num_folds: Number of folds to use for cross-validation.
+      Defaults to 5 if not set.
   """
 
   def __init__(
@@ -229,12 +264,17 @@ class VizierTuner(AbstractTuner):
       automatic_search_space: bool = False,
       parallel_trials: int = 1,
       max_trial_duration: Optional[float] = None,
+      *,
+      cross_validation: bool = False,
+      cross_validation_num_folds: Optional[int] = None,
   ):
     super().__init__(
         optimizer_key="VIZIER",
         automatic_search_space=automatic_search_space,
         parallel_trials=parallel_trials,
         max_trial_duration=max_trial_duration,
+        cross_validation=cross_validation,
+        cross_validation_num_folds=cross_validation_num_folds,
     )
 
 

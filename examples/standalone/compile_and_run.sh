@@ -23,10 +23,8 @@ set -e
 # See the "Using the C++ library" section in the user manual for more details
 # about the API. See the "Compile command-line-interface from source" section in
 # the user manual for more details about the compilation flags.
-#
-# Add "--config=use_tensorflow_io" to support TFRecord format natively.
 
-bazel build --config=linux_cpp17 --config=linux_avx2 //:beginner_cc
+bazel build --config=linux_cpp17 --config=linux_avx2  --define=use_ydf_tensorflow_proto=1 //:beginner_cc
 
 # Run the example.
 # The "dataset_dir" should contains the "adult_train.csv" and "adult_test.csv"

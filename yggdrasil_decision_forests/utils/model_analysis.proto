@@ -60,6 +60,17 @@ message Options {
     optional int32 num_rounds = 2 [default = 1];
   }
 
+  optional ShapVariableImportance shap_variable_importance = 22;
+
+  message ShapVariableImportance {
+    // Enable the computation of Shap value variable importances.
+    optional bool enabled = 1 [default = true];
+
+    // Ratio of examples used to compute the shap value variable importances.
+    // Reduce this value to speed-up the computation.
+    optional float example_sampling = 2 [default = 1.];
+  }
+
   optional bool include_model_structural_variable_importances = 17
       [default = false];
 
@@ -158,6 +169,7 @@ message PredictionAnalysisResult {
   optional FeatureVariation feature_variation = 4;
   optional dataset.proto.Example example = 5;
   optional model.proto.Prediction prediction = 6;
+  optional SingleExampleShapValues shap_values = 7;
 }
 
 // Feature variation in a prediction analysis.
@@ -189,5 +201,28 @@ message FeatureVariationItem {
       optional int32 num_values = 1;
     }
     message Boolean {}
+  }
+}
+
+// Shap values for a single example
+message SingleExampleShapValues {
+  // Name of the outputs.
+  repeated string outputs = 1;
+
+  // Shap values for each input feature.
+  repeated Value values = 2;
+
+  // Minimum and maximum shap values though all the input features and output
+  // dimensions. If all the values are positive "min_shap_value" is 0, and if
+  // all the values are negative, "max_shape_value" is 0.
+  optional float min_shap_value = 3;
+  optional float max_shap_value = 4;
+
+  message Value {
+    // Column / input feature
+    optional int32 column_idx = 1;
+    // Shap value for each of the outputs.
+    // EXPECT: values.size() == outputs.size().
+    repeated float values = 2 [packed = true];
   }
 }

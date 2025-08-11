@@ -34,16 +34,22 @@ class RandomForestModelTest(absltest.TestCase):
     )
     self.adult_binary_class_rf = model_lib.load_model(model_path)
 
-  def test_out_of_bag_evaluations(self):
-    oob_evaluations = self.adult_binary_class_rf.out_of_bag_evaluations()
+  def test_training_logs(self):
+    training_logs = self.adult_binary_class_rf.training_logs()
 
-    self.assertLen(oob_evaluations, 2)
-    self.assertEqual(oob_evaluations[0].number_of_trees, 1)
-    self.assertAlmostEqual(oob_evaluations[0].evaluation.loss, 1.80617348178)
-    self.assertEqual(oob_evaluations[1].number_of_trees, 100)
-    self.assertAlmostEqual(oob_evaluations[1].evaluation.loss, 0.31474323732)
+    self.assertLen(training_logs, 2)
+    self.assertEqual(training_logs[0].iteration, 1)
+    self.assertAlmostEqual(training_logs[0].evaluation.loss, 1.80617348178)
+    self.assertEqual(training_logs[1].iteration, 100)
+    self.assertAlmostEqual(training_logs[1].evaluation.loss, 0.31474323732)
+    self.assertIsNone(training_logs[0].training_evaluation)
+    self.assertIsNone(training_logs[1].training_evaluation)
 
-  def test_empty_out_of_bag_evaluations(self):
+    self.assertEqual(
+        self.adult_binary_class_rf.out_of_bag_evaluations(), training_logs
+    )
+
+  def test_empty_training_logs(self):
     # Uplift models do not have OOB evaluations.
     model_path = os.path.join(
         test_utils.ydf_test_data_path(),
@@ -52,9 +58,10 @@ class RandomForestModelTest(absltest.TestCase):
     )
     model = model_lib.load_model(model_path)
 
-    oob_evaluations = model.out_of_bag_evaluations()
+    training_logs = model.out_of_bag_evaluations()
 
-    self.assertEmpty(oob_evaluations)
+    self.assertEmpty(training_logs)
+    self.assertEqual(model.out_of_bag_evaluations(), training_logs)
 
   def test_predict_distance(self):
     dataset1 = pd.read_csv(

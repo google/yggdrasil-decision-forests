@@ -45,12 +45,10 @@ class PoissonLoss : public AbstractLoss {
   using AbstractLoss::Loss;
   using AbstractLoss::UpdateGradients;
 
-  PoissonLoss(const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-              model::proto::Task task,
-              const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column) {}
+  PoissonLoss(const ConstructorArgs& args) : AbstractLoss(args) {}
 
-  absl::Status Status() const override;
+  static absl::StatusOr<std::unique_ptr<AbstractLoss>> RegistrationCreate(
+      const ConstructorArgs& args);
 
   LossShape Shape() const override {
     return LossShape{.gradient_dim = 1, .prediction_dim = 1};
@@ -66,9 +64,8 @@ class PoissonLoss : public AbstractLoss {
 
   absl::Status UpdateGradients(
       const absl::Span<const float> labels,
-      const absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-      utils::RandomEngine* random,
+      const absl::Span<const float> predictions, const AbstractLossCache* cache,
+      GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   static void UpdateGradientsImp(const absl::Span<const float> labels,
@@ -83,8 +80,7 @@ class PoissonLoss : public AbstractLoss {
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,
       const absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   template <bool use_weights>

@@ -20,12 +20,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -304,18 +306,21 @@ absl::Status UpdateGradientsSingleThread(
 
 }  // namespace
 
-absl::Status NDCGLoss::Status() const {
-  if (task_ != model::proto::Task::RANKING) {
+absl::StatusOr<std::unique_ptr<AbstractLoss>> NDCGLoss::RegistrationCreate(
+    const ConstructorArgs& args) {
+  if (args.task != model::proto::Task::RANKING) {
     return absl::InvalidArgumentError(
         "NDCG loss is only compatible with a ranking task.");
   }
-  if (ndcg_truncation_ < 1) {
+  const int ndcg_truncation =
+      args.gbt_config.lambda_mart_ndcg().ndcg_truncation();
+  if (ndcg_truncation < 1) {
     return absl::InvalidArgumentError(
         absl::StrCat("The NDCG truncation must be set to a positive integer, "
                      "currently found: ",
-                     ndcg_truncation_));
+                     ndcg_truncation));
   }
-  return absl::OkStatus();
+  return absl::make_unique<NDCGLoss>(args, ndcg_truncation);
 }
 
 absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
@@ -331,10 +336,13 @@ absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
 
 absl::Status NDCGLoss::UpdateGradients(
     const absl::Span<const float> labels,
-    const absl::Span<const float> predictions,
-    const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-    utils::RandomEngine* random,
+    const absl::Span<const float> predictions, const AbstractLossCache* cache,
+    GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
+  STATUS_CHECK(cache);
+  STATUS_CHECK(dynamic_cast<const Cache*>(cache));
+  auto& ranking_index = dynamic_cast<const Cache*>(cache)->ranking_index;
+
   STATUS_CHECK_EQ(gradients->size(), 1);
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
   std::vector<float>& hessian_data = *(*gradients)[0].hessian;
@@ -345,7 +353,7 @@ absl::Status NDCGLoss::UpdateGradients(
 
   if (thread_pool == nullptr) {
     RETURN_IF_ERROR(UpdateGradientsSingleThread(
-        labels, predictions, absl::MakeConstSpan(ranking_index->groups()),
+        labels, predictions, absl::MakeConstSpan(ranking_index.groups()),
         ndcg_truncation_, gbt_config_.lambda_loss(),
         gbt_config_.lambda_mart_ndcg().gradient_use_non_normalized_dcg(),
         gbt_config_.internal().enable_ndcg_indicator_labels_optimization(),
@@ -360,7 +368,7 @@ absl::Status NDCGLoss::UpdateGradients(
       random_seeds[i] = (*random)();
     }
     utils::concurrency::ConcurrentForLoop(
-        thread_pool->num_threads(), thread_pool, ranking_index->groups().size(),
+        thread_pool->num_threads(), thread_pool, ranking_index.groups().size(),
         [&labels, &predictions, ranking_index, &gradient_data, &hessian_data,
          &random_seeds, lambda_loss = gbt_config_.lambda_loss(),
          gradient_use_non_normalized_dcg =
@@ -378,7 +386,7 @@ absl::Status NDCGLoss::UpdateGradients(
           }
           absl::Status thread_status = UpdateGradientsSingleThread(
               absl::MakeConstSpan(labels), absl::MakeConstSpan(predictions),
-              absl::MakeConstSpan(ranking_index->groups())
+              absl::MakeConstSpan(ranking_index.groups())
                   .subspan(begin_idx, end_idx - begin_idx),
               ndcg_truncation, lambda_loss, gradient_use_non_normalized_dcg,
               enable_indicator_labels_optimization, random_seeds[block_idx],
@@ -400,16 +408,30 @@ std::vector<std::string> NDCGLoss::SecondaryMetricNames() const {
 absl::StatusOr<LossResults> NDCGLoss::Loss(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
-    const RankingGroupsIndices* ranking_index,
+    const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
-  if (ranking_index == nullptr) {
-    return absl::InternalError("Missing ranking index");
-  }
+  STATUS_CHECK(cache);
+  STATUS_CHECK(dynamic_cast<const Cache*>(cache));
+  auto& ranking_index = dynamic_cast<const Cache*>(cache)->ranking_index;
 
-  const float ndcg =
-      ranking_index->NDCG(predictions, weights, ndcg_truncation_);
+  const float ndcg = ranking_index.NDCG(predictions, weights, ndcg_truncation_);
   return LossResults{/*.loss =*/-ndcg, /*.secondary_metrics =*/{ndcg}};
+}
+
+absl::StatusOr<std::unique_ptr<AbstractLossCache>> NDCGLoss::CreateLossCache(
+    const dataset::VerticalDataset& dataset) const {
+  auto cache = absl::make_unique<NDCGLoss::Cache>();
+  RETURN_IF_ERROR(cache->ranking_index.Initialize(
+      dataset, train_config_link_.label(), train_config_link_.ranking_group()));
+  return cache;
+}
+
+absl::StatusOr<std::unique_ptr<AbstractLossCache>>
+NDCGLoss::CreateRankingLossCache(absl::Span<const float> labels,
+                                 absl::Span<const uint64_t> groups) const {
+  auto cache = absl::make_unique<NDCGLoss::Cache>();
+  RETURN_IF_ERROR(cache->ranking_index.Initialize(labels, groups));
+  return cache;
 }
 
 }  // namespace gradient_boosted_trees

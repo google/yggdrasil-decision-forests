@@ -111,11 +111,16 @@ CustomBinaryClassificationLossFunctions CreateToyLoss() {
 TEST(CustomBinaryClassificationLossTest, LossShape) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  CustomBinaryClassificationLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1),
-      CreateToyLoss());
-  ASSERT_OK(loss_imp.Status());
-  auto loss_shape = loss_imp.Shape();
+
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomBinaryClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(1)},
+                           CreateToyLoss()));
+
+  auto loss_shape = loss_imp->Shape();
   EXPECT_EQ(loss_shape.gradient_dim, 1);
   EXPECT_EQ(loss_shape.prediction_dim, 1);
 }
@@ -125,13 +130,17 @@ TEST(CustomBinaryClassificationLossTest, InitialPredictions) {
                        CreateToyDataset());
   std::vector<float> weights = {2.f, 4.f, 6.f, 8.f, 10.f, 12.f};
 
-  CustomBinaryClassificationLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1),
-      CreateToyLoss());
-  ASSERT_OK(loss_imp.Status());
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomBinaryClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(1)},
+                           CreateToyLoss()));
+
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
-      loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 1, weights));
+      loss_imp->InitialPredictions(dataset, /* label_col_idx= */ 1, weights));
 
   EXPECT_THAT(init_pred, ElementsAre(2 + 8 + 6 + 16 + 10 + 24));
 }
@@ -142,13 +151,15 @@ TEST(CustomBinaryClassificationLossTest, UpdateGradients) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  CustomBinaryClassificationLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1),
-      CreateToyLoss());
-  ASSERT_OK(loss_imp.Status());
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomBinaryClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(1)},
+                           CreateToyLoss()));
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 1,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 1, *loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   const std::vector<float> loss_initial_predictions = {0};
@@ -156,10 +167,10 @@ TEST(CustomBinaryClassificationLossTest, UpdateGradients) {
                                   &predictions);
 
   utils::RandomEngine random(1234);
-  ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
-                                     /* label_col_idx= */ 1, predictions,
-                                     /*ranking_index=*/nullptr, &gradients,
-                                     &random));
+  ASSERT_OK(loss_imp->UpdateGradients(gradient_dataset,
+                                      /* label_col_idx= */ 1, predictions,
+                                      /*ranking_index=*/nullptr, &gradients,
+                                      &random));
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   EXPECT_THAT(gradients.front().gradient,
@@ -174,15 +185,18 @@ TEST(CustomBinaryClassificationLossTest, ComputeLoss) {
   std::vector<float> weights = {2.f, 4.f, 6.f, 8.f, 10.f, 12.f};
 
   std::vector<float> predictions = {2.f, 2.f, 2.f, 2.f, 2.f, 2.f};
-  CustomBinaryClassificationLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1),
-      CreateToyLoss());
-  ASSERT_OK(loss_imp.Status());
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomBinaryClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(1)},
+                           CreateToyLoss()));
   LossResults loss_results;
   ASSERT_OK_AND_ASSIGN(
       loss_results,
-      loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+      loss_imp->Loss(dataset,
+                     /* label_col_idx= */ 1, predictions, weights, nullptr));
   EXPECT_EQ(loss_results.loss, 2 * 3 + 4 * 4 + 6 * 3 + 8 * 4 + 10 * 3 + 12 * 4);
   // There are no secondary metrics.
   EXPECT_THAT(loss_results.secondary_metrics, IsEmpty());
@@ -191,38 +205,50 @@ TEST(CustomBinaryClassificationLossTest, ComputeLoss) {
 TEST(CustomBinaryClassificationLossTest, SecondaryMetricNames) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const CustomBinaryClassificationLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(0),
-      CreateToyLoss());
-  ASSERT_OK(loss_imp.Status());
-  EXPECT_THAT(loss_imp.SecondaryMetricNames(), IsEmpty());
+
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomBinaryClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(0)},
+                           CreateToyLoss()));
+  EXPECT_THAT(loss_imp->SecondaryMetricNames(), IsEmpty());
 }
 
 TEST(CustomBinaryClassificationLossTest, ValidForClassification) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const CustomBinaryClassificationLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1),
-      CreateToyLoss());
-  EXPECT_OK(loss_imp.Status());
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomBinaryClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(1)},
+                           CreateToyLoss()));
 }
 
 TEST(CustomBinaryClassificationLossTest, InvalidForRegression) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const CustomBinaryClassificationLoss loss_imp(
-      {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1),
-      CreateToyLoss());
-  EXPECT_FALSE(loss_imp.Status().ok());
+
+  EXPECT_FALSE(CustomBinaryClassificationLoss::RegistrationCreate(
+                   {{},
+                    {},
+                    model::proto::Task::REGRESSION,
+                    dataset.data_spec().columns(1)},
+                   CreateToyLoss())
+                   .ok());
 }
 
 TEST(CustomBinaryClassificationLossTest, InvalidForRanking) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const CustomBinaryClassificationLoss loss_imp({}, model::proto::Task::RANKING,
-                                                dataset.data_spec().columns(1),
-                                                CreateToyLoss());
-  EXPECT_FALSE(loss_imp.Status().ok());
+  EXPECT_FALSE(
+      CustomBinaryClassificationLoss::RegistrationCreate(
+          {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(1)},
+          CreateToyLoss())
+          .ok());
 }
 
 }  // namespace

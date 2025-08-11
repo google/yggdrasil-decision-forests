@@ -15,8 +15,15 @@
 
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -26,6 +33,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/learner/multitasker/multitasker.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -262,7 +270,6 @@ MultitaskerLearner::TrainWithStatusImpl(
       utils::concurrency::ThreadPool pool(
           deployment().num_threads(),
           {.name_prefix = std::string("multitasker")});
-      pool.StartWorkers();
       for (const auto subtask_idx : secondary_task_idxs) {
         pool.Schedule([train_subtask_nostatus, subtask_idx]() {
           train_subtask_nostatus(subtask_idx, /*primary=*/false);
@@ -293,7 +300,6 @@ MultitaskerLearner::TrainWithStatusImpl(
     utils::concurrency::ThreadPool pool(
         deployment().num_threads(),
         {.name_prefix = std::string("multitasker")});
-    pool.StartWorkers();
     for (const auto subtask_idx : primary_task_idxs) {
       pool.Schedule([train_subtask_nostatus, subtask_idx]() {
         train_subtask_nostatus(subtask_idx, /*primary=*/true);

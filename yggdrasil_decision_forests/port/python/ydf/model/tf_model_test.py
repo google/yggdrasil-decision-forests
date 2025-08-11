@@ -243,7 +243,7 @@ class TfModelTest(parameterized.TestCase):
     # Create the YDF model.
     ydf_model = model_lib.from_tensorflow_decision_forests(model_dir)
     # Convert the YDF model back to a TF-DF model and load it.
-    ydf_model.to_tensorflow_saved_model(new_model_dir)
+    ydf_model.to_tensorflow_saved_model(new_model_dir, mode="keras")
     new_tfdf_model = tf.keras.models.load_model(new_model_dir)
 
     # Check for prediction equality.
@@ -279,7 +279,7 @@ class TfModelTest(parameterized.TestCase):
     # Create the YDF model.
     ydf_model = model_lib.from_tensorflow_decision_forests(model_dir)
     # Convert the YDF model back to a TF-DF model and load it.
-    ydf_model.to_tensorflow_saved_model(new_model_dir)
+    ydf_model.to_tensorflow_saved_model(new_model_dir, mode="keras")
     new_tfdf_model = tf.keras.models.load_model(new_model_dir)
 
     # Prepare the test dataset for the loaded model: Categorical integer
@@ -322,7 +322,7 @@ class TfModelTest(parameterized.TestCase):
     #
     # This is referred as the "predict" API.
     path_wo_signature = os.path.join(tempdir, "mdl")
-    ydf_model.to_tensorflow_saved_model(path_wo_signature)
+    ydf_model.to_tensorflow_saved_model(path_wo_signature, mode="keras")
 
     # Load the model, and add a serialized tensorflow examples protobuffer
     # input signature. In other words, the model expects as input a serialized
@@ -766,7 +766,9 @@ class TfModelTest(parameterized.TestCase):
                       ),
                       "b1": tf.train.Feature(
                           int64_list=tf.train.Int64List(
-                              value=[test_ds["b1"][example_idx]]
+                              value=[
+                                  test_ds["b1"][example_idx].astype(np.int32)
+                              ]
                           )
                       ),
                       "b2": tf.train.Feature(
@@ -867,7 +869,7 @@ class TfModelTest(parameterized.TestCase):
       if not with_filter:
         proto_feature["multi_b1"] = tf.train.Feature(
             int64_list=tf.train.Int64List(
-                value=test_ds["multi_b1"][example_idx][:]
+                value=test_ds["multi_b1"][example_idx][:].astype(np.int32)
             )
         )
       tf_test_ds.append(
@@ -1346,9 +1348,12 @@ class TfModelTest(parameterized.TestCase):
 
     if mode == "keras":
       tf_dataset = tf.data.Dataset.from_tensor_slices({
-          "feature": np.array(
-              ["Café".encode("windows-1252"), "foobar".encode("windows-1252")]
-          ).reshape(-1, 1)
+          "feature": (
+              np.array([
+                  "Café".encode("windows-1252"),
+                  "foobar".encode("windows-1252"),
+              ]).reshape(-1, 1)
+          )
       })
       tfdf_model = tf.keras.models.load_model(model_path)
       tfdf_predictions = tfdf_model.predict(tf_dataset)

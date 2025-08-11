@@ -17,9 +17,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
 #include <numeric>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -82,6 +84,8 @@ utils::html::Html Model(const model::AbstractModel& model) {
   AddKeyValue(&content, "Task", proto::Task_Name(model.task()));
   if (model.has_label()) {
     AddKeyValue(&content, "Label", model.label());
+  } else {
+    AddKeyValue(&content, "No Label provided", "");
   }
 
   if (model.ranking_group_col_idx() != -1) {
@@ -96,14 +100,55 @@ utils::html::Html Model(const model::AbstractModel& model) {
         model.data_spec().columns(model.uplift_treatment_col_idx()).name());
   }
 
+  // Set of "unstackeds" already displayed (each used unstackeds should only be
+  // displayed once).
+  std::unordered_set<size_t> visited_unstacked;
+
   std::string str_input_features;
-  for (int i = 0; i < model.input_features().size(); i++) {
+  for (size_t i = 0; i < model.input_features().size(); i++) {
     if (i != 0) {
       absl::StrAppend(&str_input_features, " ");
     }
-    absl::StrAppend(
-        &str_input_features,
-        model.data_spec().columns(model.input_features()[i]).name());
+    const auto col_idx = model.input_features()[i];
+    const auto& col_spec = model.data_spec().columns(col_idx);
+    if (col_spec.is_unstacked()) {
+      // Unstacked feature.
+
+      // Find the unstacked item.
+      int selected_unstacked_idx = -1;
+      for (size_t unstacked_idx = 0;
+           unstacked_idx < model.data_spec().unstackeds_size();
+           unstacked_idx++) {
+        const auto& unstacked = model.data_spec().unstackeds(unstacked_idx);
+        if (col_idx >= unstacked.begin_column_idx() &&
+            col_idx < unstacked.begin_column_idx() + unstacked.size()) {
+          selected_unstacked_idx = unstacked_idx;
+          break;
+        }
+      }
+
+      if (selected_unstacked_idx == -1) {
+        // Cannot find the corresponding unstacked. The dataspec is either
+        // invalid or very old. We should the individual feature.
+        absl::StrAppend(&str_input_features, col_spec.name());
+      } else {
+        if (visited_unstacked.find(selected_unstacked_idx) !=
+            visited_unstacked.end()) {
+          // This unstacked feature was already shown.
+          continue;
+        }
+
+        // Show the unstacked feature with its size.
+        const auto& unstacked =
+            model.data_spec().unstackeds(selected_unstacked_idx);
+        absl::StrAppend(&str_input_features, unstacked.original_name(), "[",
+                        unstacked.size(), "]");
+        visited_unstacked.insert(selected_unstacked_idx);
+      }
+
+    } else {
+      absl::StrAppend(&str_input_features, col_spec.name());
+    }
   }
   AddKeyValue(&content,
               absl::StrCat("Features (", model.input_features().size(), ")"),
@@ -119,10 +164,13 @@ utils::html::Html Model(const model::AbstractModel& model) {
 
   AddKeyValue(&content, "Trained with tuner", HasTuner(model) ? "Yes" : "No");
 
+  AddKeyValue(&content, "Trained with Feature Selection",
+              HasFeatureSelector(model) ? "Yes" : "No");
+
   if (const auto model_size = model.ModelSizeInBytes();
       model_size.has_value()) {
     AddKeyValue(&content, "Model size",
-                absl::StrCat(*model_size / 1000, " kB"));
+                absl::StrCat(*model_size / 1024, " kB"));
   }
 
   return content;
@@ -494,24 +542,27 @@ absl::StatusOr<utils::html::Html> Structure(const model::AbstractModel& model) {
     return content;
   }
 
-  // TODO: Plot the trees.
-  AddKeyValue(&content, "Num trees", absl::StrCat(df->num_trees()));
+  AddKeyValue(&content, "Number of trees", absl::StrCat(df->num_trees()));
 
-  const int max_trees = 1;
   const int num_trees = df->num_trees();
-  if (num_trees > max_trees) {
-    content.Append(h::P("Only printing the first tree."));
+
+  if (num_trees == 0) {
+    content.Append(h::P("This model does not contain any trees"));
+    return content;
+  }
+  if (num_trees > 1) {
+    content.Append(h::P(absl::Substitute(
+        "Below is the first tree of the model. The model "
+        "contains $0 trees, "
+        "which jointly make the prediction. Other trees can be printed with "
+        "`model.print_tree(tree_idx)` or plotted with "
+        "`model.plot_tree(tree_idx)`",
+        num_trees)));
   }
 
   std::string str_trees;
-  for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
-    if (tree_idx >= max_trees) {
-      break;
-    }
-    absl::StrAppend(&str_trees, "Tree #", tree_idx, ":\n");
-    df->decision_trees()[tree_idx]->AppendModelStructure(
-        model.data_spec(), model.label_col_idx(), &str_trees);
-  }
+  df->decision_trees()[0]->AppendModelStructure(
+      model.data_spec(), model.label_col_idx(), &str_trees);
   content.Append(h::Pre(h::Class("ydf_pre"), str_trees));
   return content;
 }

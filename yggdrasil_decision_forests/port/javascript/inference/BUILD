@@ -26,7 +26,6 @@ cc_binary(
     srcs = ["inference.cc"],
     defines = [],
     linkopts = [
-        "--bind",
         "--minify=0",
         "-s USE_PTHREADS=0",
         "-s EXPORTED_RUNTIME_METHODS=FS",  # To access YDF output file from JS.
@@ -50,6 +49,7 @@ cc_binary(
     ],
     visibility = ["//visibility:private"],
     deps = [
+        "//third_party/emscripten:embind",
         "//yggdrasil_decision_forests/learner/cart",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/learner/random_forest",

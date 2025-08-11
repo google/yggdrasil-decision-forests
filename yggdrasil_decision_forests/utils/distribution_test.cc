@@ -284,6 +284,25 @@ TEST(Distribution, BinaryToIntegerConfusionMatrixDouble) {
   EXPECT_NEAR(conf.FinalEntropy(), 0.462098, 0.0001);
 }
 
+TEST(Distribution, BinaryToIntegerConfusionMatrixAdd) {
+  BinaryToIntegerConfusionMatrixDouble conf;
+  BinaryToIntegerConfusionMatrixDouble other_conf;
+  conf.SetNumClassesIntDim(4);
+  other_conf.SetNumClassesIntDim(4);
+
+  conf.Add(false, 1.);
+  conf.Add(true, 1.);
+  other_conf.Add(true, 2.);
+
+  conf.Add(other_conf);
+
+  // entropy(c(2,1)) in R.
+  EXPECT_NEAR(conf.InitEntropy(), 0.636514, 0.0001);
+
+  // entropy(c(1)) / 3 + entropy(c(1,1)) * 2 / 3 in R.
+  EXPECT_NEAR(conf.FinalEntropy(), 0.462098, 0.0001);
+}
+
 TEST(Distribution, IntegersConfusionMatrix_AppendTextReport) {
   IntegersConfusionMatrixDouble confusion;
   confusion.SetSize(4, 4);
@@ -423,6 +442,24 @@ TEST(Distribution, BinaryToNormalDistributionDouble) {
   conf.Add(false, 2);
   conf.Add(true, 1);
   conf.Add(true, 3);
+
+  EXPECT_NEAR(conf.NumObservations(), 4, 0.0001);
+
+  // var(c(1,2)) / 2 +  var(c(1,3)) / 2 = 0.625
+  // with var the variance.
+  EXPECT_NEAR(conf.FinalVariance(), 0.625, 0.0001);
+}
+
+TEST(Distribution, BinaryToNormalDistributionDoubleAdd) {
+  BinaryToNormalDistributionDouble conf;
+  BinaryToNormalDistributionDouble other_conf;
+
+  conf.Add(false, 1);
+  conf.Add(true, 1);
+  other_conf.Add(false, 2);
+  other_conf.Add(true, 3);
+
+  conf.Add(other_conf);
 
   EXPECT_NEAR(conf.NumObservations(), 4, 0.0001);
 

@@ -153,6 +153,7 @@ cc_test(
     deps = [
         ":abstract_learner",
         ":abstract_learner_cc_proto",
+        "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/dataset:weight_cc_proto",

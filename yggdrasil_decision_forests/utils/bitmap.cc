@@ -18,6 +18,7 @@
 #include <stddef.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
@@ -418,7 +419,6 @@ absl::Status ShardedMultiBitmap::SaveToFile(const std::string& base_path,
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
         num_threads,
         {.name_prefix = std::string("ShardedMultiBitmap::SaveToFile")});
-    pool.StartWorkers();
     for (uint64_t shard_idx = 0; shard_idx < shards_.size(); shard_idx++) {
       pool.Schedule([shard_idx, base_path, &status, &status_mutex, this]() {
         auto local_status = file::SetContent(

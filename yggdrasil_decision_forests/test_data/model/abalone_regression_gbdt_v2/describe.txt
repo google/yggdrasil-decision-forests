@@ -1,0 +1,208 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: REGRESSION
+Label: "Rings"
+
+Input Features (8):
+	Type
+	LongestShell
+	Diameter
+	Height
+	WholeWeight
+	ShuckedWeight
+	VisceraWeight
+	ShellWeight
+
+No weights
+
+Variable Importance: INV_MEAN_MIN_DEPTH:
+    1.   "ShellWeight"  0.478123 ################
+    2. "ShuckedWeight"  0.260315 ###
+    3.        "Height"  0.222884 #
+    4.      "Diameter"  0.220357 #
+    5.   "WholeWeight"  0.198738 
+    6. "VisceraWeight"  0.195427 
+    7.          "Type"  0.193038 
+    8.  "LongestShell"  0.191208 
+
+Variable Importance: NUM_AS_ROOT:
+    1.   "ShellWeight" 32.000000 ################
+    2.      "Diameter"  6.000000 ##
+    3.        "Height"  6.000000 ##
+    4. "VisceraWeight"  1.000000 
+
+Variable Importance: NUM_NODES:
+    1. "ShuckedWeight" 273.000000 ################
+    2.   "ShellWeight" 251.000000 ##############
+    3.   "WholeWeight" 148.000000 ######
+    4. "VisceraWeight" 132.000000 ####
+    5.        "Height" 109.000000 ###
+    6.      "Diameter" 108.000000 ###
+    7.  "LongestShell" 75.000000 
+    8.          "Type" 68.000000 
+
+Variable Importance: SUM_SCORE:
+    1.   "ShellWeight" 92667.232204 ################
+    2. "ShuckedWeight" 24948.377508 ####
+    3.   "WholeWeight" 7745.807216 
+    4.          "Type" 4454.456772 
+    5. "VisceraWeight" 4038.323577 
+    6.      "Diameter" 4002.767872 
+    7.        "Height" 3977.077604 
+    8.  "LongestShell" 2119.642117 
+
+
+
+Loss: SQUARED_ERROR
+Validation loss value: 2.10527
+Number of trees per iteration: 1
+Node format: BLOB_SEQUENCE_GZIP
+Number of trees: 45
+Total number of nodes: 2373
+
+Number of nodes by tree:
+Count: 45 Average: 52.7333 StdDev: 10.4699
+Min: 23 Max: 63 Ignored: 0
+----------------------------------------------
+[ 23, 25)  2   4.44%   4.44% #
+[ 25, 27)  0   0.00%   4.44%
+[ 27, 29)  0   0.00%   4.44%
+[ 29, 31)  0   0.00%   4.44%
+[ 31, 33)  0   0.00%   4.44%
+[ 33, 35)  0   0.00%   4.44%
+[ 35, 37)  1   2.22%   6.67% #
+[ 37, 39)  1   2.22%   8.89% #
+[ 39, 41)  0   0.00%   8.89%
+[ 41, 43)  3   6.67%  15.56% ##
+[ 43, 45)  2   4.44%  20.00% #
+[ 45, 47)  3   6.67%  26.67% ##
+[ 47, 49)  2   4.44%  31.11% #
+[ 49, 51)  2   4.44%  35.56% #
+[ 51, 53)  2   4.44%  40.00% #
+[ 53, 55)  3   6.67%  46.67% ##
+[ 55, 57)  3   6.67%  53.33% ##
+[ 57, 59)  1   2.22%  55.56% #
+[ 59, 61)  3   6.67%  62.22% ##
+[ 61, 63] 17  37.78% 100.00% ##########
+
+Depth by leafs:
+Count: 1209 Average: 4.85773 StdDev: 0.456123
+Min: 2 Max: 5 Ignored: 0
+----------------------------------------------
+[ 2, 3)    7   0.58%   0.58%
+[ 3, 4)   31   2.56%   3.14%
+[ 4, 5)   89   7.36%  10.50% #
+[ 5, 5] 1082  89.50% 100.00% ##########
+
+Number of training obs by leaf:
+Count: 1209 Average: 140.36 StdDev: 325.354
+Min: 5 Max: 3179 Ignored: 0
+----------------------------------------------
+[    5,  163) 944  78.08%  78.08% ##########
+[  163,  322) 133  11.00%  89.08% #
+[  322,  481)  58   4.80%  93.88% #
+[  481,  640)  25   2.07%  95.95%
+[  640,  798)  12   0.99%  96.94%
+[  798,  957)   6   0.50%  97.44%
+[  957, 1116)   5   0.41%  97.85%
+[ 1116, 1275)   3   0.25%  98.10%
+[ 1275, 1433)   1   0.08%  98.18%
+[ 1433, 1592)   7   0.58%  98.76%
+[ 1592, 1751)   1   0.08%  98.84%
+[ 1751, 1910)   1   0.08%  98.92%
+[ 1910, 2068)   1   0.08%  99.01%
+[ 2068, 2227)   4   0.33%  99.34%
+[ 2227, 2386)   1   0.08%  99.42%
+[ 2386, 2545)   3   0.25%  99.67%
+[ 2545, 2703)   0   0.00%  99.67%
+[ 2703, 2862)   1   0.08%  99.75%
+[ 2862, 3021)   2   0.17%  99.92%
+[ 3021, 3179]   1   0.08% 100.00%
+
+Attribute in nodes:
+	273 : ShuckedWeight [NUMERICAL]
+	251 : ShellWeight [NUMERICAL]
+	148 : WholeWeight [NUMERICAL]
+	132 : VisceraWeight [NUMERICAL]
+	109 : Height [NUMERICAL]
+	108 : Diameter [NUMERICAL]
+	75 : LongestShell [NUMERICAL]
+	68 : Type [CATEGORICAL]
+
+Attribute in nodes with depth <= 0:
+	32 : ShellWeight [NUMERICAL]
+	6 : Height [NUMERICAL]
+	6 : Diameter [NUMERICAL]
+	1 : VisceraWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	69 : ShellWeight [NUMERICAL]
+	20 : ShuckedWeight [NUMERICAL]
+	15 : Height [NUMERICAL]
+	13 : Diameter [NUMERICAL]
+	7 : LongestShell [NUMERICAL]
+	4 : VisceraWeight [NUMERICAL]
+	4 : Type [CATEGORICAL]
+	3 : WholeWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	96 : ShellWeight [NUMERICAL]
+	72 : ShuckedWeight [NUMERICAL]
+	30 : Diameter [NUMERICAL]
+	28 : Height [NUMERICAL]
+	24 : WholeWeight [NUMERICAL]
+	24 : Type [CATEGORICAL]
+	20 : LongestShell [NUMERICAL]
+	14 : VisceraWeight [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	175 : ShellWeight [NUMERICAL]
+	141 : ShuckedWeight [NUMERICAL]
+	67 : WholeWeight [NUMERICAL]
+	55 : Diameter [NUMERICAL]
+	54 : Height [NUMERICAL]
+	50 : VisceraWeight [NUMERICAL]
+	41 : Type [CATEGORICAL]
+	40 : LongestShell [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	273 : ShuckedWeight [NUMERICAL]
+	251 : ShellWeight [NUMERICAL]
+	148 : WholeWeight [NUMERICAL]
+	132 : VisceraWeight [NUMERICAL]
+	109 : Height [NUMERICAL]
+	108 : Diameter [NUMERICAL]
+	75 : LongestShell [NUMERICAL]
+	68 : Type [CATEGORICAL]
+
+Condition type in nodes:
+	1096 : HigherCondition
+	68 : ContainsBitmapCondition
+Condition type in nodes with depth <= 0:
+	45 : HigherCondition
+Condition type in nodes with depth <= 1:
+	131 : HigherCondition
+	4 : ContainsBitmapCondition
+Condition type in nodes with depth <= 2:
+	284 : HigherCondition
+	24 : ContainsBitmapCondition
+Condition type in nodes with depth <= 3:
+	582 : HigherCondition
+	41 : ContainsBitmapCondition
+Condition type in nodes with depth <= 5:
+	1096 : HigherCondition
+	68 : ContainsBitmapCondition
+
+Training logs:
+Number of iteration to final model: 45
+	Iter:1 train-loss:3.060223 valid-loss:2.994364  train-rmse:3.060223 valid-rmse:2.994364
+	Iter:2 train-loss:2.909715 valid-loss:2.860467  train-rmse:2.909715 valid-rmse:2.860467
+	Iter:3 train-loss:2.782139 valid-loss:2.744500  train-rmse:2.782139 valid-rmse:2.744500
+	Iter:4 train-loss:2.669214 valid-loss:2.643754  train-rmse:2.669214 valid-rmse:2.643754
+	Iter:5 train-loss:2.573525 valid-loss:2.561826  train-rmse:2.573525 valid-rmse:2.561826
+	Iter:6 train-loss:2.487633 valid-loss:2.485791  train-rmse:2.487633 valid-rmse:2.485791
+	Iter:16 train-loss:2.065998 valid-loss:2.181579  train-rmse:2.065998 valid-rmse:2.181579
+	Iter:26 train-loss:1.911380 valid-loss:2.132574  train-rmse:1.911380 valid-rmse:2.132574
+	Iter:36 train-loss:1.841395 valid-loss:2.108711  train-rmse:1.841395 valid-rmse:2.108711
+	Iter:46 train-loss:1.778606 valid-loss:2.107009  train-rmse:1.778606 valid-rmse:2.107009
+	Iter:56 train-loss:1.742377 valid-loss:2.111658  train-rmse:1.742377 valid-rmse:2.111658
+	Iter:66 train-loss:1.699615 valid-loss:2.126146  train-rmse:1.699615 valid-rmse:2.126146

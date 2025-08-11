@@ -82,8 +82,6 @@ class IsolationForestModel : public AbstractModel,
                         const dataset::VerticalDataset& dataset2,
                         absl::Span<float> distances) const override;
 
-  int num_trees() const override { return decision_trees_.size(); }
-
   // For the serving engines.
   // TODO: Move in DecisionForestInterface.
   size_t NumTrees() const { return num_trees(); }

@@ -10,7 +10,6 @@ package(
 # See https://github.com/emscripten-core/emscripten/blob/main/src/settings.js for the description
 # of these options.
 WASM_LINKOPTS = [
-    "--bind",
     "-s USE_PTHREADS=0",
     "-s EXPORTED_RUNTIME_METHODS=FS",
     "-s ALLOW_MEMORY_GROWTH=1",
@@ -36,6 +35,7 @@ cc_binary(
         "manual",
     ],
     deps = [
+        "//third_party/emscripten:embind",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:csv_example_writer",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",

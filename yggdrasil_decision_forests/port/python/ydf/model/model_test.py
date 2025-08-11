@@ -49,6 +49,8 @@ class GenericModelTest(parameterized.TestCase):
     super().setUpClass()
     # Loading models needed in many unittests.
     model_dir = os.path.join(test_utils.ydf_test_data_path(), "model")
+    cls._model_dir = model_dir
+
     # This model is a Random Forest classification model without training logs.
     cls.adult_binary_class_rf = model_lib.load_model(
         os.path.join(model_dir, "adult_binary_class_rf")
@@ -684,15 +686,17 @@ class GenericModelTest(parameterized.TestCase):
 Model: GRADIENT_BOOSTED_TREES
 Task: CLASSIFICATION
 Class: ydf.GradientBoostedTreesModel
-Use `model.describe()` for more details
+Use `model.describe()` for more details.
 """,
     )
 
   def test_model_describe_text(self):
-    self.assertIn(
-        'Type: "GRADIENT_BOOSTED_TREES"',
-        self.adult_binary_class_gbdt.describe("text"),
-    )
+    text_description = self.adult_binary_class_gbdt.describe("text")
+    # Model description
+    self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', text_description)
+    # Dataspec description
+    self.assertIn("DATASPEC:", text_description)
+    self.assertIn("Number of records:", text_description)
 
   def test_model_describe_html(self):
     html_description = self.adult_binary_class_gbdt.describe("html")
@@ -716,6 +720,7 @@ Use `model.describe()` for more details
         created_date=31415,
         uid=271828,
         framework="TestFramework",
+        custom_fields={"string": "bar", "bytes": b"Caf\351"},
     )
     self.adult_binary_class_gbdt.set_metadata(metadata)
     self.assertEqual(metadata, self.adult_binary_class_gbdt.metadata())
@@ -836,6 +841,42 @@ Use `model.describe()` for more details
     deserialized_predictions = deserialized_model.predict(ds)
     npt.assert_almost_equal(
         original_predictions, deserialized_predictions, decimal=5
+    )
+
+  def test_model_embed(self):
+    model = model_lib.load_model(
+        os.path.join(self._model_dir, "adult_binary_class_gbdt_v2")
+    )
+    while model.num_trees() > 3:
+      model.remove_tree(model.num_trees() - 1)
+    embedded_model_if_else_class = model.to_standalone_cc(algorithm="IF_ELSE")
+    embedded_model_routing_proba = model.to_standalone_cc(
+        algorithm="ROUTING",
+        classification_output="PROBABILITY",
+        categorical_from_string=False,
+    )
+    self.assertIsInstance(embedded_model_if_else_class, str)
+    self.assertIsInstance(embedded_model_routing_proba, str)
+
+    test_utils.golden_check_string(
+        self,
+        embedded_model_if_else_class,
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_class.h.golden",
+        ),
+    )
+    test_utils.golden_check_string(
+        self,
+        embedded_model_routing_proba,
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_probability_routing.h.golden",
+        ),
     )
 
   def test_model_pickling(self):
@@ -1273,6 +1314,29 @@ Use `model.describe()` for more details
         self.synthetic_ranking_gbdt_test_ds, mrr_truncation=truncation
     )
     self.assertAlmostEqual(evaluation.mrr, expected_mrr)
+
+  @parameterized.named_parameters(
+      {
+          "testcase_name": "map@5",
+          "truncation": 5,
+          "expected_map": 0.793028052,
+      },
+      {
+          "testcase_name": "map@2",
+          "truncation": 2,
+          "expected_map": 0.792079209,
+      },
+      {
+          "testcase_name": "map@10",
+          "truncation": 10,
+          "expected_map": 0.7601983518,
+      },
+  )
+  def test_evaluate_ranking_map_truncation(self, truncation, expected_map):
+    evaluation = self.synthetic_ranking_gbdt.evaluate(
+        self.synthetic_ranking_gbdt_test_ds, map_truncation=truncation
+    )
+    self.assertAlmostEqual(evaluation.map, expected_map, places=3)
 
   def test_model_save_pure_serving(self):
     model_path = os.path.join(

@@ -15,14 +15,22 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_multinomial.h"
 
+#include <cmath>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
@@ -36,7 +44,6 @@ using ::testing::FloatNear;
 using ::testing::IsEmpty;
 using ::testing::IsNan;
 using ::testing::Not;
-using ::testing::SizeIs;
 
 // Margin of error for numerical tests.
 constexpr float kTestPrecision = 0.000001f;
@@ -60,36 +67,6 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "1"}}));
   RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "5"}, {"b", "2"}}));
   RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"a", "6"}, {"b", "3"}}));
-  return dataset;
-}
-
-// Returns a simple dataset with gradients in the second column.
-absl::StatusOr<dataset::VerticalDataset> CreateToyGradientDataset() {
-  dataset::VerticalDataset dataset;
-  // TODO Replace PARSE_TEST_PROTO by a modern function when
-  // possible.
-  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
-    columns { type: NUMERICAL name: "a" }
-    columns {
-      type: CATEGORICAL
-      name: "b"
-      categorical { number_of_unique_values: 4 is_already_integerized: true }
-    }
-    columns { type: NUMERICAL name: "__gradient__0" }
-  )pb");
-  RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus(
-      {{"a", "1"}, {"b", "1"}, {"__gradient__0", ".25"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus(
-      {{"a", "2"}, {"b", "2"}, {"__gradient__0", "-.25"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus(
-      {{"a", "3"}, {"b", "3"}, {"__gradient__0", "0"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus(
-      {{"a", "4"}, {"b", "1"}, {"__gradient__0", ".5"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus(
-      {{"a", "5"}, {"b", "2"}, {"__gradient__0", "0"}}));
-  RETURN_IF_ERROR(dataset.AppendExampleWithStatus(
-      {{"a", "6"}, {"b", "3"}, {"__gradient__0", ".25"}}));
   return dataset;
 }
 
@@ -117,7 +94,10 @@ TEST_P(MultinomialLogLikelihoodLossTest, InitialPredictions) {
   }
 
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+      {{},
+       {},
+       model::proto::Task::CLASSIFICATION,
+       dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 1, weights));
@@ -132,10 +112,12 @@ TEST(MultinomialLogLikelihoodLossTest, UpdateGradients) {
   std::vector<GradientData> gradients;
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f};
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+      {{},
+       {},
+       model::proto::Task::CLASSIFICATION,
+       dataset.data_spec().columns(1)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 1,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 1, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
 
@@ -154,11 +136,13 @@ TEST(MultinomialLogLikelihoodLossTest, UpdateGradients) {
                                     FloatNear(-1.f / 3.f, kTestPrecision)));
 }
 
-
 TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+      {{},
+       {},
+       model::proto::Task::CLASSIFICATION,
+       dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
 }
 
@@ -176,12 +160,11 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLoss) {
           (label_column.categorical().number_of_unique_values() - 1),
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, label_column);
+      {{}, {}, model::proto::Task::CLASSIFICATION, label_column});
   LossResults loss_results;
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(loss_results,
                          loss_imp.Loss(dataset,
                                        /* label_col_idx= */ 1, predictions,
@@ -224,12 +207,11 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
           (label_column.categorical().number_of_unique_values() - 1),
       0.f);
   const MultinomialLogLikelihoodLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, label_column);
+      {{}, {}, model::proto::Task::CLASSIFICATION, label_column});
   LossResults loss_results;
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         4, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK_AND_ASSIGN(
         loss_results,
         loss_imp.Loss(dataset,

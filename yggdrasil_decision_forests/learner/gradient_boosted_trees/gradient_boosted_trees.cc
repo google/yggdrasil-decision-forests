@@ -89,54 +89,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
 
-constexpr char GradientBoostedTreesLearner::kRegisteredName[];
-
-// Generic hyper parameter names.
-constexpr char GradientBoostedTreesLearner::kHParamNumTrees[];
-constexpr char GradientBoostedTreesLearner::kHParamShrinkage[];
-constexpr char GradientBoostedTreesLearner::kHParamL1Regularization[];
-constexpr char GradientBoostedTreesLearner::kHParamL2Regularization[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamL2CategoricalRegularization[];
-constexpr char GradientBoostedTreesLearner::kHParamLambdaLoss[];
-constexpr char GradientBoostedTreesLearner::kHParamDartDropOut[];
-constexpr char GradientBoostedTreesLearner::
-    kHParamAdaptSubsampleForMaximumTrainingDuration[];
-constexpr char GradientBoostedTreesLearner::kHParamUseHessianGain[];
-constexpr char GradientBoostedTreesLearner::kHParamSamplingMethod[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodNone[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodRandom[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodGOSS[];
-constexpr char GradientBoostedTreesLearner::kSamplingMethodSelGB[];
-constexpr char GradientBoostedTreesLearner::kHParamGossAlpha[];
-constexpr char GradientBoostedTreesLearner::kHParamGossBeta[];
-constexpr char GradientBoostedTreesLearner::kHParamSelGBRatio[];
-constexpr char GradientBoostedTreesLearner::kHParamSubsample[];
-
-constexpr char GradientBoostedTreesLearner::kHParamForestExtraction[];
-constexpr char GradientBoostedTreesLearner::kHParamForestExtractionMart[];
-constexpr char GradientBoostedTreesLearner::kHParamForestExtractionDart[];
-
-constexpr char GradientBoostedTreesLearner::kHParamValidationSetRatio[];
-constexpr char GradientBoostedTreesLearner::kHParamEarlyStopping[];
-constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingNone[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamEarlyStoppingMinLossFullModel[];
-constexpr char GradientBoostedTreesLearner::kHParamEarlyStoppingLossIncrease[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamEarlyStoppingInitialIteration[];
-constexpr char GradientBoostedTreesLearner::kHParamApplyLinkFunction[];
-constexpr char
-    GradientBoostedTreesLearner::kHParamComputePermutationVariableImportance[];
-constexpr char GradientBoostedTreesLearner::kHParamValidationIntervalInTrees[];
-constexpr char GradientBoostedTreesLearner::kHParamLoss[];
-constexpr char GradientBoostedTreesLearner::kHParamFocalLossGamma[];
-constexpr char GradientBoostedTreesLearner::kHParamFocalLossAlpha[];
-constexpr char GradientBoostedTreesLearner::kHParamNDCGTruncation[];
-constexpr char GradientBoostedTreesLearner::kHParamXENDCGTruncation[];
-
 using dataset::VerticalDataset;
 using CategoricalColumn = VerticalDataset::CategoricalColumn;
 using EarlyStopping = ::yggdrasil_decision_forests::learner::
@@ -262,6 +214,7 @@ absl::Status FinalizeModelWithValidationDataset(
     const dataset::VerticalDataset& validation_dataset, const int num_threads,
     GradientBoostedTreesModel* mdl) {
   std::vector<float> final_secondary_metrics;
+  std::string log_snippet;
   if (config.gbt_config->early_stopping() ==
           proto::GradientBoostedTreesTrainingConfig::
               MIN_VALIDATION_LOSS_ON_FULL_MODEL ||
@@ -315,17 +268,21 @@ absl::Status FinalizeModelWithValidationDataset(
                "stopping completely with 'early_stopping=NONE'.";
       }
     }
+
+    // Final snippet
+    absl::StrAppendFormat(
+        &log_snippet, "Final model num-trees:%d valid-loss:%f",
+        early_stopping.best_num_trees() / mdl->num_trees_per_iter(),
+        mdl->validation_loss());
   } else {
     mdl->set_validation_loss(early_stopping.last_loss());
     final_secondary_metrics = early_stopping.last_metrics();
-  }
 
-  // Final snippet
-  std::string snippet;
-  absl::StrAppendFormat(
-      &snippet, "Final model num-trees:%d valid-loss:%f",
-      early_stopping.best_num_trees() / mdl->num_trees_per_iter(),
-      mdl->validation_loss());
+    // Final snippet
+    absl::StrAppendFormat(
+        &log_snippet, "Final model num-trees:%d valid-loss:%f",
+        mdl->NumTrees() / mdl->num_trees_per_iter(), mdl->validation_loss());
+  }
 
   if (!final_secondary_metrics.empty()) {
     for (int secondary_metric_idx = 0;
@@ -333,12 +290,12 @@ absl::Status FinalizeModelWithValidationDataset(
          mdl->training_logs().secondary_metric_names().size();
          secondary_metric_idx++) {
       absl::StrAppendFormat(
-          &snippet, " valid-%s:%f",
+          &log_snippet, " valid-%s:%f",
           mdl->training_logs().secondary_metric_names(secondary_metric_idx),
           final_secondary_metrics[secondary_metric_idx]);
     }
   }
-  LOG(INFO) << snippet;
+  LOG(INFO) << log_snippet;
 
   if (config.gbt_config->compute_permutation_variable_importance()) {
     LOG(INFO) << "Compute permutation variable importances";
@@ -583,7 +540,8 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
       CreateLoss(all_config->gbt_config->loss(),
                  all_config->train_config.task(),
                  data_spec.columns(all_config->train_config_link.label()),
-                 *all_config->gbt_config, custom_loss_functions_));
+                 *all_config->gbt_config, all_config->train_config_link,
+                 custom_loss_functions_));
 
   if (all_config->loss->RequireGroupingAttribute()) {
     if (!all_config->gbt_config->validation_set_group_feature().empty()) {
@@ -715,7 +673,6 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
               << " threads";
     thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
         "GBTLossThreadpool", deployment_.num_threads());
-    thread_pool->StartWorkers();
   }
 
   // Split the shards between train and validation.
@@ -1286,8 +1243,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   std::vector<float> sub_train_predictions;
   // Initialize the gradient dataset.
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      sub_train_dataset, config.train_config_link.label(),
-      config.gbt_config->use_hessian_gain(), *config.loss,
+      sub_train_dataset, config.train_config_link.label(), *config.loss,
       &gradient_sub_train_dataset, &gradients, &sub_train_predictions));
   // Note: At each iteration, one tree is created for each gradient dimensions.
   mdl->num_trees_per_iter_ = gradients.size();
@@ -1295,8 +1251,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   dataset::VerticalDataset gradient_validation_dataset;
   std::vector<float> validation_predictions;
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      validation_dataset, config.train_config_link.label(),
-      config.gbt_config->use_hessian_gain(), *config.loss,
+      validation_dataset, config.train_config_link.label(), *config.loss,
       &gradient_validation_dataset,
       /*gradients=*/nullptr, &validation_predictions));
 
@@ -1350,19 +1305,13 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     }
   }
 
-  std::unique_ptr<RankingGroupsIndices> train_ranking_index;
-  std::unique_ptr<RankingGroupsIndices> valid_ranking_index;
-  if (mdl->task() == model::proto::Task::RANKING) {
-    train_ranking_index = std::make_unique<RankingGroupsIndices>();
-    RETURN_IF_ERROR(train_ranking_index->Initialize(
-        sub_train_dataset, config.train_config_link.label(),
-        config.train_config_link.ranking_group()));
-    if (has_validation_dataset) {
-      valid_ranking_index = std::make_unique<RankingGroupsIndices>();
-      RETURN_IF_ERROR(valid_ranking_index->Initialize(
-          validation_dataset, config.train_config_link.label(),
-          config.train_config_link.ranking_group()));
-    }
+  std::unique_ptr<AbstractLossCache> train_loss_cache;
+  std::unique_ptr<AbstractLossCache> valid_loss_cache;
+  ASSIGN_OR_RETURN(train_loss_cache,
+                   config.loss->CreateLossCache(sub_train_dataset));
+  if (has_validation_dataset) {
+    ASSIGN_OR_RETURN(valid_loss_cache,
+                     config.loss->CreateLossCache(validation_dataset));
   }
 
   proto::TrainingLogs& training_logs = mdl->training_logs_;
@@ -1394,6 +1343,13 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
             vector_sequence_columns, /*use_gpu=*/deployment_.use_gpu()));
   }
 
+  std::optional<size_t> total_num_nodes;
+  size_t current_num_nodes = 0;
+  if (config.gbt_config->has_total_max_num_nodes() &&
+      config.gbt_config->total_max_num_nodes() >= 0) {
+    total_num_nodes = config.gbt_config->total_max_num_nodes();
+  }
+
   // Time of the next snapshot if training resume is enabled.
   auto next_snapshot =
       absl::Now() +
@@ -1421,7 +1377,6 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
               << " threads for loss computation";
     thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
         "GBTLossThreadpool", deployment_.num_threads());
-    thread_pool->StartWorkers();
   }
 
   // Try to resume training.
@@ -1467,7 +1422,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     // Compute the gradient of the residual relative to the examples.
     RETURN_IF_ERROR(config.loss->UpdateGradients(
         gradient_sub_train_dataset, config.train_config_link.label(),
-        sub_train_predictions, train_ranking_index.get(), &gradients, &random,
+        sub_train_predictions, train_loss_cache.get(), &gradients, &random,
         thread_pool.get()));
 
     float subsample_factor = 1.f;
@@ -1491,13 +1446,15 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
             &random, &selected_examples, &goss_weights);
         break;
       case proto::GradientBoostedTreesTrainingConfig::
-          kSelectiveGradientBoosting:
+          kSelectiveGradientBoosting: {
+        ASSIGN_OR_RETURN(const RankingGroupsIndices* ranking_index,
+                         train_loss_cache->ranking_indices());
         RETURN_IF_ERROR(internal::SampleTrainingExamplesWithSelGB(
-            mdl->task(), gradient_sub_train_dataset.nrow(),
-            train_ranking_index.get(), sub_train_predictions,
+            mdl->task(), gradient_sub_train_dataset.nrow(), ranking_index,
+            sub_train_predictions,
             config.gbt_config->selective_gradient_boosting().ratio(),
             &selected_examples));
-        break;
+      } break;
       case proto::GradientBoostedTreesTrainingConfig::
           kStochasticGradientBoosting:
       case proto::GradientBoostedTreesTrainingConfig::SAMPLING_METHODS_NOT_SET:
@@ -1575,6 +1532,17 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
       }
     }
 
+    if (total_num_nodes.has_value()) {
+      for (auto& tree : new_trees) {
+        current_num_nodes += tree->NumNodes();
+      }
+      if (current_num_nodes > *total_num_nodes) {
+        LOG(INFO) << "Model has reached the maximum number of nodes, stopping "
+                     "training.";
+        break;
+      }
+    }
+
     // Add the tree to the model.
     for (auto& tree : new_trees) {
       mdl->AddTree(std::move(tree));
@@ -1587,7 +1555,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           config.loss->Loss(gradient_sub_train_dataset,
                             config.train_config_link.label(),
                             sub_train_predictions, weights,
-                            train_ranking_index.get(), thread_pool.get()));
+                            train_loss_cache.get(), thread_pool.get()));
 
       auto* log_entry = training_logs.mutable_entries()->Add();
       log_entry->set_number_of_trees(iter_idx + 1);
@@ -1621,7 +1589,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
             config.loss->Loss(gradient_validation_dataset,
                               config.train_config_link.label(),
                               validation_predictions, validation_weights,
-                              valid_ranking_index.get(), thread_pool.get()));
+                              valid_loss_cache.get(), thread_pool.get()));
         log_entry->set_validation_loss(validation_loss_result.loss);
         *log_entry->mutable_validation_secondary_metrics() = {
             validation_loss_result.secondary_metrics.begin(),
@@ -2039,6 +2007,13 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamTotalMaxNumNodes);
+    if (hparam.has_value()) {
+      gbt_config->set_total_max_num_nodes(hparam.value().value().integer());
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -2440,7 +2415,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
         gbt_config.validation_interval_in_trees());
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Evaluate the model on the validation set every "validation_interval_in_trees" trees. Increasing this value reduce the cost of validation and can impact the early stopping policy (as early stopping is only tested during the validation).)");
+        R"(Evaluate the model on the validation set every "validation_interval_in_trees" trees. Increasing this value reduces the cost of validation and can impact the early stopping policy (as early stopping is only tested during the validation).)");
   }
 
   {
@@ -2551,6 +2526,17 @@ For example, in the case of binary classification, the pre-link function output 
         kHParamFocalLossGamma);
   }
 
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamTotalMaxNumNodes);
+    param.mutable_integer()->set_minimum(-1);
+    param.mutable_integer()->set_default_value(
+        gbt_config.total_max_num_nodes());
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Limit the total number of nodes in the model over all trees. This limit is an upper bound that may not be reached exactly. If the value is smaller than the number of nodes of a single tree according to other hyperparameter, the learner may return an empty model. This hyperparameter is useful for hyperparameter tuning models with very few nodes for small model size and fast inference. For training individual models, prefer adapting max_num_nodes / max_depth and num_trees. Set to -1 (default) for no limit.)");
+  }
+
   RETURN_IF_ERROR(decision_tree::GetGenericHyperParameterSpecification(
       gbt_config.decision_tree(), &hparam_def));
   return hparam_def;
@@ -2583,7 +2569,6 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
   internal_config.hessian_l2_numerical = config.gbt_config->l2_regularization();
   internal_config.hessian_l2_categorical =
       config.gbt_config->l2_regularization_categorical();
-  internal_config.num_threads = num_threads;
   internal_config.duplicated_selected_examples = false;
   internal_config.timeout = timeout;
   internal_config.split_finder_processor = split_finder_processor;
@@ -2625,6 +2610,10 @@ absl::StatusOr<proto::Loss> DefaultLoss(
     return proto::Loss::LAMBDA_MART_NDCG;
   }
 
+  if (task == model::proto::Task::SURVIVAL_ANALYSIS) {
+    return proto::Loss::COX_PROPORTIONAL_HAZARD;
+  }
+
   return absl::InvalidArgumentError(
       "No defined default loss for this combination of label type and task");
 }
@@ -2651,8 +2640,7 @@ LoadCompleteDatasetForWeakLearner(
                                       &complete_dataset->weights));
 
   RETURN_IF_ERROR(internal::CreateGradientDataset(
-      complete_dataset->dataset, config.train_config_link.label(),
-      config.gbt_config->use_hessian_gain(), *config.loss,
+      complete_dataset->dataset, config.train_config_link.label(), *config.loss,
       &complete_dataset->gradient_dataset,
       allocate_gradient ? &complete_dataset->gradients : nullptr,
       &complete_dataset->predictions));
@@ -2758,7 +2746,6 @@ absl::Status ExtractValidationDataset(const VerticalDataset& dataset,
 
 absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
                                    const int label_col_idx,
-                                   const bool hessian_splits,
                                    const AbstractLoss& loss_impl,
                                    dataset::VerticalDataset* gradient_dataset,
                                    std::vector<GradientData>* gradients,

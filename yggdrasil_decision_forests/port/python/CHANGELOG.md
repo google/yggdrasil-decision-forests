@@ -4,7 +4,87 @@
 
 ### Feature
 
--   Support Python 3.13.
+-   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random 
+    Forest Learner to retrieve the indices of the in-bag samples used for
+    training each tree.
+
+## 0.13.0 - 2025-07-15
+
+### API Changes
+
+-   For Random Forest models, `.out_of_bag_evaluations()` now returns a
+    TrainingLogs object. The content is identical to the object previously
+    returned, but the `number_of_trees` property has been renamed to
+    `iteration` for consistency with Gradient Boosted Trees Training Logs.
+-   `mode="tf"` is now the default on `model.to_tensorflow_saved_model()`. The
+    previous default is still available by setting `mode="keras"`.
+-   `model.label()` returns None for models trained without label.
+-   Remove deprecated `evaluation_task` argument for `model.evaluate()`. Use
+    `task` instead.
+
+### Feature
+
+-   Add standalone C++ export with `model.to_standalone_cc()`. Standalone models
+    are super flexible, fast and memory-efficient. They only depend on the C++
+    standard library.
+-   Add `model.training_logs()` method to return the training logs of the model.
+-   Expose Mean Average Precision for Ranking tasks.
+-   Add hyperparameters
+    `numerical_vector_sequence_enable_closer_than_conditions` and
+    `numerical_vector_sequence_enable_projected_more_than_conditions`.
+-   Clear error messages when attempting to evaluate models without label.
+-   Faster training with sparse oblique splits for datasets with many numerical
+    features
+-   Many documentation improvements.
+-   Increase default number of threads to 256 or number of CPU cores.
+-   Enable cross-validation for hyperparameter tuning.
+-   Add thresholds to classification plots.
+-   Explicitly disable custom losses for hyperparameter tuning.
+-   Disable parallel evaluation for cross-validation custom losses.
+
+### Fix
+
+-   Distributed Training: Add `recvmsg: Connection reset to isTransientError` error.
+-   Enable SHAP values when training with BEST_FIRST_GLOBAL.
+-   Predictions with cross-entropy LambdaMART no longer need the slow engine.
+-   Disable the generic engine for oblique splits without global imputation. 
+    This may fix a very rare bug in the way predictions are computed.
+
+### Release music
+
+Sinfonie Nr. 4 in A-Dur, op. 90. Felix Mendelssohn
+
+## 0.12.0 - 2025-05-20
+
+### Feature
+
+-   Enable support for Python 3.13.
+-   Add custom fields to model metadata.
+-   Add SHAP value variable importances with `model.analyze()`.
+-   Add SHAP values for a dataset with `model.predict_shap()`.
+-   Speed-up (up to 20x) training of models with CATEGORICAL_SET features.
+-   Add hyper-parameter to limit the mask size for CATEGORICAL_SET features.
+-   Add hyper-parameter `total_max_num_nodes` to limit the total number of nodes in a model.
+-   Add support for na_replacements in python tree editor API.
+-   Add support for include_all_columns in FeatureSelector.
+-   Add the `ydf.utils.LogBook` to manage and track experiments.
+-   Speed-up training of NDCG ranking model when a single example per group
+    is non-zero.
+-   Speed-up training on datasets with few columns on a computer with a
+    large amount of cores.
+-   Speed-up loss computation multi-threading code.
+-   Improve distributed training error messages.
+-   Remove need for label columns for deep learning models.
+
+### Fix
+
+-   Log message if early stopping is not used.
+-   Fix force_numerical_discretization errors and documentation.
+-   Fix handling of empty list columns in the dataset.
+
+### Release music
+
+Kindersinfonie (Berchtoldsgaden Musick). Unknown
 
 ## 0.11.0 - 2025-03-12
 

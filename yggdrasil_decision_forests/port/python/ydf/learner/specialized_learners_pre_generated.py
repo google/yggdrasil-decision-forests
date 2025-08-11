@@ -32,10 +32,11 @@ compilation.
 
 # pytype: skip-file
 # TODO: b/362480899 - Re-enable typing after pytype issue is fixed.
-from typing import Dict, Optional, Sequence, Set, Union
+from typing import Dict, List, Optional, Sequence, Set, Union
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
+from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
@@ -184,6 +185,11 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       algorithm is inspired from section "5.1 Categorical Variables" of "Random
       Forest", 2001.
         Default: "CART".
+    categorical_set_split_greedy_maximum_mask_size: For categorical set splits
+      e.g. texts. Maximum number of attribute values on the positive side of the
+      split mask. Smaller values might improve training speed but lead to worse
+      models. Setting this parameter to 1 is equal to one-hot encoding the
+      attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
       positive set. The sampling is applied once per node (i.e. not at every
@@ -298,6 +304,16 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
     num_trees: Number of individual decision trees. Increasing the number of
       trees can increase the quality of the model at the expense of size,
       training speed, and inference latency. Default: 300.
+    numerical_vector_sequence_enable_closer_than_conditions: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). If true, enable conditions of type |x-A|^2 <= T for learned
+      anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
+    numerical_vector_sequence_enable_projected_more_than_conditions: For
+      datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+      fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+      for learned anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
     numerical_vector_sequence_num_examples: For datasets with
       NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
       vectors). Maximum number of examples to use to find splits. A larger value
@@ -435,9 +451,9 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -476,6 +492,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       bootstrap_size_ratio: float = 1.0,
       bootstrap_training_dataset: bool = True,
       categorical_algorithm: str = "CART",
+      categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
@@ -499,6 +516,8 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       num_candidate_attributes_ratio: Optional[float] = None,
       num_oob_variable_importances_permutations: int = 1,
       num_trees: int = 300,
+      numerical_vector_sequence_enable_closer_than_conditions: bool = True,
+      numerical_vector_sequence_enable_projected_more_than_conditions: bool = True,
       numerical_vector_sequence_num_examples: int = 1000,
       numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
@@ -536,6 +555,9 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         "bootstrap_size_ratio": bootstrap_size_ratio,
         "bootstrap_training_dataset": bootstrap_training_dataset,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_set_split_greedy_maximum_mask_size": (
+            categorical_set_split_greedy_maximum_mask_size
+        ),
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
         ),
@@ -569,6 +591,12 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             num_oob_variable_importances_permutations
         ),
         "num_trees": num_trees,
+        "numerical_vector_sequence_enable_closer_than_conditions": (
+            numerical_vector_sequence_enable_closer_than_conditions
+        ),
+        "numerical_vector_sequence_enable_projected_more_than_conditions": (
+            numerical_vector_sequence_enable_projected_more_than_conditions
+        ),
         "numerical_vector_sequence_num_examples": (
             numerical_vector_sequence_num_examples
         ),
@@ -667,7 +695,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.RandomForestLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -701,6 +729,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=True,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=True,
     )
 
   @classmethod
@@ -752,6 +781,62 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             },
         ),
     }
+
+  def in_bag_example_indices(
+      self, *, num_examples: int, tree_idx: int
+  ) -> List[int]:
+    r"""Returns the indices of the in-bag samples used for training a specific tree.
+
+    During the training of a Random Forest model, each tree is typically trained
+    on a bootstrap sample (a random sample with replacement) of the original
+    training dataset. This function allows you to retrieve the indices of the
+    examples from the original dataset that were included in the bootstrap
+    sample used to train the tree at the given index `tree_idx`.
+
+    Note that this method only returns reliable results when it is run with the
+    same YDF build on the same machine as used when training the model. The
+    sequence of indices depends on the random seed used during training as
+    configured in the `random_seed` hyperparameter.
+
+    Usage example:
+    ```python
+    import ydf
+    import pandas as pd
+
+    dataset = pd.read_csv("data.csv")
+    # Train a Random Forest model with 10 trees.
+    learner = ydf.RandomForestLearner(label="label", num_trees=10,
+    random_seed=1234)
+    model = learner.train(dataset)
+
+    # Get the indices for the 3rd tree (index 2).
+    indices = learner.in_bag_example_indices(
+        num_examples=dataset.shape[0], tree_idx=2
+    )
+    print(f"Indices for tree 2: {indices}")
+    ```
+
+    Args:
+      num_examples: The total number of examples in the training dataset that
+        the model is trained on. This should match the number of rows in the
+        training data.
+      tree_idx: The 0-based index of the tree within the forest for which to
+        retrieve the in-bag indices. This must be between 0 and `num_trees - 1`.
+
+    Returns:
+      A sorted list of integers representing the 0-based indices of the training
+      examples that were sampled to form the training set for the specified
+      tree.
+      The list will contain duplicates if an example was sampled multiple times.
+    """
+    if num_examples <= 0:
+      raise ValueError(
+          f"The number of examples must be positive, got {num_examples}"
+      )
+    if tree_idx < 0:
+      raise ValueError(f"The tree index must not be negative, got {tree_idx}")
+    learner = self._get_learner()
+    return learner.BootstrappingIndices(num_examples, tree_idx)
 
 
 class IsolationForestLearner(generic_learner.GenericCCLearner):
@@ -943,9 +1028,9 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -1091,7 +1176,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.IsolationForestLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -1125,6 +1210,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=False,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod
@@ -1269,6 +1355,11 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       algorithm is inspired from section "5.1 Categorical Variables" of "Random
       Forest", 2001.
         Default: "CART".
+    categorical_set_split_greedy_maximum_mask_size: For categorical set splits
+      e.g. texts. Maximum number of attribute values on the positive side of the
+      split mask. Smaller values might improve training speed but lead to worse
+      models. Setting this parameter to 1 is equal to one-hot encoding the
+      attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
       positive set. The sampling is applied once per node (i.e. not at every
@@ -1451,6 +1542,16 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       tree can be smaller if early stopping is enabled. For multi-class
       classification problems, the number of decision trees is at most this
       parameter times the number of classes. Default: 300.
+    numerical_vector_sequence_enable_closer_than_conditions: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). If true, enable conditions of type |x-A|^2 <= T for learned
+      anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
+    numerical_vector_sequence_enable_projected_more_than_conditions: For
+      datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+      fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+      for learned anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
     numerical_vector_sequence_num_examples: For datasets with
       NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
       vectors). Maximum number of examples to use to find splits. A larger value
@@ -1583,6 +1684,14 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       \\"sampling_method\\" is implicitly set to \\"RANDOM\\". In other words,
       to enable random subsampling, you only need to set "\\"subsample\\".
       Default: 1.0.
+    total_max_num_nodes: Limit the total number of nodes in the model over all
+      trees. This limit is an upper bound that may not be reached exactly. If
+      the value is smaller than the number of nodes of a single tree according
+      to other hyperparameter, the learner may return an empty model. This
+      hyperparameter is useful for hyperparameter tuning models with very few
+      nodes for small model size and fast inference. For training individual
+      models, prefer adapting max_num_nodes / max_depth and num_trees. Set to -1
+      (default) for no limit. Default: -1.
     uplift_min_examples_in_treatment: For uplift models only. Minimum number of
       examples per treatment in a node. Default: 5.
     uplift_split_score: For uplift models only. Splitter score i.e. score
@@ -1597,7 +1706,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       term i.e. optimizes the splits to minimize the variance of "gradient /
       hessian. Available for all losses except regression. Default: False.
     validation_interval_in_trees: Evaluate the model on the validation set every
-      "validation_interval_in_trees" trees. Increasing this value reduce the
+      "validation_interval_in_trees" trees. Increasing this value reduces the
       cost of validation and can impact the early stopping policy (as early
       stopping is only tested during the validation). Default: 1.
     validation_ratio: Fraction of the training dataset used for validation if
@@ -1630,9 +1739,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -1670,6 +1779,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       allow_na_conditions: bool = False,
       apply_link_function: bool = True,
       categorical_algorithm: str = "CART",
+      categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
@@ -1707,6 +1817,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
       num_trees: int = 300,
+      numerical_vector_sequence_enable_closer_than_conditions: bool = True,
+      numerical_vector_sequence_enable_projected_more_than_conditions: bool = True,
       numerical_vector_sequence_num_examples: int = 1000,
       numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
@@ -1727,6 +1839,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       sparse_oblique_weights_power_of_two_min_exponent: Optional[int] = None,
       split_axis: str = "AXIS_ALIGNED",
       subsample: float = 1.0,
+      total_max_num_nodes: int = -1,
       uplift_min_examples_in_treatment: int = 5,
       uplift_split_score: str = "KULLBACK_LEIBLER",
       use_hessian_gain: bool = False,
@@ -1751,6 +1864,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "allow_na_conditions": allow_na_conditions,
         "apply_link_function": apply_link_function,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_set_split_greedy_maximum_mask_size": (
+            categorical_set_split_greedy_maximum_mask_size
+        ),
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
         ),
@@ -1800,6 +1916,12 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
         "num_trees": num_trees,
+        "numerical_vector_sequence_enable_closer_than_conditions": (
+            numerical_vector_sequence_enable_closer_than_conditions
+        ),
+        "numerical_vector_sequence_enable_projected_more_than_conditions": (
+            numerical_vector_sequence_enable_projected_more_than_conditions
+        ),
         "numerical_vector_sequence_num_examples": (
             numerical_vector_sequence_num_examples
         ),
@@ -1838,6 +1960,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         ),
         "split_axis": split_axis,
         "subsample": subsample,
+        "total_max_num_nodes": total_max_num_nodes,
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
         "uplift_split_score": uplift_split_score,
         "use_hessian_gain": use_hessian_gain,
@@ -1906,7 +2029,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.GradientBoostedTreesLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -1940,6 +2063,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=True,
         require_label=True,
         support_custom_loss=True,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod
@@ -2196,9 +2320,9 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -2348,7 +2472,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.DistributedGradientBoostedTreesLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -2382,6 +2506,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=True,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod
@@ -2514,6 +2639,11 @@ class CartLearner(generic_learner.GenericCCLearner):
       algorithm is inspired from section "5.1 Categorical Variables" of "Random
       Forest", 2001.
         Default: "CART".
+    categorical_set_split_greedy_maximum_mask_size: For categorical set splits
+      e.g. texts. Maximum number of attribute values on the positive side of the
+      split mask. Smaller values might improve training speed but lead to worse
+      models. Setting this parameter to 1 is equal to one-hot encoding the
+      attribute values. Set to -1 for no maximum (default). Default: -1.
     categorical_set_split_greedy_sampling: For categorical set splits e.g.
       texts. Probability for a categorical value to be a candidate for the
       positive set. The sampling is applied once per node (i.e. not at every
@@ -2614,6 +2744,16 @@ class CartLearner(generic_learner.GenericCCLearner):
       number_of_input_features x num_candidate_attributes_ratio`. The possible
       values are between ]0, and 1] as well as -1. If not set or equal to -1,
       the `num_candidate_attributes` is used. Default: None.
+    numerical_vector_sequence_enable_closer_than_conditions: For datasets with
+      NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
+      vectors). If true, enable conditions of type |x-A|^2 <= T for learned
+      anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
+    numerical_vector_sequence_enable_projected_more_than_conditions: For
+      datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+      fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+      for learned anchor A and threshold T, and any vector x in the sequence.
+      Default: True.
     numerical_vector_sequence_num_examples: For datasets with
       NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of fixed-size numerical
       vectors). Maximum number of examples to use to find splits. A larger value
@@ -2744,9 +2884,9 @@ class CartLearner(generic_learner.GenericCCLearner):
     num_threads: Number of threads used to train the model. Different learning
       algorithms use multi-threading differently and with different degree of
       efficiency. If `None`, `num_threads` will be automatically set to the
-      number of processors (up to a maximum of 32; or set to 6 if the number of
-      processors is not available). Making `num_threads` significantly larger
-      than the number of processors can slow-down the training speed. The
+      number of processors (up to a maximum of 256; or set to 6 if the number of
+      processors cannot be determined). Making `num_threads` significantly
+      larger than the number of processors can slow-down the training speed. The
       default value logic might change in the future.
     tuner: If set, automatically select the best hyperparameters using the
       provided tuner. When using distributed training, the tuning is
@@ -2782,6 +2922,7 @@ class CartLearner(generic_learner.GenericCCLearner):
       ] = None,
       allow_na_conditions: bool = False,
       categorical_algorithm: str = "CART",
+      categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
       categorical_set_split_min_item_frequency: int = 1,
@@ -2801,6 +2942,8 @@ class CartLearner(generic_learner.GenericCCLearner):
       missing_value_policy: str = "GLOBAL_IMPUTATION",
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
+      numerical_vector_sequence_enable_closer_than_conditions: bool = True,
+      numerical_vector_sequence_enable_projected_more_than_conditions: bool = True,
       numerical_vector_sequence_num_examples: int = 1000,
       numerical_vector_sequence_num_random_anchors: int = 100,
       pure_serving_model: bool = False,
@@ -2832,6 +2975,9 @@ class CartLearner(generic_learner.GenericCCLearner):
     hyper_parameters = {
         "allow_na_conditions": allow_na_conditions,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_set_split_greedy_maximum_mask_size": (
+            categorical_set_split_greedy_maximum_mask_size
+        ),
         "categorical_set_split_greedy_sampling": (
             categorical_set_split_greedy_sampling
         ),
@@ -2859,6 +3005,12 @@ class CartLearner(generic_learner.GenericCCLearner):
         "missing_value_policy": missing_value_policy,
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
+        "numerical_vector_sequence_enable_closer_than_conditions": (
+            numerical_vector_sequence_enable_closer_than_conditions
+        ),
+        "numerical_vector_sequence_enable_projected_more_than_conditions": (
+            numerical_vector_sequence_enable_projected_more_than_conditions
+        ),
         "numerical_vector_sequence_num_examples": (
             numerical_vector_sequence_num_examples
         ),
@@ -2956,7 +3108,7 @@ class CartLearner(generic_learner.GenericCCLearner):
 
     learner = ydf.CartLearner(label="label")
     model = learner.train(train_ds)
-    print(model.summary())
+    print(model.describe())
     ```
 
     If training is interrupted (for example, by interrupting the cell execution
@@ -2990,6 +3142,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         support_monotonic_constraints=False,
         require_label=True,
         support_custom_loss=False,
+        support_return_in_bag_example_indices=False,
     )
 
   @classmethod

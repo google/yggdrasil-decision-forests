@@ -158,6 +158,7 @@ class CARTLearnerTest(learner_test_utils.LearnerTest):
         label="label",
         max_depth=2,
         split_axis="SPARSE_OBLIQUE",
+        sparse_oblique_num_projections_exponent=4.0,
         sparse_oblique_weights="POWER_OF_TWO",
     )
     f1 = np.linspace(-1, 1, 50) ** 2
@@ -304,6 +305,15 @@ class CARTLearnerTest(learner_test_utils.LearnerTest):
     evaluation = model.evaluate("csv:" + data_path)
     self.assertEqual(evaluation.accuracy, 1)
     model.save(model_path)
+
+  def test_label_stored_in_model(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "my_label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.CartLearner(label="my_label").train(ds)
+    self.assertEqual(model.label_col_idx(), 0)
+    self.assertEqual(model.label(), "my_label")
 
 
 if __name__ == "__main__":

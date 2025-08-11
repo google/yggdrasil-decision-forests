@@ -255,6 +255,24 @@ Num thresholds: {len(self.per_threshold)}
         np.float32,
     )
 
+  def precision_at_recall(self, recall: float) -> float:
+    """Computes the precision at a given recall.
+
+    Args:
+      recall: The target recall value.
+
+    Returns:
+      The precision at the specified recall.
+    """
+
+    if recall <= 0.0:
+      # A recall of 0 is generally associated with a precision of 1.
+      return 1.0
+
+    return max_y_at_min_x(
+        xs=self.recalls, ys=self.precisions, x_min=recall, no_found_result=0.0
+    )
+
 
 @dataclasses.dataclass
 class Evaluation:
@@ -281,6 +299,7 @@ class Evaluation:
       bootstrapping. Only available for regression task.
     ndcg: Normalized Discounted Cumulative Gain. Used for ranking tasks.
     mrr: Mean Reciprocal Rank. Used for ranking tasks.
+    map: Mean Average Precision. Used for ranking tasks.
     qini: For uplifting.
     auuc: For uplifting.
     custom_metrics: User custom metrics dictionary.
@@ -347,8 +366,15 @@ class Evaluation:
 
   @property
   def accuracy(self) -> Optional[float]:
+    """Returns the accuracy for classification tasks and None otherwise."""
     if self._evaluation_proto.HasField("classification"):
       clas = self._evaluation_proto.classification
+      # If the accuracy is stored in the proto, just return it
+      if clas.HasField("accuracy"):
+        return clas.accuracy
+
+      # If the accuracy is not stored in the proto, try to compute it from the
+      # confusion table.
       classes = dataspec.categorical_column_dictionary_to_list(
           self._evaluation_proto.label_column
       )
@@ -475,6 +501,13 @@ class Evaluation:
         return rank.mrr.value
 
   @property
+  def map(self) -> Optional[float]:
+    if self._evaluation_proto.HasField("ranking"):
+      rank = self._evaluation_proto.ranking
+      if rank.HasField("map"):
+        return rank.map.value
+
+  @property
   def qini(self) -> Optional[float]:
     if self._evaluation_proto.HasField("uplift"):
       uplift = self._evaluation_proto.uplift
@@ -514,6 +547,7 @@ class Evaluation:
     add_item("rmse_ci95_bootstrap", self.rmse_ci95_bootstrap)
     add_item("ndcg", self.ndcg)
     add_item("mrr", self.mrr)
+    add_item("map", self.map)
     add_item("qini", self.qini)
     add_item("auuc", self.auuc)
     return output
@@ -537,3 +571,33 @@ def safe_div(a: float, b: float) -> float:
       )
     return 0.0
   return a / b
+
+
+def max_y_at_min_x(
+    xs: np.ndarray, ys: np.ndarray, x_min: float, no_found_result: float
+) -> float:
+  """Calculates the maximum value of "y" for "x >= x_min".
+
+  Given two aligned arrays xs and ys, return the maximum value of ys for xs >=
+  target_x.
+
+  Args:
+    xs: x values.
+    ys: y values.
+    x_min: The minimum allowed x value.
+    no_found_result: Value to return if no xs is >= x_min.
+
+  Returns:
+    The target y.
+  """
+
+  if len(xs) != len(ys):
+    raise ValueError("xs and ys should have the same size")
+
+  if len(xs) == 0:
+    raise ValueError("xs cannot be empty")
+
+  filtered_ys = ys[xs >= x_min]
+  if len(filtered_ys) == 0:
+    return no_found_result
+  return np.max(filtered_ys).item()

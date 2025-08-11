@@ -247,6 +247,16 @@ class TabularTransformerTest(parameterized.TestCase):
     self.assertEqual(model.name(), "TABULAR_TRANSFORMER")
     self.assertEqual(model.task(), generic_model_lib.Task.CLASSIFICATION)
 
+  def test_training_logs(self):
+    model: tabular_transformer.TabularTransformerModel = model_lib.load_model(
+        model_path("tabulartransformer_adult")
+    )
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        "Training logs are not available for this model type.",
+    ):
+      model.training_logs()
+
 
 if __name__ == "__main__":
   absltest.main()

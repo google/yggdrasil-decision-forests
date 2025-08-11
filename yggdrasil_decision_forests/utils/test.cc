@@ -54,8 +54,39 @@ std::string TmpDirectory() {
 void ExpectEqualGolden(
     absl::string_view content, absl::string_view path,
     const std::vector<std::pair<std::string, std::string>>& tokens_to_replace) {
-  ASSERT_OK_AND_ASSIGN(auto expected_content, file::GetContent(file::JoinPath(
-                                                  DataRootDirectory(), path)));
+  // Setup directory containing results details.
+  const std::string output_dir = file::JoinPath(TmpDirectory(), "golden");
+  ASSERT_OK(file::RecursivelyCreateDir(output_dir, file::Defaults()));
+  const std::string all_commands_path =
+      file::JoinPath(output_dir, absl::StrCat("all_commands.txt"));
+
+  // Call this method to add a line to the "all_commands.txt" file generated in
+  // the output directory.
+  const auto add_to_all_commands = [&all_commands_path](
+                                       absl::string_view command) {
+    static int first = true;
+    std::string all_commands;
+    if (!first) {
+      ASSERT_OK_AND_ASSIGN(all_commands, file::GetContent(all_commands_path));
+    }
+    LOG(INFO) << "New command added:\n" << all_commands_path;
+    absl::StrAppend(&all_commands, command, "\n");
+    ASSERT_OK(file::SetContent(all_commands_path, all_commands));
+    first = false;
+  };
+
+  // Check the existence of the golden file.
+  const std::string full_path = file::JoinPath(DataRootDirectory(), path);
+  ASSERT_OK_AND_ASSIGN(const bool golden_file_exists,
+                       file::FileExists(full_path));
+  if (!golden_file_exists) {
+    LOG(INFO) << "The following golden file does not exist:\n" << path;
+    add_to_all_commands(absl::StrCat("touch ", path));
+    EXPECT_TRUE(false);
+  }
+
+  ASSERT_OK_AND_ASSIGN(auto expected_content, file::GetContent(full_path));
+
   for (const auto& token : tokens_to_replace) {
     std::regex token_regex(absl::StrCat(R"(\$\{)", token.first, R"(\})"));
     expected_content =
@@ -88,16 +119,16 @@ void ExpectEqualGolden(
     }
 
     static int actual_idx = 0;
-    const std::string output_dir = file::JoinPath(TmpDirectory(), "golden");
-    ASSERT_OK(file::RecursivelyCreateDir(output_dir, file::Defaults()));
     const std::string output_path = file::JoinPath(
         output_dir, absl::StrCat("actual_", actual_idx, ".html"));
     const std::string expected_output_path = file::JoinPath(
-        output_dir, absl::StrCat("expected_", actual_idx++, ".html"));
+        output_dir, absl::StrCat("expected_", actual_idx, ".html"));
+
     LOG(INFO) << "Content saved to " << output_path;
     LOG(INFO) << "";
-    LOG(INFO) << "Update the golden file with:\ncp " << output_path << " "
-              << path;
+    const std::string cp_command = absl::StrCat("cp ", output_path, " ", path);
+    add_to_all_commands(cp_command);
+    LOG(INFO) << "Update the golden file with:\n" << cp_command;
     LOG(INFO) << "";
     LOG(INFO) << "Look at the difference between the fields with:\ndiff "
               << output_path << " " << path;
@@ -105,7 +136,9 @@ void ExpectEqualGolden(
     LOG(INFO) << "Expected: " << expected_output_path;
     ASSERT_OK(file::SetContent(expected_output_path, expected_content));
     ASSERT_OK(file::SetContent(output_path, content));
+
     EXPECT_TRUE(false);
+    actual_idx++;
   }
 }
 

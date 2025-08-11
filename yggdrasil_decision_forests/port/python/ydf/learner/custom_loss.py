@@ -110,7 +110,7 @@ class RegressionLoss(AbstractCustomLoss):
       memory accesses are disabled. This can be useful when training many small
       models or if the observed impact of triggering GC is large. If
       `may_trigger_gc=False`, it is very important that the user validate
-      manuallythat no memory leakage occurs.
+      manually that no memory leakage occurs.
   """
 
   initial_predictions: Callable[
@@ -247,7 +247,7 @@ class BinaryClassificationLoss(AbstractCustomLoss):
 class MultiClassificationLoss(AbstractCustomLoss):
   """A user-provided loss function for multi-class problems.
 
-  Note that the labels are but 1-based. Predictions are given in an 2D
+  Note that the labels are 1-based. Predictions are given in an 2D
   array with one row per example. Initial predictions, gradient and
   hessian are expected for each class, e.g. for a 3-class classification
   problem, output 3 gradients and hessians per class.

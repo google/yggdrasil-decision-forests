@@ -94,7 +94,6 @@ class MeanAverageErrorLossWeightAndThreadingTest
     const bool threaded = std::get<1>(GetParam()) == UseMultithreading::kYes;
     if (threaded) {
       thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>("", 6);
-      thread_pool_->StartWorkers();
     }
   }
 
@@ -113,9 +112,8 @@ TEST_P(MeanAverageErrorLossWeightTest, InitialPredictions) {
   const bool weighted = GetParam() == UseWeights::kYes;
   const std::vector<float> weights = CreateToyWeights(weighted);
 
-  const MeanAverageErrorLoss loss_imp(/*gbt_config=*/{},
-                                      model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
+  const MeanAverageErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
@@ -130,9 +128,8 @@ TEST(MeanAverageErrorLossTestNonWeighted, InitialPredictionsOdd) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset(false));
 
-  const MeanAverageErrorLoss loss_imp(/*gbt_config=*/{},
-                                      model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
+  const MeanAverageErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   EXPECT_THAT(
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, {}).value(),
       ElementsAre(2.f));
@@ -148,12 +145,10 @@ TEST_P(MeanAverageErrorLossWeightAndThreadingTest, UpdateGradients) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  const MeanAverageErrorLoss loss_imp(/*gbt_config=*/{},
-                                      model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
+  const MeanAverageErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 0, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   ASSERT_OK_AND_ASSIGN(
@@ -184,9 +179,8 @@ TEST_P(MeanAverageErrorLossWeightAndThreadingTest, ComputeLoss) {
   const std::vector<float> weights = CreateToyWeights(weighted);
 
   const std::vector<float> predictions(4, 0.f);
-  const MeanAverageErrorLoss loss_imp(/*gbt_config=*/{},
-                                      model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(0));
+  const MeanAverageErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
   LossResults loss_results;
   ASSERT_OK_AND_ASSIGN(
       loss_results, loss_imp.Loss(dataset,
@@ -221,9 +215,8 @@ TEST_P(MeanAverageErrorLossWeightAndThreadingTest, ComputeLoss) {
 TEST(MeanAverageErrorLossTest, SecondaryMetricNames) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const MeanAverageErrorLoss loss_imp(/*gbt_config=*/{},
-                                      model::proto::Task::REGRESSION,
-                                      dataset.data_spec().columns(1));
+  const MeanAverageErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("mae", "rmse"));
 }
 

@@ -49,6 +49,18 @@ struct ComputeFeatureImportanceOptions {
   int num_rounds = 1;
 };
 
+struct ComputeShapFeatureImportanceOptions {
+  // Number of threads used for the computation. Should be >=1.
+  int num_threads = 6;
+
+  // Maximum duration of the computation.
+  // Makes the computation non-deterministic.
+  std::optional<double> max_duration_seconds = std::nullopt;
+
+  // Fraction of examples to use.
+  float sampling = 1.f;
+};
+
 // Computes and adds to the model permutation feature importances.
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
@@ -76,6 +88,18 @@ absl::Status ComputePermutationFeatureImportance(
     const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
     ResultFeatureImportanceProto* output,
     const ComputeFeatureImportanceOptions& options = {});
+
+// Shap feature importances
+
+absl::Status ComputeShapFeatureImportance(
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportanceProto* output,
+    const ComputeShapFeatureImportanceOptions& options = {});
+
+absl::Status ComputeShapFeatureImportance(
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportance* output,
+    const ComputeShapFeatureImportanceOptions& options = {});
 
 // Builds a copy of the dataset with the values of the columns in
 // "shuffle_column_idxs" are shuffled randomly.

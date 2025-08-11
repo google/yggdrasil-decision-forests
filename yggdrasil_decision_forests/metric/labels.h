@@ -44,6 +44,8 @@ constexpr char kLabelNdcg[] = "NDCG";
 constexpr char kLabelNdcgConfidenceBoundsBootstrap95p[] = "NDCG CI95% [B]";
 constexpr char kLabelMrr[] = "MRR";
 constexpr char kLabelMrrConfidenceBoundsBootstrap95p[] = "MRR CI95% [B]";
+constexpr char kLabelMap[] = "MAP";
+constexpr char kLabelMapConfidenceBoundsBootstrap95p[] = "MAP CI95% [B]";
 
 }  // namespace metric
 }  // namespace yggdrasil_decision_forests

@@ -31,6 +31,7 @@ def _build_evaluation_options(
     bootstrapping: Union[bool, int],
     ndcg_truncation: int,
     mrr_truncation: int,
+    map_truncation: int,
     num_threads: Optional[int],
 ) -> metric_pb2.EvaluationOptions:
   """Builds evaluation options for the given task."""
@@ -47,7 +48,9 @@ def _build_evaluation_options(
   ranking = None
   if task == generic_model.Task.RANKING:
     ranking = metric_pb2.EvaluationOptions.Ranking(
-        ndcg_truncation=ndcg_truncation, mrr_truncation=mrr_truncation
+        ndcg_truncation=ndcg_truncation,
+        mrr_truncation=mrr_truncation,
+        map_truncation=map_truncation,
     )
   options = metric_pb2.EvaluationOptions(
       bootstrapping_samples=bootstrapping_samples,
@@ -255,6 +258,7 @@ def evaluate_predictions(
     bootstrapping: Union[bool, int] = False,
     ndcg_truncation: int = 5,
     mrr_truncation: int = 5,
+    map_truncation: int = 5,
     random_seed: int = 1234,
     num_threads: Optional[int] = None,
 ) -> metric.Evaluation:
@@ -323,7 +327,7 @@ def evaluate_predictions(
   predictions = np.linspace(0, 1, 100)
   labels = np.concatenate([np.ones(50), np.zeros(50)]).astype(float)
   evaluation = ydf.evaluate.evaluate_predictions(
-      predictions, labels, ydf.Task.REGRESSIONS
+      predictions, labels, ydf.Task.REGRESSION
   )
   print(evaluation)
   evaluation  # Prints an interactive report in IPython / Colab notebooks.
@@ -332,11 +336,11 @@ def evaluate_predictions(
   Args:
     predictions: Array of predictions to evaluate. The "task" argument defines
       the expected shape of the prediction array.
-    labels: Label values.The "task" argument defines the expected shape of the
+    labels: Label values. The "task" argument defines the expected shape of the
       prediction array.
     task: Task of the model.
     weights: Weights of the examples as a 1D float array of shape [n]. If not
-      provided, all examples have the idential weight.
+      provided, all examples have idential weight.
     label_classes: Names of the labels. Only used for classification tasks.
     ranking_groups: Ranking groups as a 1D integer array of shape [n]. Only used
       for ranking tasks.
@@ -350,6 +354,8 @@ def evaluate_predictions(
     ndcg_truncation: Controls at which ranking position the NDCG metric should
       be truncated. Default to 5. Ignored for non-ranking models.
     mrr_truncation: Controls at which ranking position the MRR metric loss
+      should be truncated. Default to 5. Ignored for non-ranking models.
+    map_truncation: Controls at which ranking position the MAP metric loss
       should be truncated. Default to 5. Ignored for non-ranking models.
     random_seed: Random seed for sampling.
     num_threads: Number of threads used to run the model.
@@ -367,6 +373,7 @@ def evaluate_predictions(
       bootstrapping,
       ndcg_truncation,
       mrr_truncation,
+      map_truncation,
       num_threads,
   )
 

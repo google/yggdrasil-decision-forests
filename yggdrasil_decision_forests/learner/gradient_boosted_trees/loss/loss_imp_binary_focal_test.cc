@@ -69,8 +69,10 @@ TEST_P(BinaryFocalLossTest, InitialPredictions) {
     weights = {2.f, 4.f, 6.f, 8.f};
   }
 
-  const BinaryFocalLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                 dataset.data_spec().columns(1));
+  const BinaryFocalLoss loss_imp({{},
+                                  {},
+                                  model::proto::Task::CLASSIFICATION,
+                                  dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /*label_col_idx=*/1, weights));
@@ -94,11 +96,12 @@ TEST(BinaryFocalLossTest, UpdateGradients) {
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.set_use_hessian_gain(true);
-  const BinaryFocalLoss loss_imp(gbt_config, model::proto::Task::CLASSIFICATION,
-                                 dataset.data_spec().columns(1));
+  const BinaryFocalLoss loss_imp({{},
+                                  gbt_config,
+                                  model::proto::Task::CLASSIFICATION,
+                                  dataset.data_spec().columns(1)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /*label_col_idx=*/1,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /*label_col_idx=*/1, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
 
@@ -133,11 +136,12 @@ TEST(BinaryFocalLossTest, UpdateGradientsCustomPredictions) {
   std::vector<float> predictions;
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.set_use_hessian_gain(true);
-  const BinaryFocalLoss loss_imp(gbt_config, model::proto::Task::CLASSIFICATION,
-                                 dataset.data_spec().columns(1));
+  const BinaryFocalLoss loss_imp({{},
+                                  gbt_config,
+                                  model::proto::Task::CLASSIFICATION,
+                                  dataset.data_spec().columns(1)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /*label_col_idx=*/1,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /*label_col_idx=*/1, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
 
@@ -167,8 +171,10 @@ TEST(BinaryFocalLossTest, ComputeLossWithoutWeights) {
                        CreateToyDataset());
   std::vector<float> weights;
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
-  const BinaryFocalLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                 dataset.data_spec().columns(1));
+  const BinaryFocalLoss loss_imp({{},
+                                  {},
+                                  model::proto::Task::CLASSIFICATION,
+                                  dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
@@ -186,8 +192,10 @@ TEST(BinaryFocalLossTest, ComputeLossWithWeights) {
                        CreateToyDataset());
   std::vector<float> weights = {2.f, 4.f, 6.f, 8.f};
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
-  const BinaryFocalLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                 dataset.data_spec().columns(1));
+  const BinaryFocalLoss loss_imp({{},
+                                  {},
+                                  model::proto::Task::CLASSIFICATION,
+                                  dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
@@ -205,8 +213,10 @@ TEST(BinaryFocalLossTest, ComputeLossWithNullWeights) {
                        CreateToyDataset());
   std::vector<float> weights(dataset.nrow(), 0.f);
   std::vector<float> predictions(dataset.nrow(), 0.f);
-  const BinaryFocalLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                 dataset.data_spec().columns(1));
+  const BinaryFocalLoss loss_imp({{},
+                                  {},
+                                  model::proto::Task::CLASSIFICATION,
+                                  dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
@@ -219,8 +229,10 @@ TEST(BinaryFocalLossTest, ComputeLossWithNullWeights) {
 TEST(BinaryFocalLossTest, SecondaryMetricName) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const BinaryFocalLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                 dataset.data_spec().columns(1));
+  const BinaryFocalLoss loss_imp({{},
+                                  {},
+                                  model::proto::Task::CLASSIFICATION,
+                                  dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
 }
 

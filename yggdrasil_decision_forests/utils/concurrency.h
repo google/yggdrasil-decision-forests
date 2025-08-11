@@ -25,8 +25,8 @@
 //
 //   # ThreadPool
 //   {
+//   // The threadpool starts workers upon construction.
 //   ThreadPool pool("name", /*num_threads=*/10);
-//   pool.StartWorkers();
 //   pool.Schedule([](){...});
 //   }
 //
@@ -181,6 +181,9 @@ absl::Status ConcurrentForLoopWithWorker(
       const size_t begin_item_idx = block_idx * block_size;
       const size_t end_item_idx =
           std::min(begin_item_idx + block_size, num_items);
+      if (begin_item_idx >= end_item_idx) {
+        continue;
+      }
       const auto status = run(block_idx, begin_item_idx, end_item_idx, &cache);
       // Record job status.
       if (!status.ok()) {

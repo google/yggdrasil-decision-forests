@@ -43,6 +43,7 @@
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
 #include "yggdrasil_decision_forests/serving/example_set_model_wrapper.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -181,7 +182,16 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
     if (gbt_model == nullptr) {
       return false;
     }
-    return gbt_model->CheckStructure({/*.global_imputation_is_higher =*/false});
+    bool no_oblique_conditions = gbt_model->CheckStructure(
+        decision_tree::CheckStructureOptions::NoObliqueConditions());
+    if (no_oblique_conditions) {
+      return gbt_model->CheckStructure({.global_imputation_is_higher = false});
+    } else {
+      // If the model contains oblique conditions, is_higher conditions must
+      // also follow global imputation.
+      return gbt_model->CheckStructure(
+          decision_tree::CheckStructureOptions::GlobalImputation());
+    }
   }
 
   std::vector<std::string> IsBetterThan() const override { return {}; }
@@ -254,6 +264,14 @@ class GradientBoostedTreesGenericFastEngineFactory : public FastEngineFactory {
       case proto::RANKING: {
         auto engine = std::make_unique<serving::ExampleSetModelWrapper<
             serving::decision_forest::GradientBoostedTreesRanking,
+            serving::decision_forest::Predict>>();
+        RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
+        return engine;
+      }
+
+      case proto::SURVIVAL_ANALYSIS: {
+        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
+            serving::decision_forest::GradientBoostedTreesSurvivalAnalysis,
             serving::decision_forest::Predict>>();
         RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
         return engine;
@@ -511,7 +529,16 @@ class RandomForestGenericFastEngineFactory : public model::FastEngineFactory {
     if (rf_model == nullptr) {
       return false;
     }
-    return rf_model->CheckStructure({/*.global_imputation_is_higher =*/false});
+    bool no_oblique_conditions = rf_model->CheckStructure(
+        decision_tree::CheckStructureOptions::NoObliqueConditions());
+    if (no_oblique_conditions) {
+      return rf_model->CheckStructure({.global_imputation_is_higher = false});
+    } else {
+      // If the model contains oblique conditions, is_higher conditions must
+      // also follow global imputation.
+      return rf_model->CheckStructure(
+          decision_tree::CheckStructureOptions::GlobalImputation());
+    }
   }
 
   std::vector<std::string> IsBetterThan() const override { return {}; }

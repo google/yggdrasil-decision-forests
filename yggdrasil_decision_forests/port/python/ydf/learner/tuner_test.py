@@ -23,6 +23,7 @@ from yggdrasil_decision_forests.learner.hyperparameters_optimizer.optimizers imp
 from yggdrasil_decision_forests.model import hyperparameter_pb2
 from ydf.learner import tuner as tuner_lib
 from ydf.utils import test_utils
+from yggdrasil_decision_forests.utils import fold_generator_pb2
 
 DiscreteCandidates = hyperparameter_pb2.HyperParameterSpace.DiscreteCandidates
 Field = hyperparameter_pb2.HyperParameterSpace.Field
@@ -62,6 +63,9 @@ class TunerTest(parameterized.TestCase):
         ),
         base_learner=abstract_learner_pb2.TrainingConfig(
             maximum_training_duration_seconds=10
+        ),
+        evaluation=hyperparameters_optimizer_pb2.Evaluation(
+            self_model_evaluation=hyperparameters_optimizer_pb2.Evaluation.SelfEvaluation()
         ),
         search_space=hyperparameter_pb2.HyperParameterSpace(
             fields=[
@@ -165,6 +169,9 @@ class TunerTest(parameterized.TestCase):
             optimizer_key="RANDOM",
             parallel_trials=1,
         ),
+        evaluation=hyperparameters_optimizer_pb2.Evaluation(
+            self_model_evaluation=hyperparameters_optimizer_pb2.Evaluation.SelfEvaluation()
+        ),
         search_space=hyperparameter_pb2.HyperParameterSpace(
             fields=[
                 Field(
@@ -181,6 +188,111 @@ class TunerTest(parameterized.TestCase):
             ],
         ),
     )
+    expected_random_optimizer = random_pb2.RandomOptimizerConfig(num_trials=20)
+
+    # Note: Extension construction is not supported.
+    expected_optimizer.optimizer.Extensions[random_pb2.random].CopyFrom(
+        expected_random_optimizer
+    )
+    expected_proto.Extensions[
+        hyperparameters_optimizer_pb2.hyperparameters_optimizer_config
+    ].CopyFrom(expected_optimizer)
+
+    test_utils.assertProto2Equal(self, tuner.train_config, expected_proto)
+
+  def test_to_proto_cross_validation(self):
+    # Define toy tuner
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=20,
+        parallel_trials=2,
+        max_trial_duration=10,
+        cross_validation=True,
+        cross_validation_num_folds=2,
+    )
+    tuner.choice("a", [1, 2, 3])
+    tuner.choice("b", [1.0, 2.0, 3.0])
+    tuner.choice("c", ["x", "y"])
+
+    s = tuner.choice("c", ["v", "w"], merge=True)
+    s.choice("d", [1, 2, 3])
+
+    # Check internal state
+    self.assertEqual(tuner.parallel_trials, 2)
+
+    expected_proto = abstract_learner_pb2.TrainingConfig(
+        learner="HYPERPARAMETER_OPTIMIZER"
+    )
+
+    expected_optimizer = HyperParametersOptimizerLearnerTrainingConfig(
+        optimizer=hyperparameters_optimizer_pb2.Optimizer(
+            optimizer_key="RANDOM",
+            parallel_trials=2,
+        ),
+        base_learner=abstract_learner_pb2.TrainingConfig(
+            maximum_training_duration_seconds=10
+        ),
+        evaluation=hyperparameters_optimizer_pb2.Evaluation(
+            cross_validation=hyperparameters_optimizer_pb2.Evaluation.CrossValidation(
+                fold_generator=fold_generator_pb2.FoldGenerator.CrossValidation(
+                    num_folds=2
+                ),
+            ),
+        ),
+        search_space=hyperparameter_pb2.HyperParameterSpace(
+            fields=[
+                Field(
+                    name="a",
+                    discrete_candidates=DiscreteCandidates(
+                        possible_values=[
+                            Value(integer=1),
+                            Value(integer=2),
+                            Value(integer=3),
+                        ],
+                    ),
+                ),
+                Field(
+                    name="b",
+                    discrete_candidates=DiscreteCandidates(
+                        possible_values=[
+                            Value(real=1),
+                            Value(real=2),
+                            Value(real=3),
+                        ]
+                    ),
+                ),
+                Field(
+                    name="c",
+                    discrete_candidates=DiscreteCandidates(
+                        possible_values=[
+                            Value(categorical="x"),
+                            Value(categorical="y"),
+                            Value(categorical="v"),
+                            Value(categorical="w"),
+                        ]
+                    ),
+                    children=[
+                        Field(
+                            name="d",
+                            discrete_candidates=DiscreteCandidates(
+                                possible_values=[
+                                    Value(integer=1),
+                                    Value(integer=2),
+                                    Value(integer=3),
+                                ]
+                            ),
+                            parent_discrete_values=DiscreteCandidates(
+                                possible_values=[
+                                    Value(categorical="v"),
+                                    Value(categorical="w"),
+                                ],
+                            ),
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    )
+
     expected_random_optimizer = random_pb2.RandomOptimizerConfig(num_trials=20)
 
     # Note: Extension construction is not supported.

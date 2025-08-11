@@ -136,11 +136,16 @@ CustomMultiClassificationLossFunctions Create3DimToyLoss() {
 TEST(CustomMultiClassificationLossTest, LossShape) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  CustomMultiClassificationLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                         dataset.data_spec().columns(0),
-                                         Create3DimToyLoss());
-  ASSERT_OK(loss_imp.Status());
-  auto loss_shape = loss_imp.Shape();
+
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomMultiClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(0)},
+                           Create3DimToyLoss()));
+
+  auto loss_shape = loss_imp->Shape();
   EXPECT_EQ(loss_shape.gradient_dim, 3);
   EXPECT_EQ(loss_shape.prediction_dim, 3);
 }
@@ -148,10 +153,13 @@ TEST(CustomMultiClassificationLossTest, LossShape) {
 TEST(CustomMultiClassificationLossTest, LossShapeBinaryFails) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  CustomMultiClassificationLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                         dataset.data_spec().columns(1),
-                                         Create3DimToyLoss());
-  ASSERT_FALSE(loss_imp.Status().ok());
+  EXPECT_FALSE(CustomMultiClassificationLoss::RegistrationCreate(
+                   {{},
+                    {},
+                    model::proto::Task::CLASSIFICATION,
+                    dataset.data_spec().columns(1)},
+                   Create3DimToyLoss())
+                   .ok());
 }
 
 TEST(CustomMultiClassificationLossTest, InitialPredictions) {
@@ -159,13 +167,16 @@ TEST(CustomMultiClassificationLossTest, InitialPredictions) {
                        CreateToyDataset());
   std::vector<float> weights = {2.f, 4.f, 6.f, 8.f, 10.f, 12.f};
 
-  CustomMultiClassificationLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                         dataset.data_spec().columns(0),
-                                         Create3DimToyLoss());
-  ASSERT_OK(loss_imp.Status());
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomMultiClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(0)},
+                           Create3DimToyLoss()));
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
-      loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
+      loss_imp->InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
 
   EXPECT_THAT(init_pred, ElementsAre(92, 184, 276));
 }
@@ -176,20 +187,22 @@ TEST(CustomMultiClassificationLossTest, UpdateGradients) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  CustomMultiClassificationLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                         dataset.data_spec().columns(0),
-                                         Create3DimToyLoss());
-  ASSERT_OK(loss_imp.Status());
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomMultiClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(0)},
+                           Create3DimToyLoss()));
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 0, *loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   utils::RandomEngine random(1234);
-  ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
-                                     /* label_col_idx= */ 0, predictions,
-                                     /*ranking_index=*/nullptr, &gradients,
-                                     &random));
+  ASSERT_OK(loss_imp->UpdateGradients(gradient_dataset,
+                                      /* label_col_idx= */ 0, predictions,
+                                      /*ranking_index=*/nullptr, &gradients,
+                                      &random));
 
   ASSERT_THAT(gradients, SizeIs(3));
   EXPECT_THAT(gradients[0].gradient, ElementsAre(1.f, 2.f, 3.f, 1.f, 2.f, 3.));
@@ -208,54 +221,56 @@ TEST(CustomMultiClassificationLossTest, ComputeLoss) {
   std::vector<float> weights = {2.f, 4.f, 6.f, 8.f, 10.f, 12.f};
 
   std::vector<float> predictions(dataset.nrow() * 3, 2.f);
-  CustomMultiClassificationLoss loss_imp({}, model::proto::Task::CLASSIFICATION,
-                                         dataset.data_spec().columns(0),
-                                         Create3DimToyLoss());
-  ASSERT_OK(loss_imp.Status());
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomMultiClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(0)},
+                           Create3DimToyLoss()));
   LossResults loss_results;
   ASSERT_OK_AND_ASSIGN(
       loss_results,
-      loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 0, predictions, weights, nullptr));
+      loss_imp->Loss(dataset,
+                     /* label_col_idx= */ 0, predictions, weights, nullptr));
   EXPECT_EQ(loss_results.loss, 528);
   // There are no secondary metrics.
   EXPECT_THAT(loss_results.secondary_metrics, IsEmpty());
 }
 
-TEST(CustomMultiClassificationLossTest, SecondaryMetricNames) {
-  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
-                       CreateToyDataset());
-  const CustomMultiClassificationLoss loss_imp(
-      {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0),
-      Create3DimToyLoss());
-  EXPECT_THAT(loss_imp.SecondaryMetricNames(), IsEmpty());
-}
-
 TEST(CustomMultiClassificationLossTest, ValidForClassification) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const CustomMultiClassificationLoss loss_imp(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(0),
-      Create3DimToyLoss());
-  EXPECT_OK(loss_imp.Status());
+
+  ASSERT_OK_AND_ASSIGN(const auto loss_imp,
+                       CustomMultiClassificationLoss::RegistrationCreate(
+                           {{},
+                            {},
+                            model::proto::Task::CLASSIFICATION,
+                            dataset.data_spec().columns(0)},
+                           Create3DimToyLoss()));
 }
 
 TEST(CustomMultiClassificationLossTest, InvalidForRegression) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const CustomMultiClassificationLoss loss_imp(
-      {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1),
-      Create3DimToyLoss());
-  EXPECT_FALSE(loss_imp.Status().ok());
+  EXPECT_FALSE(CustomMultiClassificationLoss::RegistrationCreate(
+                   {{},
+                    {},
+                    model::proto::Task::REGRESSION,
+                    dataset.data_spec().columns(1)},
+                   Create3DimToyLoss())
+                   .ok());
 }
 
 TEST(CustomMultiClassificationLossTest, InvalidForRanking) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
-  const CustomMultiClassificationLoss loss_imp({}, model::proto::Task::RANKING,
-                                               dataset.data_spec().columns(1),
-                                               Create3DimToyLoss());
-  EXPECT_FALSE(loss_imp.Status().ok());
+  EXPECT_FALSE(
+      CustomMultiClassificationLoss::RegistrationCreate(
+          {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(1)},
+          Create3DimToyLoss())
+          .ok());
 }
 
 }  // namespace

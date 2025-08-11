@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "yggdrasil_decision_forests/metric/ranking_utils.h"
 namespace yggdrasil_decision_forests {
 namespace metric {
 

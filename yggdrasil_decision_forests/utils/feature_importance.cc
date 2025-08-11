@@ -16,20 +16,29 @@
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
 
 #include <algorithm>
+#include <atomic>
+#include <cmath>
+#include <cstddef>
 #include <functional>
 #include <numeric>
 #include <optional>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/substitute.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -37,12 +46,15 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/shap.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
 namespace {
+
+constexpr char kFeatureImportanceShape[] = "SHAP_VALUE";
 
 // Generates the permutation feature importance names.
 std::vector<std::string> BuildPermutationVariableImportanceName(
@@ -72,6 +84,13 @@ void SortVariableImportance(const std::vector<std::string>& importance_names,
     std::sort(feature_importance.mutable_variable_importances()->begin(),
               feature_importance.mutable_variable_importances()->end(),
               var_importance_comparer);
+  }
+}
+
+void FeatureImportanceToProto(const ResultFeatureImportance& src,
+                              ResultFeatureImportanceProto* dst) {
+  for (const auto& item : src) {
+    (*dst)[item.first] = std::move(item.second);
   }
 }
 
@@ -192,7 +211,6 @@ absl::Status ComputePermutationFeatureImportance(
     utils::concurrency::ThreadPool pool(
         options.num_threads,
         {.name_prefix = std::string("variable_importance")});
-    pool.StartWorkers();
     LOG(INFO) << "Running " << model->data_spec().columns_size()
               << " features on " << options.num_threads << " threads with "
               << options.num_rounds << " rounds";
@@ -302,6 +320,149 @@ absl::Status ComputePermutationFeatureImportance(
   return absl::OkStatus();
 }
 
+absl::Status ComputeShapFeatureImportance(
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportance* output,
+    const ComputeShapFeatureImportanceOptions& options) {
+  auto& vas =
+      *(*output)[kFeatureImportanceShape].mutable_variable_importances();
+
+  // Configuration
+  std::atomic<bool> force_stop = false;
+  std::optional<absl::Time> cutoff_time;
+  if (options.max_duration_seconds.has_value()) {
+    cutoff_time =
+        absl::Now() + absl::Seconds(options.max_duration_seconds.value());
+  }
+
+  // Sum of abs of shape values.
+  const int num_columns = model->data_spec().columns_size();
+  std::vector<double> sum_abs_shapes(num_columns, 0.);
+  dataset::UnsignedExampleIdx num_shap_values = 0;
+  // Protects "sum_abs_shapes" and "num_shap_values".
+  concurrency::Mutex mutex;
+
+  struct Cache {
+    dataset::proto::Example example;
+    shap::ExampleShapValues example_shapes;
+    std::vector<double> sum_abs_shapes;
+  };
+
+  const auto create_cache = [&](size_t thread_idx, size_t num_threads,
+                                size_t block_size) -> Cache {
+    Cache cache;
+    return cache;
+  };
+
+  const auto run = [&force_stop, &cutoff_time, model, &dataset, &sum_abs_shapes,
+                    num_columns, &mutex, &num_shap_values,
+                    sampling = options.sampling](
+                       size_t block_idx, size_t begin_item_idx,
+                       size_t end_item_idx, Cache* cache) -> absl::Status {
+    if (force_stop) {
+      return absl::OkStatus();
+    }
+    if (cutoff_time.has_value() && cutoff_time.value() < absl::Now()) {
+      // Out of time
+      LOG(INFO) << "Maximum duration reached";
+      force_stop = true;
+      return absl::OkStatus();
+    }
+
+    utils::RandomEngine rnd;
+    if (sampling < 1.f) {
+      rnd.seed(block_idx);
+    }
+
+    cache->sum_abs_shapes.assign(num_columns, 0.);
+    dataset::UnsignedExampleIdx local_num_shap_values = 0;
+    for (auto example_idx = begin_item_idx; example_idx < end_item_idx;
+         example_idx++) {
+      if (sampling < 1.f &&
+          sampling < std::uniform_real_distribution<float>()(rnd)) {
+        // Randomly skip examples.
+        continue;
+      }
+
+      // Compute shap on example
+      dataset.ExtractExample(example_idx, &cache->example);
+      RETURN_IF_ERROR(shap::tree_shap(*model, cache->example,
+                                      &cache->example_shapes,
+                                      /*compute_bias=*/false));
+
+      // Accumulate shap values
+      DCHECK_EQ(cache->sum_abs_shapes.size(),
+                cache->example_shapes.num_columns());
+      for (size_t attribute_idx = 0;
+           attribute_idx < cache->sum_abs_shapes.size(); attribute_idx++) {
+        for (size_t output_idx = 0;
+             output_idx < cache->example_shapes.num_outputs(); output_idx++) {
+          const int index =
+              cache->example_shapes.Index(attribute_idx, output_idx);
+          cache->sum_abs_shapes[attribute_idx] +=
+              std::abs(cache->example_shapes.values()[index]);
+        }
+      }
+      local_num_shap_values++;
+    }
+
+    // Sync shap values
+    concurrency::MutexLock l(&mutex);
+    for (size_t attribute_idx = 0; attribute_idx < cache->sum_abs_shapes.size();
+         attribute_idx++) {
+      sum_abs_shapes[attribute_idx] += cache->sum_abs_shapes[attribute_idx];
+    }
+    num_shap_values += local_num_shap_values;
+    return absl::OkStatus();
+  };
+
+  LOG(INFO) << "Compute SHAP values";
+  RETURN_IF_ERROR(utils::concurrency::ConcurrentForLoopWithWorker<Cache>(
+      /*num_items=*/dataset.nrow(),
+      /*max_num_threads=*/options.num_threads,
+      /*min_block_size=*/20,
+      /*max_block_size=*/1000, create_cache, run));
+  LOG(INFO) << "Done computing SHAP values";
+
+  const auto& input_features = model->input_features();
+  const absl::flat_hash_set<int> input_features_set(input_features.begin(),
+                                                    input_features.end());
+
+  for (size_t attribute_idx = 0; attribute_idx < sum_abs_shapes.size();
+       attribute_idx++) {
+    if (!input_features_set.contains(attribute_idx)) {
+      continue;
+    }
+    auto& feature = *vas.Add();
+    feature.set_importance(sum_abs_shapes[attribute_idx] / num_shap_values);
+    feature.set_attribute_idx(attribute_idx);
+  }
+
+  // Sort values
+  const auto var_importance_comparer =
+      [](const model::proto::VariableImportance& a,
+         const model::proto::VariableImportance& b) {
+        return a.importance() > b.importance();
+      };
+  std::sort(vas.begin(), vas.end(), var_importance_comparer);
+  return absl::OkStatus();
+}
+
+absl::Status ComputeShapFeatureImportance(
+    const dataset::VerticalDataset& dataset, const model::AbstractModel* model,
+    ResultFeatureImportanceProto* output,
+    const ComputeShapFeatureImportanceOptions& options) {
+  ResultFeatureImportance raw_output;
+  const auto status =
+      ComputeShapFeatureImportance(dataset, model, &raw_output, options);
+  if (!status.ok()) {
+    LOG(WARNING) << "Cannot compute SHAP values:" << status.message();
+    return absl::OkStatus();
+  }
+  FeatureImportanceToProto(raw_output, output);
+  return absl::OkStatus();
+}
+
 absl::Status ComputePermutationFeatureImportance(
     const metric::proto::EvaluationResults& base_evaluation,
     const std::function<
@@ -313,9 +474,7 @@ absl::Status ComputePermutationFeatureImportance(
   RETURN_IF_ERROR(ComputePermutationFeatureImportance(
       base_evaluation, get_permutation_evaluation, model, &raw_output,
       options));
-  for (const auto& item : raw_output) {
-    (*output)[item.first] = std::move(item.second);
-  }
+  FeatureImportanceToProto(raw_output, output);
   return absl::OkStatus();
 }
 

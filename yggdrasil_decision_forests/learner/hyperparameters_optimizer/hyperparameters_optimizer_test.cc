@@ -158,6 +158,18 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining) {
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
 }
 
+TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTrainingCrossValidation) {
+  SetLocalTraining();
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->mutable_evaluation()->mutable_cross_validation();
+  SetTrainConfig("RANDOM", "random", 10);
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
+  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 10);
+}
+
 TEST_F(OnAdult, RandomTuner_FileDataset_LocalTraining) {
   pass_training_dataset_as_path_ = true;
   SetLocalTraining();
@@ -173,6 +185,18 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTraining) {
   EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
+}
+
+TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTrainingCrossValidation) {
+  SetDistributedTraining();
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->mutable_evaluation()->mutable_cross_validation();
+  SetTrainConfig("RANDOM", "random", 10);
+  TrainAndEvaluateModel();
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
+  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 10);
 }
 
 TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining) {

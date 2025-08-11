@@ -6,147 +6,224 @@
 
 ### What are Decision Forests?
 
-Decision Forests are easy-to-train machine learning models that excel with
-tabular data. To dive into the mathematics behind them, check out
+Decision Forests are a family of machine learning models that are easy to train
+and excel at tasks involving tabular data. To learn more about the mathematics
+behind them, we recommend
 [Google's Decision Forests online class](https://developers.google.com/machine-learning/decision-forests).
 
 ### I want to use YDF. Where should I start?
 
-Start with the YDF Python API in an a Notebook or a Colab. The Python API is the
-most comprehensive (alongside the C++ API) and user-friendly way to use YDF.
+The best place to start is with the YDF Python API in a Notebook or Colab
+environment. The Python API is the most comprehensive and user-friendly way to
+use YDF.
 
-Models trained with one API can be used with other APIs. For example, a model
-trained with the Python API can be exported to C++, Go or JavaScript for
+Models are portable across different APIs. For example, you can train a model
+using the Python API and then export it to C++, Go, or JavaScript for efficient
 serving.
 
-### Who and when was YDF created?
+### Who created YDF and when?
 
-YDF was created and continues to be developed by Google engineers in
-Switzerland.
+YDF was created and is actively developed by Google engineers in Switzerland.
 
-Some milestones of YDF's development:
+Key milestones in YDF's development:
 
--   2017: Creation as an experimental library in Google Research
--   2018: Move to production as C++ API and CLI interface. YDF models are called
-    tens of millions of times every second.
--   2019: Release of Tensorflow Decision Forests for TensorFlow 1
--   2020: Release of Tensorflow Decision Forests for TensorFlow 2 (Keras API)
--   2021: Open-sourcing and presentation at Google I/O
--   2023: [Presentation](https://doi.org/10.1145/3580305.3599933) at KDD23.
--   2023: Development of the standalone Python API.
+*   2017: Created as an experimental library in Google Research.
+*   2018: Moved to production with a C++ API and CLI. Today, YDF models at
+    Google are served tens of millions of times per second.
+*   2019: Released TensorFlow Decision Forests for TensorFlow 1.
+*   2020: Released TensorFlow Decision Forests for TensorFlow 2 (Keras API).
+*   2021: Open-sourced and presented at Google I/O.
+*   2023: Presented at KDD23 (paper).
+*   2023: Launch of the standalone YDF Python API.
 
 ## YDF and TF-DF
 
-### Should I use the YDF or TensorFlow Decision Forests (TF-DF)?
+### Should I use YDF or TensorFlow Decision Forests (TF-DF)?
 
-You should prefer YDF over TF-DF in nearly all cases.
+For new projects, you should prefer YDF over TF-DF in nearly all cases.
 
-YDF's Python API and TF-DF share the same C++ backend and, as a consequence,
-many of their features and the models they produce are the same. However, TF-DF
-is more constrained by implementing the Keras 2 API and using TensorFlow
-internally. As a consequence, TF-DF is slower, bigger and less flexible than
-YDF's Python API.
+YDF's Python API and TF-DF share the same core C++ engine, so many features and
+the models they produce are similar. However, TF-DF is constrained by its
+integration with the Keras 2 API and TensorFlow. As a result, TF-DF is generally
+slower, has a larger memory footprint, and is less flexible than the standalone
+YDF Python API.
 
-### What is the status of TF-DF? Can I still use TF-DF?
+### What is the status of TF-DF? Can I still use it?
 
-TF-DF is a production-grade library, supported and deployed in many products. It
-can still be used and it is actively maintained by the YDF team. However, we
-believe that the YDF Python API is a better fit for the majority of new use
-cases (see comparison below).
+TF-DF is a production-grade library that is supported and deployed in many
+products. You can still use it, and it is actively maintained by the YDF team.
+However, for most new use cases, we believe the YDF Python API is a better
+choice.
 
 ### What is the status of the Python API?
 
-YDF's Python API has reached feature parity with TF-DF and is in active
-development for more features.
+YDF's Python API has reached feature parity with TF-DF and is under active
+development to introduce even more features.
 
 ### How are YDF and TF-DF different?
 
-Both libraries are developed by the same team and use the same training code,
-which means that models trained by either library will be identical. **YDF is
-the successor of TF-DF and it is both significantly more feature-rich,
-efficient, and easier to use than TF-DF**.
+Both libraries are developed by the same team and use the same C++ training
+code, meaning models trained by either library will be identical. YDF is the
+successor to TF-DF and is significantly more feature-rich, efficient, and easier
+to use.
 
-&nbsp;                         | Yggdrasil Decision Forests                                                                                                                                                                 | TensorFlow Decision Forests
------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------
-Model description              | `model.describe()` produces rich html or text model description report.                                                                                                                    | `model.describe()` produces simple text report. `model.describe()` does not work if applied on a model loaded from disk.
-Model evaluation               | `model.evaluate(ds)` evaluates a model and returs a rich model evaluation report with accuracy, AUC, ROC plots, confidence intervals, etc.                                                 | Each evaluation metric needs to be configured with `model.compile()` before calling `model.evalute()`. Cannot produce ROC or confidence intervals. Cannot evaluate ranking and uplifting models.
-Model analysis                 | `model.analyze(ds)` produces a rich model analysis html report with variable importances, PDPs and CEPs.                                                                                   | Not available
-Model benchmarking             | `model.benchmark(ds)` measures the model inference speed.                                                                                                                                  | Not available
-Cross-validation               | `learner.cross_validation(ds)` performs a cross-validation and return a rich model evaluation report.                                                                                      | Not available
-Anomaly detection              | Available with Isolation Forests and its extensions.                                                                                                                                       | Not available
-Python model serving           | `model.predict(ds)` makes predictions. Support many dataset formats (file paths, pandas dataframe, dictionary of numpy arrays, TensorFlow Dataset).                                        | `model.predict(ds)` on TensorFlow Datasets. When calling `model.predict(ds)` on a model loaded from disk, you might need to adapt feature dtypes.
-TensorFlow Serving / Vertex AI | `model.to_tensorflow_saved_model(path)` create a valid SavedModel. The SavedModel signature is build automatically.                                                                        | `model.save(path, signature)`. The model signature should be written manually.
-Other model serving            | Model directly available in C++, Python, CLI, Go and Javascript. You can also use utilities to generate serving code: For example, call `model.to_cpp()` to generate the C++ serving code. | Call `model.save(path, signature)` to generate a TensorFlow SaveModel, and use the TensorFlow C++ API to run the model in C++. Alternatively, export the model to YDF.
-Training speed                 | On a small dataset, training up to 5x faster than TensorFlow Decision Forests. On all dataset sizes, model inference is up to 1000x faster than TensorFlow Decision Forests.               | On a small dataset, most of the time is spent in TensorFlow dataset reading.
-Library loading speed          | The YDF library is ~9MB.                                                                                                                                                                   | The TF-DF library is ~12MB, but it requires TensorFlow which is ~600MB.
-Error messages                 | Short, high level and actionable error messages.                                                                                                                                           | Long and hard to understand error messages often about Tensor shapes.
+|                  | Yggdrasil Decision Forests            | TensorFlow        |
+:                  :                                       : Decision Forests  :
+| ---------------- | ------------------------------------- | ----------------- |
+| Model            | model.describe() produces a rich HTML | model.describe()  |
+: Description      : or text report.                       : produces a simple :
+:                  :                                       : text report. Does :
+:                  :                                       : not work on a     :
+:                  :                                       : model loaded from :
+:                  :                                       : disk.             :
+| Model Evaluation | model.evaluate(ds) returns a          | Each metric must  |
+:                  : comprehensive evaluation report with  : be configured     :
+:                  : accuracy, AUC, ROC plots, confidence  : with              :
+:                  : intervals, etc.                       : model.compile()   :
+:                  :                                       : before calling    :
+:                  :                                       : model.evaluate(). :
+:                  :                                       : Cannot produce    :
+:                  :                                       : ROC curves or     :
+:                  :                                       : confidence        :
+:                  :                                       : intervals. Cannot :
+:                  :                                       : evaluate ranking  :
+:                  :                                       : or uplifting      :
+:                  :                                       : models.           :
+| Model Analysis   | model.analyze(ds) produces a rich     | Not available.    |
+:                  : HTML report with variable             :                   :
+:                  : importances, Partial Dependence Plots :                   :
+:                  : (PDPs), and Conditional Expectation   :                   :
+:                  : Plots (CEPs).                         :                   :
+| Model            | model.benchmark(ds) measures model    | Not available.    |
+: Benchmarking     : inference speed.                      :                   :
+| Cross-validation | learner.cross_validation(ds) performs | Not available.    |
+:                  : cross-validation and returns a rich   :                   :
+:                  : evaluation report.                    :                   :
+| Anomaly          | Available via Isolation Forest and    | Not available.    |
+: Detection        : its extensions.                       :                   :
+| Python Model     | model.predict(ds) supports multiple   | model.predict(ds) |
+: Serving          : input formats (e.g., file paths,      : operates on       :
+:                  : Pandas DataFrame, dictionary of NumPy : TensorFlow        :
+:                  : arrays, TensorFlow Dataset).          : Datasets. You may :
+:                  :                                       : need to adapt     :
+:                  :                                       : feature dtypes    :
+:                  :                                       : when predicting   :
+:                  :                                       : with a model      :
+:                  :                                       : loaded from disk. :
+| TensorFlow       | model.to_tensorflow_saved_model(path) | model.save(path,  |
+: Serving / Vertex : creates a valid SavedModel with an    : signature)        :
+: AI               : automatically generated signature.    : requires the      :
+:                  :                                       : model signature   :
+:                  :                                       : to be written     :
+:                  :                                       : manually.         :
+| Other Model      | Models are directly usable in C++,    | Export the model  |
+: Serving          : Python, Go, and JavaScript. You can   : to a TensorFlow   :
+:                  : also generate serving code; for       : SavedModel using  :
+:                  : example, model.to_cpp() generates C++ : model.save(),     :
+:                  : serving code.                         : then use the      :
+:                  :                                       : TensorFlow C++    :
+:                  :                                       : API.              :
+:                  :                                       : Alternatively,    :
+:                  :                                       : export the model  :
+:                  :                                       : to the YDF        :
+:                  :                                       : format.           :
+| Performance      | On small datasets, training is up to  | On small          |
+:                  : 5x faster. For all dataset sizes,     : datasets,         :
+:                  : model inference is up to 1000x faster : significant time  :
+:                  : than TF-DF.                           : is often spent    :
+:                  :                                       : reading data with :
+:                  :                                       : the TensorFlow    :
+:                  :                                       : Dataset pipeline. :
+| Library Size     | The YDF library is ~12B.              | The TF-DF library |
+:                  :                                       : is ~12MB, but it  :
+:                  :                                       : requires          :
+:                  :                                       : TensorFlow, which :
+:                  :                                       : is ~600MB.        :
+| Error Messages   | Error messages are short, high-level, | Error messages    |
+:                  : and actionable.                       : are often long,   :
+:                  :                                       : hard to           :
+:                  :                                       : understand, and   :
+:                  :                                       : related to        :
+:                  :                                       : internal          :
+:                  :                                       : TensorFlow        :
+:                  :                                       : details like      :
+:                  :                                       : Tensor shapes.    :
 
-## Common modeling questions
+## Common Modeling Questions
 
-### Adding an empty column to my model changes its quality. Why?
+### Adding a new column to my data changes the model. Why?
 
-YDF training is deterministic, with the changes in compiler optimizations and
-the random number generator implementation. This means that for a given version
-of YDF, training a model twice on the same data will produce the same results.
+YDF training is deterministic, meaning that training a model twice on the exact
+same data with the same YDF version on the same machine will produce an
+identical model.
 
-Part of the training is stochastic. For example, the attribute_sampling_ratio
-parameter is used to randomly select features. This random selection is
-performed using a pseudo-random number generator that is initialized with the
-training seed. Adding an empty column or shuffling the columns will change the
-random generation result and, consequently, the output model. This change is
-similar to changing the random seed.
+However, many parts of the training process are stochastic (random). For
+example, a learner might randomly sample features using a parameter like
+attribute_sampling_ratio. This process uses a pseudo-random number generator
+initialized by a seed. If you add a column (even an empty one) or reorder
+existing columns, you change the input to this random process, which can lead to
+a different model—similar to changing the training seed.
 
-## Misc
+### Can I train YDF models on a GPU or TPU?
 
-### Which architectures are supported by YDF?
+Most YDF training and inference is done on CPU and does not use GPU or TPU.
+Training of YDF models with vector sequences can use GPU. YDF models exported to
+JAX can be run on GPU or TPU, thought experiments show that YDF+JAX models don't
+run significantly faster than on CPU. Contact the team if you have an impactful
+use case for this.
 
-YDF supports the following architectures:
+## Miscellaneous
 
--   Manylinux2014 x86_64 (to be updated to a newer version of manylinux in one of 
-    the next releases).
--   MaxOS Arm64
+### Which architectures does YDF support?
 
-We also publish Windows binaries, usually with some delay after the release.
+YDF provides pre-compiled binaries for these architectures:
 
-The following architectures probably work, but we will not release binaries for them at this time:
+*   manylinux_2_17 x86_64 (Linux)
 
--   Manylinux2014 aarch64 (to be updated to a newer version of manylinux in one
-    of the next releases).
--   MacOS Intel.
+*   macOS arm64 (Apple Silicon)
 
-### My model performs worse / better than with library XYZ, why?
+We also publish Windows binaries, though typically with a delay after a new
+release.
 
-While decision forest libraries implement similar algorithms, they generally
-produce different results. The main cause of these discrepancies is generally
-the different default hyperparameter values in different libraries. For example,
-YDF trains GBTs with a maximum depth of 6 using a divide-and-conquer learning
-algorithm by default. Other libraries may use other default hyperparameters.
+The following architectures will likely work if you compile from source, but we
+do not provide pre-compiled binaries for them at this time:
 
-YDF shines by the number of available techniquing and features. Refer to our
-paper our paper titled
-[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933)
-in KDD 2023 for a comparison of model performances trained with different
-libraries.
+*   manylinux2014 aarch64 (Linux)
 
-### Can I use the ydf.experimental?
+*   macOS Intel
 
-Any API under `ydf.experimental` should not be used in production environments
-and may break, be unstable or slow.
+### My model performs differently than a model from library XYZ. Why?
 
-### Is it PYDF or YDF?
+While most decision forest libraries implement similar algorithms, they rarely
+produce identical results. The primary reason for these differences is the
+choice of default hyperparameter values. For example, YDF's Gradient Boosted
+Trees learner trains 300 trees with a maximum depth of 6 by default, while other
+libraries may use different defaults.
 
-The name of the library is simply `ydf`, and so is the name of the corresponding
-Pip package. Internally, the team sometimes uses the name *PYDF* because it fits
-so well.
+YDF's strength lies in the number of available techniques and advanced features.
+For a detailed comparison of model performance across libraries, please see our
+paper from KDD 2023:
+[Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library](https://doi.org/10.1145/3580305.3599933).
+
+### Can I use the ydf.experimental module?
+
+Any API under `ydf.experimental` should not be used in production. These
+features are subject to change, may be unstable, or could have poor performance.
+
+### Is the library called PYDF or YDF?
+
+The official name of the C++ library is Yggdrasil Decision Forests, and the Pip
+package is ydf. Internally, the development team sometimes calls the Python
+wrapper PYDF as a nickname.
 
 ### How should I pronounce PYDF?
 
-The preferred pronunciation is "Py-dee-eff" / ˈpaɪˈdiˈɛf (IPA). But since it is
-an internal name, you really don't have to pronounce it at all.
+The preferred pronunciation is "Py-dee-eff" (/ˈpaɪˈdiˈɛf/ IPA). But since it's
+an internal nickname, you don't really have to pronounce it at all.
 
-### I have an important question that has not been answered by this FAQ!
+### My question isn't answered here!
 
-You can raise issues with YDF on
+For bugs or feature requests, please open an issue on
 [Github](https://github.com/google/yggdrasil-decision-forests/issues). You can
 also contact the core development team at
 [decision-forests-contact@google.com](mailto:decision-forests-contact@google.com).

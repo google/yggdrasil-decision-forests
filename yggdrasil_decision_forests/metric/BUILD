@@ -59,10 +59,12 @@ cc_library_ydf(
 cc_library_ydf(
     name = "ranking",
     srcs = [
+        "ranking_ap.cc",
         "ranking_mrr.cc",
         "ranking_ndcg.cc",
     ],
     hdrs = [
+        "ranking_ap.h",
         "ranking_mrr.h",
         "ranking_ndcg.h",
     ],
@@ -120,6 +122,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 
@@ -153,6 +156,7 @@ cc_test(
         ":report",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:distribution",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",

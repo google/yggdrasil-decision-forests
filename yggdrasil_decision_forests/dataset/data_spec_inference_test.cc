@@ -39,6 +39,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -1057,8 +1058,9 @@ TEST(Dataset, OverrideMostFrequentItem) {
                                     &data_spec));
   LOG(INFO) << PrintHumanReadable(data_spec, false);
   auto& col = data_spec.columns(GetColumnIdxFromName("Cat_1", data_spec));
-  EXPECT_EQ(col.categorical().most_frequent_value(),
-            CategoricalStringToValue("B", col));
+  ASSERT_OK_AND_ASSIGN(auto b_value,
+                       CategoricalStringToValueWithStatus("B", col));
+  EXPECT_EQ(col.categorical().most_frequent_value(), b_value);
 }
 
 TEST(Dataset, OverrideMostFrequentItemFail1) {

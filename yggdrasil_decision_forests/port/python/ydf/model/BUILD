@@ -29,6 +29,7 @@ pybind_library(
     deps = [
         ":pydf_models",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -36,7 +37,9 @@ pybind_library(
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:types",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/dataset:weight",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
@@ -48,11 +51,14 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/model/random_forest",
         "@ydf_cc//yggdrasil_decision_forests/serving:example_set",
         "@ydf_cc//yggdrasil_decision_forests/serving:fast_engine",
+        "@ydf_cc//yggdrasil_decision_forests/serving/embed",
+        "@ydf_cc//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:concurrency",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:random",
+        "@ydf_cc//yggdrasil_decision_forests/utils:shap",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
         "@ydf_cc//yggdrasil_decision_forests/utils:synchronization_primitives",
         "@ydf_cc//yggdrasil_decision_forests/utils:uid",
@@ -109,6 +115,7 @@ py_library(
         "//ydf/utils:concurrency",
         "//ydf/utils:html",
         "//ydf/utils:log",
+        "@ydf_cc//yggdrasil_decision_forests/serving/embed:embed_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
     ],
 )
@@ -168,14 +175,13 @@ py_library(
     srcs = ["model_lib.py"],
     deps = [
         ":generic_model",
-        # absl/logging dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset:dataspec",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/isolation_forest_model",
         "//ydf/model/random_forest_model",
         "//ydf/utils:log",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -196,6 +202,7 @@ py_library(
     name = "model_metadata",
     srcs = ["model_metadata.py"],
     deps = [
+        "//ydf/utils:log",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
@@ -401,7 +408,7 @@ py_test(
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # fastapi dep,  # buildcleaner: keep
-        # pydantic dep,  # buildcleaner: keep
+        # pydantic:pydantic_v2 dep,  # buildcleaner: keep
         # requests dep,  # buildcleaner: keep
         "//ydf:api",
         "//ydf/utils:test_utils",

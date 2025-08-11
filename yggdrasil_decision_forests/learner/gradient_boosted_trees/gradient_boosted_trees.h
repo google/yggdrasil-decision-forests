@@ -47,6 +47,7 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -135,6 +136,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamNDCGTruncation[] = "ndcg_truncation";
   static constexpr char kHParamXENDCGTruncation[] =
       "cross_entropy_ndcg_truncation";
+  static constexpr char kHParamTotalMaxNumNodes[] = "total_max_num_nodes";
 
   absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
       const dataset::VerticalDataset& train_dataset,
@@ -188,6 +190,10 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   void SetCustomLossFunctions(
       const CustomLossFunctions& custom_loss_functions) {
     custom_loss_functions_ = custom_loss_functions;
+  }
+
+  bool HasCustomLossFunctions() const {
+    return custom_loss_functions_.index() > 0;
   }
 
  private:
@@ -246,7 +252,7 @@ absl::Status ExtractValidationDataset(const dataset::VerticalDataset& dataset,
 //
 // "predictions" is initialized to contain the predictions.
 absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
-                                   int label_col_idx, bool hessian_splits,
+                                   int label_col_idx,
                                    const AbstractLoss& loss_impl,
                                    dataset::VerticalDataset* gradient_dataset,
                                    std::vector<GradientData>* gradients,

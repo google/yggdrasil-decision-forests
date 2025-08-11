@@ -80,6 +80,28 @@ class IsolationForestModelTest(absltest.TestCase):
     self.model_gaussians._model.set_num_examples_per_tree(100)
     self.assertEqual(self.model_gaussians.num_examples_per_tree(), 100)
 
+  def test_export_to_tensorflow(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Anomaly Detection models are not yet supported for export to"
+        " Tensorflow.",
+    ):
+      _ = self.model_gaussians.to_tensorflow_function()
+    with self.assertRaisesRegex(
+        ValueError,
+        "Anomaly Detection models are not yet supported for export to"
+        " Tensorflow.",
+    ):
+      out_dir = self.create_tempdir()
+      _ = self.model_gaussians.to_tensorflow_saved_model(out_dir.full_path)
+
+  def test_training_logs(self):
+    with self.assertRaisesRegex(
+        NotImplementedError,
+        "Training logs are not available for this model type.",
+    ):
+      self.model_gaussians.training_logs()
+
 
 if __name__ == "__main__":
   absltest.main()

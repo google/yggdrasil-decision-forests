@@ -185,5 +185,17 @@ TEST(Filesystem, Basename) {
   EXPECT_EQ(GetBasename("gs://my_bucket/dir/dir/file.txt"), "file.txt");
 }
 
+TEST(Filesystem, Dirname) {
+  EXPECT_EQ(GetDirname("file"), "");
+  EXPECT_EQ(GetDirname("file.txt"), "");
+  EXPECT_EQ(GetDirname(""), "");
+  EXPECT_EQ(GetDirname(file::JoinPath("dir", "file")), "dir");
+  EXPECT_EQ(GetDirname(file::JoinPath("a", "b", "file")),
+            file::JoinPath("a", "b"));
+  EXPECT_EQ(GetDirname("gs://my_bucket/file.txt"), "gs://my_bucket");
+  EXPECT_EQ(GetDirname("gs://my_bucket/dir/dir/file.txt"),
+            "gs://my_bucket/dir/dir");
+}
+
 }  // namespace
 }  // namespace file

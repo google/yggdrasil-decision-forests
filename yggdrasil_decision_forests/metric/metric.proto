@@ -64,11 +64,15 @@ message EvaluationOptions {
     // If false (default) and if all the predictions (items) are in the same
     // group (i.e. there is only one group), raises an error.
     optional bool allow_only_one_group = 3 [default = false];
+    // Rank cut-off at which Mean Average Precision is computed.
+    optional int32 map_truncation = 4 [default = 5];
   }
 
   message Uplift {}
 
   message AnomalyDetection {}
+
+  message SurvivalAnalysis {}
 
   // Task of the model.
   optional model.proto.Task task = 1 [default = CLASSIFICATION];
@@ -79,6 +83,7 @@ message EvaluationOptions {
     Ranking ranking = 7;
     Uplift uplift = 8;
     AnomalyDetection anomaly_detection = 9;
+    SurvivalAnalysis survival_analysis = 12;
   }
   // Fraction of sampled predictions. If no predictions need to be sampled
   // (i.e. no part of the configuration needs it), this parameter is ignored and
@@ -106,7 +111,7 @@ message EvaluationOptions {
 
   optional int32 num_threads = 11 [default = 6];
 
-  // Next ID: 12
+  // Next ID: 13
 }
 
 // Evaluation results of a model.
@@ -170,13 +175,16 @@ message EvaluationResults {
     optional MetricEstimate mrr = 8;
     optional int32 mrr_truncation = 9;
 
+    optional MetricEstimate map = 14;
+    optional int32 map_truncation = 15;
+
     reserved 6, 7;
 
     // Fraction of examples were the highest predicted example is also the
     // example with the highest relevance value.
     optional MetricEstimate precision_at_1 = 13;
 
-    // Next ID: 14
+    // Next ID: 16
     reserved 1;
   }
 
@@ -215,6 +223,8 @@ message EvaluationResults {
 
   message AnomalyDetection {}
 
+  message SurvivalAnalysis {}
+
   // Number of predictions (weighted by example weight).
   optional double count_predictions = 1 [default = 0];
   // Number of predictions (without weights).
@@ -232,6 +242,7 @@ message EvaluationResults {
     Ranking ranking = 12;
     Uplift uplift = 14;
     AnomalyDetection anomaly_detection = 16;
+    SurvivalAnalysis survival_analysis = 17;
   }
   // The dataspec of the label column. This field can contain information such
   // as: The possible label values, the distribution of the label values, the
@@ -257,7 +268,7 @@ message EvaluationResults {
 
   // User can use this field to store value for any customized metrics.
   map<string, double> user_metrics = 15;
-  // Next ID: 17
+  // Next ID: 18
 }
 
 // Reference a metric."MetricAccessor" is used as a parameter of the function
@@ -334,9 +345,11 @@ message MetricAccessor {
     oneof Type {
       NDCG ndcg = 1;
       MRR mrr = 2;
+      MAP map = 3;
     }
     message NDCG {}
     message MRR {}
+    message MAP {}
   }
 
   message Uplift {

@@ -42,6 +42,7 @@ cc_library_ydf(
     hdrs = [
         "model_compiler.h",
     ],
+    visibility = ["//yggdrasil_decision_forests/cli:__pkg__"],
     deps = [
         ":decision_forest",
         "//yggdrasil_decision_forests/model:abstract_model",
@@ -78,6 +79,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving:example_set_model_wrapper",
         "//yggdrasil_decision_forests/serving:fast_engine",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",

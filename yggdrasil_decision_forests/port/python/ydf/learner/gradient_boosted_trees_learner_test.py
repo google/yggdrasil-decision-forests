@@ -39,6 +39,16 @@ ProtoMonotonicConstraint = abstract_learner_pb2.MonotonicConstraint
 Column = dataspec.Column
 
 
+def sigmoid(x: np.ndarray) -> np.ndarray:
+  return 1 / (1 + np.exp(-x))
+
+
+def softmax(x: np.ndarray) -> np.ndarray:
+  x_max = np.max(x, axis=1, keepdims=True)
+  e_x = np.exp(x - x_max)
+  return e_x / np.sum(e_x, axis=1, keepdims=True)
+
+
 class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
 
   def test_adult(self):
@@ -134,6 +144,50 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     )
 
     self._check_adult_model(learner=learner, minimum_accuracy=0.869)
+
+  def test_adult_total_max_num_nodes(self):
+    def count_nodes(node):
+      if node.is_leaf:
+        return 1
+      return 1 + count_nodes(node.neg_child) + count_nodes(node.pos_child)
+
+    def count_total_nodes(model):
+      total = 0
+      for i in range(model.num_trees()):
+        t = model.get_tree(i)
+        cur = count_nodes(t.root)
+        total += cur
+      return total
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="income", total_max_num_nodes=300
+    ).train(self.adult.train)
+
+    self.assertLessEqual(count_total_nodes(model), 300)
+    self.assertGreaterEqual(count_total_nodes(model), 200)
+
+  def test_adult_multiclass_total_max_num_nodes(self):
+    def count_nodes(node):
+      if node.is_leaf:
+        return 1
+      return 1 + count_nodes(node.neg_child) + count_nodes(node.pos_child)
+
+    def count_total_nodes(model):
+      total = 0
+      for i in range(model.num_trees()):
+        t = model.get_tree(i)
+        cur = count_nodes(t.root)
+        total += cur
+      return total
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="race", total_max_num_nodes=300
+    ).train(self.adult.train)
+
+    self.assertLessEqual(count_total_nodes(model), 300)
+    self.assertGreaterEqual(count_total_nodes(model), 200)
+    # One iteration of training with 5 trees per iteration.
+    self.assertEqual(model.num_trees(), 5)
 
   def test_model_type_ranking(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
@@ -448,6 +502,27 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     self.assertIsNotNone(logs)
     self.assertLen(logs.trials, 5)
 
+  def test_tuner_cross_validation(self):
+    tuner = tuner_lib.RandomSearchTuner(
+        num_trials=5,
+        automatic_search_space=True,
+        parallel_trials=2,
+        cross_validation=True,
+        cross_validation_num_folds=3,  # Reduce num_folds because cv is slow.
+    )
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        tuner=tuner,
+        num_trees=10,
+        num_threads=30,
+    )
+
+    model, _, _ = self._check_adult_model(learner, minimum_accuracy=0.85)
+    logs = model.hyperparameter_optimizer_logs()
+    self.assertIsNotNone(logs)
+    self.assertLen(logs.trials, 5)
+    self.assertGreater(logs.trials[0].score, 0)
+
   def test_label_type_error_message(self):
     with self.assertRaisesRegex(
         ValueError,
@@ -465,6 +540,66 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
       _ = specialized_learners.GradientBoostedTreesLearner(
           label="l", task=generic_learner.Task.REGRESSION
       ).train(pd.DataFrame({"l": ["A", "B"], "f": [0, 1]}))
+
+  @parameterized.parameters(
+      ("LOCAL",),
+      ("BEST_FIRST_GLOBAL",),
+  )
+  def test_shap_adult(self, growing_strategy):
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        num_trees=20,
+        growing_strategy=growing_strategy,
+    ).train(self.adult.train_pd)
+
+    shape_values, initial_values = model.predict_shap(self.adult.test_pd)
+
+    # Expected items
+    self.assertSameElements(model.input_feature_names(), shape_values.keys())
+    for _, v in shape_values.items():
+      self.assertEqual(v.shape, (self.adult.test_pd.shape[0],))
+    self.assertEqual(initial_values.shape, ())
+
+    # Predictions match
+    predictions = model.predict(self.adult.test_pd)
+    predictions_from_shap = sigmoid(
+        initial_values + np.sum([v for v in shape_values.values()], axis=0)
+    )
+    npt.assert_almost_equal(predictions, predictions_from_shap, decimal=5)
+
+  def test_shap_iris(self):
+    dataset = pd.read_csv(
+        os.path.join(test_utils.ydf_test_data_path(), "dataset", "iris.csv")
+    )
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="class", num_trees=20
+    ).train(dataset)
+
+    shape_values, initial_values = model.predict_shap(dataset)
+
+    # Expected items
+    self.assertSameElements(model.input_feature_names(), shape_values.keys())
+    for _, v in shape_values.items():
+      self.assertEqual(v.shape, (dataset.shape[0], 3))
+    self.assertEqual(initial_values.shape, (3,))
+
+    # Predictions match
+    predictions = model.predict(dataset)
+    predictions_from_shap = softmax(
+        initial_values + np.sum([v for v in shape_values.values()], axis=0)
+    )
+    npt.assert_almost_equal(predictions, predictions_from_shap, decimal=5)
+
+  def test_label_stored_in_model(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="label"
+    ).train(ds)
+    self.assertEqual(model.label_col_idx(), 0)
+    self.assertEqual(model.label(), "label")
 
 
 if __name__ == "__main__":

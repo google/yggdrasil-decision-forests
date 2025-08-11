@@ -1,0 +1,162 @@
+Type: "GRADIENT_BOOSTED_TREES"
+Task: CLASSIFICATION
+Label: "class"
+
+Input Features (4):
+	Sepal.Length
+	Sepal.Width
+	Petal.Length
+	Petal.Width
+
+No weights
+
+Variable Importance: INV_MEAN_MIN_DEPTH:
+    1. "Petal.Length"  0.518783 ################
+    2.  "Petal.Width"  0.442047 ###########
+    3. "Sepal.Length"  0.291618 ##
+    4.  "Sepal.Width"  0.250392 
+
+Variable Importance: NUM_AS_ROOT:
+    1.  "Petal.Width" 26.000000 ################
+    2. "Petal.Length" 24.000000 ##############
+    3. "Sepal.Length"  4.000000 
+
+Variable Importance: NUM_NODES:
+    1. "Petal.Length" 178.000000 ################
+    2.  "Petal.Width" 154.000000 ###########
+    3. "Sepal.Length" 125.000000 #####
+    4.  "Sepal.Width" 100.000000 
+
+Variable Importance: SUM_SCORE:
+    1.  "Petal.Width" 212.154881 ################
+    2. "Petal.Length" 68.967838 #####
+    3. "Sepal.Length"  1.676458 
+    4.  "Sepal.Width"  1.389893 
+
+
+
+Loss: MULTINOMIAL_LOG_LIKELIHOOD
+Validation loss value: 0.0945915
+Number of trees per iteration: 3
+Node format: BLOB_SEQUENCE_GZIP
+Number of trees: 54
+Total number of nodes: 1168
+
+Number of nodes by tree:
+Count: 54 Average: 21.6296 StdDev: 4.71128
+Min: 5 Max: 33 Ignored: 0
+----------------------------------------------
+[  5,  6)  1   1.85%   1.85% #
+[  6,  7)  0   0.00%   1.85%
+[  7,  9)  0   0.00%   1.85%
+[  9, 10)  0   0.00%   1.85%
+[ 10, 12)  1   1.85%   3.70% #
+[ 12, 13)  0   0.00%   3.70%
+[ 13, 15)  0   0.00%   3.70%
+[ 15, 16)  3   5.56%   9.26% ##
+[ 16, 18)  3   5.56%  14.81% ##
+[ 18, 19)  0   0.00%  14.81%
+[ 19, 20)  8  14.81%  29.63% #####
+[ 20, 22) 15  27.78%  57.41% ##########
+[ 22, 23)  0   0.00%  57.41%
+[ 23, 25)  9  16.67%  74.07% ######
+[ 25, 26)  6  11.11%  85.19% ####
+[ 26, 28)  3   5.56%  90.74% ##
+[ 28, 29)  0   0.00%  90.74%
+[ 29, 31)  3   5.56%  96.30% ##
+[ 31, 32)  1   1.85%  98.15% #
+[ 32, 33]  1   1.85% 100.00% #
+
+Depth by leafs:
+Count: 611 Average: 3.99345 StdDev: 1.13129
+Min: 1 Max: 5 Ignored: 0
+----------------------------------------------
+[ 1, 2)   3   0.49%   0.49%
+[ 2, 3)  94  15.38%  15.88% ###
+[ 3, 4)  93  15.22%  31.10% ###
+[ 4, 5) 135  22.09%  53.19% #####
+[ 5, 5] 286  46.81% 100.00% ##########
+
+Number of training obs by leaf:
+Count: 611 Average: 11.8429 StdDev: 13.2088
+Min: 5 Max: 81 Ignored: 0
+----------------------------------------------
+[  5,  8) 405  66.28%  66.28% ##########
+[  8, 12)  64  10.47%  76.76% ##
+[ 12, 16)  16   2.62%  79.38%
+[ 16, 20)  26   4.26%  83.63% #
+[ 20, 24)  20   3.27%  86.91%
+[ 24, 28)  16   2.62%  89.53%
+[ 28, 31)   7   1.15%  90.67%
+[ 31, 35)   8   1.31%  91.98%
+[ 35, 39)   4   0.65%  92.64%
+[ 39, 43)   5   0.82%  93.45%
+[ 43, 47)  19   3.11%  96.56%
+[ 47, 51)   4   0.65%  97.22%
+[ 51, 55)   0   0.00%  97.22%
+[ 55, 58)   0   0.00%  97.22%
+[ 58, 62)   4   0.65%  97.87%
+[ 62, 66)   5   0.82%  98.69%
+[ 66, 70)   7   1.15%  99.84%
+[ 70, 74)   0   0.00%  99.84%
+[ 74, 78)   0   0.00%  99.84%
+[ 78, 81]   1   0.16% 100.00%
+
+Attribute in nodes:
+	178 : Petal.Length [NUMERICAL]
+	154 : Petal.Width [NUMERICAL]
+	125 : Sepal.Length [NUMERICAL]
+	100 : Sepal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+	26 : Petal.Width [NUMERICAL]
+	24 : Petal.Length [NUMERICAL]
+	4 : Sepal.Length [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	56 : Petal.Length [NUMERICAL]
+	47 : Sepal.Length [NUMERICAL]
+	46 : Petal.Width [NUMERICAL]
+	10 : Sepal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	105 : Petal.Length [NUMERICAL]
+	78 : Petal.Width [NUMERICAL]
+	62 : Sepal.Length [NUMERICAL]
+	30 : Sepal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	138 : Petal.Length [NUMERICAL]
+	114 : Petal.Width [NUMERICAL]
+	99 : Sepal.Length [NUMERICAL]
+	63 : Sepal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	178 : Petal.Length [NUMERICAL]
+	154 : Petal.Width [NUMERICAL]
+	125 : Sepal.Length [NUMERICAL]
+	100 : Sepal.Width [NUMERICAL]
+
+Condition type in nodes:
+	557 : HigherCondition
+Condition type in nodes with depth <= 0:
+	54 : HigherCondition
+Condition type in nodes with depth <= 1:
+	159 : HigherCondition
+Condition type in nodes with depth <= 2:
+	275 : HigherCondition
+Condition type in nodes with depth <= 3:
+	414 : HigherCondition
+Condition type in nodes with depth <= 5:
+	557 : HigherCondition
+
+Training logs:
+Number of iteration to final model: 18
+	Iter:1 train-loss:0.840068 valid-loss:0.842532  train-accuracy:0.970149 valid-accuracy:1.000000
+	Iter:2 train-loss:0.662135 valid-loss:0.664902  train-accuracy:0.970149 valid-accuracy:1.000000
+	Iter:3 train-loss:0.532647 valid-loss:0.530634  train-accuracy:0.970149 valid-accuracy:1.000000
+	Iter:4 train-loss:0.434562 valid-loss:0.433510  train-accuracy:0.970149 valid-accuracy:1.000000
+	Iter:5 train-loss:0.358088 valid-loss:0.357435  train-accuracy:0.970149 valid-accuracy:1.000000
+	Iter:6 train-loss:0.298659 valid-loss:0.298604  train-accuracy:0.970149 valid-accuracy:1.000000
+	Iter:16 train-loss:0.059158 valid-loss:0.099521  train-accuracy:1.000000 valid-accuracy:0.937500
+	Iter:26 train-loss:0.014664 valid-loss:0.108613  train-accuracy:1.000000 valid-accuracy:0.937500

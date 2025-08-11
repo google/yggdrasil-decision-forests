@@ -28,7 +28,6 @@
 #include <queue>
 #include <random>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -246,108 +245,117 @@ bool MinMaxNumericalAttribute(
   return !first;
 }
 
-// Search for the attribute item that maximize the immediate variance reduction.
+// For each dictionary item of a Categorical Set attribute, computes the label
+// distribution of examples containing this item. This distribution is
+// equivalent as the label distribution of the positive branch splitted on a
+// categorical-set condition with mask equal to {item}.
 template <bool weighted>
-std::pair<int, double> GetAttributeValueWithMaximumVarianceReduction(
-    const double variance_reduction, const int32_t num_attribute_classes,
-    const utils::BinaryToNormalDistributionDouble& split_label_distribution,
+std::vector<utils::BinaryToNormalDistributionDouble>
+InitializeRegressionAttributeDistributions(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
-    const std::vector<bool>& positive_selected_example_bitmap,
+    const std::vector<float>& labels, const std::vector<float>& weights,
     const std::vector<std::pair<size_t, size_t>>& attribute_values,
-    const std::vector<int>& attribute_bank, const std::vector<float>& weights,
-    const std::vector<float>& labels, const double initial_variance,
-    std::vector<UnsignedExampleIdx>* running_attr_bank_idx,
-    std::vector<bool>* candidate_attributes_bitmap) {
+    const std::vector<int>& attribute_bank,
+    const utils::NormalDistributionDouble& label_distribution,
+    const std::vector<bool>& candidate_attributes_bitmap) {
   if constexpr (weighted) {
     DCHECK_EQ(weights.size(), labels.size());
   } else {
     DCHECK(weights.empty());
   }
-  // Search for the attribute item that maximize the variance reduction. Note:
-  // We ignore attribute that reduce the current variance reduction.
-  double best_candidate_variance_reduction = variance_reduction;
-  int best_attr_value = -1;
-  for (int candidate_attr_value = 0;
-       candidate_attr_value < num_attribute_classes; candidate_attr_value++) {
-    if (!(*candidate_attributes_bitmap)[candidate_attr_value]) {
-      // The attribute value was already selected or was excluded from the
-      // search space.
-      continue;
-    }
-    // Compute the variance reduction of the already selected values
-    // "positive_attributes_vector" and the candidate value
-    // "candidate_attr_value".
-    utils::BinaryToNormalDistributionDouble candidate_split_label_distribution =
-        split_label_distribution;
-    bool has_neg = false;
-    bool has_pos = false;
-    for (size_t select_idx = 0; select_idx < selected_examples.size();
-         select_idx++) {
-      const auto example_idx = selected_examples[select_idx];
-      if (positive_selected_example_bitmap[select_idx]) {
-        // The example is already in the positive set.
+  const int num_attribute_classes = candidate_attributes_bitmap.size();
+
+  // Initialize all candidates with the full distribution in the negative side.
+  std::vector<utils::BinaryToNormalDistributionDouble> attribute_distributions(
+      num_attribute_classes,
+      utils::BinaryToNormalDistributionDouble(label_distribution, {}));
+
+  // For every attribute value, push all examples containing this value to the
+  // positive side of the corresponding distribution.
+  for (const auto example_idx : selected_examples) {
+    const float label = labels[example_idx];
+    const auto& example_attrs_range = attribute_values[example_idx];
+
+    // Iterate through attributes present in this example
+    for (auto bank_idx = example_attrs_range.first;
+         bank_idx < example_attrs_range.second; ++bank_idx) {
+      const int candidate_attr_value = attribute_bank[bank_idx];
+      if (!candidate_attributes_bitmap[candidate_attr_value]) {
         continue;
       }
-
-      // Search if X = attribute_bank[ attribute_values[example_idx].first,
-      // attribute_values[example_idx].second ] contains the current candidate
-      // attribute value "candidate_attr_value".
-      //
-      // We use "running_attr_bank_idx[select_idx]" that contains the index in
-      // "X" of the last tested candidate attribute.
-      //
-      // Note: "X" does not contains duplicates and is sorted in increasing
-      // order. The candidate attributes "candidate_attr_value" are testing in
-      // increasing order.
-      bool match = false;
-      UnsignedExampleIdx last_attr;
-      while (
-          (*running_attr_bank_idx)[select_idx] <
-              attribute_values[example_idx].second &&
-          (last_attr = attribute_bank[(*running_attr_bank_idx)[select_idx]]) <=
-              candidate_attr_value) {
-        (*running_attr_bank_idx)[select_idx]++;
-        if (last_attr == candidate_attr_value) {
-          match = true;
-          break;
-        }
-      }
-
-      if (match) {
-        // Add the example to the positive set and remove it from the
-        // negative.
-        if constexpr (weighted) {
-          candidate_split_label_distribution.mutable_pos()->Add(
-              labels[example_idx], weights[example_idx]);
-          candidate_split_label_distribution.mutable_neg()->Add(
-              labels[example_idx], -weights[example_idx]);
-        } else {
-          candidate_split_label_distribution.mutable_pos()->Add(
-              labels[example_idx]);
-          candidate_split_label_distribution.mutable_neg()->Sub(
-              labels[example_idx]);
-        }
-        has_pos = true;
+      // This attribute is a candidate, update its stats
+      auto& dist = attribute_distributions[candidate_attr_value];
+      // Move example contribution from neg to pos.
+      if constexpr (weighted) {
+        const auto weight = weights[example_idx];
+        dist.mutable_pos()->Add(label, weight);
+        dist.mutable_neg()->Sub(label, weight);
       } else {
-        has_neg = true;
+        dist.mutable_pos()->Add(label);
+        dist.mutable_neg()->Sub(label);
       }
-    }
-    // Remove the attribute from the candidate set if the attribute is pure
-    // for the current negative set.
-    if (!has_neg || !has_pos) {
-      (*candidate_attributes_bitmap)[candidate_attr_value] = false;
-      continue;
-    }
-
-    const double candidate_variance_reduction =
-        initial_variance - candidate_split_label_distribution.FinalVariance();
-    if (candidate_variance_reduction > best_candidate_variance_reduction) {
-      // Best score so far.
-      best_candidate_variance_reduction = candidate_variance_reduction;
-      best_attr_value = candidate_attr_value;
     }
   }
-  return std::make_pair(best_attr_value, best_candidate_variance_reduction);
+
+  return attribute_distributions;
+}
+
+// For each dictionary item of a Categorical Set attribute, computes the label
+// distribution of examples containing this item. This distribution is
+// equivalent as the label distribution of the positive branch splitted on a
+// categorical-set condition with mask equal to {item}.
+template <bool weighted>
+std::vector<utils::BinaryToIntegerConfusionMatrixDouble>
+InitializeClassificationAttributeDistributions(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<int32_t>& labels, const std::vector<float>& weights,
+    const std::vector<std::pair<size_t, size_t>>& attribute_values,
+    const std::vector<int32_t>& attribute_bank,
+    const utils::IntegerDistributionDouble& label_distribution,
+    const std::vector<bool>& candidate_attributes_bitmap) {
+  if constexpr (weighted) {
+    DCHECK_EQ(weights.size(), labels.size());
+  } else {
+    DCHECK(weights.empty());
+  }
+  const int num_attribute_classes = candidate_attributes_bitmap.size();
+
+  // Initialize all candidates with the full distribution in the negative side.
+  std::vector<utils::BinaryToIntegerConfusionMatrixDouble>
+      attribute_distributions(
+          num_attribute_classes,
+          utils::BinaryToIntegerConfusionMatrixDouble(
+              label_distribution, utils::IntegerDistributionDouble(
+                                      label_distribution.NumClasses())));
+
+  // For every attribute value, push all examples containing this value to the
+  // positive side of the corresponding distribution.
+  for (const auto example_idx : selected_examples) {
+    const int32_t label = labels[example_idx];
+    const auto& example_attrs_range = attribute_values[example_idx];
+
+    // Iterate through attributes present in this example
+    for (auto bank_idx = example_attrs_range.first;
+         bank_idx < example_attrs_range.second; ++bank_idx) {
+      const int32_t candidate_attr_value = attribute_bank[bank_idx];
+      if (!candidate_attributes_bitmap[candidate_attr_value]) {
+        continue;
+      }
+      // This attribute is a candidate, update its stats
+      auto& dist = attribute_distributions[candidate_attr_value];
+      // Move example contribution from neg to pos.
+      if constexpr (weighted) {
+        const auto weight = weights[example_idx];
+        dist.mutable_pos()->Add(label, weight);
+        dist.mutable_neg()->Sub(label, weight);
+      } else {
+        dist.mutable_pos()->Add(label);
+        dist.mutable_neg()->Sub(label);
+      }
+    }
+  }
+
+  return attribute_distributions;
 }
 
 // Select which sorting strategy to use effectively.
@@ -503,14 +511,27 @@ absl::StatusOr<SplitSearchResult> FindBestConditionClassification(
               dataset::VerticalDataset::CategoricalSetColumn>(attribute_idx));
       const auto num_attribute_classes =
           attribute_column_spec.categorical().number_of_unique_values();
-      ASSIGN_OR_RETURN(
-          result,
-          FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
-              selected_examples, weights, *attribute_data,
-              label_stats.label_data, num_attribute_classes,
-              label_stats.num_label_classes, min_num_obs, dt_config,
-              label_stats.label_distribution, attribute_idx, best_condition,
-              random));
+      if (weights.empty()) {
+        ASSIGN_OR_RETURN(
+            result,
+            FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<
+                /*weighted=*/false>(selected_examples, weights, *attribute_data,
+                                    label_stats.label_data,
+                                    num_attribute_classes,
+                                    label_stats.num_label_classes, min_num_obs,
+                                    dt_config, label_stats.label_distribution,
+                                    attribute_idx, best_condition, random));
+      } else {
+        ASSIGN_OR_RETURN(
+            result,
+            FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<
+                /*weighted=*/true>(selected_examples, weights, *attribute_data,
+                                   label_stats.label_data,
+                                   num_attribute_classes,
+                                   label_stats.num_label_classes, min_num_obs,
+                                   dt_config, label_stats.label_distribution,
+                                   attribute_idx, best_condition, random));
+      }
     } break;
 
     case dataset::proto::ColumnType::BOOLEAN: {
@@ -1499,11 +1520,10 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   // Note that next_job_to_process < next_job_to_schedule always holds.
   if (internal_config.split_finder_processor == nullptr) {
     return absl::InternalError(
-        absl::Substitute("Multi-threaded execution requested but no worker "
-                         "threads created. Expected $0 threads",
-                         internal_config.num_threads));
+        "Multi-threaded execution requested but no worker threads created.");
   }
-  const int num_threads = internal_config.num_threads;
+  const int num_threads = internal_config.split_finder_processor->num_threads();
+  DCHECK_GT(num_threads, 0);
 
   if (config_link.features().empty()) {
     return false;
@@ -1817,9 +1837,18 @@ absl::StatusOr<bool> FindBestCondition(
       if (label_stat.label_distribution.NumClasses() >= 1 &&
           label_stat.label_distribution.count(
               dataset::kOutOfDictionaryItemIndex) > 0) {
-        return absl::InternalError(
-            absl::StrCat("The training label column \"", config.label(),
-                         "\" contain out-of-dictionary (=0) values."));
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The categorical training label column \"", config.label(),
+            "\" contains out-of-dictionary values. This is not allowed. "
+            "Most likely, the subset of the training dataset used to compute "
+            "the label dictionary did not contain some label values found in "
+            "the remaining of the training dataset. To solve this issue, "
+            "increase the number of training examples used to compute "
+            "dictionnaries with "
+            "`max_num_scanned_rows_to_compute_statistics=100000` (or a larger "
+            "value). To use all the training examples to build the dictionary, "
+            "use `max_num_scanned_rows_to_compute_statistics=-1` (Warning: "
+            "this can be slow on large datasets)."));
       }
 
       return FindBestConditionManager(train_dataset, selected_examples, weights,
@@ -3012,6 +3041,7 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureCategorical(
   }
 }
 
+template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
@@ -3023,9 +3053,13 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random) {
+  // TODO: `min_num_obs`is currently ignored.
   if (!weights.empty()) {
     DCHECK_EQ(weights.size(), labels.size());
   }
+
+  const int max_iterations =
+      dt_config.categorical_set_greedy_forward().max_selected_items();
   // Bitmap of available attribute values. During the course of the algorithm,
   // an attribute value is available if:
   //  - It is selected by the initial random sampling of candidate attribute
@@ -3078,6 +3112,12 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     return SplitSearchResult::kInvalidAttribute;
   }
 
+  // TODO: Cache this variable.
+  auto per_attribute_value_distributions =
+      InitializeClassificationAttributeDistributions<weighted>(
+          selected_examples, labels, weights, attribute_values, attribute_bank,
+          label_distribution, candidate_attributes_bitmap);
+
   // Contains, for each example, the index in the "attribute_bank"
   // corresponding to the next candidate attribute value
   // "candidate_attr_value".
@@ -3088,140 +3128,138 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
   std::vector<UnsignedExampleIdx> running_attr_bank_idx(
       selected_examples.size());
 
-  const int max_iterations =
-      dt_config.categorical_set_greedy_forward().max_selected_items();
-  int num_iterations = 0;
-
   const double initial_entropy = split_label_distribution.InitEntropy();
   // Information gain of the current condition i.e.
   // "positive_attributes_vector".
   double information_gain = 0;
   while (true) {
-    if (max_iterations > 0 && num_iterations >= max_iterations) {
-      break;
-    }
-
-    // Initialize the running attribute bank index.
-    for (size_t select_idx = 0; select_idx < selected_examples.size();
-         select_idx++) {
-      const auto example_idx = selected_examples[select_idx];
-      running_attr_bank_idx[select_idx] = attribute_values[example_idx].first;
-    }
-    // Search for the attribute item that maximize the information gain. Note:
-    // We ignore attribute that reduce the current information gain.
-    double best_candidate_information_gain = information_gain;
+    double best_information_gain = information_gain;
     int best_attr_value = -1;
-    for (int candidate_attr_value = 0;
-         candidate_attr_value < num_attribute_classes; candidate_attr_value++) {
-      if (!candidate_attributes_bitmap[candidate_attr_value]) {
-        // The attribute value was already selected or was excluded from the
-        // search space.
+    for (int attr_idx = 0; attr_idx < num_attribute_classes; ++attr_idx) {
+      if (!candidate_attributes_bitmap[attr_idx]) {
         continue;
       }
-      // Compute the information gains of the already selected values
-      // "positive_attributes_vector" and the candidate value
-      // "candidate_attr_value".
-      utils::BinaryToIntegerConfusionMatrixDouble
-          candidate_split_label_distribution = split_label_distribution;
-      int64_t num_absent_in_negative_set = 0;
-      for (size_t select_idx = 0; select_idx < selected_examples.size();
-           select_idx++) {
-        const auto example_idx = selected_examples[select_idx];
-        if (positive_selected_example_bitmap[select_idx]) {
-          // The example is already in the positive set.
+      const auto& cur_attr_value_dist =
+          per_attribute_value_distributions[attr_idx];
+      if (cur_attr_value_dist.neg().NumObservations() == 0) {
+        candidate_attributes_bitmap[attr_idx] = false;
+        continue;
+      }
+      double candidate_information_gain =
+          initial_entropy - cur_attr_value_dist.FinalEntropy();
+      if (candidate_information_gain > best_information_gain) {
+        // Best score so far.
+        best_information_gain = candidate_information_gain;
+        best_attr_value = attr_idx;
+      }
+    }
+    if (best_attr_value == -1) {
+      // No attribute value improves the current state.
+      break;
+    }
+    // Fix the attribute value found to be for the positive side.
+    positive_attributes_vector.push_back(best_attr_value);
+    information_gain = best_information_gain;
+    // Update the attribute value distributions.
+    for (size_t select_idx = 0; select_idx < selected_examples.size();
+         select_idx++) {
+      // Does this example already belong to a side?
+      if (positive_selected_example_bitmap[select_idx]) {
+        continue;
+      }
+      const auto example_idx = selected_examples[select_idx];
+      const auto attr_values_range = attribute_values[example_idx];
+      // Check if the attribute is missing.
+      if (attr_values_range.first > attr_values_range.second) {
+        continue;
+      }
+      // Since second >= first, this is reasonable even if both are unsigned.
+      const auto attr_values_list_size =
+          attr_values_range.second - attr_values_range.first;
+      bool match;
+      // Profiling shows that std::binary_search is quite slow for small ranges,
+      // common for CatSet splits. The threshold 100 has not been optimized.
+      constexpr int binary_search_threshold = 100;
+      if (attr_values_list_size <= binary_search_threshold) {
+        // Linear search.
+        match = std::find(attribute_bank.begin() + attr_values_range.first,
+                          attribute_bank.begin() + attr_values_range.second,
+                          best_attr_value) !=
+                attribute_bank.begin() + attr_values_range.second;
+      } else {
+        match = std::binary_search(
+            attribute_bank.begin() + attr_values_range.first,
+            attribute_bank.begin() + attr_values_range.second, best_attr_value);
+      }
+      if (!match) {
+        // The example does not contain `best_attr_value` and therefore does not
+        // change side in any distribution.
+        continue;
+      }
+      const auto label = labels[example_idx];
+      positive_selected_example_bitmap[select_idx] = true;
+      // Update the distribution of the result.
+      if constexpr (weighted) {
+        const auto weight = weights[example_idx];
+        split_label_distribution.mutable_pos()->Add(label, weight);
+        split_label_distribution.mutable_neg()->Sub(label, weight);
+      } else {
+        split_label_distribution.mutable_pos()->Add(label);
+        split_label_distribution.mutable_neg()->Sub(label);
+      }
+      split_label_distribution_no_weights.mutable_pos()->Add(label);
+      split_label_distribution_no_weights.mutable_neg()->Sub(label);
+      candidate_attributes_bitmap[best_attr_value] = false;
+
+      const auto attr_bank_begin =
+          attribute_bank.begin() + attribute_values[example_idx].first;
+      const auto attr_bank_end =
+          attribute_bank.begin() + attribute_values[example_idx].second;
+      auto current_attr_bank_iter = attr_bank_begin;
+
+      // Update the distributions of the other attribute values: Since the
+      // current example has been moved irrevocably to the positive side of
+      // the result, it has to be moved to the positive of every attribute
+      // value distribution. For the attribute values present in this example,
+      // this is already the case. Find the remaining ones and move it for
+      // them as well.
+      // attr_bank is sorted, so moving with two pointers ensures that this
+      // loop is linear in num_attribute_classes.
+      for (int current_attr_val = 0; current_attr_val < num_attribute_classes;
+           ++current_attr_val) {
+        if (!candidate_attributes_bitmap[current_attr_val]) {
+          // This attribute is already selected in the mask.
           continue;
         }
-
-        // Search if X = attribute_bank[ attribute_values[example_idx].first,
-        // attribute_values[example_idx].second ] contains the current
-        // candidate attribute value "candidate_attr_value".
-        //
-        // We use "running_attr_bank_idx[select_idx]" that contains the index
-        // in "X" of the last tested candidate attribute.
-        //
-        // Note: "X" does not contains duplicates and is sorted in increasing
-        // order. The candidate attributes "candidate_attr_value" are testing
-        // in increasing order.
-        bool match = false;
-        UnsignedExampleIdx last_attr;
-        while (
-            running_attr_bank_idx[select_idx] <
-                attribute_values[example_idx].second &&
-            (last_attr = attribute_bank[running_attr_bank_idx[select_idx]]) <=
-                candidate_attr_value) {
-          running_attr_bank_idx[select_idx]++;
-          if (last_attr == candidate_attr_value) {
-            match = true;
-            break;
-          }
+        while (current_attr_bank_iter != attr_bank_end &&
+               *current_attr_bank_iter < current_attr_val) {
+          ++current_attr_bank_iter;
         }
+        bool current_attr_val_is_in_bank =
+            (current_attr_bank_iter != attr_bank_end &&
+             *current_attr_bank_iter == current_attr_val);
 
-        if (match) {
-          // Add the example to the positive set and remove it from the
-          // negative.
-          float weight = weights.empty() ? 1.f : weights[example_idx];
-          candidate_split_label_distribution.mutable_pos()->Add(
-              labels[example_idx], weight);
-          candidate_split_label_distribution.mutable_neg()->Add(
-              labels[example_idx], -weight);
+        if (current_attr_val_is_in_bank) {
+          // The value is already on the positive side.
+          continue;
+        }
+        auto& cur_split_stats =
+            per_attribute_value_distributions[current_attr_val];
+        if constexpr (weighted) {
+          const auto weight = weights[example_idx];
+          cur_split_stats.mutable_pos()->Add(label, weight);
+          cur_split_stats.mutable_neg()->Sub(label, weight);
         } else {
-          num_absent_in_negative_set++;
+          cur_split_stats.mutable_pos()->Add(label);
+          cur_split_stats.mutable_neg()->Sub(label);
         }
-      }
-      // Remove the attribute from the candidate set if the attribute is pure
-      // for the current negative set.
-      if (num_absent_in_negative_set == 0 ||
-          num_absent_in_negative_set == selected_examples.size()) {
-        candidate_attributes_bitmap[candidate_attr_value] = false;
-        continue;
-      }
-
-      const double candidate_information_gain =
-          initial_entropy - candidate_split_label_distribution.FinalEntropy();
-      if (candidate_information_gain > best_candidate_information_gain) {
-        // Best score so far.
-        best_candidate_information_gain = candidate_information_gain;
-        best_attr_value = candidate_attr_value;
       }
     }
-    // Check if a satisfying attribute item was found.
-    if (best_attr_value == -1) {
+    // If the maximum number of iterations is reached, stop.
+    if (max_iterations > 0 &&
+        positive_attributes_vector.size() >= max_iterations) {
       break;
     }
-    // Add the attribute item to the positive set.
-    candidate_attributes_bitmap[best_attr_value] = false;
-    positive_attributes_vector.push_back(best_attr_value);
-    information_gain = best_candidate_information_gain;
-    // Update the label distributions in the positive and negative sets.
-    for (size_t select_idx = 0; select_idx < selected_examples.size();
-         select_idx++) {
-      const auto example_idx = selected_examples[select_idx];
-      if (positive_selected_example_bitmap[select_idx]) {
-        // The example is already in the positive set.
-        continue;
-      }
-      const bool match =
-          (attribute_values[example_idx].first <
-           attribute_values[example_idx].second) &&
-          std::binary_search(
-              attribute_bank.begin() + attribute_values[example_idx].first,
-              attribute_bank.begin() + attribute_values[example_idx].second,
-              best_attr_value);
-      if (match) {
-        positive_selected_example_bitmap[select_idx] = true;
-        float weight = weights.empty() ? 1.f : weights[example_idx];
-        split_label_distribution.mutable_pos()->Add(labels[example_idx],
-                                                    weight);
-        split_label_distribution.mutable_neg()->Add(labels[example_idx],
-                                                    -weight);
-        split_label_distribution_no_weights.mutable_pos()->Add(
-            labels[example_idx], 1);
-        split_label_distribution_no_weights.mutable_neg()->Add(
-            labels[example_idx], -1);
-      }
-    }
-
-    num_iterations++;
   }
 
   if (information_gain > condition->split_score()) {
@@ -3240,6 +3278,30 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
   }
 }
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::CategoricalSetColumn& attributes,
+    const std::vector<int32_t>& labels, const int32_t num_attribute_classes,
+    const int32_t num_label_classes, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::IntegerDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    utils::RandomEngine* random);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::CategoricalSetColumn& attributes,
+    const std::vector<int32_t>& labels, const int32_t num_attribute_classes,
+    const int32_t num_label_classes, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::IntegerDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    utils::RandomEngine* random);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
@@ -3252,11 +3314,15 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
     utils::RandomEngine* random) {
+  // TODO: `min_num_obs`is currently ignored.
   if constexpr (weighted) {
     DCHECK_EQ(weights.size(), labels.size());
   } else {
     DCHECK(weights.empty());
   }
+
+  const int max_iterations =
+      dt_config.categorical_set_greedy_forward().max_selected_items();
   // Bitmap of available attribute values. During the course of the algorithm,
   // an attribute value is available if:
   //  - It is selected by the initial random sampling of candidate attribute
@@ -3307,74 +3373,146 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     return SplitSearchResult::kInvalidAttribute;
   }
 
-  // Contains, for each example, the index in the "attribute_bank"
-  // corresponding to the next candidate attribute value
-  // "candidate_attr_value".
-  //
-  // When initialized, this corresponds to the index of the first values for
-  // this particular example: i.e. running_attr_bank_idx[select_idx] ==
-  // attribute_values[selected_examples[select_idx]].first.
-  std::vector<UnsignedExampleIdx> running_attr_bank_idx(
-      selected_examples.size());
+  // TODO: Cache this variable.
+  auto per_attribute_value_distributions =
+      InitializeRegressionAttributeDistributions<weighted>(
+          selected_examples, labels, weights, attribute_values, attribute_bank,
+          label_distribution, candidate_attributes_bitmap);
 
   const double initial_variance = label_distribution.Var();
+
   // Variance reduction of the current condition i.e.
   // "positive_attributes_vector".
-  double variance_reduction = 0;
+  double variance_reduction = 0.0;
+
   while (true) {
-    // Initialize the running attribute bank index.
-    for (size_t select_idx = 0; select_idx < selected_examples.size();
-         select_idx++) {
-      const auto example_idx = selected_examples[select_idx];
-      running_attr_bank_idx[select_idx] = attribute_values[example_idx].first;
-    }
-    // Find the attribute with best immediate variance reduction.
-    int best_attr_value;
-    double best_candidate_variance_reduction;
-    std::tie(best_attr_value, best_candidate_variance_reduction) =
-        GetAttributeValueWithMaximumVarianceReduction<weighted>(
-            variance_reduction, num_attribute_classes, split_label_distribution,
-            selected_examples, positive_selected_example_bitmap,
-            attribute_values, attribute_bank, weights, labels, initial_variance,
-            &running_attr_bank_idx, &candidate_attributes_bitmap);
-    // Check if a satisfying attribute item was found.
-    if (best_attr_value == -1) {
-      break;
-    }
-    // Add the attribute item to the positive set.
-    candidate_attributes_bitmap[best_attr_value] = false;
-    positive_attributes_vector.push_back(best_attr_value);
-    variance_reduction = best_candidate_variance_reduction;
-    // Update the label distributions in the positive and negative sets.
-    for (size_t select_idx = 0; select_idx < selected_examples.size();
-         select_idx++) {
-      const auto example_idx = selected_examples[select_idx];
-      if (positive_selected_example_bitmap[select_idx]) {
-        // The example is already in the positive set.
+    // Find which attribute value currently achieves the best variance
+    // reduction.
+    double best_variance_reduction = variance_reduction;
+    int best_attr_value = -1;
+    for (int attr_idx = 0; attr_idx < num_attribute_classes; ++attr_idx) {
+      const auto& cur_attr_value_dist =
+          per_attribute_value_distributions[attr_idx];
+      if (!candidate_attributes_bitmap[attr_idx]) {
         continue;
       }
-      const bool match =
-          (attribute_values[example_idx].first <
-           attribute_values[example_idx].second) &&
-          std::binary_search(
-              attribute_bank.begin() + attribute_values[example_idx].first,
-              attribute_bank.begin() + attribute_values[example_idx].second,
-              best_attr_value);
-      if (match) {
-        positive_selected_example_bitmap[select_idx] = true;
-        if constexpr (weighted) {
-          split_label_distribution.mutable_pos()->Add(labels[example_idx],
-                                                      weights[example_idx]);
-          split_label_distribution.mutable_neg()->Sub(labels[example_idx],
-                                                      weights[example_idx]);
-        } else {
-          split_label_distribution.mutable_pos()->Add(labels[example_idx]);
-          split_label_distribution.mutable_neg()->Sub(labels[example_idx]);
+      if (cur_attr_value_dist.neg().NumObservations() == 0) {
+        candidate_attributes_bitmap[attr_idx] = false;
+        continue;
+      }
+      double candidate_variance_reduction =
+          initial_variance - cur_attr_value_dist.FinalVariance();
+      if (candidate_variance_reduction > best_variance_reduction) {
+        best_variance_reduction = candidate_variance_reduction;
+        best_attr_value = attr_idx;
+      }
+    }
+    if (best_attr_value == -1) {
+      // No attribute value improves the current state.
+      break;
+    }
+    // Fix the attribute value found to be for the positive side.
+    positive_attributes_vector.push_back(best_attr_value);
+    variance_reduction = best_variance_reduction;
+    // Update the attribute value distributions.
+    for (size_t select_idx = 0; select_idx < selected_examples.size();
+         select_idx++) {
+      // Does this example already belong to a side?
+      if (positive_selected_example_bitmap[select_idx]) {
+        continue;
+      }
+      const auto example_idx = selected_examples[select_idx];
+      const auto attr_values_range = attribute_values[example_idx];
+      // Check if the attribute is missing.
+      if (attr_values_range.first > attr_values_range.second) {
+        continue;
+      }
+      // Since second >= first, this is reasonable even if both are unsigned.
+      const auto attr_values_list_size =
+          attr_values_range.second - attr_values_range.first;
+      bool match;
+      // Profiling shows that std::binary_search is quite slow for small ranges,
+      // common for CatSet splits. The threshold 100 has not been optimized.
+      constexpr int binary_search_threshold = 100;
+      if (attr_values_list_size <= binary_search_threshold) {
+        // Linear search.
+        match = std::find(attribute_bank.begin() + attr_values_range.first,
+                          attribute_bank.begin() + attr_values_range.second,
+                          best_attr_value) !=
+                attribute_bank.begin() + attr_values_range.second;
+      } else {
+        match = std::binary_search(
+            attribute_bank.begin() + attr_values_range.first,
+            attribute_bank.begin() + attr_values_range.second, best_attr_value);
+      }
+      if (!match) {
+        // The example does not contain `best_attr_value` and therefore does not
+        // change side in any distribution.
+        continue;
+      }
+      const auto label = labels[example_idx];
+      positive_selected_example_bitmap[select_idx] = true;
+      // Update the distribution of the result.
+      if constexpr (weighted) {
+        const auto weight = weights[example_idx];
+        split_label_distribution.mutable_pos()->Add(label, weight);
+        split_label_distribution.mutable_neg()->Sub(label, weight);
+      } else {
+        split_label_distribution.mutable_pos()->Add(label);
+        split_label_distribution.mutable_neg()->Sub(label);
+      }
+      split_label_distribution_no_weights.mutable_pos()->Add(label);
+      split_label_distribution_no_weights.mutable_neg()->Sub(label);
+      candidate_attributes_bitmap[best_attr_value] = false;
+
+      // If the number of iterations is what we want, just stop the loop
+      if (max_iterations > 0 &&
+          positive_attributes_vector.size() >= max_iterations) {
+        break;
+      }
+
+      const auto attr_bank_begin =
+          attribute_bank.begin() + attribute_values[example_idx].first;
+      const auto attr_bank_end =
+          attribute_bank.begin() + attribute_values[example_idx].second;
+      auto current_attr_bank_iter = attr_bank_begin;
+
+      // Update the distributions of the other attribute values: Since the
+      // current example has been moved irrevocably to the positive side of
+      // the result, it has to be moved to the positive of every attribute
+      // value distribution. For the attribute values present in this example,
+      // this is already the case. Find the remaining ones and move it for
+      // them as well.
+      // attr_bank is sorted, so moving with two pointers ensures that this
+      // loop is linear in num_attribute_classes.
+      for (int current_attr_val = 0; current_attr_val < num_attribute_classes;
+           ++current_attr_val) {
+        if (!candidate_attributes_bitmap[current_attr_val]) {
+          // This attribute is already selected in the mask.
+          continue;
         }
-        split_label_distribution_no_weights.mutable_pos()->Add(
-            labels[example_idx]);
-        split_label_distribution_no_weights.mutable_neg()->Sub(
-            labels[example_idx]);
+        while (current_attr_bank_iter != attr_bank_end &&
+               *current_attr_bank_iter < current_attr_val) {
+          ++current_attr_bank_iter;
+        }
+        bool current_attr_val_is_in_bank =
+            (current_attr_bank_iter != attr_bank_end &&
+             *current_attr_bank_iter == current_attr_val);
+
+        if (current_attr_val_is_in_bank) {
+          // The value is already on the positive side.
+          continue;
+        }
+        auto& cur_split_stats =
+            per_attribute_value_distributions[current_attr_val];
+        if constexpr (weighted) {
+          const auto weight = weights[example_idx];
+          cur_split_stats.mutable_pos()->Add(label, weight);
+          cur_split_stats.mutable_neg()->Sub(label, weight);
+        } else {
+          cur_split_stats.mutable_pos()->Add(label);
+          cur_split_stats.mutable_neg()->Sub(label);
+        }
       }
     }
   }
@@ -4097,6 +4235,8 @@ absl::Status GrowTreeBestFirstGlobal(
   const auto ingest_node = [&](const SelectedExamplesRollingBuffer example_idxs,
                                NodeWithChildren* node,
                                const int depth) -> absl::Status {
+    node->mutable_node()->set_num_pos_training_examples_without_weight(
+        example_idxs.size());
     RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
         train_dataset, example_idxs.active, weights, config, config_link,
         node));
@@ -4318,6 +4458,15 @@ absl::Status DecisionTreeTrain(
   } else {
     working_selected_examples.assign(selected_examples.begin(),
                                      selected_examples.end());
+  }
+
+  if (!(dt_config.numerical_vector_sequence()
+            .enable_projected_more_than_conditions() ||
+        dt_config.numerical_vector_sequence()
+            .enable_closer_than_conditions())) {
+    return absl::InvalidArgumentError(
+        "No condition types for vector sequences are enabled. Enable "
+        "projected-more-than conditions, closer-than conditions or both.");
   }
 
   auto leaf_example_span = leaf_examples.has_value()

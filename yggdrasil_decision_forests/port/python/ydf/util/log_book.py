@@ -18,11 +18,11 @@ import enum
 import json
 import os
 import sqlite3
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, Union
 import pandas as pd
 
 # The values stored in an experiment.
-Value = str | float | int | bool | List | Dict | Set | Tuple | None
+Value = Optional[Union[str, float, int, bool, List, Dict, Set, Tuple]]
 # The unique identifier of an experiment.
 ExperimentKey = Dict[str, Value]
 # The results of an experiment.
@@ -111,7 +111,7 @@ class LogBook:
       directory: str,
       print_num_experiments: bool = True,
       mode: Mode = Mode.SQLITE,
-      default_keys: ExperimentKey | None = None,
+      default_keys: Optional[ExperimentKey] = None,
   ):
     """Initialize the log book in a directory."""
 
@@ -181,7 +181,7 @@ class LogBook:
     self._conn.commit()
 
   def to_dataframe(
-      self, key_filter: ExperimentKey | None = None
+      self, key_filter: Optional[ExperimentKey] = None
   ) -> pd.DataFrame:
     """Creates a Pandas Dataframe with all the experiments.
 
@@ -217,6 +217,12 @@ class LogBook:
     return pd.DataFrame.from_records(records)
 
   def _augment_key(self, key: ExperimentKey) -> ExperimentKey:
+
+    if not isinstance(key, dict):
+      raise ValueError(
+          f"The key should be a dictionary. Instead, got {type(key)}."
+      )
+
     new_key = key.copy()
     for k, v in self._default_keys.items():
       if k not in new_key:

@@ -40,6 +40,8 @@ class DecisionForestCCModel : public GenericCCModel {
  public:
   int num_trees() const { return df_model_->num_trees(); }
 
+  int num_nodes() const { return df_model_->num_nodes(); }
+
   absl::StatusOr<py::array_t<int32_t>> PredictLeaves(
       const dataset::VerticalDataset& dataset);
 

@@ -43,6 +43,9 @@ class CreateDatasetCacheWorker : public distribute::AbstractWorker {
   absl::Status Done() override { return absl::OkStatus(); }
 
  private:
+  absl::StatusOr<distribute::Blob> RunRequestImpl(
+      distribute::Blob serialized_request);
+
   absl::Status SeparateDatasetColumns(
       const proto::WorkerRequest::SeparateDatasetColumns& request,
       proto::WorkerResult::SeparateDatasetColumns* result);

@@ -67,7 +67,6 @@ void MoveFilenamesNoFailures(const std::string_view src_dir,
                              const std::vector<std::string>& filenames) {
   utils::concurrency::ThreadPool thread_pool(
       kNumThreads, {.name_prefix = std::string("MoveFilenamesNoFailures")});
-  thread_pool.StartWorkers();
   for (const auto& filename : filenames) {
     thread_pool.Schedule([filename, src_dir, dst_dir]() {
       const auto src_file = file::JoinPath(src_dir, filename);
@@ -293,7 +292,6 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
   {
     utils::concurrency::ThreadPool thread_pool(
         kNumThreads, {.name_prefix = std::string("ExportColumns")});
-    thread_pool.StartWorkers();
     for (const auto column_idx : request.columns()) {
       thread_pool.Schedule([&, column_idx]() {
         {
@@ -880,6 +878,16 @@ absl::Status CreateDatasetCacheWorker::Setup(Blob serialized_welcome) {
 }
 
 absl::StatusOr<Blob> CreateDatasetCacheWorker::RunRequest(
+    Blob serialized_request) {
+  auto status_or = RunRequestImpl(serialized_request);
+  if (!status_or.ok()) {
+    LOG(WARNING) << "Worker #" << WorkerIdx()
+                 << " failed to run request: " << status_or.status().message();
+  }
+  return status_or;
+}
+
+absl::StatusOr<Blob> CreateDatasetCacheWorker::RunRequestImpl(
     Blob serialized_request) {
   ASSIGN_OR_RETURN(auto request, utils::ParseBinaryProto<proto::WorkerRequest>(
                                      serialized_request));

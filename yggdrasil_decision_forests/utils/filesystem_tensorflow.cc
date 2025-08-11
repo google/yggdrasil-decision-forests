@@ -64,6 +64,10 @@ std::string GetBasename(absl::string_view path) {
   return Interface().GetBasename(path);
 }
 
+std::string GetDirname(absl::string_view path) {
+  return Interface().GetDirname(path);
+}
+
 absl::Status SetImmutable(absl::string_view path) { return absl::OkStatus(); }
 
 absl::Status SetBinaryProto(absl::string_view path,

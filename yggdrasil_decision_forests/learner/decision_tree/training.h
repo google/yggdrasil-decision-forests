@@ -263,9 +263,6 @@ struct InternalTrainConfig {
   float hessian_l2_numerical = 0.f;
   float hessian_l2_categorical = 0.f;
 
-  // Number of attributes tested in parallel (using fiber threads).
-  int num_threads = 1;
-
   // Non owning pointer to pre-processing information.
   // Depending on the decision tree configuration this field might be required.
   const Preprocessing* preprocessing = nullptr;
@@ -776,6 +773,7 @@ FindSplitLabelHessianRegressionFeatureCategorical(
 //    return positive_set
 //
 // `weights` may be empty and this is equivalent to unit weights.
+template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     absl::Span<const UnsignedExampleIdx> selected_examples,

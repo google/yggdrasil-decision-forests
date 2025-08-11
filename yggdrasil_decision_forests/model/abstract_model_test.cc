@@ -498,6 +498,17 @@ TEST(ProtoToFloatPrediction, AnomalyDetection) {
   EXPECT_FLOAT_EQ(dst_prediction[0], 0.2f);
 }
 
+TEST(ProtoToFloatPrediction, SurvivalAnalysis) {
+  std::vector<float> dst_prediction(1);
+  proto::Prediction prediction;
+  ASSERT_OK_AND_ASSIGN(
+      prediction, utils::ParseTextProto<proto::Prediction>(
+                      R"pb(survival_analysis { log_hazard_ratio: 0.2 })pb"));
+  ProtoToFloatPrediction(prediction, proto::Task::SURVIVAL_ANALYSIS,
+                         absl::Span<float>(dst_prediction));
+  EXPECT_FLOAT_EQ(dst_prediction[0], 0.2f);
+}
+
 TEST(Evaluate, FromVerticalDataset) {
   std::unique_ptr<model::AbstractModel> model;
   EXPECT_OK(model::LoadModel(
@@ -598,6 +609,59 @@ TEST(CompareModel, Base) {
   EXPECT_EQ(
       model1->DebugCompare(*model2),
       "name_ != other.name_ i.e. GRADIENT_BOOSTED_TREES != RANDOM_FOREST");
+}
+
+TEST(AbstractModel, ExportProto) {
+  FakeModel model;
+  model.set_label_col_idx(1);
+  model.set_label_event_observed_col_idx(2);
+  model.set_label_entry_age_col_idx(3);
+  model.set_ranking_group_col(4);
+  model.set_uplift_treatment_col(5);
+  model.set_classification_outputs_probabilities(false);
+  model.set_task(proto::Task::ANOMALY_DETECTION);
+  proto::AbstractModel proto;
+  AbstractModel::ExportProto(model, &proto);
+  EXPECT_THAT(
+      proto,
+      EqualsProto(utils::ParseTextProto<proto::AbstractModel>(R"pb(
+                    name: "FAKE_MODEL"
+                    task: ANOMALY_DETECTION
+                    label_col_idx: 1
+                    ranking_group_col_idx: 4
+                    classification_outputs_probabilities: false
+                    uplift_treatment_col_idx: 5
+                    metadata { owner: "" created_date: 0 uid: 0 framework: "" }
+                    is_pure_model: false
+                    label_entry_age_col_idx: 3
+                    label_event_observed_col_idx: 2
+                  )pb")
+                      .value()));
+}
+
+TEST(AbstractModel, ImportProto) {
+  FakeModel model;
+  const auto proto = utils::ParseTextProto<proto::AbstractModel>(R"pb(
+                       name: "FAKE_MODEL"
+                       task: ANOMALY_DETECTION
+                       label_col_idx: 1
+                       ranking_group_col_idx: 4
+                       classification_outputs_probabilities: false
+                       uplift_treatment_col_idx: 5
+                       is_pure_model: false
+                       label_entry_age_col_idx: 3
+                       label_event_observed_col_idx: 2
+                     )pb")
+                         .value();
+  AbstractModel::ImportProto(proto, &model);
+
+  EXPECT_EQ(model.label_col_idx(), 1);
+  EXPECT_EQ(model.label_event_observed_col_idx(), 2);
+  EXPECT_EQ(model.label_entry_age_col_idx(), 3);
+  EXPECT_EQ(model.ranking_group_col_idx(), 4);
+  EXPECT_EQ(model.uplift_treatment_col_idx(), 5);
+  EXPECT_EQ(model.classification_outputs_probabilities(), false);
+  EXPECT_EQ(model.task(), proto::Task::ANOMALY_DETECTION);
 }
 
 }  // namespace

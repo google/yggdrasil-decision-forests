@@ -223,12 +223,14 @@ cc_binary_ydf(
 cc_binary_ydf(
     name = "compile_model",
     srcs = ["compile_model.cc"],
+    visibility = ["//visibility:private"],
     deps = [
         ":all_file_systems",
         "//yggdrasil_decision_forests/serving/decision_forest:model_compiler",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/status:statusor",
     ],
 )

@@ -16,6 +16,8 @@
 // Outputs Python source code defining Python wrapper around Yggdrasil Decision
 // Forest learners.
 
+#include <iostream>
+
 #include "ydf/learner/wrapper/wrapper_generator.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 

@@ -96,8 +96,11 @@ TEST_P(BinomialLogLikelihoodLossTest, InitialPredictions) {
   if (weighted) {
     weights = {2.f, 4.f, 6.f, 8.f};
   }
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  const auto loss_imp =
+      BinomialLogLikelihoodLoss({{},
+                                 {},
+                                 model::proto::Task::CLASSIFICATION,
+                                 dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       auto init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 1, weights));
@@ -115,11 +118,13 @@ TEST(BinomialLogLikelihoodLossTest, UpdateGradients) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions = {0.f, 0.f, 0.f, 0.f};
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  const auto loss_imp =
+      BinomialLogLikelihoodLoss({{},
+                                 {},
+                                 model::proto::Task::CLASSIFICATION,
+                                 dataset.data_spec().columns(1)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 1,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 1, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
 
@@ -141,8 +146,11 @@ TEST_P(BinomialLogLikelihoodLossTest, ComputeLoss) {
     weights = {1.f, 2.f, 3.f, 4.f};
   }
   std::vector<float> predictions(dataset.nrow(), 0.f);
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  const auto loss_imp =
+      BinomialLogLikelihoodLoss({{},
+                                 {},
+                                 model::proto::Task::CLASSIFICATION,
+                                 dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
@@ -170,8 +178,11 @@ TEST(BinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   std::vector<float> weights(dataset.nrow(), 0.f);
   std::vector<float> predictions(dataset.nrow(), 0.f);
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  const auto loss_imp =
+      BinomialLogLikelihoodLoss({{},
+                                 {},
+                                 model::proto::Task::CLASSIFICATION,
+                                 dataset.data_spec().columns(1)});
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
@@ -184,8 +195,11 @@ TEST(BinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
 
 TEST(BinomialLogLikelihoodLossTest, SecondaryMetricName) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
-  const auto loss_imp = BinomialLogLikelihoodLoss(
-      {}, model::proto::Task::CLASSIFICATION, dataset.data_spec().columns(1));
+  const auto loss_imp =
+      BinomialLogLikelihoodLoss({{},
+                                 {},
+                                 model::proto::Task::CLASSIFICATION,
+                                 dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
 }
 

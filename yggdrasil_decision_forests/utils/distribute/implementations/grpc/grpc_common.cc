@@ -24,6 +24,7 @@ bool IsTransientError(const grpc::Status& status) {
   return (status.error_message() == "Socket closed" ||
           status.error_message() == "Transport closed" ||
           status.error_message() == "Connection reset by peer" ||
+          status.error_message() == "recvmsg:Connection reset by peer" ||
           status.error_message() == "Broken pipe" ||
           status.error_message() == "keepalive watchdog timeout" ||
           absl::StartsWith(status.error_message(),

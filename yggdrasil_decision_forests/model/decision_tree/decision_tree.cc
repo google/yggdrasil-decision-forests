@@ -486,9 +486,17 @@ bool NodeWithChildren::CheckStructure(
       break;
 
     case proto::Condition::kObliqueCondition:
-      // There is currently not logic to train oblique condition that don't
-      // follow global imputation.
-      return true;
+
+      if (options.global_imputation_is_higher ||
+          options.global_imputation_others) {
+        // There is currently not logic to train oblique condition that don't
+        // follow global imputation.
+        return true;
+      }
+      if (options.check_no_oblique_conditions) {
+        return false;
+      }
+      break;
 
     case proto::Condition::kDiscretizedHigherCondition:
 

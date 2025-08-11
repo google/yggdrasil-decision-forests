@@ -22,6 +22,7 @@
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -159,6 +160,50 @@ TEST(AbstractModel, LinkTrainingConfigAnomalyDetectionWithLabel) {
 
   EXPECT_EQ(config_link.label(), 0);
   EXPECT_THAT(config_link.features(), ElementsAre(1, 2));
+}
+
+TEST(AbstractModel, LinkTrainingConfigSurvivalAnalysisWithoutEntryAge) {
+  proto::TrainingConfig training_config;
+  training_config.set_task(proto::Task::SURVIVAL_ANALYSIS);
+  training_config.set_label("A");
+  training_config.set_label_event_observed("B");
+
+  dataset::proto::DataSpecification data_spec;
+  data_spec.add_columns()->set_name("A");
+  data_spec.add_columns()->set_name("B");
+  data_spec.add_columns()->set_name("C");
+  data_spec.add_columns()->set_name("D");
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_EQ(config_link.label(), 0);
+  EXPECT_EQ(config_link.label_event_observed(), 1);
+  EXPECT_THAT(config_link.features(), ElementsAre(2, 3));
+}
+
+TEST(AbstractModel, LinkTrainingConfigSurvivalAnalysisWithEntryAge) {
+  proto::TrainingConfig training_config;
+  training_config.set_task(proto::Task::SURVIVAL_ANALYSIS);
+  training_config.set_label("A");
+  training_config.set_label_event_observed("B");
+  training_config.set_label_entry_age("C");
+
+  dataset::proto::DataSpecification data_spec;
+  data_spec.add_columns()->set_name("A");
+  data_spec.add_columns()->set_name("B");
+  data_spec.add_columns()->set_name("C");
+  data_spec.add_columns()->set_name("D");
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_EQ(config_link.label(), 0);
+  EXPECT_EQ(config_link.label_event_observed(), 1);
+  EXPECT_EQ(config_link.label_entry_age(), 2);
+  EXPECT_THAT(config_link.features(), ElementsAre(3));
 }
 
 TEST(AbstractLearner, GenericHyperParameters) {
@@ -362,6 +407,29 @@ TEST(AbstractLearner, MaximumModelSizeInMemoryInBytes) {
       "-1 } }")));
   EXPECT_FALSE(
       learner.training_config().has_maximum_model_size_in_memory_in_bytes());
+}
+
+TEST(AbstractLearner, CheckConfigurationOODItems) {
+  proto::TrainingConfig training_config;
+  training_config.set_label("A");
+  training_config.set_task(proto::Task::CLASSIFICATION);
+
+  dataset::proto::DataSpecification data_spec;
+  auto* col_a = data_spec.add_columns();
+  col_a->set_name("A");
+  col_a->set_type(dataset::proto::ColumnType::CATEGORICAL);
+  (*col_a->mutable_categorical()
+        ->mutable_items())[dataset::kOutOfDictionaryItemKey]
+      .set_count(1);
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_THAT(AbstractLearner::CheckConfiguration(data_spec, training_config,
+                                                  config_link, {}),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "contains out-of-dictionary values"));
 }
 
 }  // namespace

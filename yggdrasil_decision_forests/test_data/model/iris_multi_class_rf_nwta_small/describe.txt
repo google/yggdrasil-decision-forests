@@ -1,0 +1,137 @@
+Type: "RANDOM_FOREST"
+Task: CLASSIFICATION
+Label: "class"
+
+Input Features (4):
+	Sepal.Length
+	Sepal.Width
+	Petal.Length
+	Petal.Width
+
+No weights
+
+Variable Importance: INV_MEAN_MIN_DEPTH:
+    1. "Petal.Length"  0.707071 ################
+    2.  "Petal.Width"  0.472813 #######
+    3. "Sepal.Length"  0.290617 
+    4.  "Sepal.Width"  0.280786 
+
+Variable Importance: NUM_AS_ROOT:
+    1. "Petal.Length"  8.000000 ################
+    2.  "Petal.Width"  2.000000 
+
+Variable Importance: NUM_NODES:
+    1. "Petal.Length" 19.000000 ################
+    2.  "Petal.Width" 15.000000 ############
+    3. "Sepal.Length"  5.000000 ##
+    4.  "Sepal.Width"  2.000000 
+
+Variable Importance: SUM_SCORE:
+    1. "Petal.Length" 1011.277595 ################
+    2.  "Petal.Width" 539.298366 ########
+    3. "Sepal.Length" 14.433505 
+    4.  "Sepal.Width"  3.079313 
+
+
+
+Winner takes all: false
+Out-of-bag evaluation: accuracy:0.952703 logloss:0.551981
+Number of trees: 10
+Total number of nodes: 92
+
+Number of nodes by tree:
+Count: 10 Average: 9.2 StdDev: 1.66132
+Min: 7 Max: 13 Ignored: 0
+----------------------------------------------
+[  7,  8) 2  20.00%  20.00% ###
+[  8,  9) 0   0.00%  20.00%
+[  9, 10) 6  60.00%  80.00% ##########
+[ 10, 11) 0   0.00%  80.00%
+[ 11, 12) 1  10.00%  90.00% ##
+[ 12, 13) 0   0.00%  90.00%
+[ 13, 13] 1  10.00% 100.00% ##
+
+Depth by leafs:
+Count: 51 Average: 2.72549 StdDev: 1.01128
+Min: 1 Max: 5 Ignored: 0
+----------------------------------------------
+[ 1, 2) 10  19.61%  19.61% ###
+[ 2, 3)  3   5.88%  25.49% #
+[ 3, 4) 31  60.78%  86.27% ##########
+[ 4, 5)  5   9.80%  96.08% ##
+[ 5, 5]  2   3.92% 100.00% #
+
+Number of training obs by leaf:
+Count: 51 Average: 29.4118 StdDev: 20.1788
+Min: 5 Max: 67 Ignored: 0
+----------------------------------------------
+[  5,  8) 14  27.45%  27.45% ##########
+[  8, 11)  5   9.80%  37.25% ####
+[ 11, 14)  2   3.92%  41.18% #
+[ 14, 17)  0   0.00%  41.18%
+[ 17, 20)  0   0.00%  41.18%
+[ 20, 23)  0   0.00%  41.18%
+[ 23, 27)  1   1.96%  43.14% #
+[ 27, 30)  1   1.96%  45.10% #
+[ 30, 33)  0   0.00%  45.10%
+[ 33, 36)  1   1.96%  47.06% #
+[ 36, 39)  2   3.92%  50.98% #
+[ 39, 42)  6  11.76%  62.75% ####
+[ 42, 45)  3   5.88%  68.63% ##
+[ 45, 49)  6  11.76%  80.39% ####
+[ 49, 52)  3   5.88%  86.27% ##
+[ 52, 55)  3   5.88%  92.16% ##
+[ 55, 58)  1   1.96%  94.12% #
+[ 58, 61)  2   3.92%  98.04% #
+[ 61, 64)  0   0.00%  98.04%
+[ 64, 67]  1   1.96% 100.00% #
+
+Attribute in nodes:
+	19 : Petal.Length [NUMERICAL]
+	15 : Petal.Width [NUMERICAL]
+	5 : Sepal.Length [NUMERICAL]
+	2 : Sepal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 0:
+	8 : Petal.Length [NUMERICAL]
+	2 : Petal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 1:
+	12 : Petal.Length [NUMERICAL]
+	8 : Petal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 2:
+	18 : Petal.Length [NUMERICAL]
+	15 : Petal.Width [NUMERICAL]
+	3 : Sepal.Length [NUMERICAL]
+	1 : Sepal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 3:
+	19 : Petal.Length [NUMERICAL]
+	15 : Petal.Width [NUMERICAL]
+	4 : Sepal.Length [NUMERICAL]
+	2 : Sepal.Width [NUMERICAL]
+
+Attribute in nodes with depth <= 5:
+	19 : Petal.Length [NUMERICAL]
+	15 : Petal.Width [NUMERICAL]
+	5 : Sepal.Length [NUMERICAL]
+	2 : Sepal.Width [NUMERICAL]
+
+Condition type in nodes:
+	41 : HigherCondition
+Condition type in nodes with depth <= 0:
+	10 : HigherCondition
+Condition type in nodes with depth <= 1:
+	20 : HigherCondition
+Condition type in nodes with depth <= 2:
+	37 : HigherCondition
+Condition type in nodes with depth <= 3:
+	40 : HigherCondition
+Condition type in nodes with depth <= 5:
+	41 : HigherCondition
+Node format: BLOB_SEQUENCE_GZIP
+
+Training OOB:
+	trees: 1, Out-of-bag evaluation: accuracy:0.95082 logloss:1.20515
+	trees: 10, Out-of-bag evaluation: accuracy:0.952703 logloss:0.551981

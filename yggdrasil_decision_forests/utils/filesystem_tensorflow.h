@@ -162,6 +162,13 @@ absl::StatusOr<bool> FileExists(absl::string_view path);
 //   EXPECT_EQ(basename, "file.txt");
 std::string GetBasename(absl::string_view path);
 
+// Gets the dirname of the path.
+//
+// Usage example:
+//   std::string dirname = GetDirname("/path/to/my/file.txt");
+//   EXPECT_EQ(dirname, "/path/to/my");
+std::string GetDirname(absl::string_view path);
+
 // Renames a file or a directory.
 absl::Status Rename(absl::string_view from, absl::string_view to, int options);
 

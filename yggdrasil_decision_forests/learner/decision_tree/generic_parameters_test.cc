@@ -52,6 +52,7 @@ TEST(GenericParameters, GiveValidAndInvalidHyperparameters) {
       kHParamCategoricalSetSplitGreedySampling,
       kHParamCategoricalSetSplitMaxNumItems,
       kHParamCategoricalSetSplitMinItemFrequency,
+      kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       kHParamGrowingStrategy,
       kHParamMaxNumNodes,
       kHParamSplitAxis,
@@ -77,6 +78,8 @@ TEST(GenericParameters, GiveValidAndInvalidHyperparameters) {
       kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
       kHParamNumericalVectorSequenceNumExamples,
       kHParamNumericalVectorSequenceNumRandomAnchors,
+      kHParamNumericalVectorSequenceEnableCloserThanConditions,
+      kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
   };
   EXPECT_OK(GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters));
@@ -101,6 +104,7 @@ TEST(GenericParameters, MissingValidHyperparameters) {
       kHParamCategoricalSetSplitGreedySampling,
       kHParamCategoricalSetSplitMaxNumItems,
       kHParamCategoricalSetSplitMinItemFrequency,
+      kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       kHParamGrowingStrategy,
       kHParamMaxNumNodes,
       kHParamSplitAxis,
@@ -126,6 +130,8 @@ TEST(GenericParameters, MissingValidHyperparameters) {
       kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
       kHParamNumericalVectorSequenceNumExamples,
       kHParamNumericalVectorSequenceNumRandomAnchors,
+      kHParamNumericalVectorSequenceEnableCloserThanConditions,
+      kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -148,6 +154,7 @@ TEST(GenericParameters, MissingInvalidHyperparameters) {
       kHParamCategoricalSetSplitGreedySampling,
       kHParamCategoricalSetSplitMaxNumItems,
       kHParamCategoricalSetSplitMinItemFrequency,
+      kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       kHParamGrowingStrategy,
       kHParamMaxNumNodes,
       kHParamSplitAxis,
@@ -173,6 +180,8 @@ TEST(GenericParameters, MissingInvalidHyperparameters) {
       kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
       kHParamNumericalVectorSequenceNumExamples,
       kHParamNumericalVectorSequenceNumRandomAnchors,
+      kHParamNumericalVectorSequenceEnableCloserThanConditions,
+      kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -196,6 +205,7 @@ TEST(GenericParameters, UnknownValidHyperparameter) {
       kHParamCategoricalSetSplitGreedySampling,
       kHParamCategoricalSetSplitMaxNumItems,
       kHParamCategoricalSetSplitMinItemFrequency,
+      kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       kHParamGrowingStrategy,
       kHParamMaxNumNodes,
       kHParamSplitAxis,
@@ -221,6 +231,8 @@ TEST(GenericParameters, UnknownValidHyperparameter) {
       kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
       kHParamNumericalVectorSequenceNumExamples,
       kHParamNumericalVectorSequenceNumRandomAnchors,
+      kHParamNumericalVectorSequenceEnableCloserThanConditions,
+      kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -244,6 +256,7 @@ TEST(GenericParameters, UnknownInvalidHyperparameter) {
       kHParamCategoricalSetSplitGreedySampling,
       kHParamCategoricalSetSplitMaxNumItems,
       kHParamCategoricalSetSplitMinItemFrequency,
+      kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       kHParamGrowingStrategy,
       kHParamMaxNumNodes,
       kHParamSplitAxis,
@@ -293,6 +306,7 @@ TEST(GenericParameters, ExistingHyperparameter) {
       kHParamCategoricalSetSplitGreedySampling,
       kHParamCategoricalSetSplitMaxNumItems,
       kHParamCategoricalSetSplitMinItemFrequency,
+      kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       kHParamGrowingStrategy,
       kHParamMaxNumNodes,
       kHParamSplitAxis,
@@ -318,6 +332,8 @@ TEST(GenericParameters, ExistingHyperparameter) {
       kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
       kHParamNumericalVectorSequenceNumExamples,
       kHParamNumericalVectorSequenceNumRandomAnchors,
+      kHParamNumericalVectorSequenceEnableCloserThanConditions,
+      kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);

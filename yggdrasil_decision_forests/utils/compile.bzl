@@ -1,8 +1,8 @@
 """Utilities for the compilation of code."""
 
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@rules_cc//cc:defs.bzl", "cc_proto_library")
+load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 
 def cc_library_ydf(**attrs):
@@ -68,14 +68,8 @@ def all_proto_library(
         )
 
     if compile_py:
-        old_deps = []
-        for dep in deps:
-          if not dep.endswith(suffix):
-            fail("Dependencies should ends with _proto : " + dep)
-          old_deps.append( dep[0:-len(suffix)] + "_py_proto")
         py_proto_library(
-           name = base_name + "_py_proto",
-           srcs = srcs,
-           deps = old_deps,
-           visibility = visibility,
+            name = base_name + "_py_proto",
+            deps = [":" + name],
+            visibility = visibility,
         )

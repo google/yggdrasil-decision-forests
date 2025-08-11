@@ -15,7 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/concurrency_default.h"
 
-#include <iostream>
+#include <functional>
+#include <utility>
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -26,7 +27,11 @@ Thread::Thread(std::function<void(void)> call) : thread_(std::move(call)) {}
 void Thread::Join() { thread_.join(); }
 
 ThreadPool::ThreadPool(int num_threads, Options options)
-    : name_(std::move(options.name_prefix)), num_threads_(num_threads) {}
+    : name_(std::move(options.name_prefix)), num_threads_(num_threads) {
+  while (threads_.size() < num_threads_) {
+    threads_.emplace_back(&ThreadPool::ThreadLoop, this);
+  }
+}
 
 ThreadPool::~ThreadPool() { JoinAllAndStopThreads(); }
 
@@ -39,12 +44,6 @@ void ThreadPool::JoinAllAndStopThreads() {
     thread.join();
   }
   threads_.clear();
-}
-
-void ThreadPool::StartWorkers() {
-  while (threads_.size() < num_threads_) {
-    threads_.emplace_back(&ThreadPool::ThreadLoop, this);
-  }
 }
 
 void ThreadPool::Schedule(std::function<void()> callback) {

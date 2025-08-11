@@ -125,8 +125,8 @@ TEST_P(NDCGLossTest, InitialPredictions) {
     weights = {1.f, 2.f, 3.f, 4.f, 5.f};
   }
 
-  const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
-                          dataset.data_spec().columns(0));
+  const NDCGLoss loss_imp(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
   ASSERT_OK_AND_ASSIGN(
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
@@ -139,7 +139,8 @@ TEST_P(NDCGLossTest, UpdateGradientsArbitraryLabels) {
                        CreateToyDataset(false));
   const bool threaded = std::get<1>(GetParam());
 
-  RankingGroupsIndices index;
+  NDCGLoss::Cache cache;
+  auto& index = cache.ranking_index;
   EXPECT_OK(
       index.Initialize(dataset, /*label_col_idx=*/0, /*group_col_idx=*/1));
   EXPECT_THAT(index.groups(), SizeIs(2));
@@ -147,11 +148,10 @@ TEST_P(NDCGLossTest, UpdateGradientsArbitraryLabels) {
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
-                          dataset.data_spec().columns(0));
+  const NDCGLoss loss_imp(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx=*/0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx=*/0, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
@@ -160,15 +160,14 @@ TEST_P(NDCGLossTest, UpdateGradientsArbitraryLabels) {
   if (threaded) {
     utils::concurrency::ThreadPool thread_pool(
         6, {.name_prefix = std::string("")});
-    thread_pool.StartWorkers();
     ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
                                        /* label_col_idx= */ 0, predictions,
-                                       &index, &gradients, &random,
+                                       &cache, &gradients, &random,
                                        &thread_pool));
   } else {
     ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
                                        /* label_col_idx= */ 0, predictions,
-                                       &index, &gradients, &random));
+                                       &cache, &gradients, &random));
   }
   ASSERT_THAT(gradients, Not(IsEmpty()));
   const std::vector<float>& gradient = gradients.front().gradient;
@@ -182,19 +181,22 @@ TEST_P(NDCGLossTest, UpdateGradientsArbitraryLabels) {
 TEST(NDCGLossTest, UpdateGradientsIndicatorLabels) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset(true));
-  RankingGroupsIndices index;
+  NDCGLoss::Cache cache;
+  auto& index = cache.ranking_index;
   EXPECT_OK(
       index.Initialize(dataset, /*label_col_idx=*/0, /*group_col_idx=*/1));
   EXPECT_THAT(index.groups(), SizeIs(2));
 
-  const NDCGLoss loss_imp_indicator({}, model::proto::Task::RANKING,
-                                    dataset.data_spec().columns(0));
+  const NDCGLoss loss_imp_indicator(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
   proto::GradientBoostedTreesTrainingConfig gbt_config_no_indicator;
   gbt_config_no_indicator.mutable_internal()
       ->set_enable_ndcg_indicator_labels_optimization(false);
-  const NDCGLoss loss_imp_no_indicator(gbt_config_no_indicator,
-                                       model::proto::Task::RANKING,
-                                       dataset.data_spec().columns(0));
+  const NDCGLoss loss_imp_no_indicator({{},
+                                        gbt_config_no_indicator,
+                                        model::proto::Task::RANKING,
+                                        dataset.data_spec().columns(0)},
+                                       5);
   dataset::VerticalDataset gradient_dataset_indicator;
   dataset::VerticalDataset gradient_dataset_no_indicator;
   std::vector<GradientData> gradients_indicator;
@@ -204,26 +206,24 @@ TEST(NDCGLossTest, UpdateGradientsIndicatorLabels) {
     std::vector<float> predictions = {1.f, 0.f, 1.f, 0.5f, 0.f};
     ASSERT_OK(internal::CreateGradientDataset(
         dataset,
-        /* label_col_idx=*/0,
-        /*hessian_splits=*/false, loss_imp_indicator,
-        &gradient_dataset_indicator, &gradients_indicator, &predictions));
+        /* label_col_idx=*/0, loss_imp_indicator, &gradient_dataset_indicator,
+        &gradients_indicator, &predictions));
     utils::RandomEngine random(1234);
     CHECK_OK(loss_imp_indicator.UpdateGradients(gradient_dataset_indicator,
                                                 /* label_col_idx=*/0,
-                                                predictions, &index,
+                                                predictions, &cache,
                                                 &gradients_indicator, &random));
   }
   {
     std::vector<float> predictions = {1.f, 0.f, 1.f, 0.5f, 0.f};
     ASSERT_OK(internal::CreateGradientDataset(
         dataset,
-        /* label_col_idx=*/0,
-        /*hessian_splits=*/false, loss_imp_no_indicator,
+        /* label_col_idx=*/0, loss_imp_no_indicator,
         &gradient_dataset_no_indicator, &gradients_no_indicator, &predictions));
     utils::RandomEngine random(1234);
     CHECK_OK(loss_imp_no_indicator.UpdateGradients(
         gradient_dataset_no_indicator,
-        /* label_col_idx=*/0, predictions, &index, &gradients_no_indicator,
+        /* label_col_idx=*/0, predictions, &cache, &gradients_no_indicator,
         &random));
   }
 
@@ -240,18 +240,18 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
                        CreateToyDataset(false));
   std::vector<float> weights;
 
-  RankingGroupsIndices index;
+  CrossEntropyNDCGLoss::Cache cache;
+  auto& index = cache.ranking_index;
   EXPECT_OK(index.Initialize(dataset, 0, 1));
   EXPECT_THAT(index.groups(), SizeIs(2));
 
   dataset::VerticalDataset gradient_dataset;
   std::vector<GradientData> gradients;
   std::vector<float> predictions;
-  const CrossEntropyNDCGLoss loss_imp({}, model::proto::Task::RANKING,
-                                      dataset.data_spec().columns(0));
+  const CrossEntropyNDCGLoss loss_imp(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)});
   ASSERT_OK(internal::CreateGradientDataset(dataset,
-                                            /* label_col_idx= */ 0,
-                                            /*hessian_splits=*/false, loss_imp,
+                                            /* label_col_idx= */ 0, loss_imp,
                                             &gradient_dataset, &gradients,
                                             &predictions));
   predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
@@ -259,7 +259,7 @@ TEST(NDCGLossTest, UpdateGradientsXeNDCGMart) {
   utils::RandomEngine random(1234);
   ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
                                      /* label_col_idx= */ 0, predictions,
-                                     &index, &gradients, &random));
+                                     &cache, &gradients, &random));
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   const std::vector<float>& gradient = gradients.front().gradient;
@@ -281,15 +281,16 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictions) {
 
   // Perfectly wrong predictions.
   std::vector<float> predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
-  const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
-                          dataset.data_spec().columns(0));
-  RankingGroupsIndices index;
+  const NDCGLoss loss_imp(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
+  NDCGLoss::Cache cache;
+  auto& index = cache.ranking_index;
   EXPECT_OK(
       index.Initialize(dataset, /*label_col_idx=*/0, /*group_col_idx=*/1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
-                    /* label_col_idx=*/0, predictions, weights, &index));
+                    /* label_col_idx=*/0, predictions, weights, &cache));
   double expected_ndcg;
   if (weighted) {
     expected_ndcg = ((1. + 7 / log2(3)) / (7. + 1. / log2(3)) +
@@ -318,14 +319,18 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectlyWrongPredictionsTruncation1) {
   std::vector<float> predictions = {0.f, 1.f, 1.f, 0.5f, 0.f};
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(1);
-  const NDCGLoss loss_imp(gbt_config, model::proto::Task::RANKING,
-                          dataset.data_spec().columns(0));
-  RankingGroupsIndices index;
+  const NDCGLoss loss_imp({{},
+                           gbt_config,
+                           model::proto::Task::RANKING,
+                           dataset.data_spec().columns(0)},
+                          1);
+  NDCGLoss::Cache cache;
+  auto& index = cache.ranking_index;
   EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 0, predictions, weights, &index));
+                    /* label_col_idx= */ 0, predictions, weights, &cache));
   double expected_ndcg;
   if (weighted) {
     expected_ndcg = (1. / 7.) / 4.;
@@ -348,14 +353,15 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectPredictions) {
 
   // Perfect predictions.
   std::vector<float> predictions = {1.f, 0.f, 0.f, 0.5f, 1.f};
-  const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
-                          dataset.data_spec().columns(0));
-  RankingGroupsIndices index;
+  const NDCGLoss loss_imp(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
+  NDCGLoss::Cache cache;
+  auto& index = cache.ranking_index;
   EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 0, predictions, weights, &index));
+                    /* label_col_idx= */ 0, predictions, weights, &cache));
   EXPECT_NEAR(loss_results.loss, -1.f, kTestPrecision);
   EXPECT_THAT(loss_results.secondary_metrics,
               ElementsAre(FloatNear(1.f, kTestPrecision)));
@@ -372,14 +378,15 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectGroupedPredictions) {
 
   // Perfect predictions again (the ranking across groups has no effect).
   std::vector<float> predictions = {0.6f, 0.4f, 0.f, 0.5f, 1.f};
-  const NDCGLoss loss_imp({}, model::proto::Task::RANKING,
-                          dataset.data_spec().columns(0));
-  RankingGroupsIndices index;
+  const NDCGLoss loss_imp(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
+  NDCGLoss::Cache cache;
+  auto& index = cache.ranking_index;
   EXPECT_OK(index.Initialize(dataset, 0, 1));
   ASSERT_OK_AND_ASSIGN(
       LossResults loss_results,
       loss_imp.Loss(dataset,
-                    /* label_col_idx= */ 0, predictions, weights, &index));
+                    /* label_col_idx= */ 0, predictions, weights, &cache));
   EXPECT_NEAR(loss_results.loss, -1.f, kTestPrecision);
   EXPECT_THAT(loss_results.secondary_metrics,
               ElementsAre(FloatNear(1.f, kTestPrecision)));
@@ -387,8 +394,8 @@ TEST_P(NDCGLossTest, ComputeRankingLossPerfectGroupedPredictions) {
 
 TEST(NDCGLossTest, SecondaryMetricName) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
-  const auto loss_imp =
-      NDCGLoss({}, model::proto::Task::RANKING, dataset.data_spec().columns(0));
+  const auto loss_imp = NDCGLoss(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("NDCG@5"));
 }
 
@@ -396,8 +403,11 @@ TEST(NDCGLossTest, SecondaryMetricNameTrucation10) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(10);
-  const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
-                                 dataset.data_spec().columns(0));
+  const auto loss_imp = NDCGLoss({{},
+                                  gbt_config,
+                                  model::proto::Task::RANKING,
+                                  dataset.data_spec().columns(0)},
+                                 10);
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("NDCG@10"));
 }
 
@@ -405,9 +415,12 @@ TEST(NDCGLossTest, InvalidTruncation) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
   proto::GradientBoostedTreesTrainingConfig gbt_config;
   gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(0);
-  const auto loss_imp = NDCGLoss(gbt_config, model::proto::Task::RANKING,
-                                 dataset.data_spec().columns(0));
-  EXPECT_EQ(loss_imp.Status().code(), absl::StatusCode::kInvalidArgument);
+  const auto loss_imp =
+      NDCGLoss::RegistrationCreate({{},
+                                    gbt_config,
+                                    model::proto::Task::RANKING,
+                                    dataset.data_spec().columns(0)});
+  EXPECT_EQ(loss_imp.status().code(), absl::StatusCode::kInvalidArgument);
 }
 
 INSTANTIATE_TEST_SUITE_P(NDCGLossTestSuite, NDCGLossTest,

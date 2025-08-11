@@ -23,8 +23,10 @@
 
 #include <stdint.h>
 
+#include <memory>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -156,31 +158,54 @@ class RankingGroupsIndices {
   UnsignedExampleIdx num_items_ = 0;
 };
 
+// Per-dataset cache that a loss implementation can use for each call. For
+// example, a loss cache can be used for ranking loss not having to sort the
+// examples by ground truth value multiple times.
+class AbstractLossCache {
+ public:
+  virtual ~AbstractLossCache() = default;
+
+  virtual absl::StatusOr<const RankingGroupsIndices*> ranking_indices() const {
+    return absl::InvalidArgumentError(
+        "This loss does not have ranking indices");
+  }
+};
+
 // Loss to optimize during the training of a GBT.
 //
 // The life of a loss object is as follows:
 //   1. The loss is created.
-//   2. Gradient, hessian and predictions buffer are created using "Shape()".
-//   3. "InitialPredictions" is called to get the initial prediction of the
+//   2. A loss cache is created for each dataset. A loss cache is an optional
+//      buffer than the loss can use to keep computation results between calls.
+//   3. Gradient, hessian and predictions buffer are created using "Shape()".
+//   4. "InitialPredictions" is called to get the initial prediction of the
 //      model.
-//   4. The gradient of the model is updated using "UpdateGradients".
-//   5. A new tree is trained to predict each gradient dimension. Tree nodes are
+//   5. The gradient of the model is updated using "UpdateGradients".
+//   6. A new tree is trained to predict each gradient dimension. Tree nodes are
 //      set using "SetLeafFunctor".
-//   6. The prediction buffer is updated using "UpdatePredictions".
-//   7. Optionally (for logging or early stopping), the "Loss" is computed.
-//   8. The training stops or goes back to step 4.
+//   7. The prediction buffer is updated using "UpdatePredictions".
+//   8. Optionally (for logging or early stopping), the "Loss" is computed.
+//   9. The training stops or goes back to step 4.
 //
 class AbstractLoss {
  public:
-  explicit AbstractLoss(
-      const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-      model::proto::Task task, const dataset::proto::Column& label_column)
-      : gbt_config_(gbt_config), task_(task), label_column_(label_column) {}
+  // Force the loss implementation to have a "RegistrationCreate" method.
+  using REQUIRED_REGISTRATION_CREATE = std::true_type;
+
+  struct ConstructorArgs {
+    const model::proto::TrainingConfigLinking& train_config_link;
+    const proto::GradientBoostedTreesTrainingConfig& gbt_config;
+    model::proto::Task task;
+    const dataset::proto::Column& label_column;
+  };
+
+  explicit AbstractLoss(const ConstructorArgs& args)
+      : train_config_link_(args.train_config_link),
+        gbt_config_(args.gbt_config),
+        task_(args.task),
+        label_column_(args.label_column) {}
 
   virtual ~AbstractLoss() = default;
-
-  // Check that the loss is valid. To be called after the constructor.
-  virtual absl::Status Status() const = 0;
 
   // Shape / number of dimensions of the gradient, prediction and hessian
   // buffers required by the loss.
@@ -190,7 +215,7 @@ class AbstractLoss {
   // the "bias".
   virtual absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      const absl::Span<const float> weights) const = 0;
+      absl::Span<const float> weights) const = 0;
 
   // Initial predictions from a pre-aggregated label statistics.
   virtual absl::StatusOr<std::vector<float>> InitialPredictions(
@@ -200,6 +225,22 @@ class AbstractLoss {
   // "ranking_index" will be set in "UpdateGradients" and "Loss". For example,
   // grouping can be used in ranking.
   virtual bool RequireGroupingAttribute() const { return false; }
+
+  // Creates a loss cache. If the loss does not need a loss cache, returning an
+  // nullptr is allowed.
+  virtual absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateLossCache(
+      const dataset::VerticalDataset& dataset) const {
+    return nullptr;
+  }
+
+  // Create a loss cache with raw ranking data.
+  // TODO: Improve interface for distributed training.
+  virtual absl::StatusOr<std::unique_ptr<AbstractLossCache>>
+  CreateRankingLossCache(absl::Span<const float> labels,
+                         absl::Span<const uint64_t> groups) const {
+    return absl::InvalidArgumentError(
+        "This loss does not support / need ranking inputs.");
+  }
 
   // The "UpdateGradients" methods compute the gradient of the loss with respect
   // to the model output. Different version of "UpdateGradients" are implemented
@@ -214,7 +255,7 @@ class AbstractLoss {
   // Updates the gradient with label stored in a vector<float>.
   virtual absl::Status UpdateGradients(
       absl::Span<const float> labels, absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      const AbstractLossCache* cache, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("UpdateGradients not implemented");
@@ -223,7 +264,7 @@ class AbstractLoss {
   // Updates the gradient with label stored in a vector<int32_t>.
   virtual absl::Status UpdateGradients(
       absl::Span<const int32_t> labels, absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      const AbstractLossCache* cache, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("UpdateGradients not implemented");
@@ -232,7 +273,7 @@ class AbstractLoss {
   // Updates the gradient with label stored in a vector<int16_t>.
   virtual absl::Status UpdateGradients(
       absl::Span<const int16_t> labels, absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      const AbstractLossCache* cache, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("UpdateGradients not implemented");
@@ -244,8 +285,7 @@ class AbstractLoss {
   // (Numerical) and int32 (Categorical)).
   absl::Status UpdateGradients(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index,
+      absl::Span<const float> predictions, const AbstractLossCache* cache,
       std::vector<GradientData>* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool = nullptr) const;
 
@@ -268,43 +308,38 @@ class AbstractLoss {
   absl::StatusOr<LossResults> Loss(
       const dataset::VerticalDataset& dataset, int label_col_idx,
       absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool = nullptr) const;
 
   virtual absl::StatusOr<LossResults> Loss(
       absl::Span<const int16_t> labels, absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss not implemented");
   }
 
   virtual absl::StatusOr<LossResults> Loss(
       absl::Span<const int32_t> labels, absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss lot implemented");
   }
 
   virtual absl::StatusOr<LossResults> Loss(
       absl::Span<const float> labels, absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const {
     return absl::InternalError("Loss not implemented");
   }
 
  protected:
-  proto::GradientBoostedTreesTrainingConfig gbt_config_;
+  const model::proto::TrainingConfigLinking train_config_link_;
+  const proto::GradientBoostedTreesTrainingConfig gbt_config_;
   const model::proto::Task task_;
   const dataset::proto::Column& label_column_;
 };
 
-REGISTRATION_CREATE_POOL(AbstractLoss,
-                         const proto::GradientBoostedTreesTrainingConfig&,
-                         model::proto::Task, const dataset::proto::Column&);
+REGISTRATION_CREATE_POOL(AbstractLoss, const AbstractLoss::ConstructorArgs&);
 
 #define REGISTER_AbstractGradientBoostedTreeLoss(name, key) \
   REGISTRATION_REGISTER_CLASS(name, key, AbstractLoss);

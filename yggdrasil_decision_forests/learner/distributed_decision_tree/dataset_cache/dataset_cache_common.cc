@@ -217,7 +217,6 @@ bool HasAllRequiredFiles(absl::string_view cache_path, const int num_columns,
         {.name_prefix = std::string("HasAllRequiredFiles")});
 
     // Parse all the metadata.pb files.
-    thread_pool.StartWorkers();
     for (int col_idx = 0; col_idx < num_columns; col_idx++) {
       for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
         const auto shard_meta_data_path = absl::StrCat(

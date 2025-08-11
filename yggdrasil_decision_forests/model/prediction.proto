@@ -76,12 +76,18 @@ message Prediction {
     optional float value = 1;
   }
 
+  message SurvivalAnalysis {
+    // Instantaneous risk of event. Logarithm of the hazard ratio.
+    optional float log_hazard_ratio = 1;
+  }
+
   oneof type {
     Classification classification = 1;
     Regression regression = 2;
     Ranking ranking = 5;
     Uplift uplift = 6;
     AnomalyDetection anomaly_detection = 7;
+    SurvivalAnalysis survival_analysis = 8;
   }
   optional float weight = 3 [default = 1];
 

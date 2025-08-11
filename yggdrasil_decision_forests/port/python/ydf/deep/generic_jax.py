@@ -401,7 +401,7 @@ class GenericJAXModel(generic_model.GenericModel):
       bootstrapping: Union[bool, int] = False,
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
-      evaluation_task: Optional[generic_model.Task] = None,
+      map_truncation: int = 5,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> metric_lib.Evaluation:
@@ -421,16 +421,6 @@ class GenericJAXModel(generic_model.GenericModel):
     if label is None:
       label = self.label()
     labels = []
-
-    # Warning about deprecation of "evaluation_task"
-    if evaluation_task is not None:
-      log.warning(
-          "The `evaluation_task` argument is deprecated. Use `task` instead.",
-          message_id=log.WarningMessage.DEPRECATED_EVALUATION_TASK,
-      )
-      if task is not None:
-        raise ValueError("Cannot specify both `task` and `evaluation_task`")
-      task = evaluation_task
 
     # TODO: Implement non-supported cases.
     if weighted is not None:
@@ -460,6 +450,7 @@ class GenericJAXModel(generic_model.GenericModel):
         bootstrapping=bootstrapping,
         ndcg_truncation=ndcg_truncation,
         mrr_truncation=mrr_truncation,
+        map_truncation=map_truncation,
         num_threads=num_threads,
     )
 
@@ -477,6 +468,8 @@ class GenericJAXModel(generic_model.GenericModel):
       num_bins: int = 50,
       partial_dependence_plot: bool = True,
       conditional_expectation_plot: bool = True,
+      permutation_variable_importance: bool = True,
+      shap_values: bool = True,
       permutation_variable_importance_rounds: int = 1,
       num_threads: Optional[int] = None,
       maximum_duration: Optional[float] = 20,
@@ -518,13 +511,22 @@ class GenericJAXModel(generic_model.GenericModel):
   def to_cpp(self, key: str = "my_model") -> str:
     raise NotImplementedError  # TODO: Implement.
 
+  def to_standalone_cc(
+      self,
+      name: str = "ydf_model",
+      algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      categorical_from_string: bool = False,
+  ) -> Union[str, Dict[str, str]]:
+    raise NotImplementedError
+
   # TODO: Change default value of "mode" before 1.0 release.
   def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value
       self,
       path: str,
       input_model_signature_fn: Any = None,
       *,
-      mode: Literal["keras", "tf"] = "keras",
+      mode: Literal["keras", "tf"] = "tf",
       feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
       servo_api: bool = False,
       feed_example_proto: bool = False,

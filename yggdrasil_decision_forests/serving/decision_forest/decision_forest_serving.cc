@@ -813,6 +813,16 @@ void Predict(const GradientBoostedTreesRanking& model,
 
 template <>
 void Predict(
+    const GradientBoostedTreesSurvivalAnalysis& model,
+    const typename GradientBoostedTreesSurvivalAnalysis::ExampleSet& examples,
+    int num_examples, std::vector<float>* predictions) {
+  PredictHelper<std::remove_reference<decltype(model)>::type,
+                ActivationAddInitialPrediction>(model, examples, num_examples,
+                                                predictions);
+}
+
+template <>
+void Predict(
     const GradientBoostedTreesPoissonRegression& model,
     const typename GradientBoostedTreesPoissonRegression::ExampleSet& examples,
     int num_examples, std::vector<float>* predictions) {

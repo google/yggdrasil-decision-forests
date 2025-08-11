@@ -69,11 +69,12 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
     model = learner.train(self.gaussians.train_pd)
     with self.assertRaisesRegex(
         ValueError,
-        ".*A model cannot be evaluated without a label..*",
+        "This Anomaly Detection model has been trained without specifying the"
+        " label column during training.",
     ):
       _ = model.evaluate(
           self.gaussians.test,
-          evaluation_task=generic_learner.Task.CLASSIFICATION,
+          task=generic_learner.Task.CLASSIFICATION,
       )
 
   def test_gaussians_evaluation_with_label(self):
@@ -81,7 +82,7 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
     model = learner.train(self.gaussians.train)
     evaluation = model.evaluate(
         self.gaussians.test,
-        evaluation_task=generic_learner.Task.CLASSIFICATION,
+        task=generic_learner.Task.CLASSIFICATION,
     )
     self.assertSameElements(
         evaluation.to_dict().keys(),
@@ -215,6 +216,23 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
       _ = specialized_learners.IsolationForestLearner(
           class_weights={"a": 1.0, "b": 1.0, "c": 1.0},
       ).train(ds)
+
+  def test_no_label_in_training(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+    }
+    model = specialized_learners.IsolationForestLearner().train(ds)
+    self.assertEqual(model.label_col_idx(), -1)
+    self.assertIsNone(model.label())
+
+  def test_label_in_training(self):
+    ds = {
+        "f": np.array([1, 2, 3, 4, 5, 6], dtype=float),
+        "label": np.array(["a", "a", "b", "b", "b", "c"]),
+    }
+    model = specialized_learners.IsolationForestLearner(label="label").train(ds)
+    self.assertEqual(model.label_col_idx(), 0)
+    self.assertEqual(model.label(), "label")
 
 
 if __name__ == "__main__":

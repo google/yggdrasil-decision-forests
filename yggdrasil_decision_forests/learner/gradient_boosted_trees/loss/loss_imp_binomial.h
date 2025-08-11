@@ -49,12 +49,10 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   using AbstractLoss::Loss;
   using AbstractLoss::UpdateGradients;
 
-  BinomialLogLikelihoodLoss(
-      const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-      model::proto::Task task, const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column) {}
+  BinomialLogLikelihoodLoss(const ConstructorArgs& args) : AbstractLoss(args) {}
 
-  absl::Status Status() const override;
+  static absl::StatusOr<std::unique_ptr<AbstractLoss>> RegistrationCreate(
+      const ConstructorArgs& args);
 
   LossShape Shape() const override {
     return LossShape{.gradient_dim = 1, .prediction_dim = 1};
@@ -75,7 +73,7 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   template <typename T>
   absl::Status TemplatedUpdateGradients(
       const absl::Span<T> labels, const absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
+      const AbstractLossCache* cache, GradientDataRef* gradients,
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const;
 
@@ -87,16 +85,14 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
 
   absl::Status UpdateGradients(
       const absl::Span<const int16_t> labels,
-      const absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-      utils::RandomEngine* random,
+      const absl::Span<const float> predictions, const AbstractLossCache* cache,
+      GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   absl::Status UpdateGradients(
       const absl::Span<const int32_t> labels,
-      const absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-      utils::RandomEngine* random,
+      const absl::Span<const float> predictions, const AbstractLossCache* cache,
+      GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
@@ -104,8 +100,7 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   template <typename T>
   absl::StatusOr<LossResults> TemplatedLoss(
       const absl::Span<T> labels, const absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const;
 
   template <bool use_weights, typename T>
@@ -121,8 +116,7 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const int32_t> labels,
       const absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   // Returns the loss of the given predictions.
@@ -131,8 +125,7 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const int16_t> labels,
       const absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const override;
 };
 

@@ -15,10 +15,20 @@
 
 #include "yggdrasil_decision_forests/utils/registration.h"
 
+#include <memory>
+#include <string>
+#include <type_traits>
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
@@ -69,6 +79,34 @@ class SubClassB1 : public BaseClassB {
 REGISTRATION_CREATE_POOL(BaseClassB);
 REGISTRATION_REGISTER_CLASS(SubClassB1, "B1", BaseClassB);
 
+class BaseClassC {
+ public:
+  using REQUIRED_REGISTRATION_CREATE = std::true_type;
+
+  virtual ~BaseClassC() = default;
+  virtual std::string Result() = 0;
+};
+
+class SubClassC1 : public BaseClassC {
+ public:
+  // A constructor with some complex args that we don't provide to the
+  // registration.
+  SubClassC1(int p1, int p2) {}
+
+  static absl::StatusOr<std::unique_ptr<BaseClassC>> RegistrationCreate() {
+    return absl::make_unique<SubClassC1>(1, 2);
+  }
+
+  std::string Result() override { return "SubClassC1"; }
+};
+
+REGISTRATION_CREATE_POOL(BaseClassC);
+REGISTRATION_REGISTER_CLASS(SubClassC1, "C1", BaseClassC);
+
+TEST(Registration, WithStatus) {
+  EXPECT_EQ(BaseClassCRegisterer::Create("C1").value()->Result(), "SubClassC1");
+}
+
 TEST(Registration, WithConstructorArguments) {
   EXPECT_EQ(absl::StrJoin(BaseClassARegisterer::GetNames(), ","), "A1,A2");
 
@@ -93,6 +131,58 @@ TEST(Registration, WithOutConstructorArguments) {
   EXPECT_TRUE(BaseClassBRegisterer::IsName("B1"));
   EXPECT_FALSE(BaseClassBRegisterer::IsName("B3"));
   EXPECT_EQ(BaseClassBRegisterer::Create("B1").value()->Result(), "SubClassB1");
+}
+
+TEST(Registration, Threading) {
+  utils::concurrency::ThreadPool pool(10);
+  for (int i = 0; i < 10; ++i) {
+    pool.Schedule([]() {
+      for (int j = 0; j < 100; ++j) {
+        EXPECT_EQ(BaseClassARegisterer::Create("A1", "T").value()->Result(),
+                  "SubClassA1T");
+        EXPECT_EQ(BaseClassBRegisterer::Create("B1").value()->Result(),
+                  "SubClassB1");
+        EXPECT_EQ(BaseClassCRegisterer::Create("C1").value()->Result(),
+                  "SubClassC1");
+      }
+    });
+  }
+}
+
+// Global thread pool to keep threads running during program exit.
+utils::concurrency::ThreadPool* global_pool = nullptr;
+
+class RegistrationTsanTest : public ::testing::Test {
+ protected:
+  static void SetUpTestSuite() {
+    global_pool = new utils::concurrency::ThreadPool(10);
+    for (int i = 0; i < 10; ++i) {
+      global_pool->Schedule([]() {
+        // Keep accessing the registry indefinitely.
+        while (true) {
+          (void)BaseClassARegisterer::Create("A1", "T").value()->Result();
+          (void)BaseClassBRegisterer::Create("B1").value()->Result();
+          (void)BaseClassCRegisterer::Create("C1").value()->Result();
+          // Yield to other threads.
+          absl::SleepFor(absl::Milliseconds(1));
+        }
+      });
+    }
+  }
+
+  static void TearDownTestSuite() {
+    // Intentionally do not delete global_pool to keep threads running during
+    // exit.
+  }
+};
+
+TEST_F(RegistrationTsanTest, RunDuringExit) {
+  // Give the threads in the global pool some time to run.
+  absl::SleepFor(absl::Milliseconds(200));
+  // When this test finishes, the test suite will tear down, but the
+  // global_pool threads continue to run. Program exit will then occur,
+  // potentially triggering the race if static destructors run while
+  // threads are still accessing the registry.
 }
 
 }  // namespace

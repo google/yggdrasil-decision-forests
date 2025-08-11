@@ -47,12 +47,33 @@ class MeanSquaredErrorLoss : public AbstractLoss {
   using AbstractLoss::Loss;
   using AbstractLoss::UpdateGradients;
 
-  MeanSquaredErrorLoss(
-      const proto::GradientBoostedTreesTrainingConfig& gbt_config,
-      model::proto::Task task, const dataset::proto::Column& label_column)
-      : AbstractLoss(gbt_config, task, label_column) {}
+  MeanSquaredErrorLoss(const ConstructorArgs& args) : AbstractLoss(args) {}
 
-  absl::Status Status() const override;
+  class Cache : public AbstractLossCache {
+   public:
+    // Only used to evaluate a ranking model
+    std::unique_ptr<RankingGroupsIndices> ranking_index;
+
+    virtual ~Cache() {}
+
+    virtual absl::StatusOr<const RankingGroupsIndices*> ranking_indices()
+        const override {
+      if (!ranking_index) {
+        return absl::InvalidArgumentError("Not ranking indices available");
+      }
+      return ranking_index.get();
+    }
+  };
+
+  absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateLossCache(
+      const dataset::VerticalDataset& dataset) const override;
+
+  absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateRankingLossCache(
+      absl::Span<const float> labels,
+      absl::Span<const uint64_t> groups) const override;
+
+  static absl::StatusOr<std::unique_ptr<AbstractLoss>> RegistrationCreate(
+      const ConstructorArgs& args);
 
   LossShape Shape() const override {
     return LossShape{.gradient_dim = 1, .prediction_dim = 1};
@@ -68,9 +89,8 @@ class MeanSquaredErrorLoss : public AbstractLoss {
 
   absl::Status UpdateGradients(
       const absl::Span<const float> labels,
-      const absl::Span<const float> predictions,
-      const RankingGroupsIndices* ranking_index, GradientDataRef* gradients,
-      utils::RandomEngine* random,
+      const absl::Span<const float> predictions, const AbstractLossCache* cache,
+      GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
@@ -78,8 +98,7 @@ class MeanSquaredErrorLoss : public AbstractLoss {
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,
       const absl::Span<const float> predictions,
-      const absl::Span<const float> weights,
-      const RankingGroupsIndices* ranking_index,
+      const absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const override;
 };
 
