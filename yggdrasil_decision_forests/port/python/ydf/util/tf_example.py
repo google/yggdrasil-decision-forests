@@ -25,7 +25,7 @@ def read_tf_record(
     *,
     compressed: bool = True,
     process: Optional[
-        Callable[["tf.train.Example"], "tf.train.Example"]  # pytype: disable=name-error
+        Callable[["tf.train.Example"], Optional["tf.train.Example"]]  # pytype: disable=name-error
     ] = None,  # pylint: disable=bad-whitespace
     verbose: bool = False,
     threads: int = 20,

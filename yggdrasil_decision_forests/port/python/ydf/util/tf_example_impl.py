@@ -46,7 +46,7 @@ class ColumnSpec:
 def read_tf_record(
     path: dataset_io.Path,
     compressed: bool,
-    process: Optional[Callable[[tf.train.Example], tf.train.Example]],
+    process: Optional[Callable[[tf.train.Example], Optional[tf.train.Example]]],
     verbose: bool,
     threads: int,
 ) -> dataset_io.Data:
@@ -127,7 +127,7 @@ def _read_shard(
     reader_generator: Callable[
         [str], contextlib.AbstractContextManager[Iterator[bytes]]
     ],
-    process: Optional[Callable[[tf.train.Example], tf.train.Example]],
+    process: Optional[Callable[[tf.train.Example], Optional[tf.train.Example]]],
     verbose: bool,
 ) -> Tuple[int, Dict[str, Tuple[np.ndarray, ColumnSpec]]]:
   """Reads a single shard of data.
@@ -154,6 +154,8 @@ def _read_shard(
       example = tf.train.Example.FromString(record)
       if process is not None:
         example = process(example)
+        if example is None:
+          continue
 
       # Columns without values for this example
       example_keys = set(example.features.feature.keys())
@@ -225,7 +227,7 @@ def read_tensorflow_examples(
         [str], contextlib.AbstractContextManager[Iterator[bytes]]
     ],
     path: dataset_io.Path,
-    process: Optional[Callable[[tf.train.Example], tf.train.Example]],
+    process: Optional[Callable[[tf.train.Example], Optional[tf.train.Example]]],
     verbose: bool,
     threads: int,
 ) -> dataset_io.Data:
