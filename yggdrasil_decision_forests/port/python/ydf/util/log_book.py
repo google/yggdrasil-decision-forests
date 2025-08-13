@@ -18,8 +18,17 @@ import enum
 import json
 import os
 import sqlite3
-from typing import Dict, List, Optional, Set, Tuple, Union
-import pandas as pd
+from typing import Dict, List, Optional, Set, Tuple, Union, Any
+
+# pytype: disable=import-error
+# pylint: disable=g-import-not-at-top
+try:
+  import pandas as pd
+except ImportError:
+  pd = None
+# pylint: enable=g-import-not-at-top
+# pytype: enable=import-error
+
 
 # The values stored in an experiment.
 Value = Optional[Union[str, float, int, bool, List, Dict, Set, Tuple]]
@@ -180,9 +189,7 @@ class LogBook:
     )
     self._conn.commit()
 
-  def to_dataframe(
-      self, key_filter: Optional[ExperimentKey] = None
-  ) -> pd.DataFrame:
+  def to_dataframe(self, key_filter: Optional[ExperimentKey] = None) -> Any:
     """Creates a Pandas Dataframe with all the experiments.
 
     Args:
@@ -191,7 +198,17 @@ class LogBook:
 
     Returns:
       A dataframe with the experiments.
+
+    Raises:
+      ImportError: If Pandas is not installed.
     """
+    if pd is None:
+      raise ImportError(
+          "Pandas is not installed. Please install Pandas to use the"
+          " to_dataframe() method."
+      )
+    assert pd is not None
+
     query = "SELECT id, timestamp, key, result FROM experiments"
     self._cursor.execute(query)
     records = []
