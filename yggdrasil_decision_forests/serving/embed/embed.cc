@@ -25,6 +25,7 @@
 #include <variant>
 #include <vector>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
@@ -912,6 +913,11 @@ absl::Status ComputeInternalOptionsCategoricalDictionaries(
     dictionary.sanitized_items.assign(
         column.number_of_unique_values() - is_label, "");
     dictionary.items.assign(column.number_of_unique_values() - is_label, "");
+
+    // Set of all sanitized_items. Used to detect duplications after the
+    // conversion to c++ symbols.
+    absl::flat_hash_set<std::string> sanitized_items;
+
     for (const auto& item : column.items()) {
       int index = item.second.index();
 
@@ -930,6 +936,19 @@ absl::Status ComputeInternalOptionsCategoricalDictionaries(
       } else {
         item_symbol = StringToStructSymbol(item.first,
                                            /*.ensure_letter_first=*/false);
+
+        if (sanitized_items.contains(item_symbol)) {
+          // This sanitized symbol already exist. Create a new one by adding a
+          // prefix.
+          int local_index = 1;
+          std::string extended_item_symbol;
+          do {
+            extended_item_symbol =
+                absl::StrCat(item_symbol, "_", local_index++);
+          } while (sanitized_items.contains(extended_item_symbol));
+          item_symbol = extended_item_symbol;
+        }
+        sanitized_items.insert(item_symbol);
       }
       dictionary.sanitized_items[index] = item_symbol;
       dictionary.items[index] = item.first;
