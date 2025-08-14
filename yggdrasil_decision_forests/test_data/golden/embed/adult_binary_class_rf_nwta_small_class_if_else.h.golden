@@ -7435,7 +7435,7 @@ inline Label Predict(const Instance& instance) {
     }
   }
 
-  return static_cast<Label>(accumulator >= 1);
+  return static_cast<Label>(accumulator > 1);
 }
 
 }  // namespace ydf_model

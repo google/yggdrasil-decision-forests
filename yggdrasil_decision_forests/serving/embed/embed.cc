@@ -492,7 +492,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
         case proto::ClassificationOutput::CLASS:
           if (stats.is_binary_classification()) {
             spec.return_prediction = absl::Substitute(
-                "  return static_cast<Label>(accumulator >= $0);\n",
+                "  return static_cast<Label>(accumulator > $0);\n",
                 stats.num_trees / 2);
           } else {
             absl::StrAppend(
