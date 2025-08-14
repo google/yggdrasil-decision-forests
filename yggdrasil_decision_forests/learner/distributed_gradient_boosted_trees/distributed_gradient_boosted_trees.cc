@@ -77,6 +77,7 @@ DistributedGradientBoostedTreesLearner::Capabilities() const {
   capabilities.set_resume_training(true);
   capabilities.set_support_partial_cache_dataset_format(true);
   capabilities.set_support_validation_dataset(true);
+  capabilities.set_support_max_training_duration(true);
   return capabilities;
 }
 
@@ -554,8 +555,9 @@ TrainWithCache(
 
   Evaluation training_evaluation;
   auto time_last_checkpoint = absl::Now();
+  const auto begin_training = absl::Now();
 
-  LOG(INFO) << "Start training";
+  LOG(INFO) << "Start tree training";
   for (; iter_idx < spe_config.gbt().num_trees(); iter_idx++) {
     // Create a checkpoint.
     if (iter_idx >= minimum_iter_for_new_checkpoint &&
@@ -610,6 +612,15 @@ TrainWithCache(
       iter_idx--;
     } else if (!iter_status.ok()) {
       return absl::Status(iter_status);
+    }
+
+    if (config.has_maximum_training_duration_seconds() &&
+        (absl::Now() - begin_training) >
+            absl::Seconds(config.maximum_training_duration_seconds())) {
+      LOG(INFO) << "Stop training because the maximum training duration"
+                << absl::Seconds(config.maximum_training_duration_seconds())
+                << "s has been reached.";
+      break;
     }
   }
 

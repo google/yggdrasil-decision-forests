@@ -188,7 +188,7 @@ class GenericCCLearner {
       const dataset::proto::DataSpecificationGuide& data_spec_guide,
       const std::optional<std::string> validation_dataset_path) const {
     LOG(INFO) << "Data spec guide:\n" << data_spec_guide.DebugString();
-
+    LOG(INFO) << "Scanning dataset to build dataspec";
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     dataset::proto::DataSpecification generated_data_spec;

@@ -15,21 +15,33 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
 
+#include <string>
+
 #include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
 
 bool IsTransientError(const grpc::Status& status) {
-  return (status.error_message() == "Socket closed" ||
-          status.error_message() == "Transport closed" ||
-          status.error_message() == "Connection reset by peer" ||
-          status.error_message() == "recvmsg:Connection reset by peer" ||
-          status.error_message() == "Broken pipe" ||
-          status.error_message() == "keepalive watchdog timeout" ||
-          absl::StartsWith(status.error_message(),
-                           "failed to connect to all addresses") ||
-          absl::StrContains(status.error_message(), "empty address list"));
+  const std::string& error_message = status.error_message();
+  static constexpr absl::string_view kTransientErrors[] = {
+      "Socket closed",
+      "Stream removed",
+      "Transport closed",
+      "Connection reset by peer",
+      "recvmsg:Connection reset by peer",
+      "Broken pipe",
+      "keepalive watchdog timeout",
+      "failed to connect to all addresses",
+      "empty address list"};
+
+  for (const auto& error : kTransientErrors) {
+    if (absl::StrContainsIgnoreCase(error_message, error)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void ConfigureClientContext(grpc::ClientContext* context) {

@@ -126,3 +126,12 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "grpc_common_test",
+    srcs = ["grpc_common_test.cc"],
+    deps = [
+        ":grpc_common",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
