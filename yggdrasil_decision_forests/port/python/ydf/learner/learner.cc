@@ -78,8 +78,10 @@ void (*existing_signal_handler_alarm)(int) = nullptr;
 
 void ReceiveSignal(int signal) {
   if (!stop_training) {
+    LOG(INFO) << "Interrupting YDF training.";
     stop_training = true;
   } else {
+    LOG(INFO) << "Passing signal " << signal << ".";
     // Pass the signal to any existing handler.
     if (signal == SIGINT && existing_signal_handler_int) {
       existing_signal_handler_int(signal);
@@ -192,8 +194,16 @@ class GenericCCLearner {
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     dataset::proto::DataSpecification generated_data_spec;
-    RETURN_IF_ERROR(dataset::CreateDataSpecWithStatus(
-        typed_dataset_path, false, data_spec_guide, &generated_data_spec));
+    dataset::CreateDataSpecConfig create_dataspec_config;
+    create_dataspec_config.stop = learner_->stop_training_trigger();
+
+    EnableUserInterruption();
+    const auto status = dataset::CreateDataSpecWithStatus(
+        typed_dataset_path, false, data_spec_guide, &generated_data_spec,
+        create_dataspec_config);
+    RETURN_IF_ERROR(DisableUserInterruption());
+    RETURN_IF_ERROR(status);
+
     return TrainFromPathWithDataSpec(typed_dataset_path, generated_data_spec,
                                      validation_dataset_path);
   }

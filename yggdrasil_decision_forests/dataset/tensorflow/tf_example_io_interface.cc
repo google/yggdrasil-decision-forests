@@ -307,6 +307,10 @@ absl::Status TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
   while (reader->Next(&example).value()) {
     LOG_EVERY_N_SEC(INFO, 30) << nrow << " row(s) processed";
 
+    if ((nrow % 100) == 0 && should_stop()) {
+      return absl::InvalidArgumentError("Dataset scanning interrupted");
+    }
+
     // Check if we have seen enough records to determine all the types.
     if (guide.max_num_scanned_rows_to_guess_type() > 0 &&
         nrow >= guide.max_num_scanned_rows_to_guess_type()) {
@@ -407,6 +411,10 @@ absl::Status TFExampleReaderToDataSpecCreator::ComputeColumnStatistics(
   uint64_t nrow = 0;
   tensorflow::Example example;
   while (reader->Next(&example).value()) {
+    if ((nrow % 100) == 0 && should_stop()) {
+      return absl::InvalidArgumentError("Dataset scanning interrupted");
+    }
+
     if (guide.max_num_scanned_rows_to_accumulate_statistics() > 0 &&
         nrow >= guide.max_num_scanned_rows_to_accumulate_statistics()) {
       break;

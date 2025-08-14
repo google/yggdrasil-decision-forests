@@ -22,6 +22,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_IO_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_VERTICAL_DATASET_IO_H_
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -44,6 +45,8 @@ struct LoadConfig {
   std::optional<std::vector<int>> load_columns;
   // If specified, only load the examples that evaluate to true.
   std::optional<std::function<bool(const proto::Example&)>> load_example;
+  // If set and true, stop the data ingestion.
+  std::atomic<bool>* stop = nullptr;
 };
 
 // Load the dataset content from a file (or a set of files).

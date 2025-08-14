@@ -428,6 +428,7 @@ AbstractLearner::TrainWithStatusImpl(
                                                       data_spec, &link_config));
   auto dataset_loading_config = OptimalDatasetLoadingConfig(link_config);
   dataset_loading_config.num_threads = deployment().num_io_threads();
+  dataset_loading_config.stop = this->stop_training_trigger_;
 
   dataset::VerticalDataset train_dataset;
   RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset,

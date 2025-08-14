@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_EXAMPLE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_AVRO_EXAMPLE_H_
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -35,14 +36,20 @@
 
 namespace yggdrasil_decision_forests::dataset::avro {
 
+struct CreateDataspecConfig {
+  // If set and true, stop the data ingestion.
+  std::atomic<bool>* stop = nullptr;
+};
+
 // Creates a dataspec from the Avro file.
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
-    absl::string_view path,
-    const dataset::proto::DataSpecificationGuide& guide);
+    absl::string_view path, const dataset::proto::DataSpecificationGuide& guide,
+    const CreateDataspecConfig& config = {});
 
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
     std::unique_ptr<AvroReader> reader,
-    const dataset::proto::DataSpecificationGuide& guide);
+    const dataset::proto::DataSpecificationGuide& guide,
+    const CreateDataspecConfig& config);
 
 class AvroExampleReader final : public ExampleReaderInterface {
  public:

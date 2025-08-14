@@ -80,6 +80,9 @@ absl::Status LoadVerticalDatasetSingleThread(
         dataset->AppendExampleWithStatus(example, config.load_columns));
     if ((dataset->nrow() % 100) == 0) {
       LOG_EVERY_N_SEC(INFO, 30) << dataset->nrow() << " examples scanned.";
+      if (config.stop && *config.stop) {
+        return absl::InvalidArgumentError("Dataset loading interrupted");
+      }
     }
   }
 
@@ -150,6 +153,9 @@ absl::Status LoadVerticalDataset(
   // Reads the examples in a shard.
   const auto load_shard = [&](const std::string shard)
       -> absl::StatusOr<std::unique_ptr<BlockOfExamples>> {
+    if (config.stop && *config.stop) {
+      return absl::InvalidArgumentError("Dataset loading interrupted");
+    }
     return LoadShard(data_spec, prefix, required_columns, shard);
   };
 

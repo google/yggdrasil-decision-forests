@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/dataset/avro_example.h"
 
+#include <atomic>
 #include <string>
 
 #include "gmock/gmock.h"
@@ -349,6 +350,18 @@ TEST(AvroExample, CreateDataspec) {
   )pb");
 
   EXPECT_THAT(dataspec, EqualsProto(expected));
+}
+
+TEST(AvroExample, CreateDataspecInterrupt) {
+  dataset::proto::DataSpecificationGuide guide;
+  CreateDataspecConfig config;
+  std::atomic<bool> stop;
+  stop = true;
+  config.stop = &stop;
+  EXPECT_FALSE(
+      CreateDataspec(file::JoinPath(DatasetDir(), "toy_codex-null.avro"), guide,
+                     config)
+          .ok());
 }
 
 struct ReadExampleCase {

@@ -386,11 +386,12 @@ absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
 }
 
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
-    absl::string_view path,
-    const dataset::proto::DataSpecificationGuide& guide) {
+    absl::string_view path, const dataset::proto::DataSpecificationGuide& guide,
+    const CreateDataspecConfig& config) {
   ASSIGN_OR_RETURN(auto reader, AvroReader::Create(path));
   const auto schema_string = reader->schema_string();
-  ASSIGN_OR_RETURN(auto spec, CreateDataspecImpl(std::move(reader), guide),
+  ASSIGN_OR_RETURN(auto spec,
+                   CreateDataspecImpl(std::move(reader), guide, config),
                    _ << "While creating dataspec for " << path
                      << " with schema " << schema_string);
   return spec;
@@ -398,7 +399,8 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspec(
 
 absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
     std::unique_ptr<AvroReader> reader,
-    const dataset::proto::DataSpecificationGuide& guide) {
+    const dataset::proto::DataSpecificationGuide& guide,
+    const CreateDataspecConfig& config) {
   // TODO: Reading of multiple paths.
 
   // Infer the column spec for the single-dimensional features and the unstacked
@@ -426,6 +428,10 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
 
   size_t record_idx;
   for (record_idx = 0; true; record_idx++) {
+    if ((record_idx % 100) == 0 && config.stop && *config.stop) {
+      return absl::InvalidArgumentError("Dataset scanning interrupted");
+    }
+
     if (guide.max_num_scanned_rows_to_accumulate_statistics() > 0 &&
         record_idx >= guide.max_num_scanned_rows_to_accumulate_statistics()) {
       // Enough records scanned.
@@ -770,7 +776,14 @@ absl::Status AvroDataSpecCreator::CreateDataspec(
     LOG(INFO) << "Only using first Avro file (of " << paths.size()
               << " files) to determine dataset schema";
   }
-  ASSIGN_OR_RETURN(*data_spec, avro::CreateDataspec(paths.front(), guide),
+
+  CreateDataspecConfig config;
+  if (this->config.has_value()) {
+    config.stop = this->config.value().stop;
+  }
+
+  ASSIGN_OR_RETURN(*data_spec,
+                   avro::CreateDataspec(paths.front(), guide, config),
                    _ << "While creating dataspec for " << paths.front());
   return absl::OkStatus();
 }
