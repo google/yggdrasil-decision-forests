@@ -302,7 +302,7 @@ TEST_F(RandomForestOnAdult, Honest) {
 
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8504, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.426, 0.04);
 }
 
 // Extremely Randomize Trees on Adult.
@@ -1171,7 +1171,8 @@ TEST_F(RandomForestOnSimPTE, Base) {
             train_dataset_.nrow() + 1 /*the header*/);
 }
 
-TEST_F(RandomForestOnSimPTE, Honest) {
+// TODO: b/2439527146 - Re-enable honest trees with uplift.
+TEST_F(RandomForestOnSimPTE, DISABLED_Honest) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->mutable_decision_tree()->mutable_honest();
@@ -1516,6 +1517,50 @@ TEST(RandomForestBootstrappingIndices, IndicesCorrectness) {
     EXPECT_FLOAT_EQ(mean_example_idx, root_prediction)
         << "Mismatch in tree " << tree_idx;
   }
+}
+
+TEST(RandomForest, Honest) {
+  // Create a toy dataset of simply increasing numbers in both label and feature
+  dataset::VerticalDataset dataset;
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "feature" }
+    columns { type: NUMERICAL name: "label" }
+  )pb");
+  dataset.set_data_spec(dataspec);
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+
+  ASSERT_OK_AND_ASSIGN(auto* col_feature,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(0));
+  *col_feature->mutable_values() = {0, 1, 2, 3, 4, 5};
+
+  ASSERT_OK_AND_ASSIGN(auto* col_label,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(1));
+  *col_label->mutable_values() = {5, 4, 3, 2, 1, 0};
+  dataset.set_nrow(6);
+
+  // This configuration perfectly separates the examples.
+  model::proto::TrainingConfig training_config = PARSE_TEST_PROTO(R"pb(
+    task: REGRESSION
+    label: "label"
+    [yggdrasil_decision_forests.model.random_forest.proto
+         .random_forest_config] {
+      decision_tree {
+        min_examples: 1
+        honest: {}
+      }
+      num_trees: 1
+      bootstrap_training_dataset: false
+    }
+  )pb");
+
+  RandomForestLearner learner{training_config};
+  ASSERT_OK_AND_ASSIGN(auto model, learner.TrainWithStatus(dataset));
+  auto* rf_model = dynamic_cast<const RandomForestModel*>(model.get());
+  ASSERT_NE(rf_model, nullptr);
+  // Make sure the model doesn't actually separate all examples.
+  EXPECT_LT(rf_model->NumNodes(), 11);
 }
 
 }  // namespace

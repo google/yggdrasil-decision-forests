@@ -912,8 +912,8 @@ TEST_F(GradientBoostedTreesOnAdult, Honest) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->mutable_decision_tree()->mutable_honest();
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8589, 0.0131, 0.8609);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.015, 0.3075);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8589, 0.0131, 0.8615);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3095, 0.015, 0.3032);
 }
 // Train a GBT with a validation dataset provided as a VerticalDataset.
 TEST_F(GradientBoostedTreesOnAdult, ValidVerticalDataset) {

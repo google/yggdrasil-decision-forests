@@ -444,6 +444,14 @@ RandomForestLearner::TrainWithStatusImpl(
     rf_config.set_compute_oob_performances(false);
   }
 
+  if ((training_config().task() == model::proto::Task::NUMERICAL_UPLIFT ||
+       training_config().task() == model::proto::Task::CATEGORICAL_UPLIFT) &&
+      rf_config.decision_tree().has_honest()) {
+    // TODO: b/2439527146 - Re-enable honest trees with uplift.
+    return absl::InvalidArgumentError(
+        "Honest trees are not compatible with Uplift tasks.");
+  }
+
   model::proto::TrainingConfigLinking config_link;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       config_with_default, train_dataset.data_spec(), &config_link));

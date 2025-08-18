@@ -5,9 +5,20 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
 ## HEAD
 
+### API Changes
+
+-   The `Uplift` task is not currently compatible with the `honest=True`
+    hyperparameter. Support for honest uplift trees is not yet implemented.
+    Training an uplift model with `honest=True` will now raise an error. Please
+    reach out to the YDF team if you have a use case for this functionality.
+
 ### Features
 
 -   Allow custom fields in model metadata.
+
+### Fix
+
+-   Fix honest trees implementation.
 
 ## 1.11.0 - 2025-03-12
 

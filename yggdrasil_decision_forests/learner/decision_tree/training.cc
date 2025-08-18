@@ -4543,7 +4543,6 @@ absl::Status DecisionTreeCoreTrain(
       return absl::InvalidArgumentError("Grow strategy not set");
   }
 }
-
 absl::Status NodeTrain(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
@@ -4570,10 +4569,7 @@ absl::Status NodeTrain(
     RETURN_IF_ERROR(ApplyConstraintOnNode(constraints, node));
   }
 
-  if (selected_examples.size() < dt_config.min_examples() ||
-      (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth()) ||
-      (internal_config.timeout.has_value() &&
-       internal_config.timeout < absl::Now())) {
+  auto finalize_as_leaf = [&]() -> absl::Status {
     if (leaf_examples.has_value()) {
       // Override the leaf values.
       RETURN_IF_ERROR(internal_config.set_leaf_value_functor(
@@ -4581,10 +4577,16 @@ absl::Status NodeTrain(
           node));
       RETURN_IF_ERROR(ApplyConstraintOnNode(constraints, node));
     }
-
     // Stop the growth of the branch.
     node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
     return absl::OkStatus();
+  };
+
+  if (selected_examples.size() < dt_config.min_examples() ||
+      (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth()) ||
+      (internal_config.timeout.has_value() &&
+       internal_config.timeout < absl::Now())) {
+    return finalize_as_leaf();
   }
 
   // Dataset used to train this node.
@@ -4635,9 +4637,7 @@ absl::Status NodeTrain(
                         constraints, node->mutable_node()->mutable_condition(),
                         random, cache));
   if (!has_better_condition) {
-    // No good condition found. Close the branch.
-    node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
-    return absl::OkStatus();
+    return finalize_as_leaf();
   }
   STATUS_CHECK_EQ(
       selected_examples.size(),
@@ -4659,8 +4659,7 @@ absl::Status NodeTrain(
     // The splitter statistics don't match exactly the condition evaluation and
     // one of the children is pure.
     node->ClearChildren();
-    node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
-    return absl::OkStatus();
+    return finalize_as_leaf();
   }
 
   // Separate the positive and negative examples used only to determine the node
@@ -4673,6 +4672,11 @@ absl::Status NodeTrain(
             train_dataset, *leaf_examples, node->node().condition(), false,
             dt_config.internal_error_on_wrong_splitter_statistics(),
             /*examples_are_training_examples=*/false));
+    if (node_only_example_split->positive_examples.empty() ||
+        node_only_example_split->negative_examples.empty()) {
+      node->ClearChildren();
+      return finalize_as_leaf();
+    }
   }
 
   // Set leaf outputs

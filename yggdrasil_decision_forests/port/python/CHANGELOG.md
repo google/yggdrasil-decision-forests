@@ -2,6 +2,14 @@
 
 ## HEAD
 
+### API Changes
+
+-   The `Uplift` task is not currently compatible with the `honest=True`
+    hyperparameter. Support for honest uplift trees is not yet implemented.
+    Training an uplift model with `honest=True` will now raise an error. Please
+    reach out to the YDF team if you have a use case for this functionality.
+
+
 ### Feature
 
 -   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random 
