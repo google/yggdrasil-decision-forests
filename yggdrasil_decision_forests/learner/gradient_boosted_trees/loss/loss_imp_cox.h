@@ -59,29 +59,26 @@ class CoxProportionalHazardLoss : public AbstractLoss {
 
   CoxProportionalHazardLoss(const ConstructorArgs& args) : AbstractLoss(args) {}
 
+  struct Update {
+    enum class Type { ARRIVAL = 0, EVENT = 1, CENSORING = 2 };
+
+    float time;
+    Type type;
+    CoxProportionalHazardLoss::row_t example_idx;
+    bool operator<(const Update& other) const {
+      return std::tie(time, type, example_idx) <
+             std::tie(other.time, other.type, other.example_idx);
+    }
+  };
+
   class Cache : public AbstractLossCache {
    public:
     Cache() {}
     virtual ~Cache() = default;
-
-    // These pair of structures are used to store the risk sets. A risk set R_i
-    // contains the idxs of the examples that were at risk at the departure age
-    // of the i-th example. Risk sets are only created for examples with
-    // departure events (non-censored).
-    //
-    // We store all sets in a flat vector `risk_set_idxs` to make sure all data
-    // is contiguous in memory. And since the sets do not have constant sizes,
-    // we use an additional vector of pairs `risk_set_sizes` to store the sizes
-    // of the sets, and the idx they belong to. Specifically, if
-    // `risk_set_sizes[j] = (i, n)`, then the j-th set in `risk_set_idxs`
-    // corresponds to R_i, and has n elements.
-    //
-    // TODO: Today the `risk_set_sizes` are sorted in increasing order
-    // of the departure age of the example. But the idxs could be sorted by
-    // value to process the dataset sequentially and have a better cache
-    // locality.
-    std::vector<std::pair<row_t, row_t>> risk_set_sizes;
-    std::vector<row_t> risk_set_bank;
+    // Contains all the arrivals, events and censorings in the dataset, sorted
+    // by time when they happened. This allows to compute at any moment in time
+    // the elements that were at risk.
+    std::vector<Update> updates;
   };
 
   absl::StatusOr<std::unique_ptr<AbstractLossCache>> CreateLossCache(

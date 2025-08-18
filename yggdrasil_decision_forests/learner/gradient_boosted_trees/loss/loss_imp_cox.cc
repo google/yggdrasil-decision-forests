@@ -85,46 +85,20 @@ CoxProportionalHazardLoss::CreateLossCache(
   auto cache = absl::make_unique<CoxProportionalHazardLoss::Cache>();
   LOG(INFO) << "Precomputing Cox Proportional Hazard Cache";
 
-  struct Update {
-    enum class Type { ARRIVAL = 0, EVENT = 1, CENSORING = 2 };
-
-    float time;
-    Type type;
-    CoxProportionalHazardLoss::row_t example_idx;
-    bool operator<(const Update& other) const {
-      return std::tie(time, type, example_idx) <
-             std::tie(other.time, other.type, other.example_idx);
-    }
-  };
-  std::vector<Update> updates;
-  updates.reserve(dataset.nrow() * 2);
+  cache->updates.reserve(dataset.nrow() * 2);
   for (row_t idx = 0; idx < dataset.nrow(); ++idx) {
     // Populate Arrival times.
-    updates.push_back({entry_ages.has_value() ? entry_ages.value()[idx] : 0.f,
-                       Update::Type::ARRIVAL, idx});
+    cache->updates.push_back(
+        {entry_ages.has_value() ? entry_ages.value()[idx] : 0.f,
+         CoxProportionalHazardLoss::Update::Type::ARRIVAL, idx});
     // Populate Event or Censoring times.
-    updates.push_back(
+    cache->updates.push_back(
         {departure_ages[idx],
-         events[idx] ? Update::Type::EVENT : Update::Type::CENSORING, idx});
+         events[idx] ? CoxProportionalHazardLoss::Update::Type::EVENT
+                     : CoxProportionalHazardLoss::Update::Type::CENSORING,
+         idx});
   }
-  std::sort(updates.begin(), updates.end());
-
-  absl::flat_hash_set<row_t> at_risk;
-  for (const auto& [time, update_type, example_idx] : updates) {
-    switch (update_type) {
-      case Update::Type::ARRIVAL:
-        at_risk.insert(example_idx);
-        break;
-      case Update::Type::EVENT:
-        cache->risk_set_sizes.emplace_back(example_idx, at_risk.size());
-        cache->risk_set_bank.insert(cache->risk_set_bank.end(), at_risk.begin(),
-                                    at_risk.end());
-        [[fallthrough]];
-      case Update::Type::CENSORING:
-        at_risk.erase(example_idx);
-    }
-  }
-  DCHECK(at_risk.empty());
+  std::sort(cache->updates.begin(), cache->updates.end());
 
   LOG(INFO) << "Done precomputing Cox Proportional Hazard Cache";
   return cache;
@@ -142,20 +116,27 @@ absl::StatusOr<LossResults> CoxProportionalHazardLoss::Loss(
   const double log_w = std::log(w);
 
   double loss = 0.f;
-
-  // Iterate over all the risk-sets.
-  row_t risk_set_offset = 0;  // Starting offset of a risk set within the bank.
-  for (const auto& [example_idx, risk_set_size] : cox_cache->risk_set_sizes) {
-    double risk_set_hazard = 0.f;
-    for (row_t idx = 0; idx < risk_set_size; ++idx) {
-      auto at_risk_idx = cox_cache->risk_set_bank[risk_set_offset + idx];
-      risk_set_hazard += w * std::exp(log_hazard_predictions[at_risk_idx]);
+  double hazard = 0.f;
+  absl::flat_hash_set<row_t> at_risk;
+  for (const auto& [time, update_type, example_idx] : cox_cache->updates) {
+    switch (update_type) {
+      case CoxProportionalHazardLoss::Update::Type::ARRIVAL:
+        at_risk.insert(example_idx);
+        break;
+      case CoxProportionalHazardLoss::Update::Type::EVENT:
+        hazard = 0.f;
+        for (auto at_risk_idx : at_risk) {
+          hazard += w * std::exp(log_hazard_predictions[at_risk_idx]);
+        }
+        loss += w * (std::log(hazard) - log_hazard_predictions[example_idx] -
+                     log_w);
+        [[fallthrough]];
+      case CoxProportionalHazardLoss::Update::Type::CENSORING:
+        at_risk.erase(example_idx);
     }
-
-    risk_set_offset += risk_set_size;
-    loss += w * (std::log(risk_set_hazard) -
-                 log_hazard_predictions[example_idx] - log_w);
   }
+  DCHECK(at_risk.empty());
+
   return LossResults{static_cast<float>(loss), /*.secondary_metrics =*/{}};
 }
 
@@ -174,27 +155,30 @@ absl::Status CoxProportionalHazardLoss::UpdateGradients(
   std::fill(hessians.begin(), hessians.end(), 0.f);
   std::fill(gradients.begin(), gradients.end(), 0.f);
 
-  // Iterate over all the risk-sets.
-  row_t risk_set_offset = 0;  // Starting offset of a risk set within the bank.
-  for (const auto& [example_idx, risk_set_size] : cox_cache->risk_set_sizes) {
-    float risk_set_hazard = 0.f;
-    // Iterate over all the examples in this risk-set.
-    for (row_t idx = 0; idx < risk_set_size; ++idx) {
-      auto at_risk_idx = cox_cache->risk_set_bank[risk_set_offset + idx];
-      risk_set_hazard += std::exp(log_hazard_predictions[at_risk_idx]);
+  double hazard = 0.f;
+  absl::flat_hash_set<row_t> at_risk;
+  for (const auto& [time, update_type, example_idx] : cox_cache->updates) {
+    switch (update_type) {
+      case CoxProportionalHazardLoss::Update::Type::ARRIVAL:
+        at_risk.insert(example_idx);
+        break;
+      case CoxProportionalHazardLoss::Update::Type::EVENT:
+        hazard = 0.f;
+        for (auto at_risk_idx : at_risk) {
+          hazard += std::exp(log_hazard_predictions[at_risk_idx]);
+        }
+        for (auto at_risk_idx : at_risk) {
+          float p = std::exp(log_hazard_predictions[at_risk_idx]) / hazard;
+          gradients[at_risk_idx] -= w * p;
+          hessians[at_risk_idx] += w * p * (1.f - p);
+        }
+        gradients[example_idx] += w;
+        [[fallthrough]];
+      case CoxProportionalHazardLoss::Update::Type::CENSORING:
+        at_risk.erase(example_idx);
     }
-
-    for (row_t idx = 0; idx < risk_set_size; ++idx) {
-      auto at_risk_idx = cox_cache->risk_set_bank[risk_set_offset + idx];
-      float hazard_prediction = std::exp(log_hazard_predictions[at_risk_idx]);
-      float p = hazard_prediction / risk_set_hazard;
-      gradients[at_risk_idx] -= w * p;
-      hessians[at_risk_idx] += w * p * (1.f - p);
-    }
-    gradients[example_idx] += w;
-    risk_set_offset += risk_set_size;
   }
-
+  DCHECK(at_risk.empty());
   return absl::OkStatus();
 }
 
