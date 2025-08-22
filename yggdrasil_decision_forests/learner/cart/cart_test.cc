@@ -297,7 +297,8 @@ TEST_F(CartOnSimPTE, Base) {
   YDF_TEST_METRIC(rf_model->NumNodes(), 37.0, 42.0, 51.0);
 }
 
-TEST_F(CartOnSimPTE, Honest) {
+// TODO: b/2439527146 - Re-enable honest trees with uplift.
+TEST_F(CartOnSimPTE, DISABLED_Honest) {
   auto* config = train_config_.MutableExtension(cart::proto::cart_config);
   config->mutable_decision_tree()->mutable_honest();
 

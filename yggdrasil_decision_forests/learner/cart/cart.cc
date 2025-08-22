@@ -186,6 +186,14 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
 
   RETURN_IF_ERROR(SetDefaultHyperParameters(&cart_config));
 
+  if ((training_config().task() == model::proto::Task::NUMERICAL_UPLIFT ||
+       training_config().task() == model::proto::Task::CATEGORICAL_UPLIFT) &&
+      cart_config.decision_tree().has_honest()) {
+    // TODO: b/2439527146 - Re-enable honest trees with uplift.
+    return absl::InvalidArgumentError(
+        "Honest trees are not compatible with Uplift tasks.");
+  }
+
   model::proto::TrainingConfigLinking config_link;
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
       config, train_dataset.data_spec(), &config_link));
