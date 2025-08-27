@@ -271,7 +271,7 @@ efficient engine on the current hardware. The `cli/benchmark_inference` tool can
 measure the inference speed of a model and the compatible serving engines.
 
 A **learner** is instantiated from a
-[TrainingConfig](../yggdrasil_decision_forests/learner/abstract_learner.proto)
+[TrainingConfig](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
 proto. The **TrainingConfig** defines the label, input features, task, learner
 type, and hyper-parameters for the learning.
 
@@ -284,7 +284,7 @@ The [hyper-parameter](hyperparameters.md) page lists the learners and their
 hyper-parameters.
 
 Optionally, a learner can be configured with a **deployment specification**. A
-[deployment specification](../yggdrasil_decision_forests/learner/abstract_learner.proto)
+[deployment specification](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/abstract_learner.proto)
 defines the computing resources to use during the training. This includes the
 number of threads or the number of workers (in the case of distributed
 training). Changing the deployment configuration (or not providing any) can

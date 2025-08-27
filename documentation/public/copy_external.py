@@ -14,25 +14,30 @@
 
 """Copy files from YDF repo into the doc."""
 
+
+import os
 import mkdocs_gen_files
 
-try:
-  with open("CHANGELOG.md", "r", encoding="utf-8") as f_in:
-    with mkdocs_gen_files.open("changelog.md", "w") as f_out:
-      f_out.write("See also the [PYDF changelogs](changelog_pydf).\n\n")
-      f_out.write(f_in.read())
+# Get the path to the root of the repository, which is two levels above this script.
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-  with open("LICENSE", "r", encoding="utf-8") as f_in:
-    with mkdocs_gen_files.open("LICENSE", "w") as f_out:
-      f_out.write(f_in.read())
+files_to_copy = {
+    "CHANGELOG.md": "changelog.md",
+    "LICENSE": "LICENSE",
+    "yggdrasil_decision_forests/port/python/CHANGELOG.md": "changelog_pydf.md",
+}
 
-  with open(
-      "yggdrasil_decision_forests/port/python/CHANGELOG.md",
-      "r",
-      encoding="utf-8",
-  ) as f_in:
-    with mkdocs_gen_files.open("changelog_pydf.md", "w") as f_out:
-      f_out.write(f_in.read())
-
-except:
-  pass
+for src_path, dest_name in files_to_copy.items():
+  full_src_path = os.path.join(REPO_ROOT, src_path)
+  try:
+    with open(full_src_path, "r", encoding="utf-8") as f_in:
+      with mkdocs_gen_files.open(dest_name, "w") as f_out:
+        if dest_name == "changelog.md":
+          # Add the extra header line only for the main changelog
+          f_out.write("See also the [PYDF changelogs](changelog_pydf.md).\n\n")
+        f_out.write(f_in.read())
+  except FileNotFoundError:
+    print(f"Warning: Could not find source file {full_src_path} to copy.")
+  except Exception as e:
+    # Print any other unexpected errors to help with debugging
+    print(f"Error copying {full_src_path}: {e}")

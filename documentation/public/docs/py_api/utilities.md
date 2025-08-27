@@ -22,7 +22,10 @@
 
 ::: ydf.strict
 
-::: ydf.Evaluation
+<!---
+ May cause issues with the public documentation build, disable temporarily.
+# ::: ydf.Evaluation
+-->
 
 ::: ydf.ModelIOOptions
 
