@@ -1,3 +1,5 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+
 # TODO: Enbable CUDA build in OSS
 # load("@rules_cuda//cuda:defs.bzl", "cuda_library", "requires_cuda")
 
