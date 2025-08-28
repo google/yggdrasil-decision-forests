@@ -632,7 +632,10 @@ class GenericModelTest(parameterized.TestCase):
         test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
     )
     test_df = pd.read_csv(dataset_path)
-    with self.assertRaisesRegex(ValueError, "an integer greater than 100"):
+    with self.assertRaisesRegex(
+        ValueError,
+        "`bootstrapping` must be a boolean or an integer >= 100, but got 1.",
+    ):
       self.abalone_regression_gbdt.evaluate(test_df, bootstrapping=1)
 
   def test_prefixed_model_loading_autodetection(self):

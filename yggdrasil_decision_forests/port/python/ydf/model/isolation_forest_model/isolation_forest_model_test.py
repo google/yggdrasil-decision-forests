@@ -83,14 +83,14 @@ class IsolationForestModelTest(absltest.TestCase):
   def test_export_to_tensorflow(self):
     with self.assertRaisesRegex(
         ValueError,
-        "Anomaly Detection models are not yet supported for export to"
-        " Tensorflow.",
+        "Export to TensorFlow is not yet supported for Anomaly Detection"
+        " models.",
     ):
       _ = self.model_gaussians.to_tensorflow_function()
     with self.assertRaisesRegex(
         ValueError,
-        "Anomaly Detection models are not yet supported for export to"
-        " Tensorflow.",
+        "Export to TensorFlow is not yet supported for Anomaly Detection"
+        " models.",
     ):
       out_dir = self.create_tempdir()
       _ = self.model_gaussians.to_tensorflow_saved_model(out_dir.full_path)
