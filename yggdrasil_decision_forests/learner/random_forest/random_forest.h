@@ -59,6 +59,7 @@ class RandomForestLearner : public AbstractLearner {
   // Generic hyper parameter names.
   static constexpr char kHParamNumTrees[] = "num_trees";
   static constexpr char kHParamWinnerTakeAll[] = "winner_take_all";
+  static constexpr char kHParamWinnerTakesAll[] = "winner_takes_all";
   static constexpr char
       kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration[] =
           "adapt_bootstrap_size_ratio_for_maximum_training_duration";

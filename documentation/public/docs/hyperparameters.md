@@ -650,7 +650,7 @@ argument in the Python and TensorFlow Decision Forests APIs.
 A configuration that is generally better than the default parameters without
 being more expensive.
 
--   `winner_take_all`: true
+-   `winner_takes_all`: true
 
 **benchmark_rank1@1**
 

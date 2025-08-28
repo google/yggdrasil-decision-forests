@@ -17,6 +17,8 @@
 -   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random 
     Forest Learner to retrieve the indices of the in-bag samples used for
     training each tree.
+-   New hyperparameter `winner_takes_all` to replace the deprecated 
+    `winner_take_all` with identical functionality.
 -   Add export to standalone Java.
 
 ## 0.13.0 - 2025-07-15
