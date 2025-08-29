@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <limits>
 #include <numeric>
@@ -112,21 +113,32 @@ absl::Status GenerateFoldsCrossValidationWithGroups(
         "\" no found."));
   }
 
-  if (dataset.column(group_column_idx)->type() !=
-      dataset::proto::ColumnType::CATEGORICAL) {
+  absl::flat_hash_map<uint64_t, Group> rows_per_groups;
+
+  auto group_column_type = dataset.column(group_column_idx)->type();
+  if (group_column_type == dataset::proto::ColumnType::HASH) {
+    ASSIGN_OR_RETURN(
+        const auto* group_attribute,
+        dataset.ColumnWithCastWithStatus<
+            dataset::VerticalDataset::HashColumn>(group_column_idx));
+    for (dataset::VerticalDataset::row_t row_idx = 0; row_idx < dataset.nrow();
+         row_idx++) {
+      const int group = group_attribute->values()[row_idx];
+      rows_per_groups[group].push_back(row_idx);
+    }
+  } else if (group_column_type == dataset::proto::ColumnType::CATEGORICAL) {
+    ASSIGN_OR_RETURN(
+        const auto* group_attribute,
+        dataset.ColumnWithCastWithStatus<
+            dataset::VerticalDataset::CategoricalColumn>(group_column_idx));
+    for (dataset::VerticalDataset::row_t row_idx = 0; row_idx < dataset.nrow();
+         row_idx++) {
+      const int group = group_attribute->values()[row_idx];
+      rows_per_groups[group].push_back(row_idx);
+    }
+  } else {
     return absl::InvalidArgumentError(
         "The fold group attribute is not categorical.");
-  }
-
-  ASSIGN_OR_RETURN(
-      const auto* group_attribute,
-      dataset.ColumnWithCastWithStatus<
-          dataset::VerticalDataset::CategoricalColumn>(group_column_idx));
-  absl::flat_hash_map<int, Group> rows_per_groups;
-  for (dataset::VerticalDataset::row_t row_idx = 0; row_idx < dataset.nrow();
-       row_idx++) {
-    const int group = group_attribute->values()[row_idx];
-    rows_per_groups[group].push_back(row_idx);
   }
 
   const int num_folds = generator.cross_validation().num_folds();
