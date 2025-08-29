@@ -79,7 +79,7 @@ namespace random_forest {
 namespace {
 
 absl::StatusOr<std::vector<int64_t>> GenerateTreeSeeds(
-    const uint64_t random_seed,
+    utils::RandomEngine* random_engine,
     const proto::RandomForestTrainingConfig& rf_config) {
   std::vector<int64_t> tree_seeds;
   int num_trees = rf_config.num_trees();
@@ -93,11 +93,31 @@ absl::StatusOr<std::vector<int64_t>> GenerateTreeSeeds(
     tree_seeds = {rf_config.internal().individual_tree_seeds().begin(),
                   rf_config.internal().individual_tree_seeds().end()};
   } else {
-    auto random_engine = utils::RandomEngine(random_seed);
     tree_seeds.reserve(num_trees);
     for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
-      tree_seeds.push_back((random_engine)());
+      tree_seeds.push_back((*random_engine)());
     }
+  }
+  return tree_seeds;
+}
+
+absl::StatusOr<std::vector<int64_t>> GenerateHonestSplitSeeds(
+    utils::RandomEngine* random_engine,
+    const proto::RandomForestTrainingConfig& rf_config) {
+  if (!rf_config.decision_tree().has_honest()) {
+    return absl::InvalidArgumentError(
+        "The training configuration does not specify honest trees.");
+  }
+  bool single_seed = rf_config.decision_tree().honest().fixed_separation();
+  int num_trees = rf_config.num_trees();
+  if (single_seed) {
+    auto seed = (*random_engine)();
+    return std::vector<int64_t>(num_trees, seed);
+  }
+
+  std::vector<int64_t> tree_seeds(num_trees);
+  for (auto& tree_seed : tree_seeds) {
+    tree_seed = (*random_engine)();
   }
   return tree_seeds;
 }
@@ -425,9 +445,16 @@ RandomForestLearner::TrainWithStatusImpl(
       random_forest::proto::random_forest_config);
   RETURN_IF_ERROR(internal::SetDefaultHyperParameters(&rf_config));
 
-  ASSIGN_OR_RETURN(
-      const auto tree_seeds,
-      GenerateTreeSeeds(config_with_default.random_seed(), rf_config));
+  utils::RandomEngine random_engine(config_with_default.random_seed());
+  ASSIGN_OR_RETURN(const auto tree_seeds,
+                   GenerateTreeSeeds(&random_engine, rf_config));
+  // Generate the split seeds right after bootstrapping, to make sure this is
+  // reproducible via other paths.
+  std::optional<std::vector<int64_t>> honest_split_seeds = std::nullopt;
+  if (rf_config.decision_tree().has_honest()) {
+    ASSIGN_OR_RETURN(honest_split_seeds,
+                     GenerateHonestSplitSeeds(&random_engine, rf_config));
+  }
 
   // If the maximum model size is limited, "keep_non_leaf_label_distribution"
   // defaults to false.
@@ -704,6 +731,10 @@ RandomForestLearner::TrainWithStatusImpl(
         if (vector_sequence_computer) {
           internal_config.vector_sequence_computer =
               vector_sequence_computer.get();
+        }
+        if (honest_split_seeds.has_value()) {
+          DCHECK_LT(tree_idx, honest_split_seeds->size());
+          internal_config.honest_split_seed = (*honest_split_seeds)[tree_idx];
         }
         auto status_train = decision_tree::Train(
             train_dataset, selected_examples, config_with_default, config_link,
@@ -999,9 +1030,9 @@ RandomForestLearner::GetTrainingExampleIndices(UnsignedExampleIdx dataset_size,
         "compatible with GetTrainingExampleIndices. This is because the "
         "sampling ratio is not known beforehand.");
   }
-  ASSIGN_OR_RETURN(
-      auto tree_seeds,
-      GenerateTreeSeeds(training_config_.random_seed(), rf_config));
+  utils::RandomEngine random_engine(training_config_.random_seed());
+  ASSIGN_OR_RETURN(auto tree_seeds,
+                   GenerateTreeSeeds(&random_engine, rf_config));
   std::vector<UnsignedExampleIdx> selected_examples;
   DCHECK_LT(tree_idx, tree_seeds.size());
   auto tree_random_engine = utils::RandomEngine(tree_seeds[tree_idx]);

@@ -292,6 +292,10 @@ struct InternalTrainConfig {
   // split_finder_processor should be created with
   // CreateSplitterFinderStreamProcessor.
   SplitterFinderStreamProcessor* split_finder_processor = nullptr;
+
+  // Seed for the honest trees split. If not given, the default random engine is
+  // used.
+  std::optional<int64_t> honest_split_seed;
 };
 
 // Find the best condition for a leaf node. Return true if a condition better
@@ -978,6 +982,14 @@ int NumAttributesToTest(const proto::DecisionTreeTrainingConfig& dt_config,
 // increasing monotonic, and 0 if a feature is not constrained.
 int8_t MonotonicConstraintSign(
     const model::proto::TrainingConfigLinking& config_link, int attribute_idx);
+
+// Splits the selected examples into training and leaf examples for honest
+// trees.
+void SplitHonestExamples(
+    absl::Span<const UnsignedExampleIdx> selected_examples, float leaf_rate,
+    utils::RandomEngine* random_engine,
+    std::vector<UnsignedExampleIdx>& leaf_examples,
+    std::vector<UnsignedExampleIdx>& working_selected_examples);
 
 namespace internal {
 

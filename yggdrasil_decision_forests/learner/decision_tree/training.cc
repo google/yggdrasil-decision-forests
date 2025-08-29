@@ -4168,6 +4168,28 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
   }
 }
 
+void SplitHonestExamples(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const float leaf_rate, utils::RandomEngine* random_engine,
+    std::vector<UnsignedExampleIdx>& leaf_examples,
+    std::vector<UnsignedExampleIdx>& working_selected_examples) {
+  std::uniform_real_distribution<float> dist_01;
+
+  // Reduce the risk of std::vector re-allocations.
+  const float error_margin = 1.1f;
+  leaf_examples.reserve(selected_examples.size() * leaf_rate * error_margin);
+  working_selected_examples.reserve(selected_examples.size() *
+                                    (1.f - leaf_rate) * error_margin);
+
+  for (const auto& example : selected_examples) {
+    if (dist_01(*random_engine) < leaf_rate) {
+      leaf_examples.push_back(example);
+    } else {
+      working_selected_examples.push_back(example);
+    }
+  }
+}
+
 absl::Status GrowTreeBestFirstGlobal(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
@@ -4425,35 +4447,25 @@ absl::Status DecisionTreeTrain(
   }
 
   if (dt_config.has_honest()) {
-    // Split the examples in two parts. One ("selected_examples_buffer") will be
-    // used to infer the structure of the trees while the second
-    // ("leaf_examples_buffer") will be used to determine the leaf values (i.e.
-    // the predictions).
-
-    const float leaf_rate = dt_config.honest().ratio_leaf_examples();
-    std::uniform_real_distribution<float> dist_01;
-
-    // Reduce the risk of std::vector re-allocations.
-    const float error_margin = 1.1f;
+    // Split the examples in two parts. One ("selected_examples_buffer")
+    // will be used to infer the structure of the trees while the second
+    // ("leaf_examples_buffer") will be used to determine the leaf values
+    // (i.e. the predictions).
     leaf_examples = std::vector<UnsignedExampleIdx>();
-    auto& leaf_examples_value = leaf_examples.value();
-    leaf_examples_value.reserve(selected_examples.size() * leaf_rate *
-                                error_margin);
-    working_selected_examples.reserve(selected_examples.size() *
-                                      (1.f - leaf_rate) * error_margin);
-
-    auto* effective_random = random;
-    utils::RandomEngine fixed_random(12345678);
-    if (dt_config.honest().fixed_separation()) {
-      effective_random = &fixed_random;
-    }
-
-    for (const auto& example : selected_examples) {
-      if (dist_01(*effective_random) < leaf_rate) {
-        leaf_examples_value.push_back(example);
-      } else {
-        working_selected_examples.push_back(example);
-      }
+    // If the internal training config provides a special seed for the random
+    // split, use this seed with a new random engine. Otherwise, just use the
+    // default random engine.
+    if (internal_config.honest_split_seed.has_value()) {
+      utils::RandomEngine honest_split_random(
+          *internal_config.honest_split_seed);
+      SplitHonestExamples(selected_examples,
+                          dt_config.honest().ratio_leaf_examples(),
+                          &honest_split_random, leaf_examples.value(),
+                          working_selected_examples);
+    } else {
+      SplitHonestExamples(selected_examples,
+                          dt_config.honest().ratio_leaf_examples(), random,
+                          leaf_examples.value(), working_selected_examples);
     }
   } else {
     working_selected_examples.assign(selected_examples.begin(),
