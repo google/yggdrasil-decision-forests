@@ -35,6 +35,8 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
+#include "yggdrasil_decision_forests/serving/embed/common.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -99,7 +101,7 @@ TestData BuildToyTestData() {
   return TestData{.model = std::move(model)};
 };
 
-struct GoldenGeneratedHCase {
+struct GoldenGeneratedCCCase {
   std::string model_filename;
   std::string golden_filename;
   proto::Algorithm::Enum algorithm;
@@ -110,7 +112,7 @@ struct GoldenGeneratedHCase {
 
 // Compare the generated .h files against golden files.
 SIMPLE_PARAMETERIZED_TEST(
-    GoldenGeneratedH, GoldenGeneratedHCase,
+    GoldenGeneratedCC, GoldenGeneratedCCCase,
     {
         // GBT
         {
@@ -234,12 +236,13 @@ SIMPLE_PARAMETERIZED_TEST(
   }
 
   proto::Options options;
+  options.mutable_cc();
   options.set_algorithm(test_case.algorithm);
   options.set_categorical_from_string(test_case.categorical_from_string);
   if (test_case.output.has_value()) {
     options.set_classification_output(*test_case.output);
   }
-  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModelCC(*model, options));
+  ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModel(*model, options));
   EXPECT_EQ(embed.size(), 1);
   EXPECT_TRUE(embed.contains("ydf_model.h"));
 

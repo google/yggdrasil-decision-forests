@@ -13,22 +13,18 @@
  * limitations under the License.
  */
 
-#ifndef YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_EMBED_H_
-#define YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_EMBED_H_
+#include "yggdrasil_decision_forests/serving/embed/java_embed.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
-#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 
-namespace yggdrasil_decision_forests::serving::embed {
+namespace yggdrasil_decision_forests::serving::embed::internal {
 
-// Embed a model into a C++ library without dependencies to the YDF library.
-// Returns a list of filenames and matching content.
-absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModel(
-    const model::AbstractModel& model, const proto::Options& options);
-
-}  // namespace yggdrasil_decision_forests::serving::embed
-
-#endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_EMBED_H_
+absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelJava(
+    const model::AbstractModel& model, const proto::Options& options) {
+  return absl::UnimplementedError("Java export not yet implemented.");
+}
+}  // namespace yggdrasil_decision_forests::serving::embed::internal

@@ -24,16 +24,18 @@
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.h"
-#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
-ABSL_FLAG(std::string, name, "", "Name of the model");
+ABSL_FLAG(
+    std::string, name, "",
+    "Name of the model. If set in the options proto, this value is ignored.");
 ABSL_FLAG(std::string, input, "", "Input YDF model directory");
 ABSL_FLAG(std::string, output, "",
           "Output directory where to write the generated files.");
@@ -41,6 +43,9 @@ ABSL_FLAG(std::string, options, "", "Options for the embedded model");
 ABSL_FLAG(bool, remove_output_filename, false,
           "If set, 'output' is a file path. The filename should be removed to "
           "get the real output directory.");
+ABSL_FLAG(std::string, language, "CC",
+          "Target language. Can be CC (i.e. C++, default) or JAVA. If set in "
+          "the options proto, this value is ignored.");
 
 namespace yggdrasil_decision_forests::serving::embed {
 
@@ -51,14 +56,11 @@ absl::Status WriteEmbeddedModel() {
   const auto remove_output_filename =
       absl::GetFlag(FLAGS_remove_output_filename);
   const auto options_text = absl::GetFlag(FLAGS_options);
+  const auto language_str = absl::GetFlag(FLAGS_language);
 
   if (remove_output_filename) {
     output = file::GetDirname(output);
   }
-
-  LOG(INFO) << "Loading model";
-  ASSIGN_OR_RETURN(const std::unique_ptr<model::AbstractModel> model,
-                   model::LoadModel(input));
 
   LOG(INFO) << "Compiling model";
   proto::Options options;
@@ -66,8 +68,26 @@ absl::Status WriteEmbeddedModel() {
     ASSIGN_OR_RETURN(options,
                      utils::ParseTextProto<proto::Options>(options_text));
   }
-  options.set_name(name);
-  ASSIGN_OR_RETURN(const auto embedded_model, EmbedModelCC(*model, options));
+  if (!options.has_name()) {
+    options.set_name(name);
+  }
+
+  if (options.language_case() == proto::Options::LANGUAGE_NOT_SET) {
+    if (language_str == "CC") {
+      options.mutable_cc();
+    } else if (language_str == "Java") {
+      options.mutable_java();
+    } else {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Unknown language ", language_str, ". Available options: CC, Java"));
+    }
+  }
+
+  LOG(INFO) << "Loading model";
+  ASSIGN_OR_RETURN(const std::unique_ptr<model::AbstractModel> model,
+                   model::LoadModel(input));
+
+  ASSIGN_OR_RETURN(const auto embedded_model, EmbedModel(*model, options));
 
   LOG(INFO) << "Write embedded model";
   for (const auto& file_and_data : embedded_model) {

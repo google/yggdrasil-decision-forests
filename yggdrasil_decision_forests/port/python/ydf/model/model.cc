@@ -38,9 +38,8 @@
 #include "ydf/model/isolation_forest_model/isolation_forest_wrapper.h"
 #include "ydf/model/model_wrapper.h"
 #include "ydf/model/random_forest_model/random_forest_wrapper.h"
-#include "ydf/utils/custom_casters.h"
+#include "ydf/utils/custom_casters.h"  // IWYU pragma: keep
 #include "ydf/utils/status_casters.h"
-#include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"

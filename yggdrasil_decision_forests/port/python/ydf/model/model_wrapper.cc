@@ -413,7 +413,7 @@ GenericCCModel::EmbedModel(
     const serving::embed::proto::Options& options) const {
   std::unordered_map<std::string, std::string> std_result;
   ASSIGN_OR_RETURN(const auto absl_result,
-                   serving::embed::EmbedModelCC(*model_, options));
+                   serving::embed::EmbedModel(*model_, options));
   std_result.insert(absl_result.begin(), absl_result.end());
   return std_result;
 }
