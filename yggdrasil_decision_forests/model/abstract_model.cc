@@ -60,6 +60,8 @@
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
+
+
 namespace yggdrasil_decision_forests {
 namespace model {
 
@@ -557,7 +559,9 @@ absl::Status AbstractModel::AppendEvaluation(
   if (!option.force_slow_engine()) {
     engine_or_status = BuildFastEngine();
   }
-  if (engine_or_status.ok()) {
+
+  //if (engine_or_status.ok()) {
+  if (false) {
     RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
                                                *engine_or_status.value(), rnd,
                                                predictions, eval));
@@ -602,6 +606,8 @@ absl::Status AbstractModel::AppendEvaluationOverrideType(
   }
 
   auto engine_or_status = BuildFastEngine();
+  
+
   if (engine_or_status.ok()) {
     RETURN_IF_ERROR(AppendEvaluationWithEngineOverrideType(
         dataset, option, override_task, override_label_col_idx,
@@ -1461,6 +1467,8 @@ AbstractModel::BuildFastEngine(
 
   // List the compatible engines.
   auto sorted_compatible_engines = ListCompatibleFastEngines();
+
+
 
   // How to create the engine.
   std::unique_ptr<FastEngineFactory> engine_factory;

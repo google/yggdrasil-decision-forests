@@ -157,6 +157,14 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
     }
   }
   {
+    const auto hparam = generic_hyper_params->Get(kHParamKernelMethod);
+    if (hparam.has_value()) {
+      rf_config->set_kernel_method(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+  LOG(INFO) << "Kernel method: " << kHParamKernelMethod;
+  {
     const auto hparam = generic_hyper_params->Get(
         kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration);
     if (hparam.has_value()) {
@@ -302,6 +310,18 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
         R"(Control how classification trees vote. If true, each tree votes for one class. If false, each tree vote for a distribution of classes. winner_take_all_inference=false is often preferable.)");
   }
   {
+    auto& param = hparam_def.mutable_fields()->operator[](kHParamKernelMethod);
+    param.mutable_categorical()->set_default_value(
+      rf_config.kernel_method() ? "true" : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_proto_field("kernel_method");
+
+    param.mutable_documentation()->set_description(
+      R"(Use raw class counts instead of normalized counts at leaf. Set kernel_method=true at default)");
+  }
+  {
     auto& param = hparam_def.mutable_fields()->operator[](
         kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration);
     param.mutable_categorical()->set_default_value(
@@ -397,12 +417,20 @@ absl::Status RandomForestLearner::CheckConfiguration(
   RETURN_IF_ERROR(AbstractLearner::CheckConfiguration(data_spec, config,
                                                       config_link, deployment));
   // Check that the decision tree will contain prediction weighting is needed.
-  if (!rf_config.winner_take_all_inference()) {
-    if (!rf_config.decision_tree().store_detailed_label_distribution())
-      return absl::InvalidArgumentError(
-          "store_detailed_label_label_distribution should be true if "
-          "winner_take_all is false. The decision trees need to contain the "
-          "detailed label distributions.");
+  // if (!rf_config.winner_take_all_inference()) {
+  //   if (!rf_config.decision_tree().store_detailed_label_distribution())
+  //     return absl::InvalidArgumentError(
+  //         "store_detailed_label_label_distribution should be true if "
+  //         "winner_take_all is false. The decision trees need to contain the "
+  //         "detailed label distributions.");
+  // }
+
+  if ((rf_config.kernel_method() || !rf_config.winner_take_all_inference()) &&
+      !rf_config.decision_tree().store_detailed_label_distribution()) {
+    return absl::InvalidArgumentError(
+        "store_detailed_label_distribution should be true if "
+        "\"winner_take_all_inference=false\" or \"kernel_method=true\". The decision trees need to contain the "
+        "detailed label distributions");
   }
   return absl::OkStatus();
 }
@@ -839,7 +867,8 @@ RandomForestLearner::TrainWithStatusImpl(
           // Update the prediction accumulator.
           auto update_oob_status = internal::UpdateOOBPredictionsWithNewTree(
               train_dataset, config_with_default, selected_examples,
-              rf_config.winner_take_all_inference(), *decision_tree, {},
+              rf_config.winner_take_all_inference(),rf_config.kernel_method(),
+               *decision_tree, {},
               &random, &oob_predictions);
           if (!update_oob_status.ok()) {
             utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
@@ -866,7 +895,7 @@ RandomForestLearner::TrainWithStatusImpl(
             last_oob_computation_num_trees = current_num_trained_trees;
             proto::OutOfBagTrainingEvaluations evaluation;
             evaluation.set_number_of_trees(current_num_trained_trees);
-            auto evaluation_or = internal::EvaluateOOBPredictions(
+            auto evaluation_or = internal::EvaluateOOBPredictions(training_config(),
                 train_dataset, mdl->task(), mdl->label_col_idx(),
                 mdl->uplift_treatment_col_idx(), mdl->weights(),
                 oob_predictions,
@@ -900,7 +929,8 @@ RandomForestLearner::TrainWithStatusImpl(
                 const auto update_oob_status =
                     internal::UpdateOOBPredictionsWithNewTree(
                         train_dataset, config_with_default, selected_examples,
-                        rf_config.winner_take_all_inference(), *decision_tree,
+                        rf_config.winner_take_all_inference(), rf_config.kernel_method(),
+                         *decision_tree,
                         feature_idx, &random,
                         &oob_predictions_per_input_features[feature_idx]);
                 if (!update_oob_status.ok()) {
@@ -978,7 +1008,7 @@ RandomForestLearner::TrainWithStatusImpl(
   }
 
   if (compute_oob_variable_importances) {
-    RETURN_IF_ERROR(ComputeVariableImportancesFromAccumulatedPredictions(
+    RETURN_IF_ERROR(ComputeVariableImportancesFromAccumulatedPredictions(training_config(),
         oob_predictions, oob_predictions_per_input_features, train_dataset,
         deployment().num_threads(), mdl.get()));
   }
@@ -1084,6 +1114,7 @@ absl::Status UpdateOOBPredictionsWithNewTree(
     const model::proto::TrainingConfig& config,
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
+    const bool kernel_method,
     const decision_tree::DecisionTree& new_decision_tree,
     const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
     std::vector<PredictionAccumulator>* oob_predictions) {
@@ -1125,7 +1156,7 @@ absl::Status UpdateOOBPredictionsWithNewTree(
     accumulator.num_trees++;
     switch (config.task()) {
       case model::proto::Task::CLASSIFICATION:
-        AddClassificationLeafToAccumulator(winner_take_all_inference, *leaf,
+        AddClassificationLeafToAccumulator(winner_take_all_inference,kernel_method, *leaf,
                                            &accumulator.classification);
         break;
       case model::proto::Task::REGRESSION:
@@ -1145,12 +1176,17 @@ absl::Status UpdateOOBPredictionsWithNewTree(
 }
 
 absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
+    const model::proto::TrainingConfig& training_config,
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     const int uplift_treatment_col_idx,
     const std::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<PredictionAccumulator>& oob_predictions,
     const bool for_permutation_importance) {
+  // Add training config for passing parameter
+  const auto& rf_config = training_config.GetExtension(
+    random_forest::proto::random_forest_config);
+
   // Configure the evaluation options.
   metric::proto::EvaluationOptions eval_options;
   eval_options.set_task(task);
@@ -1196,10 +1232,12 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     }
 
     switch (task) {
-      case model::proto::Task::CLASSIFICATION:
+      case model::proto::Task::CLASSIFICATION:{
+        auto acc = prediction_accumulator.classification;
         FinalizeClassificationLeafToAccumulator(
-            prediction_accumulator.classification, &prediction);
+            acc, &prediction, rf_config.kernel_method());
         break;
+      }
       case model::proto::Task::REGRESSION:
         prediction.mutable_regression()->set_value(
             prediction_accumulator.regression /
@@ -1238,6 +1276,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
 }
 
 absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
+    const model::proto::TrainingConfig& training_config,
     const std::vector<internal::PredictionAccumulator>& oob_predictions,
     const std::vector<std::vector<internal::PredictionAccumulator>>&
         oob_predictions_per_input_features,
@@ -1247,7 +1286,7 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
   // other expensive evaluation metrics.
   ASSIGN_OR_RETURN(
       const auto base_evaluation,
-      EvaluateOOBPredictions(dataset, model->task(), model->label_col_idx(),
+      EvaluateOOBPredictions(training_config,dataset, model->task(), model->label_col_idx(),
                              model->uplift_treatment_col_idx(),
                              model->weights(), oob_predictions,
                              /*for_permutation_importance=*/true));
@@ -1259,7 +1298,7 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
     }
     ASSIGN_OR_RETURN(auto eval,
                      EvaluateOOBPredictions(
-                         dataset, model->task(), model->label_col_idx(),
+                         training_config, dataset, model->task(), model->label_col_idx(),
                          model->uplift_treatment_col_idx(), model->weights(),
                          oob_predictions_per_input_features[feature_idx],
                          /*for_permutation_importance=*/true));
@@ -1281,6 +1320,7 @@ void InitializeModelWithTrainingConfig(
   const auto& rf_config =
       training_config.GetExtension(random_forest::proto::random_forest_config);
   model->set_winner_take_all_inference(rf_config.winner_take_all_inference());
+  model->set_kernel_method(rf_config.kernel_method());
 }
 
 absl::Status SampleTrainingExamples(
