@@ -1,5 +1,7 @@
 """Blaze / Bazel rule to embed YDF models in a binary."""
 
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 def cc_ydf_standalone_model(
         name,
         data,
@@ -69,7 +71,7 @@ def cc_ydf_standalone_model(
     )
 
     # Creates a cc library with the model.
-    native.cc_library(
+    cc_library(
         name = name,
         srcs = [],
         hdrs = [name + ".h"],

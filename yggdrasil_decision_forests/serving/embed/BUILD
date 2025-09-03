@@ -1,4 +1,5 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//yggdrasil_decision_forests/serving/embed:embed.bzl", "cc_ydf_standalone_model")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_binary_ydf", "cc_library_ydf")
 
