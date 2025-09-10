@@ -79,6 +79,7 @@ static const Node nodes[] = {
 static const uint8_t root_deltas[] = {5,15,11};
 
 
+// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
 inline Label Predict(const Instance& instance) {
   std::array<float, 3> accumulator {0, 0, 0};
 

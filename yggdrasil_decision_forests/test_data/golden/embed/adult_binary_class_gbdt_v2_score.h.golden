@@ -165,6 +165,7 @@ struct Instance {
   FeatureNativeCountry native_country;
 };
 
+// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
 inline float Predict(const Instance& instance) {
   float accumulator {-1.1631};
   // Tree #0

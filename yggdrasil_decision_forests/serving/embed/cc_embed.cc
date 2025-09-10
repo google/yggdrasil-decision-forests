@@ -285,10 +285,18 @@ namespace $0 {
   }
   STATUS_CHECK(!predict_output_type.empty());
 
+  const std::string missing_numerical_warning =
+      "Warning: Missing numerical features are not supported and will lead to "
+      "incorrect predictions. Ensure that no fields in the `Instance` struct "
+      "are NaN.";
+  LOG(WARNING) << missing_numerical_warning;
   absl::SubstituteAndAppend(&header, R"(
-inline $0 Predict(const Instance& instance) {
+// $0
+inline $1 Predict(const Instance& instance) {
 )",
-                            predict_output_type);
+                            missing_numerical_warning,  // $0
+                            predict_output_type         // $1
+  );
 
   absl::StrAppend(&header, predict_body);
 

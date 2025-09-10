@@ -33,6 +33,7 @@ struct Instance {
   Numerical shellweight;
 };
 
+// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
 inline float Predict(const Instance& instance) {
   float accumulator {9.94246};
   // Tree #0

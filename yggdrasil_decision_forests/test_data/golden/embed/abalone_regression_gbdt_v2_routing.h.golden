@@ -248,6 +248,7 @@ static const uint8_t root_deltas[] = {63,63,63};
 
 static const std::bitset<24> categorical_bank {"101110110011101110110011"};
 
+// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
 inline float Predict(const Instance& instance) {
   float accumulator {9.94246};
 
