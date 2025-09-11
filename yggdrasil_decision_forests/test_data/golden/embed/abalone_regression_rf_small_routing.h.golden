@@ -5,6 +5,7 @@
 #include <cstring>
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <bitset>
 #include <cassert>
 
@@ -3702,8 +3703,14 @@ static const uint16_t root_deltas[] = {1199,1211,1233};
 
 static const std::bitset<360> categorical_bank {"100010000110010010000110100000100010010000101000001001100110010010001000110000101000001000100010001010101000110010000110100010101010010001000010100001100110110001101000011001000010100010101000001010000110001010100100011000101000011010001000011010001010001000100010110010000110011010100010100001001010010001001000100010101010110001101000101010001010001010100010"};
 
-// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
-inline float Predict(const Instance& instance) {
+// Predict on an instance with no NaN values. This function may give incorrect
+// predictions if `instance` contains missing values (e.g. NaN).
+//
+// Prefer using `Predict()` unless `instance` is guaranteed to not contain
+// missing values.
+//
+// This function is called by `Predict()`.
+inline float PredictWithoutMissingValues(const Instance& instance) {
   float accumulator {0};
 
   const Node* root = nodes;
@@ -3731,6 +3738,22 @@ inline float Predict(const Instance& instance) {
   }
 
   return accumulator;
+}
+
+// Prediction function.
+//
+// Replaces NaN numerical features by the global imputation of the model, and
+// then calls `PredictWithoutMissingValues()`.
+inline float Predict(Instance instance) {
+  instance.longestshell = std::isnan(instance.longestshell) ? 0.523992 : instance.longestshell;
+  instance.diameter = std::isnan(instance.diameter) ? 0.407881 : instance.diameter;
+  instance.height = std::isnan(instance.height) ? 0.139516 : instance.height;
+  instance.wholeweight = std::isnan(instance.wholeweight) ? 0.828742 : instance.wholeweight;
+  instance.shuckedweight = std::isnan(instance.shuckedweight) ? 0.359367 : instance.shuckedweight;
+  instance.visceraweight = std::isnan(instance.visceraweight) ? 0.180594 : instance.visceraweight;
+  instance.shellweight = std::isnan(instance.shellweight) ? 0.238831 : instance.shellweight;
+
+  return PredictWithoutMissingValues(instance);
 }
 
 }  // namespace ydf_model

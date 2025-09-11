@@ -361,7 +361,6 @@ static const uint8_t root_deltas[] = {55,57,57};
 
 static const std::bitset<345> categorical_bank {"011011111111100110000011011000001110110110011001001111100100011011110110001001010000000001000000000110001110110101000000000001100000110110000000000100000001110000010000000000100000001001000001100000001110110110011000001101100100011000100100000110010110111111111101100000100110000100100000110000000111011011001100000110110010001100000010000111000"};
 
-// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
 inline float Predict(const Instance& instance) {
   float accumulator {-1.1631};
 
@@ -391,6 +390,7 @@ inline float Predict(const Instance& instance) {
 
   // Sigmoid
   return 1.f / (1.f + std::exp(-accumulator));
+
 }
 
 }  // namespace ydf_model

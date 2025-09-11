@@ -80,8 +80,14 @@ static const uint8_t root_deltas[] = {13,9,7};
 
 static const float leaf_value_bank[] = {0.333333,0,0,0,0.333333,0,0,0.2,0.133333,0,0.333333,0,0,0.266667,0.0666667,0,0.166667,0.166667,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.125,0.208333,0,0.133333,0.2,0,0,0.333333,0.333333,0,0,0,0.333333,0,0,0.266667,0.0666667,0,0,0.333333};
 
-// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
-inline std::array<float, 3> Predict(const Instance& instance) {
+// Predict on an instance with no NaN values. This function may give incorrect
+// predictions if `instance` contains missing values (e.g. NaN).
+//
+// Prefer using `Predict()` unless `instance` is guaranteed to not contain
+// missing values.
+//
+// This function is called by `Predict()`.
+inline std::array<float, 3> PredictWithoutMissingValues(const Instance& instance) {
   std::array<float, 3> accumulator {0};
 
   const Node* root = nodes;
@@ -105,6 +111,19 @@ inline std::array<float, 3> Predict(const Instance& instance) {
   }
 
 return accumulator;
+}
+
+// Prediction function.
+//
+// Replaces NaN numerical features by the global imputation of the model, and
+// then calls `PredictWithoutMissingValues()`.
+inline std::array<float, 3> Predict(Instance instance) {
+  instance.sepal_length = std::isnan(instance.sepal_length) ? 5.843333 : instance.sepal_length;
+  instance.sepal_width = std::isnan(instance.sepal_width) ? 3.057333 : instance.sepal_width;
+  instance.petal_length = std::isnan(instance.petal_length) ? 3.758000 : instance.petal_length;
+  instance.petal_width = std::isnan(instance.petal_width) ? 1.199333 : instance.petal_width;
+
+  return PredictWithoutMissingValues(instance);
 }
 
 }  // namespace ydf_model

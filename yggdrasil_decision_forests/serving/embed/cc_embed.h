@@ -147,9 +147,12 @@ absl::Status ComputeInternalOptionsCategoricalDictionaries(
     const proto::Options& options, InternalOptions* out);
 
 struct FeatureDef {
+  std::string variable_name;  // Name used for the feature in the export.
   std::string type;  // Type to encode a feature using typedef / enum class.
   std::string underlying_type;  // Type to encode a feature e.g. "float".
   absl::optional<std::string> default_value = {};  // Optional default value.
+  absl::optional<std::string> na_replacement =
+      {};  // NA Replacement value for numerical features.
 };
 
 // Generates the definition of a feature in an instance struct.
@@ -169,7 +172,10 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
                          const ModelStatistics& stats,
                          const InternalOptions& internal_options,
                          const proto::Options& options,
-                         const ValueBank& routing_bank, std::string* content);
+                         const std::vector<FeatureDef>& feature_defs,
+                         const ValueBank& routing_bank,
+                         std::string* content_with_nan_replacement,
+                         std::string* content_without_nan_replacement);
 
 // The scalar type of an accumulator.
 struct AccumulatorDef {

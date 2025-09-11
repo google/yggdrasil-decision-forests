@@ -362,7 +362,6 @@ static const float oblique_weights[] = {0.875222,0.0589885,0.000130299,-2.82861,
 
 static const uint8_t oblique_features[] = {2,4,11,2,11,12,3,0,4,12,1,11,3,0,4,12,2,10,11,1,10,3,0,10,11,2,4,12,4,0,2,4,12,3,2,4,12,3,0,4,12,1,11,1,10,2,0,12,3,4,11,12,3,4,11,12,4,0,4,10,11,1,10,3,0,11,12,2,0,2,3,0,10,12,3,4,10,11,2,0,4,2,4,10,2,0,2,1,10,3,0,2,12,1,10,3,2,4,12,1,4,2,0,12,1,10,1,0,2,0,10,1,4,3,10,11,12,3,0,4,12,2,2,11,2,10,11,1,10,2,4,10,3,0,11,12,3,0,10,12,3,0,4,10,1,10,2,10,11,1,2,1,10,3,4,10,12,4,0,2,4,12,4,0,4,11,12,3,0,4,12,1,10,1,10,4,0,2,11,12,1,10,3,4,10,11,4,2,4,11,12,3,0,11,12,4,0,4,10,11,4,0,4,10,12};
 
-// Warning: Missing numerical features are not supported and will lead to incorrect predictions. Ensure that no fields in the `Instance` struct are NaN.
 inline float Predict(const Instance& instance) {
   float accumulator {-1.1631};
 
@@ -398,6 +397,7 @@ inline float Predict(const Instance& instance) {
 
   // Sigmoid
   return 1.f / (1.f + std::exp(-accumulator));
+
 }
 
 }  // namespace ydf_model

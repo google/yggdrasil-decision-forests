@@ -31,6 +31,7 @@ print(model.predict(ds[:1]))
 */
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 #include "gtest/gtest.h"
@@ -123,6 +124,18 @@ namespace {
       .shuckedweight = 0.2245f, \
       .visceraweight = 0.101f,  \
       .shellweight = 0.15f,     \
+  }
+
+#define ABALONE_EXAMPLE_WITH_NA \
+  {                             \
+      .type = FeatureType::kM,  \
+      .longestshell = NAN,      \
+      .diameter = 0.365f,       \
+      .height = NAN,            \
+      .wholeweight = 0.514f,    \
+      .shuckedweight = NAN,     \
+      .visceraweight = NAN,     \
+      .shellweight = NAN,       \
   }
 
 constexpr double eps = 0.00001;
@@ -340,6 +353,33 @@ TEST(Embed, test_model_iris_multi_class_rf_wta_small_proba_routing) {
   EXPECT_NEAR(pred[(int)Label::kSetosa], 1., eps);
   EXPECT_NEAR(pred[(int)Label::kVersicolor], 0., eps);
   EXPECT_NEAR(pred[(int)Label::kVirginica], 0., eps);
+}
+
+//
+// NA Values
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_no_na_handling) {
+  using namespace test_model_abalone_regression_gbdt_v2;
+  const float pred = Predict(ABALONE_EXAMPLE);
+  EXPECT_NEAR(pred, 9.815921, eps);
+}
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_routing_no_na_handling) {
+  using namespace test_model_abalone_regression_gbdt_v2_routing;
+  const float pred = Predict(ABALONE_EXAMPLE);
+  EXPECT_NEAR(pred, 9.815921, eps);
+}
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_with_na) {
+  using namespace test_model_abalone_regression_gbdt_v2;
+  const float pred = Predict(ABALONE_EXAMPLE_WITH_NA);
+  EXPECT_NEAR(pred, 9.362932, eps);
+}
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_routing_with_na) {
+  using namespace test_model_abalone_regression_gbdt_v2_routing;
+  const float pred = Predict(ABALONE_EXAMPLE_WITH_NA);
+  EXPECT_NEAR(pred, 9.362932, eps);
 }
 
 }  // namespace

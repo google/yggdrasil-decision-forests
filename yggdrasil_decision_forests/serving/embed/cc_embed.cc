@@ -58,7 +58,8 @@ constexpr absl::string_view kLabelReservedSymbol = "Label";
 absl::StatusOr<std::string> GenInstanceStruct(
     const model::AbstractModel& model, const proto::Options& options,
     const internal::InternalOptions& internal_options,
-    const internal::ModelStatistics& stats) {
+    const internal::ModelStatistics& stats,
+    const std::vector<FeatureDef>& feature_defs) {
   std::string content;
 
   std::string numerical_type;
@@ -83,12 +84,10 @@ struct Instance {
                             numerical_type                  // $2
   );
 
-  for (const auto input_feature : model.input_features()) {
-    const auto& col = model.data_spec().columns(input_feature);
-    const std::string variable_name = StringToVariableSymbol(col.name());
-    ASSIGN_OR_RETURN(const auto feature_def,
-                     internal::GenFeatureDef(col, internal_options));
-    absl::StrAppend(&content, "  ", feature_def.type, " ", variable_name);
+  for (int i = 0; i < model.input_features().size(); ++i) {
+    const auto& feature_def = feature_defs[i];
+    absl::StrAppend(&content, "  ", feature_def.type, " ",
+                    feature_def.variable_name);
 
     if (!feature_def.default_value.has_value()) {
       absl::StrAppend(&content, ";\n");
@@ -253,9 +252,20 @@ namespace $0 {
       GenCategoricalStringDictionaries(model, options, internal_options));
   absl::StrAppend(&header, categorical_dict);
 
+  // Generate FeatureDefs for all input features.
+  std::vector<FeatureDef> feature_defs;
+  feature_defs.reserve(model.input_features().size());
+  for (const auto input_feature : model.input_features()) {
+    const auto& col = model.data_spec().columns(input_feature);
+    ASSIGN_OR_RETURN(const auto feature_def,
+                     internal::GenFeatureDef(col, internal_options));
+    feature_defs.push_back(feature_def);
+  }
+
   // Instance struct.
-  ASSIGN_OR_RETURN(const auto instance_struct,
-                   GenInstanceStruct(model, options, internal_options, stats));
+  ASSIGN_OR_RETURN(
+      const auto instance_struct,
+      GenInstanceStruct(model, options, internal_options, stats, feature_defs));
   absl::StrAppend(&header, instance_struct);
 
   // Model data
@@ -267,11 +277,16 @@ namespace $0 {
   }
 
   // Predict method
-  std::string predict_body;
+  std::string predict_body_with_nan_replacement;
+  std::string predict_body_without_nan_replacement;
+
   RETURN_IF_ERROR(internal::CorePredict(
       model.data_spec(), *df_interface, specialized_conversion, stats,
-      internal_options, options, routing_bank, &predict_body));
-  STATUS_CHECK(!predict_body.empty());
+      internal_options, options, feature_defs, routing_bank,
+      &predict_body_with_nan_replacement,
+      &predict_body_without_nan_replacement));
+  STATUS_CHECK(!predict_body_without_nan_replacement.empty());
+  bool requires_nan_replacement = !predict_body_with_nan_replacement.empty();
 
   std::string predict_output_type;
   if (options.classification_output() != proto::ClassificationOutput::SCORE) {
@@ -285,22 +300,44 @@ namespace $0 {
   }
   STATUS_CHECK(!predict_output_type.empty());
 
-  const std::string missing_numerical_warning =
-      "Warning: Missing numerical features are not supported and will lead to "
-      "incorrect predictions. Ensure that no fields in the `Instance` struct "
-      "are NaN.";
-  LOG(WARNING) << missing_numerical_warning;
-  absl::SubstituteAndAppend(&header, R"(
-// $0
-inline $1 Predict(const Instance& instance) {
+  std::string missing_numerical_warning = "";
+
+  if (requires_nan_replacement) {
+    absl::SubstituteAndAppend(&header, R"(
+// Predict on an instance with no NaN values. This function may give incorrect
+// predictions if `instance` contains missing values (e.g. NaN).
+//
+// Prefer using `Predict()` unless `instance` is guaranteed to not contain
+// missing values.
+//
+// This function is called by `Predict()`.
+inline $0 PredictWithoutMissingValues(const Instance& instance) {
+$1
+}
+
+// Prediction function.
+//
+// Replaces NaN numerical features by the global imputation of the model, and
+// then calls `PredictWithoutMissingValues()`.
+inline $0 Predict(Instance instance) {
+$2
+  return PredictWithoutMissingValues(instance);
+}
 )",
-                            missing_numerical_warning,  // $0
-                            predict_output_type         // $1
-  );
-
-  absl::StrAppend(&header, predict_body);
-
-  absl::StrAppend(&header, "}\n");
+                              predict_output_type,                   // $0
+                              predict_body_without_nan_replacement,  // $1
+                              predict_body_with_nan_replacement      // $2
+    );
+  } else {
+    absl::SubstituteAndAppend(&header, R"(
+inline $0 Predict(const Instance& instance) {
+$1
+}
+)",
+                              predict_output_type,                  // $0
+                              predict_body_without_nan_replacement  // $1
+    );
+  }
 
   // Close define and namespace.
   absl::SubstituteAndAppend(&header, R"(
@@ -319,9 +356,55 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
                          const ModelStatistics& stats,
                          const InternalOptions& internal_options,
                          const proto::Options& options,
-                         const ValueBank& routing_bank, std::string* content) {
+                         const std::vector<FeatureDef>& feature_defs,
+                         const ValueBank& routing_bank,
+                         std::string* content_with_nan_replacement,
+                         std::string* content_without_nan_replacement) {
+  // Add NAN checks.
+  bool needs_na_replacement = false;
+  for (const auto& feature_def : feature_defs) {
+    if (feature_def.na_replacement.has_value()) {
+      needs_na_replacement = true;
+      break;
+    }
+  }
+
+  if (needs_na_replacement) {
+    const bool has_global_imputation =
+        df_interface.CheckStructure({.global_imputation_is_higher = true});
+    if (!has_global_imputation) {
+      LOG(WARNING)
+          << "The model is not trained with global imputation. The generated "
+             "code will crash if an instance with NaN values is provided. "
+             "Ensure that input instances are NaN-free and call "
+             "PredictWithoutMissingValues or train the model with global "
+             "imputation.";
+      *content_with_nan_replacement = R"(
+    // If the model has not been trained with global imputation, export to C++
+    // is only supported without support for missing values. 
+    //
+    // Aborting to avoid incorrect predictions.
+    abort();
+)";
+    } else {
+      for (const auto& feature_def : feature_defs) {
+        if (feature_def.na_replacement.has_value()) {
+          // One could use instance.$0 != instance.$0 to avoid inclusion of
+          // cmath, but it hurts readability and is likely not worth it.
+          absl::SubstituteAndAppend(
+              content_with_nan_replacement,
+              "  instance.$0 = std::isnan(instance.$0) ? $1 : instance.$0;\n",
+              feature_def.variable_name,   // $0
+              *feature_def.na_replacement  // $1
+          );
+        }
+      }
+    }
+  }
+
   // Accumulator
-  absl::SubstituteAndAppend(content, "  $0 accumulator {$1};\n",
+  absl::SubstituteAndAppend(content_without_nan_replacement,
+                            "  $0 accumulator {$1};\n",
                             specialized_conversion.accumulator_type,
                             specialized_conversion.accumulator_initial_value);
 
@@ -330,19 +413,22 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
     case proto::Algorithm::IF_ELSE:
       RETURN_IF_ERROR(GenerateTreeInferenceIfElse(
           dataspec, df_interface, options, internal_options,
-          specialized_conversion.set_node_ifelse_fn, content));
+          specialized_conversion.set_node_ifelse_fn,
+          content_without_nan_replacement));
       break;
     case proto::Algorithm::ROUTING:
       RETURN_IF_ERROR(GenerateTreeInferenceRouting(
           dataspec, df_interface, options, internal_options,
-          specialized_conversion, stats, routing_bank, content));
+          specialized_conversion, stats, routing_bank,
+          content_without_nan_replacement));
       break;
     default:
       return absl::InvalidArgumentError("Non supported algorithm.");
   }
 
   // Accumulator to predictions.
-  absl::StrAppend(content, specialized_conversion.return_prediction);
+  absl::StrAppend(content_without_nan_replacement,
+                  specialized_conversion.return_prediction);
   return absl::OkStatus();
 }
 
@@ -499,7 +585,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
         case proto::ClassificationOutput::CLASS:
           if (stats.is_binary_classification()) {
             spec.return_prediction = absl::Substitute(
-                "  return static_cast<Label>(accumulator > $0);\n",
+                "  return static_cast<Label>(accumulator > $0);",
                 stats.num_trees / 2);
           } else {
             absl::StrAppend(
@@ -507,11 +593,11 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
                 "  return "
                 "static_cast<Label>(std::distance(accumulator.begin(), "
                 "std::max_element(accumulator.begin(), "
-                "accumulator.end())));\n");
+                "accumulator.end())));");
           }
           break;
         case proto::ClassificationOutput::SCORE:
-          spec.return_prediction = "  return accumulator;\n";
+          spec.return_prediction = "  return accumulator;";
           break;
         case proto::ClassificationOutput::PROBABILITY:
           if (model.winner_take_all_inference()) {
@@ -530,7 +616,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
                   stats.num_classification_classes, stats.num_trees);
             }
           } else {
-            spec.return_prediction = "return accumulator;\n";
+            spec.return_prediction = "return accumulator;";
           }
           break;
       }
@@ -538,7 +624,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
 
     case model::proto::Task::REGRESSION:
       spec.accumulator_type = "float";
-      spec.return_prediction = "  return accumulator;\n";
+      spec.return_prediction = "  return accumulator;";
       spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
 
       spec.set_node_ifelse_fn =
@@ -631,17 +717,17 @@ SpecializedConversionGradientBoostedTrees(
         case proto::ClassificationOutput::CLASS:
           if (stats.is_binary_classification()) {
             spec.return_prediction =
-                "  return static_cast<Label>(accumulator >= 0);\n";
+                "  return static_cast<Label>(accumulator >= 0);";
           } else {
             spec.return_prediction =
                 ("  return "
                  "static_cast<Label>(std::distance(accumulator.begin(), "
                  "std::max_element(accumulator.begin(), "
-                 "accumulator.end())));\n");
+                 "accumulator.end())));");
           }
           break;
         case proto::ClassificationOutput::SCORE:
-          spec.return_prediction = "  return accumulator;\n";
+          spec.return_prediction = "  return accumulator;";
           break;
         case proto::ClassificationOutput::PROBABILITY:
           if (stats.is_binary_classification()) {
@@ -666,7 +752,7 @@ SpecializedConversionGradientBoostedTrees(
 
     case model::proto::Task::REGRESSION:
       spec.accumulator_type = "float";
-      spec.return_prediction = "  return accumulator;\n";
+      spec.return_prediction = "  return accumulator;";
 
       spec.set_node_ifelse_fn =
           [](const model::decision_tree::proto::Node& node, const int depth,
@@ -794,6 +880,11 @@ absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
             absl::StrCat("Non supported feature type: ",
                          dataset::proto::ColumnType_Name(col_spec.type())));
     }
+  }
+
+  // Include cmath for numerical features for std::isnan().
+  if (out->numerical_feature_is_float) {
+    out->includes.cmath = true;
   }
   return absl::OkStatus();
 }
@@ -939,11 +1030,15 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
     case dataset::proto::ColumnType::NUMERICAL: {
       if (internal_options.numerical_feature_is_float) {
         DCHECK_EQ(internal_options.feature_value_bytes, 4);
-        return FeatureDef{.type = "Numerical",
-                          .underlying_type = "float",
-                          .default_value = {}};
+        return FeatureDef{
+            .variable_name = StringToVariableSymbol(col.name()),
+            .type = "Numerical",
+            .underlying_type = "float",
+            .default_value = {},
+            .na_replacement = std::to_string(col.numerical().mean())};
       } else {
-        return FeatureDef{.type = "Numerical",
+        return FeatureDef{.variable_name = StringToVariableSymbol(col.name()),
+                          .type = "Numerical",
                           .underlying_type = SignedInteger(
                               internal_options.feature_value_bytes),
                           .default_value = {}};
@@ -952,6 +1047,7 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
     case dataset::proto::ColumnType::BOOLEAN:
     case dataset::proto::ColumnType::CATEGORICAL: {
       return FeatureDef{
+          .variable_name = StringToVariableSymbol(col.name()),
           .type = absl::StrCat("Feature", StringToStructSymbol(col.name())),
           .underlying_type =
               UnsignedInteger(internal_options.feature_value_bytes),
