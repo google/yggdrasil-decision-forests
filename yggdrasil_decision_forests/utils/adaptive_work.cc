@@ -58,7 +58,7 @@ double AdaptativeWork::OptimalApproximationFactor() const {
   const double approximation_factor =
       std::max(std::numeric_limits<double>::epsilon(),
                total_budget_ / forecasted_total_budget_without_approx);
-  return std::clamp(approximation_factor, min_factor_, 1.);
+  return std::max(min_factor_, std::min(approximation_factor, 1.));
 }
 
 }  // namespace utils
