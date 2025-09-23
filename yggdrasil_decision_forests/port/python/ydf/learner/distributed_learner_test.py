@@ -136,6 +136,32 @@ class DistributedGradientBoostedTreesLearnerTest(absltest.TestCase):
     workers.stop()
     self.assertAlmostEqual(model.evaluate(str(test_ds)).accuracy, 0.850, 1)
 
+  def test_adult_subset_of_features(self):
+    # Prepare datasets
+    tmp_dir = pathlib.Path(self.create_tempdir().full_path)
+    dataset_directory = test_utils.ydf_test_data_pathlib() / "dataset"
+    splitted_train_ds = split_dataset(
+        dataset_directory / "adult_train.csv", tmp_dir, 10
+    )
+    logging.info("Dataset paths: %s", splitted_train_ds)
+
+    # Start workers
+    workers = create_in_process_workers(4)
+
+    # Train model
+    model = specialized_learners.DistributedGradientBoostedTreesLearner(
+        label="income",
+        features=["age"],
+        working_dir=os.path.join(tmp_dir, "work_dir"),
+        resume_training=True,
+        num_trees=10,
+        workers=workers.ips,
+        worker_logs=False,
+    ).train(",".join(map(str, splitted_train_ds)))
+
+    workers.stop()
+    self.assertSetEqual({"age"}, set(model.input_feature_names()))
+
   def test_adult_with_validation(self):
     # Prepare datasets
     tmp_dir = pathlib.Path(self.create_tempdir().full_path)
