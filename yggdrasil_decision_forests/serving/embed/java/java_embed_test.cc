@@ -68,6 +68,7 @@ SIMPLE_PARAMETERIZED_TEST(
             "iris_multi_class_gbdt_v2_probability_routing.java.golden",
             "iris_multi_class_gbdt_v2_probability_routing_data.bin.golden",
             proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
         },
         {
             "abalone_regression_gbdt_v2",

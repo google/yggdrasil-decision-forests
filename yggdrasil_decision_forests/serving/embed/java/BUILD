@@ -21,6 +21,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving/embed:common",
+        "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "//yggdrasil_decision_forests/serving/embed:utils",
         "//yggdrasil_decision_forests/utils:bitmap",
         "//yggdrasil_decision_forests/utils:status_macros",

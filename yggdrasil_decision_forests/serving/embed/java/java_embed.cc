@@ -36,6 +36,7 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/java/model_data_bank.h"
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
 #include "yggdrasil_decision_forests/utils/bitmap.h"
@@ -379,7 +380,8 @@ public static class Instance {
 // the label.
 absl::StatusOr<std::string> GenCategoricalStringDictionaries(
     const model::AbstractModel& model, const proto::Options& options,
-    const JavaInternalOptions& internal_options) {
+    const JavaInternalOptions& internal_options,
+    const internal::ModelStatistics& stats) {
   std::string content;
 
   for (const auto& dict : internal_options.categorical_dicts) {
@@ -397,6 +399,25 @@ public enum $0$1 {
     }
     absl::StrAppend(&content, R"(};
 )");
+
+    if (dict.second.is_label && !stats.is_binary_classification() &&
+        (options.classification_output() ==
+             proto::ClassificationOutput::PROBABILITY ||
+         options.classification_output() ==
+             proto::ClassificationOutput::SCORE)) {
+      absl::StrAppend(&content, R"(
+/**
+ * Returns the index in the prediction array corresponding to the given label.
+ * @param label The label.
+ * @return The index in the prediction array.
+ */
+// ordinal() is safe here because this code is generated and the Label enum is not expected to change.
+@SuppressWarnings("EnumOrdinal")
+public static int getLabelIndex(Label label) {
+  return label.ordinal();
+}
+)");
+    }
 
     if (options.categorical_from_string()) {
       return absl::UnimplementedError(
@@ -489,9 +510,9 @@ public final class $0 {
                             options.name());
 
   // Categorical dictionary
-  ASSIGN_OR_RETURN(
-      const auto categorical_dict,
-      GenCategoricalStringDictionaries(model, options, internal_options));
+  ASSIGN_OR_RETURN(const auto categorical_dict,
+                   GenCategoricalStringDictionaries(model, options,
+                                                    internal_options, stats));
   absl::StrAppend(&code, categorical_dict);
 
   // Instance struct.
@@ -523,7 +544,7 @@ public final class $0 {
   std::string predict_output_type;
   if (options.classification_output() != proto::ClassificationOutput::SCORE) {
     // The prediction type is defined by the task, and independent of the model
-    // implementation..
+    // implementation.
     predict_output_type = internal_options.output_type;
   } else {
     // The prediction type is determined by the specific decision forest model
@@ -591,6 +612,8 @@ absl::Status ComputeJavaInternalOptionsOutput(
         case proto::ClassificationOutput::PROBABILITY:
           if (stats.is_binary_classification()) {
             out->output_type = "float";
+          } else {
+            out->output_type = "float[]";
           }
           break;
       }

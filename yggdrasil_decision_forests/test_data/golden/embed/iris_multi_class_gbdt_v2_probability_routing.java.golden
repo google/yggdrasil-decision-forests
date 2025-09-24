@@ -13,6 +13,17 @@ public enum Label {
   VIRGINICA,
 };
 
+/**
+ * Returns the index in the prediction array corresponding to the given label.
+ * @param label The label.
+ * @return The index in the prediction array.
+ */
+// ordinal() is safe here because this code is generated and the Label enum is not expected to change.
+@SuppressWarnings("EnumOrdinal")
+public static int getLabelIndex(Label label) {
+  return label.ordinal();
+}
+
 private static final int NUM_FEATURES = 4;
 private static final int NUM_TREES = 3;
 
@@ -70,7 +81,7 @@ public static class Instance {
     }
   }
 
-public static Label predict(Instance instance) {
+public static float[] predict(Instance instance) {
   float[] accumulator = {0f, 0f, 0f};
 
   int nodeIndex = 0;
@@ -89,13 +100,25 @@ public static Label predict(Instance instance) {
     nodeIndex += rootDeltas[treeIdx];
   }
 
-  int maxIndex = 0;
-  for (int i = 1; i < accumulator.length; i++) {
-    if (accumulator[i] > accumulator[maxIndex]) {
-      maxIndex = i;
+  // Softmax
+  float[] probas = new float[3];
+  float maxLogit = Float.NEGATIVE_INFINITY;
+  for (float val : accumulator) {
+    if (val > maxLogit) {
+      maxLogit = val;
     }
   }
-  return Label.values()[maxIndex];
+
+  float sumExps = 0.0f;
+  for (int i = 0; i < 3; i++) {
+    probas[i] = (float) Math.exp(accumulator[i] - maxLogit);
+    sumExps += probas[i];
+  }
+
+  for (int i = 0; i < 3; i++) {
+    probas[i] /= sumExps;
+  }
+  return probas;
 }
 
 
