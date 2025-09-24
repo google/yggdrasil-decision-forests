@@ -640,13 +640,103 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
   SpecializedConversion spec;
   switch (stats.task) {
     case model::proto::Task::CLASSIFICATION: {
-      return absl::UnimplementedError(
-          "Classification with Random Forests not yet implemented for Java");
+      // Leaf setter
+      if (stats.is_binary_classification()) {
+        if (model.winner_take_all_inference()) {
+          // We accumulate the count of votes for the positive class.
+          spec.accumulator_type =
+              JavaInteger(MaxSignedValueToNumBytes(stats.num_trees));
+          // No memory saving by using bool over int here.
+          spec.leaf_value_spec = {.dtype = proto::DType::INT8, .dims = 1};
+          spec.set_node_ifelse_fn =
+              [](const model::decision_tree::proto::Node& node, const int depth,
+                 const int tree_idx,
+                 absl::string_view prefix) -> absl::StatusOr<std::string> {
+            const int node_value = node.classifier().top_value();
+            if (node_value == 2) {
+              return absl::StrCat(prefix, "accumulator++;\n");
+            } else {
+              return "";
+            }
+          };
+
+          spec.leaf_value_fn =
+              [](const model::decision_tree::proto::Node& node) -> LeafValue {
+            const int node_value = node.classifier().top_value();
+            return std::vector<bool>{node_value == 2};
+          };
+
+          spec.routing_node = R"(
+    accumulator += nodeVal[currentNodeIndex];
+)";
+        } else {
+          // We accumulate the probability vote for the positive class.
+          spec.accumulator_type = "float";
+          spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
+
+          spec.set_node_ifelse_fn =
+              [&](const model::decision_tree::proto::Node& node,
+                  const int depth, const int tree_idx,
+                  absl::string_view prefix) -> absl::StatusOr<std::string> {
+            const float node_value =
+                node.classifier().distribution().counts(2) /
+                (node.classifier().distribution().sum() * stats.num_trees);
+            if (node_value == 0) {
+              return "";
+            } else {
+              return absl::StrCat(prefix, "accumulator += ", node_value,
+                                  "f;\n");
+            }
+          };
+
+          spec.leaf_value_fn =
+              [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+            const float node_value =
+                node.classifier().distribution().counts(2) /
+                (node.classifier().distribution().sum() * stats.num_trees);
+            return std::vector<float>{node_value};
+          };
+
+          spec.routing_node = R"(
+    accumulator += nodeVal[currentNodeIndex];
+)";
+        }
+      } else {
+        return absl::UnimplementedError(
+            "Multi-class classification is not implemented for Java.");
+      }
+      // Return accumulator
+      switch (options.classification_output()) {
+        case proto::ClassificationOutput::CLASS:
+          if (stats.is_binary_classification()) {
+            spec.return_prediction = absl::Substitute(
+                "  return Label.values()[accumulator > $0 ? 1 : 0];\n",
+                stats.num_trees / 2);
+          } else {
+            // This case is not yet supported.
+          }
+          break;
+        case proto::ClassificationOutput::SCORE:
+          spec.return_prediction = "  return accumulator;\n";
+          break;
+        case proto::ClassificationOutput::PROBABILITY:
+          if (model.winner_take_all_inference()) {
+            if (stats.is_binary_classification()) {
+              spec.return_prediction = absl::Substitute(
+                  "  return (float) accumulator / $0f;\n", stats.num_trees);
+            } else {
+              // This case is not yet supported.
+            }
+          } else {
+            spec.return_prediction = "return accumulator;\n";
+          }
+          break;
+      }
     } break;
 
     case model::proto::Task::REGRESSION:
       spec.accumulator_type = "float";
-      spec.return_prediction = "  return accumulator;";
+      spec.return_prediction = "  return accumulator;\n";
       spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
 
       spec.set_node_ifelse_fn =

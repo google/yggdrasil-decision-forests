@@ -10,6 +10,12 @@ import ydf.models.TestModelAbaloneRegressionRFSmallRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ClassRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ProbaRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ScoreRouting;
+import ydf.models.TestModelAdultBinaryClassRFNWTASmallClassRouting;
+import ydf.models.TestModelAdultBinaryClassRFNWTASmallProbaRouting;
+import ydf.models.TestModelAdultBinaryClassRFNWTASmallScoreRouting;
+import ydf.models.TestModelAdultBinaryClassRFWTASmallClassRouting;
+import ydf.models.TestModelAdultBinaryClassRFWTASmallProbaRouting;
+import ydf.models.TestModelAdultBinaryClassRFWTASmallScoreRouting;
 import ydf.models.TestModelIrisMultiClassGBDTV2ClassRouting;
 import ydf.models.TestModelIrisMultiClassGBDTV2ProbaRouting;
 import ydf.models.TestModelIrisMultiClassGBDTV2ScoreRouting;
@@ -137,6 +143,193 @@ public class JavaPredTest {
         .isWithin(0.00001f)
         .of(expected);
   }
+
+  // Adult RF WTA
+
+  @Test
+  public void testAdultBinaryClassRFWTASmallProbaRouting_knownOutput() {
+
+    var instance =
+        new TestModelAdultBinaryClassRFWTASmallProbaRouting.Instance(
+            /* age= */ 39,
+            /* workclass= */ TestModelAdultBinaryClassRFWTASmallProbaRouting.FeatureWorkclass
+                .STATE_GOV,
+            /* fnlwgt= */ 77516,
+            /* education= */ TestModelAdultBinaryClassRFWTASmallProbaRouting.FeatureEducation
+                .BACHELORS,
+            /* educationNum= */ 13,
+            TestModelAdultBinaryClassRFWTASmallProbaRouting.FeatureMaritalStatus
+                .NEVER_MARRIED, // maritalStatus
+            TestModelAdultBinaryClassRFWTASmallProbaRouting.FeatureOccupation
+                .ADM_CLERICAL, // occupation
+            TestModelAdultBinaryClassRFWTASmallProbaRouting.FeatureRelationship
+                .NOT_IN_FAMILY, // relationship
+            /* race= */ TestModelAdultBinaryClassRFWTASmallProbaRouting.FeatureRace.WHITE,
+            /* sex= */ TestModelAdultBinaryClassRFWTASmallProbaRouting.FeatureSex.MALE,
+            /* capitalGain= */ 2174,
+            /* capitalLoss= */ 0,
+            /* hoursPerWeek= */ 40,
+            /* nativeCountry= */ TestModelAdultBinaryClassRFWTASmallProbaRouting
+                .FeatureNativeCountry.UNITED_STATES);
+    float expected = 0.f;
+    assertThat(TestModelAdultBinaryClassRFWTASmallProbaRouting.predict(instance))
+        .isWithin(0.00001f)
+        .of(expected);
+  }
+
+  @Test
+  public void testAdultBinaryClassRFWTASmallClassRouting_knownOutput() {
+
+    var instance =
+        new TestModelAdultBinaryClassRFWTASmallClassRouting.Instance(
+            /* age= */ 39,
+            /* workclass= */ TestModelAdultBinaryClassRFWTASmallClassRouting.FeatureWorkclass
+                .STATE_GOV,
+            /* fnlwgt= */ 77516,
+            /* education= */ TestModelAdultBinaryClassRFWTASmallClassRouting.FeatureEducation
+                .BACHELORS,
+            /* educationNum= */ 13,
+            TestModelAdultBinaryClassRFWTASmallClassRouting.FeatureMaritalStatus
+                .NEVER_MARRIED, // maritalStatus
+            TestModelAdultBinaryClassRFWTASmallClassRouting.FeatureOccupation
+                .ADM_CLERICAL, // occupation
+            TestModelAdultBinaryClassRFWTASmallClassRouting.FeatureRelationship
+                .NOT_IN_FAMILY, // relationship
+            /* race= */ TestModelAdultBinaryClassRFWTASmallClassRouting.FeatureRace.WHITE,
+            /* sex= */ TestModelAdultBinaryClassRFWTASmallClassRouting.FeatureSex.MALE,
+            /* capitalGain= */ 2174,
+            /* capitalLoss= */ 0,
+            /* hoursPerWeek= */ 40,
+            /* nativeCountry= */ TestModelAdultBinaryClassRFWTASmallClassRouting
+                .FeatureNativeCountry.UNITED_STATES);
+    assertThat(TestModelAdultBinaryClassRFWTASmallClassRouting.predict(instance))
+        .isEqualTo(TestModelAdultBinaryClassRFWTASmallClassRouting.Label.LT50K);
+  }
+
+  @Test
+  public void testAdultBinaryClassRFWTASmallScoreRouting_knownOutput() {
+
+    var instance =
+        new TestModelAdultBinaryClassRFWTASmallScoreRouting.Instance(
+            /* age= */ 39,
+            /* workclass= */ TestModelAdultBinaryClassRFWTASmallScoreRouting.FeatureWorkclass
+                .STATE_GOV,
+            /* fnlwgt= */ 77516,
+            /* education= */ TestModelAdultBinaryClassRFWTASmallScoreRouting.FeatureEducation
+                .BACHELORS,
+            /* educationNum= */ 13,
+            TestModelAdultBinaryClassRFWTASmallScoreRouting.FeatureMaritalStatus
+                .NEVER_MARRIED, // maritalStatus
+            TestModelAdultBinaryClassRFWTASmallScoreRouting.FeatureOccupation
+                .ADM_CLERICAL, // occupation
+            TestModelAdultBinaryClassRFWTASmallScoreRouting.FeatureRelationship
+                .NOT_IN_FAMILY, // relationship
+            /* race= */ TestModelAdultBinaryClassRFWTASmallScoreRouting.FeatureRace.WHITE,
+            /* sex= */ TestModelAdultBinaryClassRFWTASmallScoreRouting.FeatureSex.MALE,
+            /* capitalGain= */ 2174,
+            /* capitalLoss= */ 0,
+            /* hoursPerWeek= */ 40,
+            /* nativeCountry= */ TestModelAdultBinaryClassRFWTASmallScoreRouting
+                .FeatureNativeCountry.UNITED_STATES);
+    byte expected = 0;
+    assertThat(TestModelAdultBinaryClassRFWTASmallScoreRouting.predict(instance))
+        .isEqualTo(expected);
+  }
+
+  // Adult RF NWTA
+
+  @Test
+  public void testAdultBinaryClassRFNWTASmallProbaRouting_knownOutput() {
+
+    var instance =
+        new TestModelAdultBinaryClassRFNWTASmallProbaRouting.Instance(
+            /* age= */ 39,
+            /* workclass= */ TestModelAdultBinaryClassRFNWTASmallProbaRouting.FeatureWorkclass
+                .STATE_GOV,
+            /* fnlwgt= */ 77516,
+            /* education= */ TestModelAdultBinaryClassRFNWTASmallProbaRouting.FeatureEducation
+                .BACHELORS,
+            /* educationNum= */ 13,
+            TestModelAdultBinaryClassRFNWTASmallProbaRouting.FeatureMaritalStatus
+                .NEVER_MARRIED, // maritalStatus
+            TestModelAdultBinaryClassRFNWTASmallProbaRouting.FeatureOccupation
+                .ADM_CLERICAL, // occupation
+            TestModelAdultBinaryClassRFNWTASmallProbaRouting.FeatureRelationship
+                .NOT_IN_FAMILY, // relationship
+            /* race= */ TestModelAdultBinaryClassRFNWTASmallProbaRouting.FeatureRace.WHITE,
+            /* sex= */ TestModelAdultBinaryClassRFNWTASmallProbaRouting.FeatureSex.MALE,
+            /* capitalGain= */ 2174,
+            /* capitalLoss= */ 0,
+            /* hoursPerWeek= */ 40,
+            /* nativeCountry= */ TestModelAdultBinaryClassRFNWTASmallProbaRouting
+                .FeatureNativeCountry.UNITED_STATES);
+    float expected = 0.01538462f;
+    assertThat(TestModelAdultBinaryClassRFNWTASmallProbaRouting.predict(instance))
+        .isWithin(0.00001f)
+        .of(expected);
+  }
+
+  @Test
+  public void testAdultBinaryClassRFNWTASmallClassRouting_knownOutput() {
+
+    var instance =
+        new TestModelAdultBinaryClassRFNWTASmallClassRouting.Instance(
+            /* age= */ 39,
+            /* workclass= */ TestModelAdultBinaryClassRFNWTASmallClassRouting.FeatureWorkclass
+                .STATE_GOV,
+            /* fnlwgt= */ 77516,
+            /* education= */ TestModelAdultBinaryClassRFNWTASmallClassRouting.FeatureEducation
+                .BACHELORS,
+            /* educationNum= */ 13,
+            TestModelAdultBinaryClassRFNWTASmallClassRouting.FeatureMaritalStatus
+                .NEVER_MARRIED, // maritalStatus
+            TestModelAdultBinaryClassRFNWTASmallClassRouting.FeatureOccupation
+                .ADM_CLERICAL, // occupation
+            TestModelAdultBinaryClassRFNWTASmallClassRouting.FeatureRelationship
+                .NOT_IN_FAMILY, // relationship
+            /* race= */ TestModelAdultBinaryClassRFNWTASmallClassRouting.FeatureRace.WHITE,
+            /* sex= */ TestModelAdultBinaryClassRFNWTASmallClassRouting.FeatureSex.MALE,
+            /* capitalGain= */ 2174,
+            /* capitalLoss= */ 0,
+            /* hoursPerWeek= */ 40,
+            /* nativeCountry= */ TestModelAdultBinaryClassRFNWTASmallClassRouting
+                .FeatureNativeCountry.UNITED_STATES);
+    assertThat(TestModelAdultBinaryClassRFNWTASmallClassRouting.predict(instance))
+        .isEqualTo(TestModelAdultBinaryClassRFNWTASmallClassRouting.Label.LT50K);
+  }
+
+  @Test
+  public void testAdultBinaryClassRFNWTASmallScoreRouting_knownOutput() {
+
+    var instance =
+        new TestModelAdultBinaryClassRFNWTASmallScoreRouting.Instance(
+            /* age= */ 39,
+            /* workclass= */ TestModelAdultBinaryClassRFNWTASmallScoreRouting.FeatureWorkclass
+                .STATE_GOV,
+            /* fnlwgt= */ 77516,
+            /* education= */ TestModelAdultBinaryClassRFNWTASmallScoreRouting.FeatureEducation
+                .BACHELORS,
+            /* educationNum= */ 13,
+            TestModelAdultBinaryClassRFNWTASmallScoreRouting.FeatureMaritalStatus
+                .NEVER_MARRIED, // maritalStatus
+            TestModelAdultBinaryClassRFNWTASmallScoreRouting.FeatureOccupation
+                .ADM_CLERICAL, // occupation
+            TestModelAdultBinaryClassRFNWTASmallScoreRouting.FeatureRelationship
+                .NOT_IN_FAMILY, // relationship
+            /* race= */ TestModelAdultBinaryClassRFNWTASmallScoreRouting.FeatureRace.WHITE,
+            /* sex= */ TestModelAdultBinaryClassRFNWTASmallScoreRouting.FeatureSex.MALE,
+            /* capitalGain= */ 2174,
+            /* capitalLoss= */ 0,
+            /* hoursPerWeek= */ 40,
+            /* nativeCountry= */ TestModelAdultBinaryClassRFNWTASmallScoreRouting
+                .FeatureNativeCountry.UNITED_STATES);
+    float expected = 0.01538462f;
+    assertThat(TestModelAdultBinaryClassRFNWTASmallScoreRouting.predict(instance))
+        .isWithin(0.00001f)
+        .of(expected);
+  }
+
+  // Iris GBDT
 
   @Test
   public void testIrisMultiClassGBDTV2ClassRouting_knownOutput() {

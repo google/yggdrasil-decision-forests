@@ -90,6 +90,13 @@ SIMPLE_PARAMETERIZED_TEST(
             "abalone_regression_rf_small_routing_data.bin.golden",
             proto::Algorithm::ROUTING,
         },
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_proba_routing.java.golden",
+            "adult_binary_class_rf_nwta_small_proba_routing_data.bin.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
 
     }) {
   const auto& test_case = GetParam();
