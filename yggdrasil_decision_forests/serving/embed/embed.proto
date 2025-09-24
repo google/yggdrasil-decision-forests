@@ -119,4 +119,6 @@ message Algorithm {
 
 message CC {}
 
-message Java {}
+message Java {
+  optional string package_name = 1 [default = "com.google.ydf"];
+}

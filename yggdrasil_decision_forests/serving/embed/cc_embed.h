@@ -61,12 +61,13 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
 // forest node tracing.
 std::string ObliqueFeatureType(const ValueBank& bank);
 
-absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
+absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestCC(
     const model::random_forest::RandomForestModel& model,
     const internal::ModelStatistics& stats,
     const CCInternalOptions& internal_options, const proto::Options& options);
 
-absl::StatusOr<SpecializedConversion> SpecializedConversionGradientBoostedTrees(
+absl::StatusOr<SpecializedConversion>
+SpecializedConversionGradientBoostedTreesCC(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
     const internal::ModelStatistics& stats,
     const CCInternalOptions& internal_options, const proto::Options& options);

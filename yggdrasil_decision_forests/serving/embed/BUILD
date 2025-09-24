@@ -105,7 +105,6 @@ cc_binary_ydf(
     srcs = ["write_embed.cc"],
     deps = [
         ":embed",
-        ":embed_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:filesystem",

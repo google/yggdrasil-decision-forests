@@ -16,6 +16,8 @@ cc_library_ydf(
     deps = [
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving/embed:common",
         "//yggdrasil_decision_forests/serving/embed:utils",
         "//yggdrasil_decision_forests/utils:status_macros",

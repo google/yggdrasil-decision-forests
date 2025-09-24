@@ -21,6 +21,8 @@
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
@@ -54,5 +56,16 @@ absl::StatusOr<JavaInternalOptions> ComputeJavaInternalOptions(
 absl::Status ComputeJavaInternalOptionsOutput(
     const internal::ModelStatistics& stats, const proto::Options& options,
     JavaInternalOptions* out);
+
+absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
+    const model::random_forest::RandomForestModel& model,
+    const internal::ModelStatistics& stats,
+    const JavaInternalOptions& internal_options, const proto::Options& options);
+
+absl::StatusOr<SpecializedConversion>
+SpecializedConversionGradientBoostedTreesJava(
+    const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
+    const internal::ModelStatistics& stats,
+    const JavaInternalOptions& internal_options, const proto::Options& options);
 }  // namespace yggdrasil_decision_forests::serving::embed::internal
 #endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_JAVA_JAVA_EMBED_H_

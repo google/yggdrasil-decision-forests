@@ -1,0 +1,8 @@
+package com.google.ydf;
+
+
+public final class YdfModel {
+
+
+  private YdfModel() {} // Prevent instantiation
+}

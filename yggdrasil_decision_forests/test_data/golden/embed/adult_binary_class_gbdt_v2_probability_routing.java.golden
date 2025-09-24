@@ -1,0 +1,9 @@
+package com.google.ydf;
+
+import java.util.BitSet;
+
+public final class YdfModel {
+
+
+  private YdfModel() {} // Prevent instantiation
+}

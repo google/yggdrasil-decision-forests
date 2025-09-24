@@ -194,11 +194,11 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
         dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
     if (model_gbt) {
       ASSIGN_OR_RETURN(specialized_conversion,
-                       internal::SpecializedConversionGradientBoostedTrees(
+                       internal::SpecializedConversionGradientBoostedTreesCC(
                            *model_gbt, stats, internal_options, options));
     } else if (model_rf) {
       ASSIGN_OR_RETURN(specialized_conversion,
-                       internal::SpecializedConversionRandomForest(
+                       internal::SpecializedConversionRandomForestCC(
                            *model_rf, stats, internal_options, options));
     } else {
       return absl::InvalidArgumentError("The model type is not supported.");
@@ -427,7 +427,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
   return absl::OkStatus();
 }
 
-absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
+absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestCC(
     const model::random_forest::RandomForestModel& model,
     const internal::ModelStatistics& stats,
     const CCInternalOptions& internal_options, const proto::Options& options) {
@@ -650,7 +650,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
 }
 
 absl::StatusOr<internal::SpecializedConversion>
-SpecializedConversionGradientBoostedTrees(
+SpecializedConversionGradientBoostedTreesCC(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
     const internal::ModelStatistics& stats,
     const CCInternalOptions& internal_options, const proto::Options& options) {
