@@ -281,9 +281,11 @@ TEST(Process, ManualBinaryGBT) {
       stats.has_conditions
           [model::decision_tree::proto::Condition::kTrueValueCondition]);
 
+  proto::Options options;
+  options.mutable_cc();
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
-      internal::ComputeInternalOptions(*test_data.model, *df, stats, {}));
+      internal::ComputeInternalOptions(*test_data.model, *df, stats, options));
   EXPECT_EQ(internal_options.feature_value_bytes, 2);
   EXPECT_EQ(internal_options.numerical_feature_is_float, false);
 
@@ -323,9 +325,11 @@ TEST(Process, RealBinaryGBT) {
   EXPECT_TRUE(stats.is_binary_classification());
   EXPECT_EQ(stats.num_classification_classes, 2);
 
+  proto::Options options;
+  options.mutable_cc();
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
-      internal::ComputeInternalOptions(*model, *df, stats, {}));
+      internal::ComputeInternalOptions(*model, *df, stats, options));
   EXPECT_EQ(internal_options.feature_value_bytes, 4);
   EXPECT_EQ(internal_options.numerical_feature_is_float, false);
 
@@ -353,9 +357,11 @@ TEST(Process, RealMultiClassGBT) {
   EXPECT_FALSE(stats.is_binary_classification());
   EXPECT_EQ(stats.num_classification_classes, 3);
 
+  proto::Options options;
+  options.mutable_cc();
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
-      internal::ComputeInternalOptions(*model, *df, stats, {}));
+      internal::ComputeInternalOptions(*model, *df, stats, options));
   EXPECT_EQ(internal_options.feature_value_bytes, 4);
   EXPECT_EQ(internal_options.numerical_feature_is_float, true);
 }

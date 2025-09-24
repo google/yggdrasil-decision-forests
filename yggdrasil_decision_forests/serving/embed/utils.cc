@@ -22,6 +22,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -119,9 +120,11 @@ std::string StringToSnakeCaseSymbol(const std::string_view input,
 
     const auto replace_it = kReplacements.find(ch);
     if (replace_it != kReplacements.end()) {
-      if (!result.empty() && !last_char_was_separator) {
+      last_char_was_separator = true;
+      if (to_upper) {
+        absl::StrAppend(&result, absl::AsciiStrToUpper(replace_it->second));
+      } else {
         absl::StrAppend(&result, replace_it->second);
-        last_char_was_separator = true;
       }
     }
 
@@ -140,12 +143,30 @@ std::string StringToConstantSymbol(const absl::string_view input) {
   return StringToSnakeCaseSymbol(input, true, 'V');
 }
 
+std::string StringToJavaEnumConstant(absl::string_view input) {
+  return StringToSnakeCaseSymbol(input, true, 'V');
+}
+
 std::string StringToVariableSymbol(const absl::string_view input) {
   return StringToSnakeCaseSymbol(input, false, 'v');
 }
 
 std::string StringToStructSymbol(const absl::string_view input,
                                  const bool ensure_letter_first) {
+  return StringToCamelCase(input, ensure_letter_first);
+}
+
+std::string StringToLowerCamelCase(absl::string_view input,
+                                   bool ensure_letter_first) {
+  auto camel_case = StringToCamelCase(input, ensure_letter_first);
+  if (!camel_case.empty()) {
+    camel_case[0] = std::tolower(camel_case[0]);
+  }
+  return camel_case;
+}
+
+std::string StringToCamelCase(absl::string_view input,
+                              bool ensure_letter_first) {
   if (input.empty()) {
     return "";
   }
@@ -232,6 +253,21 @@ std::string UnsignedInteger(int bytes) {
 }
 std::string SignedInteger(int bytes) {
   return absl::StrCat("int", bytes * 8, "_t");
+}
+std::string JavaInteger(int bytes) {
+  switch (bytes) {
+    case 1:
+      return "byte";
+    case 2:
+      return "short";
+    case 4:
+      return "int";
+    case 8:
+      return "long";
+    default:
+      DCHECK(false) << "Invalid number of bytes for JavaInteger: " << bytes;
+      return "";
+  }
 }
 
 std::string DTypeToCCType(const proto::DType::Enum value) {

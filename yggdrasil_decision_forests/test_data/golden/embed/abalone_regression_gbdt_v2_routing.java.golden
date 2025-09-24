@@ -4,6 +4,37 @@ import java.util.BitSet;
 
 public final class YdfModel {
 
+public enum FeatureType {
+  OUT_OF_VOCABULARY,
+  M,
+  I,
+  F,
+};
+
+private static final int NUM_FEATURES = 8;
+private static final int NUM_TREES = 3;
+
+public static class Instance {
+
+  private final float[] numericalFeatureValues;
+  private final int[] categoricalOrBooleanFeatureValues;
+
+  public Instance(FeatureType type, float longestshell, float diameter, float height, float wholeweight, float shuckedweight, float visceraweight, float shellweight) {
+    // NaN substitutions are required to handle missing values correctly.
+    // If no missing numerical values are used, this block can be removed.
+    longestshell = Float.isNaN(longestshell) ? 0.523992f : longestshell;
+    diameter = Float.isNaN(diameter) ? 0.407881f : diameter;
+    height = Float.isNaN(height) ? 0.139516f : height;
+    wholeweight = Float.isNaN(wholeweight) ? 0.828742f : wholeweight;
+    shuckedweight = Float.isNaN(shuckedweight) ? 0.359367f : shuckedweight;
+    visceraweight = Float.isNaN(visceraweight) ? 0.180594f : visceraweight;
+    shellweight = Float.isNaN(shellweight) ? 0.238831f : shellweight;
+
+    this.numericalFeatureValues = new float[] {0, longestshell, diameter, height, wholeweight, shuckedweight, visceraweight, shellweight};
+    this.categoricalOrBooleanFeatureValues = new int[] {type.ordinal(), -1, -1, -1, -1, -1, -1, -1};
+  }
+}
+
 
   private YdfModel() {} // Prevent instantiation
 }

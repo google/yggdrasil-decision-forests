@@ -61,7 +61,7 @@ TEST(Embed, StringToUpperCaseVariable) {
   EXPECT_EQ(StringToConstantSymbol("123AAA!"), "V123AAA");
   EXPECT_EQ(StringToConstantSymbol(""), "");
 
-  EXPECT_EQ(StringToConstantSymbol("A<B"), "ALtB");
+  EXPECT_EQ(StringToConstantSymbol("A<B"), "ALTB");
 }
 
 TEST(Embed, StringToLowerCaseVariable) {

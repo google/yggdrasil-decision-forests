@@ -31,11 +31,26 @@ absl::Status CheckModelName(absl::string_view value,
                             proto::Options::LanguageCase language);
 absl::Status CheckFeatureName(absl::string_view value);
 
-// Converts any string into a c++ constant (with the "k") e.g. "HELLO_WOLRD_1".
+// Converts any string into a C++ constant (with the "k") e.g. "HELLO_WORLD_1".
 std::string StringToConstantSymbol(absl::string_view input);
+
+// Converts any string into a Java Enum constant e.g. "HELLO_WORLD_1".
+std::string StringToJavaEnumConstant(absl::string_view input);
 
 // Converts any string into a c++ variable name e.g. "hello_world_1".
 std::string StringToVariableSymbol(absl::string_view input);
+
+// Converts any string into upper Camel Case.
+// If "ensure_letter_first=true", adds a "V" character in front if the first
+// character is not a letter.
+std::string StringToCamelCase(absl::string_view input,
+                              bool ensure_letter_first = true);
+
+// Converts any string into lower Camel Case.
+// If "ensure_letter_first=true", adds a "V" character in front if the first
+// character is not a letter.
+std::string StringToLowerCamelCase(absl::string_view input,
+                                   bool ensure_letter_first = true);
 
 // Converts any string into a c++ struct name e.g. "HelloWorld1".
 // If "ensure_letter_first=true", adds a "V" character in front if the first
@@ -64,9 +79,11 @@ std::string DTypeToCCType(proto::DType::Enum value);
 // Integer representation to dtype.
 proto::DType::Enum UnsignedIntegerToDtype(int bytes);
 
-// Integer representation e.g. uint16_t.
+// C++ Integer representation e.g. uint16_t.
 std::string UnsignedInteger(int bytes);
 std::string SignedInteger(int bytes);
+// Java integer representation. There are no unsigned primitive types in Java.
+std::string JavaInteger(int bytes);
 
 // Computes the number of nodes (leaves and non-leaves) in a tree given the
 // number of leaves. Note: The trees are binary trees.

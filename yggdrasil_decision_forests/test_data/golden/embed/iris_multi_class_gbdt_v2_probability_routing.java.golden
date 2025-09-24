@@ -3,6 +3,31 @@ package com.google.ydf;
 
 public final class YdfModel {
 
+public enum Label {
+  SETOSA,
+  VERSICOLOR,
+  VIRGINICA,
+};
+
+private static final int NUM_FEATURES = 4;
+private static final int NUM_TREES = 3;
+
+public static class Instance {
+
+  private final float[] numericalFeatureValues;
+
+  public Instance(float sepal_Length, float sepal_Width, float petal_Length, float petal_Width) {
+    // NaN substitutions are required to handle missing values correctly.
+    // If no missing numerical values are used, this block can be removed.
+    sepal_Length = Float.isNaN(sepal_Length) ? 5.84333f : sepal_Length;
+    sepal_Width = Float.isNaN(sepal_Width) ? 3.05733f : sepal_Width;
+    petal_Length = Float.isNaN(petal_Length) ? 3.758f : petal_Length;
+    petal_Width = Float.isNaN(petal_Width) ? 1.19933f : petal_Width;
+
+    this.numericalFeatureValues = new float[] {sepal_Length, sepal_Width, petal_Length, petal_Width};
+  }
+}
+
 
   private YdfModel() {} // Prevent instantiation
 }

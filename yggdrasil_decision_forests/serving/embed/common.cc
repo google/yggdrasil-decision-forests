@@ -34,6 +34,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
+#include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
@@ -206,12 +207,31 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
 
       std::string item_symbol;
       if (!is_label && index == dataset::kOutOfDictionaryItemIndex) {
-        item_symbol =
-            "OutOfVocabulary";  // Better than the default <OOV> symbol.
+        switch (options.language_case()) {
+          case proto::Options::kCc:
+            item_symbol =
+                "OutOfVocabulary";  // Better than the default <OOV> symbol.
+            break;
+          case proto::Options::kJava:
+            item_symbol = "OUT_OF_VOCABULARY";
+            break;
+          case proto::Options::LANGUAGE_NOT_SET:
+            NOTREACHED();
+            break;
+        }
       } else {
-        item_symbol = StringToStructSymbol(item.first,
-                                           /*.ensure_letter_first=*/false);
-
+        switch (options.language_case()) {
+          case proto::Options::kCc:
+            item_symbol = StringToStructSymbol(item.first,
+                                               /*.ensure_letter_first=*/false);
+            break;
+          case proto::Options::kJava:
+            item_symbol = StringToJavaEnumConstant(item.first);
+            break;
+          case proto::Options::LANGUAGE_NOT_SET:
+            NOTREACHED();
+            break;
+        }
         if (sanitized_items.contains(item_symbol)) {
           // This sanitized symbol already exist. Create a new one by adding a
           // prefix.
