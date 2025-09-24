@@ -25,9 +25,10 @@
 
 namespace yggdrasil_decision_forests::serving::embed {
 
-// Checks that a model name is valid. A model name can only contain letters,
-// numbers, and _.
-absl::Status CheckModelName(absl::string_view value);
+// Checks that a model name is valid. A model name can only contain certain
+// letters depending on the language.
+absl::Status CheckModelName(absl::string_view value,
+                            proto::Options::LanguageCase language);
 absl::Status CheckFeatureName(absl::string_view value);
 
 // Converts any string into a c++ constant (with the "k") e.g. "HELLO_WOLRD_1".

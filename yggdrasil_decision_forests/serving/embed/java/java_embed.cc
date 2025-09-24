@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/serving/embed/java/java_embed.h"
 
+#include <string>
+
 #include "absl/container/node_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -38,7 +40,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelJava(
   }
 
   // Check names.
-  RETURN_IF_ERROR(CheckModelName(options.name()));
+  RETURN_IF_ERROR(CheckModelName(options.name(), proto::Options::kJava));
   for (const auto& column_idx : model.input_features()) {
     RETURN_IF_ERROR(
         CheckFeatureName(model.data_spec().columns(column_idx).name()));
@@ -50,7 +52,12 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelJava(
   ASSIGN_OR_RETURN(
       const JavaInternalOptions internal_options,
       ComputeJavaInternalOptions(model, *df_interface, stats, options));
-  return absl::UnimplementedError("Java export not yet implemented.");
+
+  // Generate the code.
+  absl::node_hash_map<Filename, Content> result;
+  std::string code = "";
+  result[absl::StrCat(options.name(), ".java")] = code;
+  return result;
 }
 
 absl::StatusOr<JavaInternalOptions> ComputeJavaInternalOptions(

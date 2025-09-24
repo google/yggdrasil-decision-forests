@@ -171,7 +171,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   }
 
   // Check names.
-  RETURN_IF_ERROR(CheckModelName(options.name()));
+  RETURN_IF_ERROR(CheckModelName(options.name(), proto::Options::kCc));
   for (const auto& column_idx : model.input_features()) {
     RETURN_IF_ERROR(
         CheckFeatureName(model.data_spec().columns(column_idx).name()));
@@ -1648,19 +1648,5 @@ int ObliqueFeatureIndex(const CCInternalOptions& internal_options) {
 std::string ObliqueFeatureType(const ValueBank& bank) {
   return UnsignedInteger(
       MaxUnsignedValueToNumBytes(bank.oblique_features.size()));
-}
-
-absl::Status SpecializedConversion::Validate() const {
-  STATUS_CHECK(!accumulator_type.empty());
-  STATUS_CHECK(!accumulator_initial_value.empty());
-  STATUS_CHECK(!return_prediction.empty());
-  STATUS_CHECK(!accumulator_type.empty());
-  STATUS_CHECK_GT(leaf_value_spec.dims, 0);
-  STATUS_CHECK_NE(leaf_value_spec.dtype, proto::DType::UNDEFINED);
-
-  STATUS_CHECK(set_node_ifelse_fn);
-  STATUS_CHECK(leaf_value_fn);
-  STATUS_CHECK(!routing_node.empty());
-  return absl::OkStatus();
 }
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

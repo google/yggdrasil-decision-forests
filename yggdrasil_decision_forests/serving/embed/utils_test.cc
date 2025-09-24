@@ -20,16 +20,29 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
 namespace {
 
-TEST(Embed, CheckModelName) {
-  EXPECT_OK(CheckModelName("my_model_123"));
-  EXPECT_THAT(CheckModelName("my-model"),
+TEST(Embed, CheckModelNameCC) {
+  EXPECT_OK(CheckModelName("my_model_123", proto::Options::kCc));
+  EXPECT_THAT(CheckModelName("my-model", proto::Options::kCc),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(CheckModelName("my model"),
+  EXPECT_THAT(CheckModelName("MyModel", proto::Options::kCc),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CheckModelName("my model", proto::Options::kCc),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(Embed, CheckModelNameJava) {
+  EXPECT_OK(CheckModelName("MyModel", proto::Options::kJava));
+  EXPECT_THAT(CheckModelName("my_model_123", proto::Options::kJava),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CheckModelName("my-model", proto::Options::kJava),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CheckModelName("my model", proto::Options::kJava),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 

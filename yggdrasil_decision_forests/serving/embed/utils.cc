@@ -40,14 +40,30 @@ const absl::flat_hash_map<char, std::string> kReplacements = {
 
 }  // namespace
 
-absl::Status CheckModelName(absl::string_view value) {
-  for (const char c : value) {
-    if (!std::islower(c) && !std::isdigit(c) && c != '_') {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Invalid model name: ", value,
-                       ". The model name can only contain lowercase letters, "
-                       "numbers, and _."));
-    }
+absl::Status CheckModelName(absl::string_view value,
+                            proto::Options::LanguageCase language) {
+  switch (language) {
+    case proto::Options::kCc:
+      for (const char c : value) {
+        if (!std::islower(c) && !std::isdigit(c) && c != '_') {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "Invalid model name: ", value,
+              ". The model name can only contain lowercase letters, "
+              "numbers, and _."));
+        }
+      }
+      break;
+    case proto::Options::kJava:
+      for (const char c : value) {
+        if (!std::isalnum(c)) {
+          return absl::InvalidArgumentError(absl::StrCat(
+              "Invalid model name: ", value,
+              ". The model name can only contain alphanumeric characters."));
+        }
+      }
+      break;
+    case proto::Options::LANGUAGE_NOT_SET:
+      return absl::InternalError("Language not set for CheckModelName");
   }
   return absl::OkStatus();
 }

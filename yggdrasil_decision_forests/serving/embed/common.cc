@@ -34,6 +34,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 
@@ -246,6 +247,20 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
              col_spec.categorical(), false);
   }
 
+  return absl::OkStatus();
+}
+
+absl::Status SpecializedConversion::Validate() const {
+  STATUS_CHECK(!accumulator_type.empty());
+  STATUS_CHECK(!accumulator_initial_value.empty());
+  STATUS_CHECK(!return_prediction.empty());
+  STATUS_CHECK(!accumulator_type.empty());
+  STATUS_CHECK_GT(leaf_value_spec.dims, 0);
+  STATUS_CHECK_NE(leaf_value_spec.dtype, proto::DType::UNDEFINED);
+
+  STATUS_CHECK(set_node_ifelse_fn);
+  STATUS_CHECK(leaf_value_fn);
+  STATUS_CHECK(!routing_node.empty());
   return absl::OkStatus();
 }
 

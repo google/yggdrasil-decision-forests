@@ -1,9 +1,13 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
+
+# Libraries
+# =========
 
 cc_library_ydf(
     name = "java_embed",
@@ -19,5 +23,29 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+    ],
+)
+
+# Tests
+# =====
+
+cc_test(
+    name = "java_embed_test",
+    srcs = ["java_embed_test.cc"],
+    data = [
+        "//yggdrasil_decision_forests/test_data",
+        "//yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_filegroup",
+    ],
+    deps = [
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/serving/embed",
+        "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_googletest//:gtest_main",
     ],
 )
