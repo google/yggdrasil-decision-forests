@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/container/btree_map.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -47,63 +46,13 @@ struct Includes {
 // model compilation e.g. how many bits to use to encode numerical features. The
 // internal options are computed using the user provided options (simply called
 // "options" in the code) and the model.
-struct InternalOptions {
-  // Number of bytes to encode a fixed-size feature.
-  // Note: Currently, all the fixed-size features are encoded with the same
-  // precision (e.g. all the numerical and categorical values are encoded with
-  // the same number of bytes). Can be 1, 2, or 4.
-  int feature_value_bytes = 0;
-
-  // If the numerical features are encoded as float. In this case
-  // feature_value_bytes=4 (currently). If false, numerical features are encoded
-  // as ints, and "feature_value_bytes" specify the precision.
-  bool numerical_feature_is_float = false;
-
-  // Number of bytes to encode a feature index.
-  int feature_index_bytes = 0;
-
-  // Number of bytes to encode a tree index.
-  int tree_index_bytes;
-
-  // Number of bytes to encode a node index.
-  int node_index_bytes;
-
-  // Number of bytes to encode a node index withing a tree.
-  int node_offset_bytes;
-
-  // Number of bytes to encode an index in the categorical mask bank.
-  // Note: This value is currently inferred from
-  // "sum_size_categorical_bitmap_masks", which assume the bank is not
-  // compressed / optimized in any way.
-  int categorical_idx_bytes;
-
-  // The type returned by the prediction function.
-  std::string output_type;
-
+struct CCInternalOptions : BaseInternalOptions {
   // C++ includes.
   Includes includes;
-
-  // Mapping from a column idx to a dense index of the model input features. If
-  // a column is not a feature, the corresponding value is -1.
-  std::vector<int> column_idx_to_feature_idx;
-
-  // Mapping between column idx of a categorical-string column, to the sanitized
-  // dictionary of possible values.
-  struct CategoricalDict {
-    // Name of the column
-    std::string sanitized_name;
-    // Possible values sanitized so they can be used as c++ variable names.
-    std::vector<std::string> sanitized_items;
-    // Possible values
-    std::vector<std::string> items;
-    // If this column a label.
-    bool is_label;
-  };
-  absl::btree_map<int, CategoricalDict> categorical_dicts;
 };
 
 // Reserved feature index used for oblique conditions.
-int ObliqueFeatureIndex(const InternalOptions& internal_options);
+int ObliqueFeatureIndex(const CCInternalOptions& internal_options);
 
 absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
     const model::AbstractModel& model, const proto::Options& options);
@@ -115,17 +64,15 @@ std::string ObliqueFeatureType(const ValueBank& bank);
 absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
     const model::random_forest::RandomForestModel& model,
     const internal::ModelStatistics& stats,
-    const internal::InternalOptions& internal_options,
-    const proto::Options& options);
+    const CCInternalOptions& internal_options, const proto::Options& options);
 
 absl::StatusOr<SpecializedConversion> SpecializedConversionGradientBoostedTrees(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
     const internal::ModelStatistics& stats,
-    const internal::InternalOptions& internal_options,
-    const proto::Options& options);
+    const CCInternalOptions& internal_options, const proto::Options& options);
 
 // Computes the internal options of the model.
-absl::StatusOr<InternalOptions> ComputeInternalOptions(
+absl::StatusOr<CCInternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats, const proto::Options& options);
@@ -134,17 +81,12 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
 absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
                                            const model::AbstractModel& model,
                                            const proto::Options& options,
-                                           InternalOptions* out);
+                                           CCInternalOptions* out);
 
 // Populates the output parts of the internal option.
 absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
                                           const proto::Options& options,
-                                          InternalOptions* out);
-
-// Populates the categorical dictionary parts of the internal option.
-absl::Status ComputeInternalOptionsCategoricalDictionaries(
-    const model::AbstractModel& model, const ModelStatistics& stats,
-    const proto::Options& options, InternalOptions* out);
+                                          CCInternalOptions* out);
 
 struct FeatureDef {
   std::string variable_name;  // Name used for the feature in the export.
@@ -158,7 +100,7 @@ struct FeatureDef {
 // Generates the definition of a feature in an instance struct.
 absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
-    const internal::InternalOptions& internal_options);
+    const CCInternalOptions& internal_options);
 
 // Adds the code of a condition for the routing algorithm.
 // If the model supports multiple types of condition, wrapps the code with the
@@ -170,7 +112,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
                          const model::DecisionForestInterface& df_interface,
                          const SpecializedConversion& specialized_conversion,
                          const ModelStatistics& stats,
-                         const InternalOptions& internal_options,
+                         const CCInternalOptions& internal_options,
                          const proto::Options& options,
                          const std::vector<FeatureDef>& feature_defs,
                          const ValueBank& routing_bank,
@@ -189,13 +131,13 @@ AccumulatorDef GenAccumulatorDef(const proto::Options& options,
 absl::Status GenerateTreeInferenceIfElse(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const InternalOptions& internal_options,
+    const proto::Options& options, const CCInternalOptions& internal_options,
     const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content);
 
 absl::Status GenerateTreeInferenceRouting(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const InternalOptions& internal_options,
+    const proto::Options& options, const CCInternalOptions& internal_options,
     const SpecializedConversion& specialized_conversion,
     const ModelStatistics& stats, const ValueBank& routing_bank,
     std::string* content);
@@ -206,7 +148,7 @@ absl::Status GenRoutingModelData(
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
-    const proto::Options& options, const InternalOptions& internal_options,
+    const proto::Options& options, const CCInternalOptions& internal_options,
     std::string* content, ValueBank* bank);
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

@@ -24,6 +24,7 @@
 #include <variant>
 #include <vector>
 
+#include "absl/container/btree_map.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -41,6 +42,58 @@ typedef std::string Filename;
 typedef std::string Content;
 
 namespace internal {
+
+// Options used internally by the code generation.
+// These options are common to all language exports.
+struct BaseInternalOptions {
+  // Number of bytes to encode a fixed-size feature.
+  // Note: Currently, all the fixed-size features are encoded with the same
+  // precision (e.g. all the numerical and categorical values are encoded with
+  // the same number of bytes). Can be 1, 2, or 4.
+  int feature_value_bytes = 0;
+
+  // If the numerical features are encoded as float. In this case
+  // feature_value_bytes=4 (currently). If false, numerical features are encoded
+  // as ints, and "feature_value_bytes" specify the precision.
+  bool numerical_feature_is_float = false;
+
+  // Number of bytes to encode a feature index.
+  int feature_index_bytes = 0;
+
+  // Number of bytes to encode a tree index.
+  int tree_index_bytes;
+
+  // Number of bytes to encode a node index withing a tree.
+  int node_offset_bytes;
+
+  // Number of bytes to encode an index in the categorical mask bank.
+  // Note: This value is currently inferred from
+  // "sum_size_categorical_bitmap_masks", which assume the bank is not
+  // compressed / optimized in any way.
+  int categorical_idx_bytes;
+
+  // The type returned by the prediction function.
+  std::string output_type;
+
+  // Mapping from a column idx to a dense index of the model input features. If
+  // a column is not a feature, the corresponding value is -1.
+  std::vector<int> column_idx_to_feature_idx;
+
+  // Mapping between column idx of a categorical-string column, to the sanitized
+  // dictionary of possible values.
+  struct CategoricalDict {
+    // Name of the column
+    std::string sanitized_name;
+    // Possible values sanitized so they can be used as c++ variable names.
+    std::vector<std::string> sanitized_items;
+    // Possible values
+    std::vector<std::string> items;
+    // If this column a label.
+    bool is_label;
+  };
+  absl::btree_map<int, CategoricalDict> categorical_dicts;
+};
+
 // Statistics about the model.
 struct ModelStatistics {
   // Number of trees.
@@ -198,6 +251,16 @@ struct SpecializedConversion {
 absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface);
+
+// Populates the feature parts of the internal option.
+absl::Status ComputeBaseInternalOptionsFeature(
+    const ModelStatistics& stats, const model::AbstractModel& model,
+    const proto::Options& options, BaseInternalOptions* out);
+
+// Populates the categorical dictionary parts of the internal option.
+absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
+    const model::AbstractModel& model, const ModelStatistics& stats,
+    const proto::Options& options, BaseInternalOptions* out);
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed
 

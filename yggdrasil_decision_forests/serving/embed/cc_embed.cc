@@ -15,7 +15,6 @@
 
 #include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
 
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -23,7 +22,6 @@
 #include <variant>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
@@ -34,7 +32,6 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/span.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
@@ -51,13 +48,11 @@
 namespace yggdrasil_decision_forests::serving::embed::internal {
 
 namespace {
-constexpr absl::string_view kLabelReservedSymbol = "Label";
-
 // Generates the struct for a single instance (i.e., an example without a
 // label).
 absl::StatusOr<std::string> GenInstanceStruct(
     const model::AbstractModel& model, const proto::Options& options,
-    const internal::InternalOptions& internal_options,
+    const CCInternalOptions& internal_options,
     const internal::ModelStatistics& stats,
     const std::vector<FeatureDef>& feature_defs) {
   std::string content;
@@ -107,7 +102,7 @@ struct Instance {
 // the label.
 absl::StatusOr<std::string> GenCategoricalStringDictionaries(
     const model::AbstractModel& model, const proto::Options& options,
-    const internal::InternalOptions& internal_options) {
+    const CCInternalOptions& internal_options) {
   std::string content;
 
   for (const auto& dict : internal_options.categorical_dicts) {
@@ -186,7 +181,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
                    internal::ComputeStatistics(model, *df_interface));
 
   ASSIGN_OR_RETURN(
-      const internal::InternalOptions internal_options,
+      const CCInternalOptions internal_options,
       internal::ComputeInternalOptions(model, *df_interface, stats, options));
 
   // Implementation specific specialization.
@@ -354,7 +349,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
                          const model::DecisionForestInterface& df_interface,
                          const SpecializedConversion& specialized_conversion,
                          const ModelStatistics& stats,
-                         const InternalOptions& internal_options,
+                         const CCInternalOptions& internal_options,
                          const proto::Options& options,
                          const std::vector<FeatureDef>& feature_defs,
                          const ValueBank& routing_bank,
@@ -435,8 +430,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
 absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForest(
     const model::random_forest::RandomForestModel& model,
     const internal::ModelStatistics& stats,
-    const internal::InternalOptions& internal_options,
-    const proto::Options& options) {
+    const CCInternalOptions& internal_options, const proto::Options& options) {
   SpecializedConversion spec;
 
   switch (stats.task) {
@@ -659,8 +653,7 @@ absl::StatusOr<internal::SpecializedConversion>
 SpecializedConversionGradientBoostedTrees(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
     const internal::ModelStatistics& stats,
-    const internal::InternalOptions& internal_options,
-    const proto::Options& options) {
+    const CCInternalOptions& internal_options, const proto::Options& options) {
   SpecializedConversion spec;
   switch (stats.task) {
     case model::proto::Task::CLASSIFICATION: {
@@ -786,16 +779,16 @@ SpecializedConversionGradientBoostedTrees(
   return spec;
 }
 
-absl::StatusOr<InternalOptions> ComputeInternalOptions(
+absl::StatusOr<CCInternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats, const proto::Options& options) {
-  InternalOptions internal_options;
+  CCInternalOptions internal_options;
   RETURN_IF_ERROR(
       ComputeInternalOptionsFeature(stats, model, options, &internal_options));
   RETURN_IF_ERROR(
       ComputeInternalOptionsOutput(stats, options, &internal_options));
-  RETURN_IF_ERROR(ComputeInternalOptionsCategoricalDictionaries(
+  RETURN_IF_ERROR(ComputeBaseInternalOptionsCategoricalDictionaries(
       model, stats, options, &internal_options));
   return internal_options;
 }
@@ -803,84 +796,9 @@ absl::StatusOr<InternalOptions> ComputeInternalOptions(
 absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
                                            const model::AbstractModel& model,
                                            const proto::Options& options,
-                                           InternalOptions* out) {
-  out->feature_value_bytes = 1;
-  out->numerical_feature_is_float = false;
-
-  out->feature_index_bytes =
-      MaxUnsignedValueToNumBytes(stats.num_features + kReservedFeatureIndexes);
-  out->tree_index_bytes = MaxUnsignedValueToNumBytes(stats.num_trees);
-  out->node_index_bytes =
-      MaxUnsignedValueToNumBytes(stats.num_leaves + stats.num_conditions);
-
-  if (stats.sum_size_categorical_bitmap_masks == 0) {
-    out->categorical_idx_bytes = 0;
-  } else {
-    out->categorical_idx_bytes =
-        MaxUnsignedValueToNumBytes(stats.sum_size_categorical_bitmap_masks);
-  }
-
-  // This is the number of bytes to encode a node index in a tree. The precision
-  // for an offset is in average 50% smaller.
-  // TODO: Optimize node_offset_bytes.
-  out->node_offset_bytes = MaxUnsignedValueToNumBytes(
-      NumLeavesToNumNodes(stats.max_num_leaves_per_tree));
-
-  out->column_idx_to_feature_idx.assign(model.data_spec().columns_size(), -1);
-
-  // Feature encoding.
-  for (size_t feature_idx = 0; feature_idx < model.input_features().size();
-       feature_idx++) {
-    const auto& column_idx = model.input_features()[feature_idx];
-    const auto& col_spec = model.data_spec().columns(column_idx);
-
-    // Index the input feature.
-    out->column_idx_to_feature_idx[column_idx] = feature_idx;
-
-    switch (col_spec.type()) {
-      case dataset::proto::ColumnType::NUMERICAL: {
-        switch (col_spec.dtype()) {
-          // TODO: Add support for unsigned features.
-          case dataset::proto::DTYPE_INVALID:  // Default
-          case dataset::proto::DTYPE_FLOAT32:
-          // Note: float64 are always converted to float32 during training.
-          case dataset::proto::DTYPE_FLOAT64:
-            out->numerical_feature_is_float = true;
-            out->feature_value_bytes = std::max(out->feature_value_bytes, 4);
-            break;
-          case dataset::proto::DTYPE_INT16:
-            out->feature_value_bytes = std::max(out->feature_value_bytes, 2);
-            break;
-          case dataset::proto::DTYPE_INT32:
-          // Note: int64 are always converted to int32 during training.
-          case dataset::proto::DTYPE_INT64:
-            out->feature_value_bytes = std::max(out->feature_value_bytes, 4);
-            break;
-          case dataset::proto::DTYPE_INT8:
-          case dataset::proto::DTYPE_BOOL:
-            // Nothing to do.
-            break;
-          default:
-            return absl::InvalidArgumentError(
-                absl::StrCat("Non supported numerical feature type: ",
-                             dataset::proto::DType_Name(col_spec.dtype())));
-        }
-      } break;
-      case dataset::proto::ColumnType::CATEGORICAL: {
-        const int feature_bytes = MaxUnsignedValueToNumBytes(
-            col_spec.categorical().number_of_unique_values());
-        out->feature_value_bytes =
-            std::max(out->feature_value_bytes, feature_bytes);
-      } break;
-      case dataset::proto::ColumnType::BOOLEAN:
-        // Nothing to do.
-        break;
-      default:
-        return absl::InvalidArgumentError(
-            absl::StrCat("Non supported feature type: ",
-                         dataset::proto::ColumnType_Name(col_spec.type())));
-    }
-  }
+                                           CCInternalOptions* out) {
+  RETURN_IF_ERROR(
+      ComputeBaseInternalOptionsFeature(stats, model, options, out));
 
   // Include cmath for numerical features for std::isnan().
   if (out->numerical_feature_is_float) {
@@ -891,7 +809,7 @@ absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
 
 absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
                                           const proto::Options& options,
-                                          InternalOptions* out) {
+                                          CCInternalOptions* out) {
   if (stats.has_conditions
           [model::decision_tree::proto::Condition::kContainsBitmapCondition] ||
       stats.has_conditions
@@ -945,84 +863,9 @@ absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
   return absl::OkStatus();
 }
 
-absl::Status ComputeInternalOptionsCategoricalDictionaries(
-    const model::AbstractModel& model, const ModelStatistics& stats,
-    const proto::Options& options, InternalOptions* out) {
-  const auto add_dict = [&](absl::string_view name, const int column_idx,
-                            const dataset::proto::CategoricalSpec& column,
-                            const bool is_label) {
-    // Get the list of values.
-    auto& dictionary = out->categorical_dicts[column_idx];
-    dictionary.sanitized_name = name;
-    dictionary.is_label = is_label;
-    dictionary.sanitized_items.assign(
-        column.number_of_unique_values() - is_label, "");
-    dictionary.items.assign(column.number_of_unique_values() - is_label, "");
-
-    // Set of all sanitized_items. Used to detect duplications after the
-    // conversion to c++ symbols.
-    absl::flat_hash_set<std::string> sanitized_items;
-
-    for (const auto& item : column.items()) {
-      int index = item.second.index();
-
-      // Labels don't have the OOB item.
-      if (is_label) {
-        if (index == dataset::kOutOfDictionaryItemIndex) {
-          continue;
-        }
-        index--;
-      }
-
-      std::string item_symbol;
-      if (!is_label && index == dataset::kOutOfDictionaryItemIndex) {
-        item_symbol =
-            "OutOfVocabulary";  // Better than the default <OOV> symbol.
-      } else {
-        item_symbol = StringToStructSymbol(item.first,
-                                           /*.ensure_letter_first=*/false);
-
-        if (sanitized_items.contains(item_symbol)) {
-          // This sanitized symbol already exist. Create a new one by adding a
-          // prefix.
-          int local_index = 1;
-          std::string extended_item_symbol;
-          do {
-            extended_item_symbol =
-                absl::StrCat(item_symbol, "_", local_index++);
-          } while (sanitized_items.contains(extended_item_symbol));
-          item_symbol = extended_item_symbol;
-        }
-        sanitized_items.insert(item_symbol);
-      }
-      dictionary.sanitized_items[index] = item_symbol;
-      dictionary.items[index] = item.first;
-    }
-  };
-
-  if (model.task() == model::proto::Task::CLASSIFICATION &&
-      !model.LabelColumnSpec().categorical().is_already_integerized()) {
-    // The classification labels
-    add_dict(kLabelReservedSymbol, model.label_col_idx(),
-             model.LabelColumnSpec().categorical(), true);
-  }
-
-  // The categorical features.
-  for (const auto input_feature : model.input_features()) {
-    const auto& col_spec = model.data_spec().columns(input_feature);
-    if (col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
-      continue;
-    }
-    add_dict(StringToStructSymbol(col_spec.name()), input_feature,
-             col_spec.categorical(), false);
-  }
-
-  return absl::OkStatus();
-}
-
 absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
-    const internal::InternalOptions& internal_options) {
+    const CCInternalOptions& internal_options) {
   // TODO: Add support for default values.
   // TODO: For integer numericals, use the min/max to possibly reduce the
   // required precision.
@@ -1064,7 +907,7 @@ absl::Status GenerateTreeInferenceIfElseNode(
     const dataset::proto::DataSpecification& dataspec,
     const model::decision_tree::NodeWithChildren& node, const int depth,
     const IfElseSetNodeFn& set_node_ifelse_fn, const int tree_idx,
-    const internal::InternalOptions& internal_options, std::string* content) {
+    const CCInternalOptions& internal_options, std::string* content) {
   std::string prefix(depth * 2 + 2, ' ');
 
   if (node.IsLeaf()) {
@@ -1203,7 +1046,7 @@ absl::Status GenerateTreeInferenceIfElseNode(
 absl::Status GenerateTreeInferenceIfElse(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const InternalOptions& internal_options,
+    const proto::Options& options, const CCInternalOptions& internal_options,
     const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content) {
   for (int tree_idx = 0; tree_idx < df_interface.num_trees(); tree_idx++) {
     absl::StrAppend(content, "  // Tree #", tree_idx, "\n");
@@ -1287,7 +1130,7 @@ absl::Status AddRoutingConditions(std::vector<RoutingConditionCode> conditions,
 absl::Status GenerateTreeInferenceRouting(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const InternalOptions& internal_options,
+    const proto::Options& options, const CCInternalOptions& internal_options,
     const SpecializedConversion& specialized_conversion,
     const ModelStatistics& stats, const ValueBank& routing_bank,
     std::string* content) {
@@ -1384,7 +1227,7 @@ absl::Status GenRoutingModelDataNode(
     const dataset::proto::DataSpecification& dataspec,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
-    const proto::Options& options, const InternalOptions& internal_options,
+    const proto::Options& options, const CCInternalOptions& internal_options,
     const model::decision_tree::NodeWithChildren& node, const int depth,
     std::string* serialized_nodes, int* node_idx, ValueBank* bank) {
   if (node.IsLeaf()) {
@@ -1617,7 +1460,7 @@ absl::StatusOr<std::vector<uint8_t>> GenRoutingModelDataConditionType(
 
 // Outputs the code to encode the bank data and other arrays of the routing
 // algorithm.
-absl::Status GenRoutingModelDataBank(const InternalOptions& internal_options,
+absl::Status GenRoutingModelDataBank(const CCInternalOptions& internal_options,
                                      const ValueBank& bank,
                                      std::string* content) {
   const std::string root_delta_type =
@@ -1675,7 +1518,7 @@ static const $0 oblique_features[] = {$1};
 // Outputs the struct code to encode the nodes in the routing
 // algorithm.
 absl::Status GenRoutingModelDataStruct(
-    const InternalOptions& internal_options, const ModelStatistics& stats,
+    const CCInternalOptions& internal_options, const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion, const ValueBank& bank,
     std::string* content) {
   // TODO: Add boolean condition support.
@@ -1759,7 +1602,7 @@ absl::Status GenRoutingModelData(
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
-    const proto::Options& options, const InternalOptions& internal_options,
+    const proto::Options& options, const CCInternalOptions& internal_options,
     std::string* content, ValueBank* bank) {
   // Compute the node data and populate the banks.
   std::string serialized_nodes;
@@ -1798,7 +1641,7 @@ static const uint8_t condition_types[] = {$0};
   return absl::OkStatus();
 }
 
-int ObliqueFeatureIndex(const InternalOptions& internal_options) {
+int ObliqueFeatureIndex(const CCInternalOptions& internal_options) {
   return NumBytesToMaxUnsignedValue(internal_options.feature_index_bytes);
 }
 

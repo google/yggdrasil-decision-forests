@@ -15,7 +15,7 @@
 
 // Test the code to embed models.
 
-#include "yggdrasil_decision_forests/serving/embed/embed.h"
+#include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
 
 #include <memory>
 #include <optional>
@@ -35,8 +35,8 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
-#include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -301,7 +301,6 @@ TEST(Process, ManualBinaryGBT) {
 
   EXPECT_EQ(internal_options.feature_index_bytes, 1);
   EXPECT_EQ(internal_options.tree_index_bytes, 1);
-  EXPECT_EQ(internal_options.node_index_bytes, 1);
   EXPECT_EQ(internal_options.node_offset_bytes, 1);
 }
 
@@ -332,7 +331,6 @@ TEST(Process, RealBinaryGBT) {
 
   EXPECT_EQ(internal_options.feature_index_bytes, 1);
   EXPECT_EQ(internal_options.tree_index_bytes, 1);
-  EXPECT_EQ(internal_options.node_index_bytes, 2);
   EXPECT_EQ(internal_options.node_offset_bytes, 1);
 }
 
@@ -412,7 +410,7 @@ SIMPLE_PARAMETERIZED_TEST(
          "int16_t"},
     }) {
   const auto& test_case = GetParam();
-  internal::InternalOptions internal_options;
+  internal::CCInternalOptions internal_options;
   ASSERT_OK(internal::ComputeInternalOptionsOutput(
       test_case.stats, test_case.options, &internal_options));
   EXPECT_EQ(internal_options.output_type, test_case.expected_output_type);
@@ -420,7 +418,7 @@ SIMPLE_PARAMETERIZED_TEST(
 
 struct GenFeatureDefCase {
   dataset::proto::Column col_spec;
-  internal::InternalOptions internal_options;
+  internal::BaseInternalOptions base_internal_options;
   std::string expected_underlying_type;
   absl::optional<std::string> expected_default_value;
 };
@@ -469,9 +467,12 @@ SIMPLE_PARAMETERIZED_TEST(
          {}},
     }) {
   const auto& test_case = GetParam();
-  ASSERT_OK_AND_ASSIGN(
-      const auto value,
-      internal::GenFeatureDef(test_case.col_spec, test_case.internal_options));
+
+  internal::CCInternalOptions options;
+  static_cast<internal::BaseInternalOptions&>(options) =
+      test_case.base_internal_options;
+  ASSERT_OK_AND_ASSIGN(const auto value,
+                       internal::GenFeatureDef(test_case.col_spec, options));
   EXPECT_EQ(value.underlying_type, test_case.expected_underlying_type);
   EXPECT_EQ(value.default_value, test_case.expected_default_value);
 }

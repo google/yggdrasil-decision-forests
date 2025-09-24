@@ -16,18 +16,30 @@
 #include "yggdrasil_decision_forests/serving/embed/common.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <string>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/serving/embed/utils.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
+
+namespace {
+constexpr char kLabelReservedSymbol[] = "Label";
+}  // namespace
 
 absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::AbstractModel& model,
@@ -79,6 +91,162 @@ absl::StatusOr<ModelStatistics> ComputeStatistics(
       std::count(stats.has_conditions.begin(), stats.has_conditions.end(),
                  true) > 1;
   return stats;
+}
+
+absl::Status ComputeBaseInternalOptionsFeature(
+    const ModelStatistics& stats, const model::AbstractModel& model,
+    const proto::Options& options, BaseInternalOptions* out) {
+  out->feature_value_bytes = 1;
+  out->numerical_feature_is_float = false;
+
+  out->feature_index_bytes =
+      MaxUnsignedValueToNumBytes(stats.num_features + kReservedFeatureIndexes);
+  out->tree_index_bytes = MaxUnsignedValueToNumBytes(stats.num_trees);
+
+  if (stats.sum_size_categorical_bitmap_masks == 0) {
+    out->categorical_idx_bytes = 0;
+  } else {
+    out->categorical_idx_bytes =
+        MaxUnsignedValueToNumBytes(stats.sum_size_categorical_bitmap_masks);
+  }
+
+  // This is the number of bytes to encode a node index in a tree. The precision
+  // for an offset is in average 50% smaller.
+  // TODO: Optimize node_offset_bytes.
+  out->node_offset_bytes = MaxUnsignedValueToNumBytes(
+      NumLeavesToNumNodes(stats.max_num_leaves_per_tree));
+
+  out->column_idx_to_feature_idx.assign(model.data_spec().columns_size(), -1);
+
+  // Feature encoding.
+  for (size_t feature_idx = 0; feature_idx < model.input_features().size();
+       feature_idx++) {
+    const auto& column_idx = model.input_features()[feature_idx];
+    const auto& col_spec = model.data_spec().columns(column_idx);
+
+    // Index the input feature.
+    out->column_idx_to_feature_idx[column_idx] = feature_idx;
+
+    switch (col_spec.type()) {
+      case dataset::proto::ColumnType::NUMERICAL: {
+        switch (col_spec.dtype()) {
+          // TODO: Add support for unsigned features.
+          case dataset::proto::DTYPE_INVALID:  // Default
+          case dataset::proto::DTYPE_FLOAT32:
+          // Note: float64 are always converted to float32 during training.
+          case dataset::proto::DTYPE_FLOAT64:
+            out->numerical_feature_is_float = true;
+            out->feature_value_bytes = std::max(out->feature_value_bytes, 4);
+            break;
+          case dataset::proto::DTYPE_INT16:
+            out->feature_value_bytes = std::max(out->feature_value_bytes, 2);
+            break;
+          case dataset::proto::DTYPE_INT32:
+          // Note: int64 are always converted to int32 during training.
+          case dataset::proto::DTYPE_INT64:
+            out->feature_value_bytes = std::max(out->feature_value_bytes, 4);
+            break;
+          case dataset::proto::DTYPE_INT8:
+          case dataset::proto::DTYPE_BOOL:
+            // Nothing to do.
+            break;
+          default:
+            return absl::InvalidArgumentError(
+                absl::StrCat("Non supported numerical feature type: ",
+                             dataset::proto::DType_Name(col_spec.dtype())));
+        }
+      } break;
+      case dataset::proto::ColumnType::CATEGORICAL: {
+        const int feature_bytes = MaxUnsignedValueToNumBytes(
+            col_spec.categorical().number_of_unique_values());
+        out->feature_value_bytes =
+            std::max(out->feature_value_bytes, feature_bytes);
+      } break;
+      case dataset::proto::ColumnType::BOOLEAN:
+        // Nothing to do.
+        break;
+      default:
+        return absl::InvalidArgumentError(
+            absl::StrCat("Non supported feature type: ",
+                         dataset::proto::ColumnType_Name(col_spec.type())));
+    }
+  }
+  return absl::OkStatus();
+}
+
+absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
+    const model::AbstractModel& model, const ModelStatistics& stats,
+    const proto::Options& options, BaseInternalOptions* out) {
+  const auto add_dict = [&](absl::string_view name, const int column_idx,
+                            const dataset::proto::CategoricalSpec& column,
+                            const bool is_label) {
+    // Get the list of values.
+    auto& dictionary = out->categorical_dicts[column_idx];
+    dictionary.sanitized_name = name;
+    dictionary.is_label = is_label;
+    dictionary.sanitized_items.assign(
+        column.number_of_unique_values() - is_label, "");
+    dictionary.items.assign(column.number_of_unique_values() - is_label, "");
+
+    // Set of all sanitized_items. Used to detect duplications after the
+    // conversion to c++ symbols.
+    absl::flat_hash_set<std::string> sanitized_items;
+
+    for (const auto& item : column.items()) {
+      int index = item.second.index();
+
+      // Labels don't have the OOB item.
+      if (is_label) {
+        if (index == dataset::kOutOfDictionaryItemIndex) {
+          continue;
+        }
+        index--;
+      }
+
+      std::string item_symbol;
+      if (!is_label && index == dataset::kOutOfDictionaryItemIndex) {
+        item_symbol =
+            "OutOfVocabulary";  // Better than the default <OOV> symbol.
+      } else {
+        item_symbol = StringToStructSymbol(item.first,
+                                           /*.ensure_letter_first=*/false);
+
+        if (sanitized_items.contains(item_symbol)) {
+          // This sanitized symbol already exist. Create a new one by adding a
+          // prefix.
+          int local_index = 1;
+          std::string extended_item_symbol;
+          do {
+            extended_item_symbol =
+                absl::StrCat(item_symbol, "_", local_index++);
+          } while (sanitized_items.contains(extended_item_symbol));
+          item_symbol = extended_item_symbol;
+        }
+        sanitized_items.insert(item_symbol);
+      }
+      dictionary.sanitized_items[index] = item_symbol;
+      dictionary.items[index] = item.first;
+    }
+  };
+
+  if (model.task() == model::proto::Task::CLASSIFICATION &&
+      !model.LabelColumnSpec().categorical().is_already_integerized()) {
+    // The classification labels
+    add_dict(kLabelReservedSymbol, model.label_col_idx(),
+             model.LabelColumnSpec().categorical(), true);
+  }
+
+  // The categorical features.
+  for (const auto input_feature : model.input_features()) {
+    const auto& col_spec = model.data_spec().columns(input_feature);
+    if (col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
+      continue;
+    }
+    add_dict(StringToStructSymbol(col_spec.name()), input_feature,
+             col_spec.categorical(), false);
+  }
+
+  return absl::OkStatus();
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal
