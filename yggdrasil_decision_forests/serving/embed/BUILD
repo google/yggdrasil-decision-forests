@@ -19,10 +19,10 @@ cc_library_ydf(
         ":cc_embed",
         ":common",
         ":embed_cc_proto",
-        ":java_embed",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
+        "//yggdrasil_decision_forests/serving/embed/java:java_embed",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
@@ -42,19 +42,6 @@ cc_library_ydf(
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library_ydf(
-    name = "java_embed",
-    srcs = ["java_embed.cc"],
-    hdrs = ["java_embed.h"],
-    deps = [
-        ":common",
-        "//yggdrasil_decision_forests/model:abstract_model",
-        "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
     ],
 )
 
