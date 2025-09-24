@@ -44,6 +44,7 @@ struct TestData {
 struct GoldenGeneratedJavaCase {
   std::string model_filename;
   std::string golden_filename;
+  std::string golden_resource_filename;
   proto::Algorithm::Enum algorithm;
   std::optional<proto::ClassificationOutput::Enum> output;
   int crop_num_trees = 3;
@@ -58,22 +59,26 @@ SIMPLE_PARAMETERIZED_TEST(
         {
             "adult_binary_class_gbdt_v2",
             "adult_binary_class_gbdt_v2_probability_routing.java.golden",
+            "adult_binary_class_gbdt_v2_probability_routing_data.bin.golden",
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::PROBABILITY,
         },
         {
             "iris_multi_class_gbdt_v2",
             "iris_multi_class_gbdt_v2_probability_routing.java.golden",
+            "iris_multi_class_gbdt_v2_probability_routing_data.bin.golden",
             proto::Algorithm::ROUTING,
         },
         {
             "abalone_regression_gbdt_v2",
             "abalone_regression_gbdt_v2_routing.java.golden",
+            "abalone_regression_gbdt_v2_routing_data.bin.golden",
             proto::Algorithm::ROUTING,
         },
         {
             "adult_binary_class_gbdt_oblique",
             "adult_binary_class_gbdt_oblique_proba_routing.java.golden",
+            "adult_binary_class_gbdt_oblique_proba_routing_data.bin.golden",
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::PROBABILITY,
         },
@@ -97,14 +102,21 @@ SIMPLE_PARAMETERIZED_TEST(
     options.set_classification_output(*test_case.output);
   }
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModel(*model, options));
-  EXPECT_EQ(embed.size(), 1);
-  EXPECT_TRUE(embed.contains("YdfModel.java"));
+  EXPECT_EQ(embed.size(), 2);
+  ASSERT_TRUE(embed.contains("YdfModel.java"));
+  ASSERT_TRUE(embed.contains("YdfModelData.bin"));
 
   test::ExpectEqualGolden(
       embed.at("YdfModel.java"),
       file::JoinPath("yggdrasil_decision_forests/test_data/"
                      "golden/embed",
                      test_case.golden_filename));
+
+  test::ExpectEqualGolden(
+      embed.at("YdfModelData.bin"),
+      file::JoinPath("yggdrasil_decision_forests/test_data/"
+                     "golden/embed",
+                     test_case.golden_resource_filename));
 }
 
 }  // namespace

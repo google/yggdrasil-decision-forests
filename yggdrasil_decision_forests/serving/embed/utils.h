@@ -67,14 +67,20 @@ std::string QuoteString(absl::string_view input);
 // (since using a single byte cannot encode a value greater than 255).
 int MaxUnsignedValueToNumBytes(uint32_t value);
 
+// Maximum signed value to encode with "bytes" bytes.
+int32_t NumBytesToMaxSignedValue(int bytes);
+
 // Maximum unsigned value to encode with "bytes" bytes.
 uint32_t NumBytesToMaxUnsignedValue(int bytes);
 
 // Same as MaxUnsignedValueToNumBytes, but for signed values.
 int MaxSignedValueToNumBytes(int32_t value);
 
-// Convert a proto dtype to the corresponding c++ class.
+// Convert a proto dtype to the corresponding C++ class.
 std::string DTypeToCCType(proto::DType::Enum value);
+
+// Convert a proto dtype to the corresponding Java primitive type.
+std::string DTypeToJavaType(proto::DType::Enum value);
 
 // Integer representation to dtype.
 proto::DType::Enum UnsignedIntegerToDtype(int bytes);

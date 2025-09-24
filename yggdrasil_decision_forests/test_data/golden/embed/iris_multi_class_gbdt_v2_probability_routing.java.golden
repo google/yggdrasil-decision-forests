@@ -1,5 +1,9 @@
 package com.google.ydf;
 
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 
 public final class YdfModel {
 
@@ -27,6 +31,44 @@ public static class Instance {
     this.numericalFeatureValues = new float[] {sepal_Length, sepal_Width, petal_Length, petal_Width};
   }
 }
+  private static final byte[] nodePos;
+  private static final float[] nodeVal;
+  private static final byte[] nodeFeat;
+  private static final float[] nodeThr;
+  private static final byte[] rootDeltas;
+
+  static {
+    try (InputStream is = YdfModel.class.getResourceAsStream("YdfModelData.bin");
+         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+    int nodePosLength = dis.readInt();
+    nodePos = new byte[nodePosLength];
+    for (int i = 0; i < nodePosLength; i++) {
+      nodePos[i] = dis.readByte();
+    }
+    int nodeValLength = dis.readInt();
+    nodeVal = new float[nodeValLength];
+    for (int i = 0; i < nodeValLength; i++) {
+      nodeVal[i] = dis.readFloat();
+    }
+    int nodeFeatLength = dis.readInt();
+    nodeFeat = new byte[nodeFeatLength];
+    for (int i = 0; i < nodeFeatLength; i++) {
+      nodeFeat[i] = dis.readByte();
+    }
+    int nodeThrLength = dis.readInt();
+    nodeThr = new float[nodeThrLength];
+    for (int i = 0; i < nodeThrLength; i++) {
+      nodeThr[i] = dis.readFloat();
+    }
+    int rootDeltasLength = dis.readInt();
+    rootDeltas = new byte[rootDeltasLength];
+    for (int i = 0; i < rootDeltasLength; i++) {
+      rootDeltas[i] = dis.readByte();
+    }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+    }
+  }
 
 
   private YdfModel() {} // Prevent instantiation

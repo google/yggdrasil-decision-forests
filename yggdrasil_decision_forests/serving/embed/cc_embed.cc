@@ -1175,7 +1175,7 @@ absl::Status GenerateTreeInferenceRouting(
   RETURN_IF_ERROR(AddRoutingConditions(
       {{RoutingConditionType::OBLIQUE_CONDITION,
         absl::StrCat("node->cond.feat == ",
-                     ObliqueFeatureIndex(internal_options)),
+                     ObliqueFeatureIndex(options, internal_options)),
         absl::Substitute(
             R"(        const $0 num_projs = oblique_features[node->cond.obl];
         float obl_acc = -oblique_weights[node->cond.obl];
@@ -1398,11 +1398,11 @@ absl::Status GenRoutingModelDataNode(
         bank->oblique_features.push_back(sub_feature_idx);
       }
 
-      absl::SubstituteAndAppend(serialized_nodes,
-                                "{.pos=$0,.cond={.feat=$1,.obl=$2}},\n",
-                                delta_pos_node,                         // $0
-                                ObliqueFeatureIndex(internal_options),  // $1
-                                oblique_idx                             // $2
+      absl::SubstituteAndAppend(
+          serialized_nodes, "{.pos=$0,.cond={.feat=$1,.obl=$2}},\n",
+          delta_pos_node,                                  // $0
+          ObliqueFeatureIndex(options, internal_options),  // $1
+          oblique_idx                                      // $2
       );
       bank->num_conditions[static_cast<int>(
           RoutingConditionType::OBLIQUE_CONDITION)]++;
@@ -1423,39 +1423,6 @@ absl::Status GenRoutingModelDataNode(
       *node.pos_child(), depth + 1, serialized_nodes, node_idx, bank));
 
   return absl::OkStatus();
-}
-
-// Computes the mapping from feature idx to condition type.
-//
-// Record a mapping from feature to condition type. This is possible because
-// this implementation assumes that each feature is only used in one type of
-// condition (which is not generally the case in YDF).
-//
-// TODO: Use a virtual feature index system to allow a same feature to be
-// used with different condition types.
-absl::StatusOr<std::vector<uint8_t>> GenRoutingModelDataConditionType(
-    const model::AbstractModel& model, const ModelStatistics& stats) {
-  std::vector<uint8_t> condition_types(stats.num_features, 0);
-  for (int feature_idx = 0; feature_idx < model.input_features().size();
-       feature_idx++) {
-    const auto& column_idx = model.input_features()[feature_idx];
-    const auto& col_spec = model.data_spec().columns(column_idx);
-    switch (col_spec.type()) {
-      case dataset::proto::ColumnType::NUMERICAL:
-        condition_types[feature_idx] =
-            static_cast<uint8_t>(RoutingConditionType::HIGHER_CONDITION);
-        break;
-      case dataset::proto::ColumnType::CATEGORICAL:
-        condition_types[feature_idx] = static_cast<uint8_t>(
-            RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP);
-        break;
-      default:
-        return absl::InvalidArgumentError(
-            absl::StrCat("Non supported feature type: ",
-                         dataset::proto::ColumnType_Name(col_spec.type())));
-    }
-  }
-  return condition_types;
 }
 
 // Outputs the code to encode the bank data and other arrays of the routing
@@ -1639,10 +1606,6 @@ static const uint8_t condition_types[] = {$0};
   // Print the bank.
   RETURN_IF_ERROR(GenRoutingModelDataBank(internal_options, *bank, content));
   return absl::OkStatus();
-}
-
-int ObliqueFeatureIndex(const CCInternalOptions& internal_options) {
-  return NumBytesToMaxUnsignedValue(internal_options.feature_index_bytes);
 }
 
 std::string ObliqueFeatureType(const ValueBank& bank) {

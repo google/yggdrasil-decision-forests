@@ -15,8 +15,11 @@
 
 #include "yggdrasil_decision_forests/serving/embed/java/java_embed.h"
 
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "absl/container/node_hash_map.h"
@@ -29,20 +32,189 @@
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
+#include "yggdrasil_decision_forests/serving/embed/java/model_data_bank.h"
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
+#include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 
 namespace {
-struct JavaFeatureDef {
-  std::string type;  // Type to encode a feature using type / enum class.
-};
 
-absl::StatusOr<JavaFeatureDef> GenJavaFeatureDef(
+std::string GetResourceName(const proto::Options& options) {
+  return absl::StrCat(options.name(), "Data.bin");
+}
+
+absl::Status AddTreeToBank(const dataset::proto::DataSpecification& dataspec,
+                           const SpecializedConversion& specialized_conversion,
+                           const proto::Options& options,
+                           const JavaInternalOptions& internal_options,
+                           const model::decision_tree::NodeWithChildren& node,
+                           ModelDataBank* bank) {
+  if (node.IsLeaf()) {
+    const auto leaf_value = specialized_conversion.leaf_value_fn(node.node());
+    if (specialized_conversion.leaf_value_spec.dims > 1) {
+      return absl::UnimplementedError(
+          "Multi-output nodes (e.g for multi-class Random Forests) are not yet "
+          "supported");
+    }
+    Int64OrFloat val;
+    if (std::holds_alternative<std::vector<bool>>(leaf_value)) {
+      const auto& v = std::get<std::vector<bool>>(leaf_value);
+      if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
+      val = static_cast<int64_t>(v.front());
+    } else if (std::holds_alternative<std::vector<int32_t>>(leaf_value)) {
+      const auto& v = std::get<std::vector<int32_t>>(leaf_value);
+      if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
+      val = static_cast<int64_t>(v.front());
+    } else if (std::holds_alternative<std::vector<float>>(leaf_value)) {
+      const auto& v = std::get<std::vector<float>>(leaf_value);
+      if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
+      val = v.front();
+    } else {
+      return absl::InvalidArgumentError("Unsupported leaf type.");
+    }
+    RETURN_IF_ERROR(bank->AddNode({.pos = 0, .val = val}));
+    return absl::OkStatus();
+  }
+
+  // This is the node offset between a parent node and the positive node. Note
+  // that the offset to the negative node is 1 and does not need to be encoded.
+  const auto delta_pos_node = node.neg_child()->NumNodes();
+
+  // Get the dense feature index.
+  const int attribute_idx = node.node().condition().attribute();
+  const int feature_idx =
+      internal_options.column_idx_to_feature_idx.at(attribute_idx);
+
+  // Create a contains condition node.
+  const auto categorical_contains_condition =
+      [&](const std::vector<bool>& bitmap) -> absl::Status {
+    // TODO: For bitmap requiring less bits than a bitmap bank index,
+    // store the mask in the node directly (instead of using the bank).
+    // TODO: Search if the bitmap bank already contains the current
+    // bitmap. If so, use the existing bitmap segment instead.
+    RETURN_IF_ERROR(
+        bank->AddNode({.pos = delta_pos_node,
+                       .feat = feature_idx,
+                       .cat = static_cast<int64_t>(bank->categorical.size())}));
+    bank->categorical.insert(bank->categorical.end(), bitmap.begin(),
+                             bitmap.end());
+    bank->num_conditions[static_cast<int>(
+        RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP)]++;
+    return absl::OkStatus();
+  };
+
+  // Encode all the possible condition nodes.
+  switch (node.node().condition().condition().type_case()) {
+    case model::decision_tree::proto::Condition::TypeCase::kHigherCondition: {
+      // Condition of the type "a >= threshold".
+      const auto& typed_condition =
+          node.node().condition().condition().higher_condition();
+      Int64OrFloat threshold = typed_condition.threshold();
+      if (!internal_options.numerical_feature_is_float) {
+        threshold =
+            static_cast<int64_t>(std::ceil(typed_condition.threshold()));
+      }
+      RETURN_IF_ERROR(bank->AddNode(
+          {.pos = delta_pos_node, .feat = feature_idx, .thr = threshold}));
+      bank->num_conditions[static_cast<int>(
+          RoutingConditionType::HIGHER_CONDITION)]++;
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::kContainsCondition: {
+      // Condition of the type "a in Mask" where mask is represented by a list
+      // of integers.
+      const auto& typed_condition =
+          node.node().condition().condition().contains_condition();
+      std::vector<bool> bitmap(dataspec.columns(attribute_idx)
+                                   .categorical()
+                                   .number_of_unique_values(),
+                               false);
+      for (const auto item_idx : typed_condition.elements()) {
+        bitmap[item_idx] = true;
+      }
+      RETURN_IF_ERROR(categorical_contains_condition(bitmap));
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::
+        kContainsBitmapCondition: {
+      // Condition of the type "a in Mask" where mask is represented by a
+      // bitmap.
+      const auto& typed_condition =
+          node.node().condition().condition().contains_bitmap_condition();
+      std::vector<bool> bitmap(dataspec.columns(attribute_idx)
+                                   .categorical()
+                                   .number_of_unique_values(),
+                               false);
+      for (size_t item_idx = 0; item_idx < bitmap.size(); item_idx++) {
+        if (utils::bitmap::GetValueBit(typed_condition.elements_bitmap(),
+                                       item_idx)) {
+          bitmap[item_idx] = true;
+        }
+      }
+      RETURN_IF_ERROR(categorical_contains_condition(bitmap));
+    } break;
+
+    case model::decision_tree::proto::Condition::TypeCase::kObliqueCondition: {
+      // Sparse oblique condition.
+      const auto& typed_condition =
+          node.node().condition().condition().oblique_condition();
+      // TODO: Compute oblique projections as integers instead of floats if
+      // both the feature values and oblique weights are integers.
+
+      const size_t num_projections = typed_condition.weights_size();
+      std::vector<float> oblique_weights;
+      oblique_weights.reserve(num_projections + 1);
+      std::vector<size_t> oblique_features;
+      oblique_features.reserve(num_projections + 1);
+
+      // Magic values
+      oblique_features.push_back(num_projections);
+      oblique_weights.push_back(typed_condition.threshold());
+
+      // Oblique weights + indexes
+      for (size_t proj_idx = 0; proj_idx < num_projections; proj_idx++) {
+        oblique_weights.push_back(typed_condition.weights(proj_idx));
+        const int sub_feature_idx =
+            internal_options.column_idx_to_feature_idx.at(
+                typed_condition.attributes(proj_idx));
+        oblique_features.push_back(sub_feature_idx);
+      }
+
+      ASSIGN_OR_RETURN(const int64_t oblique_features_size,
+                       bank->GetObliqueFeaturesSize());
+
+      RETURN_IF_ERROR(
+          bank->AddNode({.pos = delta_pos_node,
+                         .feat = ObliqueFeatureIndex(options, internal_options),
+                         .obl = oblique_features_size,
+                         .oblique_weights = oblique_weights,
+                         .oblique_features = oblique_features}));
+      bank->num_conditions[static_cast<int>(
+          RoutingConditionType::OBLIQUE_CONDITION)]++;
+    } break;
+
+    default:
+      return absl::InvalidArgumentError(
+          absl::StrCat("Non supported condition type: ",
+                       model::decision_tree::ConditionTypeToString(
+                           node.node().condition().condition().type_case())));
+  }
+  RETURN_IF_ERROR(AddTreeToBank(dataspec, specialized_conversion, options,
+                                internal_options, *node.neg_child(), bank));
+  RETURN_IF_ERROR(AddTreeToBank(dataspec, specialized_conversion, options,
+                                internal_options, *node.pos_child(), bank));
+
+  return absl::OkStatus();
+}
+
+// Returns the Java type for a given feature column.
+absl::StatusOr<std::string> GetJavaFeatureType(
     const dataset::proto::Column& col,
     const JavaInternalOptions& internal_options) {
   // TODO: Add support for default values.
@@ -52,16 +224,14 @@ absl::StatusOr<JavaFeatureDef> GenJavaFeatureDef(
     case dataset::proto::ColumnType::NUMERICAL: {
       if (internal_options.numerical_feature_is_float) {
         DCHECK_EQ(internal_options.feature_value_bytes, 4);
-        return JavaFeatureDef{.type = "float"};
+        return "float";
       } else {
-        return JavaFeatureDef{
-            .type = JavaInteger(internal_options.feature_value_bytes)};
+        return JavaInteger(internal_options.feature_value_bytes);
       }
     } break;
     case dataset::proto::ColumnType::BOOLEAN:
     case dataset::proto::ColumnType::CATEGORICAL: {
-      return JavaFeatureDef{
-          .type = absl::StrCat("Feature", StringToCamelCase(col.name()))};
+      return absl::StrCat("Feature", StringToCamelCase(col.name()));
     } break;
     default:
       return absl::InvalidArgumentError(
@@ -132,10 +302,10 @@ public static class Instance {
   std::vector<std::string> constructor_args;
   for (const auto& input_feature : model.input_features()) {
     const auto& col = model.data_spec().columns(input_feature);
-    ASSIGN_OR_RETURN(const auto feature_def,
-                     internal::GenJavaFeatureDef(col, internal_options));
-    constructor_args.push_back(absl::StrCat(
-        feature_def.type, " ", StringToLowerCamelCase(col.name())));
+    ASSIGN_OR_RETURN(const std::string feature_type,
+                     internal::GetJavaFeatureType(col, internal_options));
+    constructor_args.push_back(
+        absl::StrCat(feature_type, " ", StringToLowerCamelCase(col.name())));
   }
   absl::StrAppend(&content, absl::StrJoin(constructor_args, ", "));
   absl::StrAppend(&content, ") {\n");
@@ -297,6 +467,12 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelJava(
 )",
                             options.java().package_name());
 
+  absl::StrAppend(&code,
+                  R"(import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+)");
   if (internal_options.imports.bitset) {
     absl::StrAppend(&code, "import java.util.BitSet;\n");
   }
@@ -317,6 +493,20 @@ public final class $0 {
                    GenInstanceStruct(model, options, internal_options, stats));
   absl::StrAppend(&code, instance_struct);
 
+  // Model data
+  // Data stored in the nodes.
+  ModelDataBank bank(internal_options, stats, specialized_conversion);
+
+  if (options.algorithm() == proto::Algorithm::ROUTING) {
+    RETURN_IF_ERROR(internal::GenRoutingModelDataJava(
+        model, model.data_spec(), *df_interface, stats, specialized_conversion,
+        options, internal_options, &code, &bank));
+  } else {
+    return absl::UnimplementedError(
+        absl::StrCat("Unsupported algorithm for tha Java export: ",
+                     proto::Algorithm_Enum_Name(options.algorithm())));
+  }
+
   // TODO: Add remaining logic.
 
   // Close define and namespace.
@@ -328,6 +518,8 @@ public final class $0 {
                             options.name());
 
   result[absl::StrCat(options.name(), ".java")] = code;
+  ASSIGN_OR_RETURN(result[GetResourceName(options)],
+                   bank.SerializeData(internal_options));
   return result;
 }
 
@@ -422,12 +614,11 @@ SpecializedConversionGradientBoostedTreesJava(
         };
 
         spec.routing_node = R"(
-    accumulator += NODE_VAL[currentNodeIndex] ? 1 : 0;
+    accumulator += nodeVal[currentNodeIndex];
 )";
 
       } else {
-        spec.accumulator_type =
-            absl::StrCat("float[", stats.num_classification_classes, "]");
+        spec.accumulator_type = absl::StrCat("float[]");
 
         spec.set_node_ifelse_fn =
             [&](const model::decision_tree::proto::Node& node, const int depth,
@@ -447,7 +638,7 @@ SpecializedConversionGradientBoostedTreesJava(
         };
 
         spec.routing_node = absl::Substitute(R"(
-    accumulator[tree_idx % $0] += NODE_VAL[currentNodeIndex] ? 1 : 0;
+    accumulator[treeIdx % $0] += nodeVal[currentNodeIndex];
 )",
                                              stats.num_classification_classes);
       }
@@ -523,7 +714,7 @@ SpecializedConversionGradientBoostedTreesJava(
       };
 
       spec.routing_node = R"(
-    accumulator += NODE_VAL[currentNodeIndex] ? 1 : 0;
+    accumulator += nodeVal[currentNodeIndex];
 )";
       break;
 
@@ -535,9 +726,50 @@ SpecializedConversionGradientBoostedTreesJava(
   // TODO: Integer optimization of leaf values.
   spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
 
-  spec.accumulator_initial_value =
-      absl::StrJoin(model.initial_predictions(), ", ");
+  std::vector<std::string> initial_predictions_str;
+  for (const float val : model.initial_predictions()) {
+    initial_predictions_str.push_back(absl::StrCat(val, "f"));
+  }
+  spec.accumulator_initial_value = absl::StrJoin(initial_predictions_str, ", ");
+  if (model.initial_predictions().size() > 1) {
+    spec.accumulator_initial_value =
+        absl::StrCat("{", spec.accumulator_initial_value, "}");
+  }
   return spec;
+}
+
+absl::Status GenRoutingModelDataJava(
+    const model::AbstractModel& model,
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const ModelStatistics& stats,
+    const SpecializedConversion& specialized_conversion,
+    const proto::Options& options, const JavaInternalOptions& internal_options,
+    std::string* content, ModelDataBank* bank) {
+  std::vector<int64_t> root_deltas;
+  root_deltas.reserve(df_interface.num_trees());
+  for (int tree_idx = 0; tree_idx < df_interface.num_trees(); tree_idx++) {
+    const auto& tree = df_interface.decision_trees()[tree_idx];
+    RETURN_IF_ERROR(AddTreeToBank(dataspec, specialized_conversion, options,
+                                  internal_options, tree->root(), bank));
+    RETURN_IF_ERROR(bank->AddRootDelta(tree->root().NumNodes()));
+  }
+
+  if (stats.has_multiple_condition_types) {
+    ASSIGN_OR_RETURN(const auto condition_types,
+                     GenRoutingModelDataConditionType(model, stats));
+    RETURN_IF_ERROR(bank->AddConditionTypes(condition_types));
+  }
+
+  RETURN_IF_ERROR(bank->FinalizeJavaTypes());
+
+  // Append the node bank Java code.
+  ASSIGN_OR_RETURN(const std::string bank_code,
+                   bank->GenerateJavaCode(internal_options, options.name(),
+                                          GetResourceName(options)));
+  absl::StrAppend(content, bank_code);
+
+  return absl::OkStatus();
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

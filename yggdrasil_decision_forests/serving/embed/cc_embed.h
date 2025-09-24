@@ -51,9 +51,6 @@ struct CCInternalOptions : BaseInternalOptions {
   Includes includes;
 };
 
-// Reserved feature index used for oblique conditions.
-int ObliqueFeatureIndex(const CCInternalOptions& internal_options);
-
 absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
     const model::AbstractModel& model, const proto::Options& options);
 // Type used to encode an oblique index.

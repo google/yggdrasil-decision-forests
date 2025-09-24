@@ -261,6 +261,21 @@ absl::Status ComputeBaseInternalOptionsFeature(
 absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
     const model::AbstractModel& model, const ModelStatistics& stats,
     const proto::Options& options, BaseInternalOptions* out);
+
+// Computes the mapping from feature idx to condition type.
+//
+// Record a mapping from feature to condition type. This is possible because
+// this implementation assumes that each feature is only used in one type of
+// condition (which is not generally the case in YDF).
+//
+// TODO: Use a virtual feature index system to allow a same feature to be
+// used with different condition types.
+absl::StatusOr<std::vector<uint8_t>> GenRoutingModelDataConditionType(
+    const model::AbstractModel& model, const ModelStatistics& stats);
+
+// Reserved feature index used for oblique conditions.
+int ObliqueFeatureIndex(const proto::Options& options,
+                        const BaseInternalOptions& internal_options);
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed
 

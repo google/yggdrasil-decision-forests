@@ -238,6 +238,20 @@ uint32_t NumBytesToMaxUnsignedValue(int bytes) {
   }
 }
 
+int32_t NumBytesToMaxSignedValue(int bytes) {
+  switch (bytes) {
+    case 1:
+      return 0x7f;
+    case 2:
+      return 0x7fff;
+    case 4:
+      return 0x7fffffff;
+    default:
+      DCHECK(false);
+      return 0;
+  }
+}
+
 int MaxSignedValueToNumBytes(int32_t value) {
   if (value <= 0x7f && value >= -0x80) {
     return 1;
@@ -295,6 +309,34 @@ std::string DTypeToCCType(const proto::DType::Enum value) {
 
     case proto::DType::BOOL:
       return "bool";
+  }
+}
+
+std::string DTypeToJavaType(const proto::DType::Enum value) {
+  switch (value) {
+    case proto::DType::UNDEFINED:
+      DCHECK(false);
+      return "UNDEFINED";
+
+    case proto::DType::INT8:
+      return "byte";
+    case proto::DType::INT16:
+      return "short";
+    case proto::DType::INT32:
+      return "int";
+
+    case proto::DType::UINT8:
+      return "byte";
+    case proto::DType::UINT16:
+      return "short";
+    case proto::DType::UINT32:
+      return "int";
+
+    case proto::DType::FLOAT32:
+      return "float";
+
+    case proto::DType::BOOL:
+      return "boolean";
   }
 }
 

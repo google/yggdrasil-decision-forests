@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
@@ -101,22 +102,28 @@ absl::Status ComputeBaseInternalOptionsFeature(
   out->feature_value_bytes = 1;
   out->numerical_feature_is_float = false;
 
+  const bool is_java = options.language_case() == proto::Options::kJava;
+  const auto max_value_to_num_bytes = [is_java](const int64_t value) {
+    return is_java ? MaxSignedValueToNumBytes(value)
+                   : MaxUnsignedValueToNumBytes(value);
+  };
+
   out->feature_index_bytes =
-      MaxUnsignedValueToNumBytes(stats.num_features + kReservedFeatureIndexes);
-  out->tree_index_bytes = MaxUnsignedValueToNumBytes(stats.num_trees);
+      max_value_to_num_bytes(stats.num_features + kReservedFeatureIndexes);
+  out->tree_index_bytes = max_value_to_num_bytes(stats.num_trees);
 
   if (stats.sum_size_categorical_bitmap_masks == 0) {
     out->categorical_idx_bytes = 0;
   } else {
     out->categorical_idx_bytes =
-        MaxUnsignedValueToNumBytes(stats.sum_size_categorical_bitmap_masks);
+        max_value_to_num_bytes(stats.sum_size_categorical_bitmap_masks);
   }
 
   // This is the number of bytes to encode a node index in a tree. The precision
   // for an offset is in average 50% smaller.
   // TODO: Optimize node_offset_bytes.
-  out->node_offset_bytes = MaxUnsignedValueToNumBytes(
-      NumLeavesToNumNodes(stats.max_num_leaves_per_tree));
+  const auto max_num_nodes = NumLeavesToNumNodes(stats.max_num_leaves_per_tree);
+  out->node_offset_bytes = max_value_to_num_bytes(max_num_nodes);
 
   out->column_idx_to_feature_idx.assign(model.data_spec().columns_size(), -1);
 
@@ -159,7 +166,7 @@ absl::Status ComputeBaseInternalOptionsFeature(
         }
       } break;
       case dataset::proto::ColumnType::CATEGORICAL: {
-        const int feature_bytes = MaxUnsignedValueToNumBytes(
+        const int feature_bytes = max_value_to_num_bytes(
             col_spec.categorical().number_of_unique_values());
         out->feature_value_bytes =
             std::max(out->feature_value_bytes, feature_bytes);
@@ -282,6 +289,46 @@ absl::Status SpecializedConversion::Validate() const {
   STATUS_CHECK(leaf_value_fn);
   STATUS_CHECK(!routing_node.empty());
   return absl::OkStatus();
+}
+// Computes the mapping from feature idx to condition type.
+//
+// Record a mapping from feature to condition type. This is possible because
+// this implementation assumes that each feature is only used in one type of
+// condition (which is not generally the case in YDF).
+//
+// TODO: Use a virtual feature index system to allow a same feature to be
+// used with different condition types.
+absl::StatusOr<std::vector<uint8_t>> GenRoutingModelDataConditionType(
+    const model::AbstractModel& model, const ModelStatistics& stats) {
+  std::vector<uint8_t> condition_types(stats.num_features, 0);
+  for (int feature_idx = 0; feature_idx < model.input_features().size();
+       feature_idx++) {
+    const auto& column_idx = model.input_features()[feature_idx];
+    const auto& col_spec = model.data_spec().columns(column_idx);
+    switch (col_spec.type()) {
+      case dataset::proto::ColumnType::NUMERICAL:
+        condition_types[feature_idx] =
+            static_cast<uint8_t>(RoutingConditionType::HIGHER_CONDITION);
+        break;
+      case dataset::proto::ColumnType::CATEGORICAL:
+        condition_types[feature_idx] = static_cast<uint8_t>(
+            RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP);
+        break;
+      default:
+        return absl::InvalidArgumentError(
+            absl::StrCat("Unsupported feature type: ",
+                         dataset::proto::ColumnType_Name(col_spec.type())));
+    }
+  }
+  return condition_types;
+}
+
+int ObliqueFeatureIndex(const proto::Options& options,
+                        const BaseInternalOptions& internal_options) {
+  const bool is_java = options.language_case() == proto::Options::kJava;
+  return is_java
+             ? NumBytesToMaxSignedValue(internal_options.feature_index_bytes)
+             : NumBytesToMaxUnsignedValue(internal_options.feature_index_bytes);
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

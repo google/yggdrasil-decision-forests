@@ -1,5 +1,9 @@
 package com.google.ydf;
 
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.BitSet;
 
 public final class YdfModel {
@@ -150,6 +154,67 @@ public static class Instance {
     this.categoricalOrBooleanFeatureValues = new int[] {-1, workclass.ordinal(), -1, education.ordinal(), -1, maritalStatus.ordinal(), occupation.ordinal(), relationship.ordinal(), race.ordinal(), sex.ordinal(), -1, -1, -1, nativeCountry.ordinal()};
   }
 }
+  private static final byte[] nodePos;
+  private static final float[] nodeVal;
+  private static final byte[] nodeFeat;
+  private static final int[] nodeThr;
+  private static final short[] nodeCat;
+  private static final byte[] rootDeltas;
+  private static final byte[] conditionTypes;
+  private static final BitSet categoricalBank;
+
+  static {
+    try (InputStream is = YdfModel.class.getResourceAsStream("YdfModelData.bin");
+         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+    int nodePosLength = dis.readInt();
+    nodePos = new byte[nodePosLength];
+    for (int i = 0; i < nodePosLength; i++) {
+      nodePos[i] = dis.readByte();
+    }
+    int nodeValLength = dis.readInt();
+    nodeVal = new float[nodeValLength];
+    for (int i = 0; i < nodeValLength; i++) {
+      nodeVal[i] = dis.readFloat();
+    }
+    int nodeFeatLength = dis.readInt();
+    nodeFeat = new byte[nodeFeatLength];
+    for (int i = 0; i < nodeFeatLength; i++) {
+      nodeFeat[i] = dis.readByte();
+    }
+    int nodeThrLength = dis.readInt();
+    nodeThr = new int[nodeThrLength];
+    for (int i = 0; i < nodeThrLength; i++) {
+      nodeThr[i] = dis.readInt();
+    }
+    int nodeCatLength = dis.readInt();
+    nodeCat = new short[nodeCatLength];
+    for (int i = 0; i < nodeCatLength; i++) {
+      nodeCat[i] = dis.readShort();
+    }
+    int rootDeltasLength = dis.readInt();
+    rootDeltas = new byte[rootDeltasLength];
+    for (int i = 0; i < rootDeltasLength; i++) {
+      rootDeltas[i] = dis.readByte();
+    }
+    int conditionTypesLength = dis.readInt();
+    conditionTypes = new byte[conditionTypesLength];
+    for (int i = 0; i < conditionTypesLength; i++) {
+      conditionTypes[i] = dis.readByte();
+    }
+    int categoricalBankNumLongs = dis.readInt();
+    if (categoricalBankNumLongs > 0) {
+      long[] longs = new long[categoricalBankNumLongs];
+      for (int i = 0; i < categoricalBankNumLongs; i++) {
+        longs[i] = dis.readLong();
+      }
+      categoricalBank = BitSet.valueOf(longs);
+    } else {
+      categoricalBank = new BitSet();
+    }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+    }
+  }
 
 
   private YdfModel() {} // Prevent instantiation
