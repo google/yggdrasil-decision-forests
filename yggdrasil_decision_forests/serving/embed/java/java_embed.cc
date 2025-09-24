@@ -45,6 +45,12 @@ namespace yggdrasil_decision_forests::serving::embed::internal {
 
 namespace {
 
+absl::StatusOr<std::string> ObliqueFeatureTypeJava(const ModelDataBank& bank) {
+  ASSIGN_OR_RETURN(const auto oblique_features_size,
+                   bank.GetObliqueFeaturesSize());
+  return JavaInteger(MaxSignedValueToNumBytes(oblique_features_size));
+}
+
 std::string GetResourceName(const proto::Options& options) {
   return absl::StrCat(options.name(), "Data.bin");
 }
@@ -507,7 +513,33 @@ public final class $0 {
                      proto::Algorithm_Enum_Name(options.algorithm())));
   }
 
-  // TODO: Add remaining logic.
+  // Predict method
+  std::string predict_body;
+  RETURN_IF_ERROR(
+      CorePredictJava(model.data_spec(), *df_interface, specialized_conversion,
+                      stats, internal_options, options, bank, &predict_body));
+  STATUS_CHECK(!predict_body.empty());
+
+  std::string predict_output_type;
+  if (options.classification_output() != proto::ClassificationOutput::SCORE) {
+    // The prediction type is defined by the task, and independent of the model
+    // implementation..
+    predict_output_type = internal_options.output_type;
+  } else {
+    // The prediction type is determined by the specific decision forest model
+    // implementation.
+    predict_output_type = specialized_conversion.accumulator_type;
+  }
+  STATUS_CHECK(!predict_output_type.empty());
+
+  absl::SubstituteAndAppend(&code, R"(
+public static $0 predict(Instance instance) {
+)",
+                            predict_output_type);
+
+  absl::StrAppend(&code, predict_body);
+
+  absl::StrAppend(&code, "}\n");
 
   // Close define and namespace.
   absl::SubstituteAndAppend(&code, R"(
@@ -665,7 +697,7 @@ SpecializedConversionGradientBoostedTreesJava(
         case proto::ClassificationOutput::PROBABILITY:
           if (stats.is_binary_classification()) {
             spec.return_prediction = R"(  // Sigmoid
-  return 1.0f / (1.0f + (float)Math.exp(-accumulator));
+  return 1.0f / (1.0f + (float) Math.exp(-accumulator));
 )";
           } else {
             spec.return_prediction =
@@ -769,6 +801,213 @@ absl::Status GenRoutingModelDataJava(
                                           GetResourceName(options)));
   absl::StrAppend(content, bank_code);
 
+  return absl::OkStatus();
+}
+
+absl::Status AddRoutingConditionsJava(
+    std::vector<RoutingConditionCode> conditions, const ModelDataBank& bank,
+    std::string* content) {
+  // Get the number of used conditions.
+  // is_condition_used[i] is true if conditions[i] is used by the model.
+  std::vector<bool> is_condition_used(conditions.size(), false);
+  int num_used_conditions = 0;
+  for (int condition_idx = 0; condition_idx < conditions.size();
+       condition_idx++) {
+    const auto& condition = conditions[condition_idx];
+    if (bank.num_conditions[static_cast<int>(condition.type)] == 0) {
+      // The model uses this condition code.
+      continue;
+    }
+    is_condition_used[condition_idx] = true;
+    num_used_conditions++;
+  }
+  const std::string prefix(6, ' ');
+
+  if (num_used_conditions == 0) {
+    // The model does not contain any condition.
+    absl::StrAppend(
+        content, prefix,
+        "throw new AssertionError(\"This model has no conditions\");\n");
+  }
+  if (num_used_conditions == 1) {
+    absl::StrAppend(content, "\n");
+  }
+
+  int num_exported_conditions = 0;
+  for (int condition_idx = 0; condition_idx < conditions.size();
+       condition_idx++) {
+    if (!is_condition_used[condition_idx]) {
+      continue;
+    }
+    const auto& condition = conditions[condition_idx];
+
+    if (num_used_conditions >= 2) {
+      // Select which condition to apply.
+      std::string used_code = condition.used_code;
+      if (used_code.empty()) {
+        // Implicit condition to see if the condition should be evaluated.
+        used_code = absl::Substitute("conditionTypes[featureIndex] == $0",
+                                     static_cast<int>(condition.type));
+      }
+      if (num_exported_conditions == 0) {
+        // First condition.
+        absl::StrAppend(content, "\n", prefix);
+      } else if (num_exported_conditions > 0) {
+        // Not the first condition.
+        absl::StrAppend(content, prefix, "} else ");
+      }
+      absl::StrAppend(content, "if (", used_code, ") {\n");
+    }
+
+    // Apply the condition.
+    absl::StrAppend(content, condition.eval_code);
+
+    num_exported_conditions++;
+  }
+
+  // Debug test to make sure at least one condition was evaluated.
+  if (num_used_conditions >= 2) {
+    absl::StrAppend(content, prefix, R"(} else {
+        throw new AssertionError("Internal Error");
+      })");
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status GenerateTreeInferenceRoutingJava(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const proto::Options& options, const JavaInternalOptions& internal_options,
+    const SpecializedConversion& specialized_conversion,
+    const ModelStatistics& stats, const ModelDataBank& routing_bank,
+    std::string* content) {
+  const std::string node_offset_type =
+      JavaInteger(internal_options.node_offset_bytes);
+  const std::string tree_index_type =
+      JavaInteger(internal_options.tree_index_bytes);
+
+  std::string numerical_type;
+  if (internal_options.numerical_feature_is_float) {
+    numerical_type = "float";
+    STATUS_CHECK_EQ(internal_options.feature_value_bytes, 4);
+  } else {
+    numerical_type = JavaInteger(internal_options.feature_value_bytes);
+  }
+
+  std::string categorical_type;
+  if (internal_options.categorical_idx_bytes > 0) {
+    categorical_type = JavaInteger(internal_options.feature_value_bytes);
+  }
+
+  const std::string feature_index_type =
+      JavaInteger(internal_options.feature_index_bytes);
+
+  // Top of the loop: For-loop on trees & while-loop on nodes.
+  absl::SubstituteAndAppend(content, R"(
+  int nodeIndex = 0;)");
+
+  absl::SubstituteAndAppend(content, R"(
+  for ($0 treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+    int currentNodeIndex = nodeIndex;
+    while(nodePos[currentNodeIndex] != 0) {
+      boolean conditionResult;
+      $1 featureIndex = nodeFeat[currentNodeIndex];)",
+                            tree_index_type,    // $0
+                            feature_index_type  // $1
+
+  );
+  // Condition
+  // Note: emplace_back currently fails with the older GCC from the open-source
+  // build.
+  std::vector<RoutingConditionCode> conditions;
+  conditions.push_back(
+      {RoutingConditionType::HIGHER_CONDITION,
+       {},
+       absl::Substitute(
+           R"(        $0 numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+        $0 threshold = nodeThr[currentNodeIndex];
+        conditionResult = numericalFeatureValue >= threshold;
+)",
+           numerical_type)});
+  conditions.push_back(
+      {RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP,
+       {},
+       R"(        int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
+        int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
+        conditionResult = categoricalBank.get(bitIndex);
+)"});
+  if (stats.has_conditions[model::decision_tree::proto::Condition::TypeCase::
+                               kObliqueCondition]) {
+    ASSIGN_OR_RETURN(const auto oblique_feature_type,
+                     ObliqueFeatureTypeJava(routing_bank));
+    conditions.push_back(
+        {RoutingConditionType::OBLIQUE_CONDITION,
+         absl::Substitute("featureIndex == ($0) $1", feature_index_type,
+                          ObliqueFeatureIndex(options, internal_options)),
+         absl::Substitute(
+             R"(        $0 num_projs = obliqueFeatures[nodeObl[currentNodeIndex]];
+        float obliqueAcc = -obliqueWeights[nodeObl[currentNodeIndex]];
+        for ($0 projIdx = 0; projIdx < num_projs; projIdx++){
+          int off = nodeObl[currentNodeIndex] + projIdx + 1;
+          $1 numericalFeature = instance.numericalFeatureValues[obliqueFeatures[off]];
+          obliqueAcc += numericalFeature * obliqueWeights[off];
+        }
+        conditionResult = obliqueAcc >= 0;
+)",
+             oblique_feature_type, numerical_type)});
+  }
+  RETURN_IF_ERROR(AddRoutingConditionsJava(conditions, routing_bank, content));
+
+  // Middle of the loop: Select the next node.
+  absl::StrAppend(content, R"(
+      currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+    })");
+
+  // Add the leaf value to the accumulator.
+  absl::StrAppend(content, specialized_conversion.routing_node);
+
+  // Bottom of the loop: Go to the next tree.
+
+  absl::StrAppend(content,
+                  R"(    nodeIndex += rootDeltas[treeIdx];
+  }
+
+)");
+  return absl::OkStatus();
+}
+
+absl::Status CorePredictJava(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const SpecializedConversion& specialized_conversion,
+    const ModelStatistics& stats, const JavaInternalOptions& internal_options,
+    const proto::Options& options, const ModelDataBank& routing_bank,
+    std::string* content) {
+  // Accumulator
+  absl::SubstituteAndAppend(content, "  $0 accumulator = $1;\n",
+                            specialized_conversion.accumulator_type,
+                            specialized_conversion.accumulator_initial_value);
+
+  // Accumulate leaf values
+  switch (options.algorithm()) {
+    case proto::Algorithm::IF_ELSE:
+      // Note: The limitation on the size of Java functions makes it unlikely
+      // that this will ever be implemented.
+      return absl::UnimplementedError(
+          "IF-Else algorithm is not implemented for Java.");
+      break;
+    case proto::Algorithm::ROUTING:
+      RETURN_IF_ERROR(GenerateTreeInferenceRoutingJava(
+          dataspec, df_interface, options, internal_options,
+          specialized_conversion, stats, routing_bank, content));
+      break;
+    default:
+      return absl::InvalidArgumentError("Unsupported algorithm.");
+  }
+
+  // Accumulator to predictions.
+  absl::StrAppend(content, specialized_conversion.return_prediction);
   return absl::OkStatus();
 }
 

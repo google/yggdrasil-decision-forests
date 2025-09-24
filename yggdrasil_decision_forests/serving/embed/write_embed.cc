@@ -43,9 +43,9 @@ ABSL_FLAG(std::string, options, "", "Options for the embedded model");
 ABSL_FLAG(bool, remove_output_filename, false,
           "If set, 'output' is a file path. The filename should be removed to "
           "get the real output directory.");
-ABSL_FLAG(std::string, language, "CC",
-          "Target language. Can be CC (i.e. C++, default) or JAVA. If set in "
-          "the options proto, this value is ignored.");
+ABSL_FLAG(
+    std::string, language, "CC",
+    "Target language. If set in the options proto, this value is ignored.");
 
 namespace yggdrasil_decision_forests::serving::embed {
 

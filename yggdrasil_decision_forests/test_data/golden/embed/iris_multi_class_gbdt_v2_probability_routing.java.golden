@@ -70,6 +70,34 @@ public static class Instance {
     }
   }
 
+public static Label predict(Instance instance) {
+  float[] accumulator = {0f, 0f, 0f};
+
+  int nodeIndex = 0;
+  for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+    int currentNodeIndex = nodeIndex;
+    while(nodePos[currentNodeIndex] != 0) {
+      boolean conditionResult;
+      byte featureIndex = nodeFeat[currentNodeIndex];
+        float numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+        float threshold = nodeThr[currentNodeIndex];
+        conditionResult = numericalFeatureValue >= threshold;
+
+      currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+    }
+    accumulator[treeIdx % 3] += nodeVal[currentNodeIndex];
+    nodeIndex += rootDeltas[treeIdx];
+  }
+
+  int maxIndex = 0;
+  for (int i = 1; i < accumulator.length; i++) {
+    if (accumulator[i] > accumulator[maxIndex]) {
+      maxIndex = i;
+    }
+  }
+  return Label.values()[maxIndex];
+}
+
 
   private YdfModel() {} // Prevent instantiation
 }

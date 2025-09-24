@@ -216,6 +216,36 @@ public static class Instance {
     }
   }
 
+public static float predict(Instance instance) {
+  float accumulator = -1.1631f;
+
+  int nodeIndex = 0;
+  for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+    int currentNodeIndex = nodeIndex;
+    while(nodePos[currentNodeIndex] != 0) {
+      boolean conditionResult;
+      byte featureIndex = nodeFeat[currentNodeIndex];
+      if (conditionTypes[featureIndex] == 0) {
+        int numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+        int threshold = nodeThr[currentNodeIndex];
+        conditionResult = numericalFeatureValue >= threshold;
+      } else if (conditionTypes[featureIndex] == 1) {
+        int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
+        int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
+        conditionResult = categoricalBank.get(bitIndex);
+      } else {
+        throw new AssertionError("Internal Error");
+      }
+      currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+    }
+    accumulator += nodeVal[currentNodeIndex];
+    nodeIndex += rootDeltas[treeIdx];
+  }
+
+  // Sigmoid
+  return 1.0f / (1.0f + (float) Math.exp(-accumulator));
+}
+
 
   private YdfModel() {} // Prevent instantiation
 }

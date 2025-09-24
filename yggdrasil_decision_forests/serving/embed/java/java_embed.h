@@ -80,5 +80,12 @@ absl::Status GenRoutingModelDataJava(
     const proto::Options& options, const JavaInternalOptions& internal_options,
     std::string* content, ModelDataBank* node_bank);
 
+absl::Status CorePredictJava(
+    const dataset::proto::DataSpecification& dataspec,
+    const model::DecisionForestInterface& df_interface,
+    const SpecializedConversion& specialized_conversion,
+    const ModelStatistics& stats, const JavaInternalOptions& internal_options,
+    const proto::Options& options, const ModelDataBank& routing_bank,
+    std::string* content);
 }  // namespace yggdrasil_decision_forests::serving::embed::internal
 #endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_JAVA_JAVA_EMBED_H_
