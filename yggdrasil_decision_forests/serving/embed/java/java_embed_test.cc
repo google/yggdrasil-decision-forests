@@ -83,6 +83,14 @@ SIMPLE_PARAMETERIZED_TEST(
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::PROBABILITY,
         },
+        // RF
+        {
+            "abalone_regression_rf_small",
+            "abalone_regression_rf_small_routing.java.golden",
+            "abalone_regression_rf_small_routing_data.bin.golden",
+            proto::Algorithm::ROUTING,
+        },
+
     }) {
   const auto& test_case = GetParam();
 

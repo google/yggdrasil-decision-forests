@@ -1,0 +1,133 @@
+package com.google.ydf;
+
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.BitSet;
+
+public final class YdfModel {
+
+public enum FeatureType {
+  OUT_OF_VOCABULARY,
+  M,
+  I,
+  F,
+};
+
+private static final int NUM_FEATURES = 8;
+private static final int NUM_TREES = 3;
+
+public static class Instance {
+
+  private final float[] numericalFeatureValues;
+  private final int[] categoricalOrBooleanFeatureValues;
+
+  public Instance(FeatureType type, float longestshell, float diameter, float height, float wholeweight, float shuckedweight, float visceraweight, float shellweight) {
+    // NaN substitutions are required to handle missing values correctly.
+    // If no missing numerical values are used, this block can be removed.
+    longestshell = Float.isNaN(longestshell) ? 0.523992f : longestshell;
+    diameter = Float.isNaN(diameter) ? 0.407881f : diameter;
+    height = Float.isNaN(height) ? 0.139516f : height;
+    wholeweight = Float.isNaN(wholeweight) ? 0.828742f : wholeweight;
+    shuckedweight = Float.isNaN(shuckedweight) ? 0.359367f : shuckedweight;
+    visceraweight = Float.isNaN(visceraweight) ? 0.180594f : visceraweight;
+    shellweight = Float.isNaN(shellweight) ? 0.238831f : shellweight;
+
+    this.numericalFeatureValues = new float[] {0, longestshell, diameter, height, wholeweight, shuckedweight, visceraweight, shellweight};
+    this.categoricalOrBooleanFeatureValues = new int[] {type.ordinal(), -1, -1, -1, -1, -1, -1, -1};
+  }
+}
+  private static final short[] nodePos;
+  private static final float[] nodeVal;
+  private static final byte[] nodeFeat;
+  private static final float[] nodeThr;
+  private static final short[] nodeCat;
+  private static final short[] rootDeltas;
+  private static final byte[] conditionTypes;
+  private static final BitSet categoricalBank;
+
+  static {
+    try (InputStream is = YdfModel.class.getResourceAsStream("YdfModelData.bin");
+         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+    int nodePosLength = dis.readInt();
+    nodePos = new short[nodePosLength];
+    for (int i = 0; i < nodePosLength; i++) {
+      nodePos[i] = dis.readShort();
+    }
+    int nodeValLength = dis.readInt();
+    nodeVal = new float[nodeValLength];
+    for (int i = 0; i < nodeValLength; i++) {
+      nodeVal[i] = dis.readFloat();
+    }
+    int nodeFeatLength = dis.readInt();
+    nodeFeat = new byte[nodeFeatLength];
+    for (int i = 0; i < nodeFeatLength; i++) {
+      nodeFeat[i] = dis.readByte();
+    }
+    int nodeThrLength = dis.readInt();
+    nodeThr = new float[nodeThrLength];
+    for (int i = 0; i < nodeThrLength; i++) {
+      nodeThr[i] = dis.readFloat();
+    }
+    int nodeCatLength = dis.readInt();
+    nodeCat = new short[nodeCatLength];
+    for (int i = 0; i < nodeCatLength; i++) {
+      nodeCat[i] = dis.readShort();
+    }
+    int rootDeltasLength = dis.readInt();
+    rootDeltas = new short[rootDeltasLength];
+    for (int i = 0; i < rootDeltasLength; i++) {
+      rootDeltas[i] = dis.readShort();
+    }
+    int conditionTypesLength = dis.readInt();
+    conditionTypes = new byte[conditionTypesLength];
+    for (int i = 0; i < conditionTypesLength; i++) {
+      conditionTypes[i] = dis.readByte();
+    }
+    int categoricalBankNumLongs = dis.readInt();
+    if (categoricalBankNumLongs > 0) {
+      long[] longs = new long[categoricalBankNumLongs];
+      for (int i = 0; i < categoricalBankNumLongs; i++) {
+        longs[i] = dis.readLong();
+      }
+      categoricalBank = BitSet.valueOf(longs);
+    } else {
+      categoricalBank = new BitSet();
+    }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+    }
+  }
+
+public static float predict(Instance instance) {
+  float accumulator = 0;
+
+  int nodeIndex = 0;
+  for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+    int currentNodeIndex = nodeIndex;
+    while(nodePos[currentNodeIndex] != 0) {
+      boolean conditionResult;
+      byte featureIndex = nodeFeat[currentNodeIndex];
+      if (conditionTypes[featureIndex] == 0) {
+        float numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+        float threshold = nodeThr[currentNodeIndex];
+        conditionResult = numericalFeatureValue >= threshold;
+      } else if (conditionTypes[featureIndex] == 1) {
+        int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
+        int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
+        conditionResult = categoricalBank.get(bitIndex);
+      } else {
+        throw new AssertionError("Internal Error");
+      }
+      currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+    }
+    accumulator += nodeVal[currentNodeIndex];
+    nodeIndex += rootDeltas[treeIdx];
+  }
+
+  return accumulator;}
+
+
+  private YdfModel() {} // Prevent instantiation
+}

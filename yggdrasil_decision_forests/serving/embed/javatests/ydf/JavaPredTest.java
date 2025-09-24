@@ -6,6 +6,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import ydf.models.TestModelAbaloneRegressionGBDTV2Routing;
+import ydf.models.TestModelAbaloneRegressionRFSmallRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ClassRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ProbaRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ScoreRouting;
@@ -30,6 +31,24 @@ public class JavaPredTest {
             /* shellweight= */ 0.15f);
     float expected = 9.815921f;
     assertThat(TestModelAbaloneRegressionGBDTV2Routing.predict(instance))
+        .isWithin(0.00001f)
+        .of(expected);
+  }
+
+  @Test
+  public void testAbaloneRegressionRFSmallRouting_knownOutput() {
+    var instance =
+        new TestModelAbaloneRegressionRFSmallRouting.Instance(
+            /* type= */ TestModelAbaloneRegressionRFSmallRouting.FeatureType.M,
+            /* longestshell= */ 0.455f,
+            /* diameter= */ 0.365f,
+            /* height= */ 0.095f,
+            /* wholeweight= */ 0.514f,
+            /* shuckedweight= */ 0.2245f,
+            /* visceraweight= */ 0.101f,
+            /* shellweight= */ 0.15f);
+    float expected = 11.092856f;
+    assertThat(TestModelAbaloneRegressionRFSmallRouting.predict(instance))
         .isWithin(0.00001f)
         .of(expected);
   }

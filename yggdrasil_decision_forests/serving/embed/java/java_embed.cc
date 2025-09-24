@@ -637,8 +637,43 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
     const internal::ModelStatistics& stats,
     const JavaInternalOptions& internal_options,
     const proto::Options& options) {
-  return absl::UnimplementedError(
-      "Java export is not implemented for Random Forests");
+  SpecializedConversion spec;
+  switch (stats.task) {
+    case model::proto::Task::CLASSIFICATION: {
+      return absl::UnimplementedError(
+          "Classification with Random Forests not yet implemented for Java");
+    } break;
+
+    case model::proto::Task::REGRESSION:
+      spec.accumulator_type = "float";
+      spec.return_prediction = "  return accumulator;";
+      spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
+
+      spec.set_node_ifelse_fn =
+          [&](const model::decision_tree::proto::Node& node, const int depth,
+              const int tree_idx,
+              absl::string_view prefix) -> absl::StatusOr<std::string> {
+        return absl::UnimplementedError("IF_ELSE not implemented for Java");
+      };
+
+      spec.leaf_value_fn =
+          [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+        const float node_value = node.regressor().top_value() / stats.num_trees;
+        return std::vector<float>{node_value};
+      };
+
+      spec.routing_node = R"(
+    accumulator += nodeVal[currentNodeIndex];
+)";
+      break;
+
+    default:
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Unsupported task: ", model::proto::Task_Name(stats.task)));
+  }
+
+  spec.accumulator_initial_value = "0";
+  return spec;
 }
 
 absl::StatusOr<internal::SpecializedConversion>
@@ -658,8 +693,7 @@ SpecializedConversionGradientBoostedTreesJava(
             [](const model::decision_tree::proto::Node& node, const int depth,
                const int tree_idx,
                absl::string_view prefix) -> absl::StatusOr<std::string> {
-          const float node_value = node.regressor().top_value();
-          return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+          return absl::UnimplementedError("IF_ELSE not implemented for Java");
         };
 
         spec.leaf_value_fn =
@@ -679,11 +713,7 @@ SpecializedConversionGradientBoostedTreesJava(
             [&](const model::decision_tree::proto::Node& node, const int depth,
                 const int tree_idx,
                 absl::string_view prefix) -> absl::StatusOr<std::string> {
-          const float node_value = node.regressor().top_value();
-          const int output_dim_idx =
-              tree_idx % stats.num_classification_classes;
-          return absl::StrCat(prefix, "accumulator[", output_dim_idx,
-                              "] += ", node_value, ";\n");
+          return absl::UnimplementedError("IF_ELSE not implemented for Java");
         };
 
         spec.leaf_value_fn =
@@ -758,8 +788,7 @@ SpecializedConversionGradientBoostedTreesJava(
           [](const model::decision_tree::proto::Node& node, const int depth,
              const int tree_idx,
              absl::string_view prefix) -> absl::StatusOr<std::string> {
-        const float node_value = node.regressor().top_value();
-        return absl::StrCat(prefix, "accumulator += ", node_value, ";\n");
+        return absl::UnimplementedError("IF_ELSE not implemented for Java");
       };
 
       spec.leaf_value_fn =
