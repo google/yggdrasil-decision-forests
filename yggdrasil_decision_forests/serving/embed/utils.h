@@ -95,6 +95,9 @@ std::string JavaInteger(int bytes);
 // number of leaves. Note: The trees are binary trees.
 int NumLeavesToNumNodes(int num_leaves);
 
+// Indents every line of the string by the given number of spaces.
+std::string IndentString(absl::string_view input, int num_spaces);
+
 }  // namespace yggdrasil_decision_forests::serving::embed
 
 #endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_UTILS_H_

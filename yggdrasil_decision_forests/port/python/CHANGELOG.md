@@ -15,6 +15,7 @@
 -   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random 
     Forest Learner to retrieve the indices of the in-bag samples used for
     training each tree.
+-   Add export to standalone Java.
 
 ## 0.13.0 - 2025-07-15
 

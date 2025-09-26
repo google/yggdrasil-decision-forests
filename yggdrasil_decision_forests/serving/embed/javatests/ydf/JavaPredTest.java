@@ -550,4 +550,26 @@ public class JavaPredTest {
         .isWithin(0.00001f)
         .of(0.f);
   }
+
+  //
+  // NA Values
+  //
+
+  @Test
+  public void testAbaloneRegressionGBDTV2Routing_withNa() {
+    var instance =
+        new TestModelAbaloneRegressionGBDTV2Routing.Instance(
+            /* type= */ TestModelAbaloneRegressionGBDTV2Routing.FeatureType.M,
+            /* longestshell= */ Float.NaN,
+            /* diameter= */ 0.365f,
+            /* height= */ Float.NaN,
+            /* wholeweight= */ 0.514f,
+            /* shuckedweight= */ Float.NaN,
+            /* visceraweight= */ Float.NaN,
+            /* shellweight= */ Float.NaN);
+    float expected = 9.362932f;
+    assertThat(TestModelAbaloneRegressionGBDTV2Routing.predict(instance))
+        .isWithin(0.00001f)
+        .of(expected);
+  }
 }

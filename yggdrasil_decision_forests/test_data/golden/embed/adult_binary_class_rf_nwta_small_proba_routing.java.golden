@@ -8,152 +8,153 @@ import java.util.BitSet;
 
 public final class YdfModel {
 
-public enum Label {
-  LT50K,
-  GT50K,
-};
+  public enum Label {
+    LT50K,
+    GT50K,
+  };
 
-public enum FeatureWorkclass {
-  OUT_OF_VOCABULARY,
-  PRIVATE,
-  SELF_EMP_NOT_INC,
-  LOCAL_GOV,
-  STATE_GOV,
-  SELF_EMP_INC,
-  FEDERAL_GOV,
-  WITHOUT_PAY,
-};
+  public enum FeatureWorkclass {
+    OUT_OF_VOCABULARY,
+    PRIVATE,
+    SELF_EMP_NOT_INC,
+    LOCAL_GOV,
+    STATE_GOV,
+    SELF_EMP_INC,
+    FEDERAL_GOV,
+    WITHOUT_PAY,
+  };
 
-public enum FeatureEducation {
-  OUT_OF_VOCABULARY,
-  HS_GRAD,
-  SOME_COLLEGE,
-  BACHELORS,
-  MASTERS,
-  ASSOC_VOC,
-  V11TH,
-  ASSOC_ACDM,
-  V10TH,
-  V7TH_8TH,
-  PROF_SCHOOL,
-  V9TH,
-  V12TH,
-  DOCTORATE,
-  V5TH_6TH,
-  V1ST_4TH,
-  PRESCHOOL,
-};
+  public enum FeatureEducation {
+    OUT_OF_VOCABULARY,
+    HS_GRAD,
+    SOME_COLLEGE,
+    BACHELORS,
+    MASTERS,
+    ASSOC_VOC,
+    V11TH,
+    ASSOC_ACDM,
+    V10TH,
+    V7TH_8TH,
+    PROF_SCHOOL,
+    V9TH,
+    V12TH,
+    DOCTORATE,
+    V5TH_6TH,
+    V1ST_4TH,
+    PRESCHOOL,
+  };
 
-public enum FeatureMaritalStatus {
-  OUT_OF_VOCABULARY,
-  MARRIED_CIV_SPOUSE,
-  NEVER_MARRIED,
-  DIVORCED,
-  WIDOWED,
-  SEPARATED,
-  MARRIED_SPOUSE_ABSENT,
-  MARRIED_AF_SPOUSE,
-};
+  public enum FeatureMaritalStatus {
+    OUT_OF_VOCABULARY,
+    MARRIED_CIV_SPOUSE,
+    NEVER_MARRIED,
+    DIVORCED,
+    WIDOWED,
+    SEPARATED,
+    MARRIED_SPOUSE_ABSENT,
+    MARRIED_AF_SPOUSE,
+  };
 
-public enum FeatureOccupation {
-  OUT_OF_VOCABULARY,
-  PROF_SPECIALTY,
-  EXEC_MANAGERIAL,
-  CRAFT_REPAIR,
-  ADM_CLERICAL,
-  SALES,
-  OTHER_SERVICE,
-  MACHINE_OP_INSPCT,
-  TRANSPORT_MOVING,
-  HANDLERS_CLEANERS,
-  FARMING_FISHING,
-  TECH_SUPPORT,
-  PROTECTIVE_SERV,
-  PRIV_HOUSE_SERV,
-};
+  public enum FeatureOccupation {
+    OUT_OF_VOCABULARY,
+    PROF_SPECIALTY,
+    EXEC_MANAGERIAL,
+    CRAFT_REPAIR,
+    ADM_CLERICAL,
+    SALES,
+    OTHER_SERVICE,
+    MACHINE_OP_INSPCT,
+    TRANSPORT_MOVING,
+    HANDLERS_CLEANERS,
+    FARMING_FISHING,
+    TECH_SUPPORT,
+    PROTECTIVE_SERV,
+    PRIV_HOUSE_SERV,
+  };
 
-public enum FeatureRelationship {
-  OUT_OF_VOCABULARY,
-  HUSBAND,
-  NOT_IN_FAMILY,
-  OWN_CHILD,
-  UNMARRIED,
-  WIFE,
-  OTHER_RELATIVE,
-};
+  public enum FeatureRelationship {
+    OUT_OF_VOCABULARY,
+    HUSBAND,
+    NOT_IN_FAMILY,
+    OWN_CHILD,
+    UNMARRIED,
+    WIFE,
+    OTHER_RELATIVE,
+  };
 
-public enum FeatureRace {
-  OUT_OF_VOCABULARY,
-  WHITE,
-  BLACK,
-  ASIAN_PAC_ISLANDER,
-  AMER_INDIAN_ESKIMO,
-  OTHER,
-};
+  public enum FeatureRace {
+    OUT_OF_VOCABULARY,
+    WHITE,
+    BLACK,
+    ASIAN_PAC_ISLANDER,
+    AMER_INDIAN_ESKIMO,
+    OTHER,
+  };
 
-public enum FeatureSex {
-  OUT_OF_VOCABULARY,
-  MALE,
-  FEMALE,
-};
+  public enum FeatureSex {
+    OUT_OF_VOCABULARY,
+    MALE,
+    FEMALE,
+  };
 
-public enum FeatureNativeCountry {
-  OUT_OF_VOCABULARY,
-  UNITED_STATES,
-  MEXICO,
-  PHILIPPINES,
-  GERMANY,
-  CANADA,
-  PUERTO_RICO,
-  INDIA,
-  EL_SALVADOR,
-  CUBA,
-  ENGLAND,
-  JAMAICA,
-  DOMINICAN_REPUBLIC,
-  SOUTH,
-  CHINA,
-  ITALY,
-  COLUMBIA,
-  GUATEMALA,
-  JAPAN,
-  VIETNAM,
-  TAIWAN,
-  IRAN,
-  POLAND,
-  HAITI,
-  NICARAGUA,
-  GREECE,
-  PORTUGAL,
-  ECUADOR,
-  FRANCE,
-  PERU,
-  THAILAND,
-  CAMBODIA,
-  IRELAND,
-  LAOS,
-  YUGOSLAVIA,
-  TRINADADTOBAGO,
-  HONDURAS,
-  HONG,
-  HUNGARY,
-  SCOTLAND,
-  OUTLYING_USGUAM_USVI_ETC,
-};
+  public enum FeatureNativeCountry {
+    OUT_OF_VOCABULARY,
+    UNITED_STATES,
+    MEXICO,
+    PHILIPPINES,
+    GERMANY,
+    CANADA,
+    PUERTO_RICO,
+    INDIA,
+    EL_SALVADOR,
+    CUBA,
+    ENGLAND,
+    JAMAICA,
+    DOMINICAN_REPUBLIC,
+    SOUTH,
+    CHINA,
+    ITALY,
+    COLUMBIA,
+    GUATEMALA,
+    JAPAN,
+    VIETNAM,
+    TAIWAN,
+    IRAN,
+    POLAND,
+    HAITI,
+    NICARAGUA,
+    GREECE,
+    PORTUGAL,
+    ECUADOR,
+    FRANCE,
+    PERU,
+    THAILAND,
+    CAMBODIA,
+    IRELAND,
+    LAOS,
+    YUGOSLAVIA,
+    TRINADADTOBAGO,
+    HONDURAS,
+    HONG,
+    HUNGARY,
+    SCOTLAND,
+    OUTLYING_USGUAM_USVI_ETC,
+  };
 
-private static final int NUM_FEATURES = 14;
-private static final int NUM_TREES = 3;
+  private static final int NUM_FEATURES = 14;
+  private static final int NUM_TREES = 3;
 
-public static class Instance {
+  public static class Instance {
 
-  private final int[] numericalFeatureValues;
-  private final int[] categoricalOrBooleanFeatureValues;
+    private final int[] numericalFeatureValues;
+    private final int[] categoricalOrBooleanFeatureValues;
 
-  public Instance(int age, FeatureWorkclass workclass, int fnlwgt, FeatureEducation education, int educationNum, FeatureMaritalStatus maritalStatus, FeatureOccupation occupation, FeatureRelationship relationship, FeatureRace race, FeatureSex sex, int capitalGain, int capitalLoss, int hoursPerWeek, FeatureNativeCountry nativeCountry) {
-    this.numericalFeatureValues = new int[] {age, 0, fnlwgt, 0, educationNum, 0, 0, 0, 0, 0, capitalGain, capitalLoss, hoursPerWeek, 0};
-    this.categoricalOrBooleanFeatureValues = new int[] {-1, workclass.ordinal(), -1, education.ordinal(), -1, maritalStatus.ordinal(), occupation.ordinal(), relationship.ordinal(), race.ordinal(), sex.ordinal(), -1, -1, -1, nativeCountry.ordinal()};
+    public Instance(int age, FeatureWorkclass workclass, int fnlwgt, FeatureEducation education, int educationNum, FeatureMaritalStatus maritalStatus, FeatureOccupation occupation, FeatureRelationship relationship, FeatureRace race, FeatureSex sex, int capitalGain, int capitalLoss, int hoursPerWeek, FeatureNativeCountry nativeCountry) {
+      this.numericalFeatureValues = new int[] {age, 0, fnlwgt, 0, educationNum, 0, 0, 0, 0, 0, capitalGain, capitalLoss, hoursPerWeek, 0};
+      this.categoricalOrBooleanFeatureValues = new int[] {-1, workclass.ordinal(), -1, education.ordinal(), -1, maritalStatus.ordinal(), occupation.ordinal(), relationship.ordinal(), race.ordinal(), sex.ordinal(), -1, -1, -1, nativeCountry.ordinal()};
+    }
   }
-}
+
   private static final short[] nodePos;
   private static final float[] nodeVal;
   private static final byte[] nodeFeat;
@@ -216,34 +217,34 @@ public static class Instance {
     }
   }
 
-public static float predict(Instance instance) {
-  float accumulator = 0;
+  public static float predict(Instance instance) {
+    float accumulator = 0;
 
-  int nodeIndex = 0;
-  for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
-    int currentNodeIndex = nodeIndex;
-    while(nodePos[currentNodeIndex] != 0) {
-      boolean conditionResult;
-      byte featureIndex = nodeFeat[currentNodeIndex];
-      if (conditionTypes[featureIndex] == 0) {
-        int numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
-        int threshold = nodeThr[currentNodeIndex];
-        conditionResult = numericalFeatureValue >= threshold;
-      } else if (conditionTypes[featureIndex] == 1) {
-        int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
-        int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
-        conditionResult = categoricalBank.get(bitIndex);
-      } else {
-        throw new AssertionError("Internal Error");
+    int nodeIndex = 0;
+    for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+      int currentNodeIndex = nodeIndex;
+      while(nodePos[currentNodeIndex] != 0) {
+        boolean conditionResult;
+        byte featureIndex = nodeFeat[currentNodeIndex];
+        if (conditionTypes[featureIndex] == 0) {
+          int numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+          int threshold = nodeThr[currentNodeIndex];
+          conditionResult = numericalFeatureValue >= threshold;
+        } else if (conditionTypes[featureIndex] == 1) {
+          int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
+          int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
+          conditionResult = categoricalBank.get(bitIndex);
+        } else {
+          throw new AssertionError("Internal Error");
+        }
+        currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
       }
-      currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+      accumulator += nodeVal[currentNodeIndex];
+      nodeIndex += rootDeltas[treeIdx];
     }
-    accumulator += nodeVal[currentNodeIndex];
-    nodeIndex += rootDeltas[treeIdx];
-  }
 
-return accumulator;
-}
+    return accumulator;
+  }
 
 
   private YdfModel() {} // Prevent instantiation

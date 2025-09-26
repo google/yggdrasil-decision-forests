@@ -15,6 +15,7 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 ### Features
 
 -   Allow custom fields in model metadata.
+-   Add export to standalone Java.
 
 ### Fix
 

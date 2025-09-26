@@ -281,79 +281,79 @@ TEST_F(ModelDataBankTest, GenerateJavaCode) {
       bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin"));
 
   const std::string expected_code =
-      R"(  private static final int[] nodePos;
-  private static final float[] nodeVal;
-  private static final short[] nodeFeat;
-  private static final int[] nodeThr;
-  private static final short[] nodeCat;
-  private static final byte[] nodeObl;
-  private static final int[] rootDeltas;
-  private static final float[] obliqueWeights;
-  private static final short[] obliqueFeatures;
-  private static final BitSet categoricalBank;
+      R"(private static final int[] nodePos;
+private static final float[] nodeVal;
+private static final short[] nodeFeat;
+private static final int[] nodeThr;
+private static final short[] nodeCat;
+private static final byte[] nodeObl;
+private static final int[] rootDeltas;
+private static final float[] obliqueWeights;
+private static final short[] obliqueFeatures;
+private static final BitSet categoricalBank;
 
-  static {
-    try (InputStream is = MyModel.class.getResourceAsStream("MyModelData.bin");
-         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
-    int nodePosLength = dis.readInt();
-    nodePos = new int[nodePosLength];
-    for (int i = 0; i < nodePosLength; i++) {
-      nodePos[i] = dis.readInt();
-    }
-    int nodeValLength = dis.readInt();
-    nodeVal = new float[nodeValLength];
-    for (int i = 0; i < nodeValLength; i++) {
-      nodeVal[i] = dis.readFloat();
-    }
-    int nodeFeatLength = dis.readInt();
-    nodeFeat = new short[nodeFeatLength];
-    for (int i = 0; i < nodeFeatLength; i++) {
-      nodeFeat[i] = dis.readShort();
-    }
-    int nodeThrLength = dis.readInt();
-    nodeThr = new int[nodeThrLength];
-    for (int i = 0; i < nodeThrLength; i++) {
-      nodeThr[i] = dis.readInt();
-    }
-    int nodeCatLength = dis.readInt();
-    nodeCat = new short[nodeCatLength];
-    for (int i = 0; i < nodeCatLength; i++) {
-      nodeCat[i] = dis.readShort();
-    }
-    int nodeOblLength = dis.readInt();
-    nodeObl = new byte[nodeOblLength];
-    for (int i = 0; i < nodeOblLength; i++) {
-      nodeObl[i] = dis.readByte();
-    }
-    int rootDeltasLength = dis.readInt();
-    rootDeltas = new int[rootDeltasLength];
-    for (int i = 0; i < rootDeltasLength; i++) {
-      rootDeltas[i] = dis.readInt();
-    }
-    int obliqueWeightsLength = dis.readInt();
-    obliqueWeights = new float[obliqueWeightsLength];
-    for (int i = 0; i < obliqueWeightsLength; i++) {
-      obliqueWeights[i] = dis.readFloat();
-    }
-    int obliqueFeaturesLength = dis.readInt();
-    obliqueFeatures = new short[obliqueFeaturesLength];
-    for (int i = 0; i < obliqueFeaturesLength; i++) {
-      obliqueFeatures[i] = dis.readShort();
-    }
-    int categoricalBankNumLongs = dis.readInt();
-    if (categoricalBankNumLongs > 0) {
-      long[] longs = new long[categoricalBankNumLongs];
-      for (int i = 0; i < categoricalBankNumLongs; i++) {
-        longs[i] = dis.readLong();
-      }
-      categoricalBank = BitSet.valueOf(longs);
-    } else {
-      categoricalBank = new BitSet();
-    }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
-    }
+static {
+  try (InputStream is = MyModel.class.getResourceAsStream("MyModelData.bin");
+       DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+  int nodePosLength = dis.readInt();
+  nodePos = new int[nodePosLength];
+  for (int i = 0; i < nodePosLength; i++) {
+    nodePos[i] = dis.readInt();
   }
+  int nodeValLength = dis.readInt();
+  nodeVal = new float[nodeValLength];
+  for (int i = 0; i < nodeValLength; i++) {
+    nodeVal[i] = dis.readFloat();
+  }
+  int nodeFeatLength = dis.readInt();
+  nodeFeat = new short[nodeFeatLength];
+  for (int i = 0; i < nodeFeatLength; i++) {
+    nodeFeat[i] = dis.readShort();
+  }
+  int nodeThrLength = dis.readInt();
+  nodeThr = new int[nodeThrLength];
+  for (int i = 0; i < nodeThrLength; i++) {
+    nodeThr[i] = dis.readInt();
+  }
+  int nodeCatLength = dis.readInt();
+  nodeCat = new short[nodeCatLength];
+  for (int i = 0; i < nodeCatLength; i++) {
+    nodeCat[i] = dis.readShort();
+  }
+  int nodeOblLength = dis.readInt();
+  nodeObl = new byte[nodeOblLength];
+  for (int i = 0; i < nodeOblLength; i++) {
+    nodeObl[i] = dis.readByte();
+  }
+  int rootDeltasLength = dis.readInt();
+  rootDeltas = new int[rootDeltasLength];
+  for (int i = 0; i < rootDeltasLength; i++) {
+    rootDeltas[i] = dis.readInt();
+  }
+  int obliqueWeightsLength = dis.readInt();
+  obliqueWeights = new float[obliqueWeightsLength];
+  for (int i = 0; i < obliqueWeightsLength; i++) {
+    obliqueWeights[i] = dis.readFloat();
+  }
+  int obliqueFeaturesLength = dis.readInt();
+  obliqueFeatures = new short[obliqueFeaturesLength];
+  for (int i = 0; i < obliqueFeaturesLength; i++) {
+    obliqueFeatures[i] = dis.readShort();
+  }
+  int categoricalBankNumLongs = dis.readInt();
+  if (categoricalBankNumLongs > 0) {
+    long[] longs = new long[categoricalBankNumLongs];
+    for (int i = 0; i < categoricalBankNumLongs; i++) {
+      longs[i] = dis.readLong();
+    }
+    categoricalBank = BitSet.valueOf(longs);
+  } else {
+    categoricalBank = new BitSet();
+  }
+  } catch (IOException e) {
+    throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+  }
+}
 )";
   EXPECT_EQ(java_code, expected_code);
 }
@@ -379,85 +379,85 @@ TEST_F(ModelDataBankTest, GenerateJavaCodeWithMultiDimLeaves) {
       bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin"));
 
   const std::string expected_code =
-      R"(  private static final int[] nodePos;
-  private static final byte[] nodeVal;
-  private static final short[] nodeFeat;
-  private static final int[] nodeThr;
-  private static final short[] nodeCat;
-  private static final byte[] nodeObl;
-  private static final int[] rootDeltas;
-  private static final float[] obliqueWeights;
-  private static final short[] obliqueFeatures;
-  private static final float[] leafValues;
-  private static final BitSet categoricalBank;
+      R"(private static final int[] nodePos;
+private static final byte[] nodeVal;
+private static final short[] nodeFeat;
+private static final int[] nodeThr;
+private static final short[] nodeCat;
+private static final byte[] nodeObl;
+private static final int[] rootDeltas;
+private static final float[] obliqueWeights;
+private static final short[] obliqueFeatures;
+private static final float[] leafValues;
+private static final BitSet categoricalBank;
 
-  static {
-    try (InputStream is = MyModel.class.getResourceAsStream("MyModelData.bin");
-         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
-    int nodePosLength = dis.readInt();
-    nodePos = new int[nodePosLength];
-    for (int i = 0; i < nodePosLength; i++) {
-      nodePos[i] = dis.readInt();
-    }
-    int nodeValLength = dis.readInt();
-    nodeVal = new byte[nodeValLength];
-    for (int i = 0; i < nodeValLength; i++) {
-      nodeVal[i] = dis.readByte();
-    }
-    int nodeFeatLength = dis.readInt();
-    nodeFeat = new short[nodeFeatLength];
-    for (int i = 0; i < nodeFeatLength; i++) {
-      nodeFeat[i] = dis.readShort();
-    }
-    int nodeThrLength = dis.readInt();
-    nodeThr = new int[nodeThrLength];
-    for (int i = 0; i < nodeThrLength; i++) {
-      nodeThr[i] = dis.readInt();
-    }
-    int nodeCatLength = dis.readInt();
-    nodeCat = new short[nodeCatLength];
-    for (int i = 0; i < nodeCatLength; i++) {
-      nodeCat[i] = dis.readShort();
-    }
-    int nodeOblLength = dis.readInt();
-    nodeObl = new byte[nodeOblLength];
-    for (int i = 0; i < nodeOblLength; i++) {
-      nodeObl[i] = dis.readByte();
-    }
-    int rootDeltasLength = dis.readInt();
-    rootDeltas = new int[rootDeltasLength];
-    for (int i = 0; i < rootDeltasLength; i++) {
-      rootDeltas[i] = dis.readInt();
-    }
-    int obliqueWeightsLength = dis.readInt();
-    obliqueWeights = new float[obliqueWeightsLength];
-    for (int i = 0; i < obliqueWeightsLength; i++) {
-      obliqueWeights[i] = dis.readFloat();
-    }
-    int obliqueFeaturesLength = dis.readInt();
-    obliqueFeatures = new short[obliqueFeaturesLength];
-    for (int i = 0; i < obliqueFeaturesLength; i++) {
-      obliqueFeatures[i] = dis.readShort();
-    }
-    int leafValuesLength = dis.readInt();
-    leafValues = new float[leafValuesLength];
-    for (int i = 0; i < leafValuesLength; i++) {
-      leafValues[i] = dis.readFloat();
-    }
-    int categoricalBankNumLongs = dis.readInt();
-    if (categoricalBankNumLongs > 0) {
-      long[] longs = new long[categoricalBankNumLongs];
-      for (int i = 0; i < categoricalBankNumLongs; i++) {
-        longs[i] = dis.readLong();
-      }
-      categoricalBank = BitSet.valueOf(longs);
-    } else {
-      categoricalBank = new BitSet();
-    }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
-    }
+static {
+  try (InputStream is = MyModel.class.getResourceAsStream("MyModelData.bin");
+       DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+  int nodePosLength = dis.readInt();
+  nodePos = new int[nodePosLength];
+  for (int i = 0; i < nodePosLength; i++) {
+    nodePos[i] = dis.readInt();
   }
+  int nodeValLength = dis.readInt();
+  nodeVal = new byte[nodeValLength];
+  for (int i = 0; i < nodeValLength; i++) {
+    nodeVal[i] = dis.readByte();
+  }
+  int nodeFeatLength = dis.readInt();
+  nodeFeat = new short[nodeFeatLength];
+  for (int i = 0; i < nodeFeatLength; i++) {
+    nodeFeat[i] = dis.readShort();
+  }
+  int nodeThrLength = dis.readInt();
+  nodeThr = new int[nodeThrLength];
+  for (int i = 0; i < nodeThrLength; i++) {
+    nodeThr[i] = dis.readInt();
+  }
+  int nodeCatLength = dis.readInt();
+  nodeCat = new short[nodeCatLength];
+  for (int i = 0; i < nodeCatLength; i++) {
+    nodeCat[i] = dis.readShort();
+  }
+  int nodeOblLength = dis.readInt();
+  nodeObl = new byte[nodeOblLength];
+  for (int i = 0; i < nodeOblLength; i++) {
+    nodeObl[i] = dis.readByte();
+  }
+  int rootDeltasLength = dis.readInt();
+  rootDeltas = new int[rootDeltasLength];
+  for (int i = 0; i < rootDeltasLength; i++) {
+    rootDeltas[i] = dis.readInt();
+  }
+  int obliqueWeightsLength = dis.readInt();
+  obliqueWeights = new float[obliqueWeightsLength];
+  for (int i = 0; i < obliqueWeightsLength; i++) {
+    obliqueWeights[i] = dis.readFloat();
+  }
+  int obliqueFeaturesLength = dis.readInt();
+  obliqueFeatures = new short[obliqueFeaturesLength];
+  for (int i = 0; i < obliqueFeaturesLength; i++) {
+    obliqueFeatures[i] = dis.readShort();
+  }
+  int leafValuesLength = dis.readInt();
+  leafValues = new float[leafValuesLength];
+  for (int i = 0; i < leafValuesLength; i++) {
+    leafValues[i] = dis.readFloat();
+  }
+  int categoricalBankNumLongs = dis.readInt();
+  if (categoricalBankNumLongs > 0) {
+    long[] longs = new long[categoricalBankNumLongs];
+    for (int i = 0; i < categoricalBankNumLongs; i++) {
+      longs[i] = dis.readLong();
+    }
+    categoricalBank = BitSet.valueOf(longs);
+  } else {
+    categoricalBank = new BitSet();
+  }
+  } catch (IOException e) {
+    throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+  }
+}
 )";
   EXPECT_EQ(java_code, expected_code);
 }

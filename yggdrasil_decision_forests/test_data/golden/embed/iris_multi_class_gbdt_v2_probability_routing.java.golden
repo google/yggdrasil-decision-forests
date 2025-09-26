@@ -7,41 +7,42 @@ import java.io.InputStream;
 
 public final class YdfModel {
 
-public enum Label {
-  SETOSA,
-  VERSICOLOR,
-  VIRGINICA,
-};
+  public enum Label {
+    SETOSA,
+    VERSICOLOR,
+    VIRGINICA,
+  };
 
-/**
- * Returns the index in the prediction array corresponding to the given label.
- * @param label The label.
- * @return The index in the prediction array.
- */
-// ordinal() is safe here because this code is generated and the Label enum is not expected to change.
-@SuppressWarnings("EnumOrdinal")
-public static int getLabelIndex(Label label) {
-  return label.ordinal();
-}
-
-private static final int NUM_FEATURES = 4;
-private static final int NUM_TREES = 3;
-
-public static class Instance {
-
-  private final float[] numericalFeatureValues;
-
-  public Instance(float sepal_Length, float sepal_Width, float petal_Length, float petal_Width) {
-    // NaN substitutions are required to handle missing values correctly.
-    // If no missing numerical values are used, this block can be removed.
-    sepal_Length = Float.isNaN(sepal_Length) ? 5.84333f : sepal_Length;
-    sepal_Width = Float.isNaN(sepal_Width) ? 3.05733f : sepal_Width;
-    petal_Length = Float.isNaN(petal_Length) ? 3.758f : petal_Length;
-    petal_Width = Float.isNaN(petal_Width) ? 1.19933f : petal_Width;
-
-    this.numericalFeatureValues = new float[] {sepal_Length, sepal_Width, petal_Length, petal_Width};
+  /**
+   * Returns the index in the prediction array corresponding to the given label.
+   * @param label The label.
+   * @return The index in the prediction array.
+   */
+  // ordinal() is safe here because this code is generated and the Label enum is not expected to change.
+  @SuppressWarnings("EnumOrdinal")
+  public static int getLabelIndex(Label label) {
+    return label.ordinal();
   }
-}
+
+  private static final int NUM_FEATURES = 4;
+  private static final int NUM_TREES = 3;
+
+  public static class Instance {
+
+    private final float[] numericalFeatureValues;
+
+    public Instance(float sepal_Length, float sepal_Width, float petal_Length, float petal_Width) {
+      // NaN substitutions are required to handle missing values correctly.
+      // If no missing numerical values are used, this block can be removed.
+      sepal_Length = Float.isNaN(sepal_Length) ? 5.84333f : sepal_Length;
+      sepal_Width = Float.isNaN(sepal_Width) ? 3.05733f : sepal_Width;
+      petal_Length = Float.isNaN(petal_Length) ? 3.758f : petal_Length;
+      petal_Width = Float.isNaN(petal_Width) ? 1.19933f : petal_Width;
+
+      this.numericalFeatureValues = new float[] {sepal_Length, sepal_Width, petal_Length, petal_Width};
+    }
+  }
+
   private static final byte[] nodePos;
   private static final float[] nodeVal;
   private static final byte[] nodeFeat;
@@ -81,45 +82,45 @@ public static class Instance {
     }
   }
 
-public static float[] predict(Instance instance) {
-  float[] accumulator = {0f, 0f, 0f};
+  public static float[] predict(Instance instance) {
+    float[] accumulator = {0f, 0f, 0f};
 
-  int nodeIndex = 0;
-  for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
-    int currentNodeIndex = nodeIndex;
-    while(nodePos[currentNodeIndex] != 0) {
-      boolean conditionResult;
-      byte featureIndex = nodeFeat[currentNodeIndex];
-        float numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
-        float threshold = nodeThr[currentNodeIndex];
-        conditionResult = numericalFeatureValue >= threshold;
+    int nodeIndex = 0;
+    for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+      int currentNodeIndex = nodeIndex;
+      while(nodePos[currentNodeIndex] != 0) {
+        boolean conditionResult;
+        byte featureIndex = nodeFeat[currentNodeIndex];
+          float numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+          float threshold = nodeThr[currentNodeIndex];
+          conditionResult = numericalFeatureValue >= threshold;
 
-      currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+        currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+      }
+      accumulator[treeIdx % 3] += nodeVal[currentNodeIndex];
+      nodeIndex += rootDeltas[treeIdx];
     }
-    accumulator[treeIdx % 3] += nodeVal[currentNodeIndex];
-    nodeIndex += rootDeltas[treeIdx];
-  }
 
-  // Softmax
-  float[] probas = new float[3];
-  float maxLogit = Float.NEGATIVE_INFINITY;
-  for (float val : accumulator) {
-    if (val > maxLogit) {
-      maxLogit = val;
+    // Softmax
+    float[] probas = new float[3];
+    float maxLogit = Float.NEGATIVE_INFINITY;
+    for (float val : accumulator) {
+      if (val > maxLogit) {
+        maxLogit = val;
+      }
     }
-  }
 
-  float sumExps = 0.0f;
-  for (int i = 0; i < 3; i++) {
-    probas[i] = (float) Math.exp(accumulator[i] - maxLogit);
-    sumExps += probas[i];
-  }
+    float sumExps = 0.0f;
+    for (int i = 0; i < 3; i++) {
+      probas[i] = (float) Math.exp(accumulator[i] - maxLogit);
+      sumExps += probas[i];
+    }
 
-  for (int i = 0; i < 3; i++) {
-    probas[i] /= sumExps;
+    for (int i = 0; i < 3; i++) {
+      probas[i] /= sumExps;
+    }
+    return probas;
   }
-  return probas;
-}
 
 
   private YdfModel() {} // Prevent instantiation

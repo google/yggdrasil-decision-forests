@@ -310,20 +310,19 @@ absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
       return absl::InternalError(
           absl::StrCat("Array ", java_name, " is unexpectedly empty."));
     }
-    absl::SubstituteAndAppend(&declarations,
-                              "  private static final $0[] $1;\n", java_type,
-                              java_name);
+    absl::SubstituteAndAppend(&declarations, "private static final $0[] $1;\n",
+                              java_type, java_name);
 
     absl::SubstituteAndAppend(&static_block,
-                              "    int $0Length = dis.readInt();\n"
-                              "    $1 = new $2[$0Length];\n"
-                              "    for (int i = 0; i < $0Length; i++) {\n",
+                              "  int $0Length = dis.readInt();\n"
+                              "  $1 = new $2[$0Length];\n"
+                              "  for (int i = 0; i < $0Length; i++) {\n",
                               java_name, java_name, java_type);
 
     ASSIGN_OR_RETURN(const std::string read_method, array->GetJavaReadMethod());
-    absl::SubstituteAndAppend(&static_block, "      $0[i] = dis.$1;\n",
-                              java_name, read_method);
-    absl::StrAppend(&static_block, "    }\n");
+    absl::SubstituteAndAppend(&static_block, "    $0[i] = dis.$1;\n", java_name,
+                              read_method);
+    absl::StrAppend(&static_block, "  }\n");
     return absl::OkStatus();
   };
 
@@ -338,37 +337,36 @@ absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
   // 2. Categorical condition bank if categorical conditions exist.
   if (node_cat.has_value()) {
     absl::StrAppend(&declarations,
-                    "  private static final BitSet categoricalBank;\n");
-    absl::StrAppend(
-        &static_block,
-        "    int categoricalBankNumLongs = dis.readInt();\n"
-        "    if (categoricalBankNumLongs > 0) {\n"
-        "      long[] longs = new long[categoricalBankNumLongs];\n"
-        "      for (int i = 0; i < categoricalBankNumLongs; i++) {\n"
-        "        longs[i] = dis.readLong();\n"
-        "      }\n"
-        "      categoricalBank = BitSet.valueOf(longs);\n"
-        "    } else {\n"
-        "      categoricalBank = new BitSet();\n"
-        "    }\n");
+                    "private static final BitSet categoricalBank;\n");
+    absl::StrAppend(&static_block,
+                    "  int categoricalBankNumLongs = dis.readInt();\n"
+                    "  if (categoricalBankNumLongs > 0) {\n"
+                    "    long[] longs = new long[categoricalBankNumLongs];\n"
+                    "    for (int i = 0; i < categoricalBankNumLongs; i++) {\n"
+                    "      longs[i] = dis.readLong();\n"
+                    "    }\n"
+                    "    categoricalBank = BitSet.valueOf(longs);\n"
+                    "  } else {\n"
+                    "    categoricalBank = new BitSet();\n"
+                    "  }\n");
   }
 
   std::string content = declarations;
-  absl::StrAppend(&content, "\n  static {\n");
+  absl::StrAppend(&content, "\nstatic {\n");
   absl::SubstituteAndAppend(&content,
-                            "    try (InputStream is = "
+                            "  try (InputStream is = "
                             "$0.class.getResourceAsStream(\"$1\");\n"
-                            "         DataInputStream dis = new "
+                            "       DataInputStream dis = new "
                             "DataInputStream(new "
                             "BufferedInputStream(is))) {\n",
                             class_name, resource_name);
   absl::StrAppend(&content, static_block);
   absl::StrAppend(&content,
-                  "    } catch (IOException e) {\n"
-                  "      throw new RuntimeException(\"Failed to load model "
+                  "  } catch (IOException e) {\n"
+                  "    throw new RuntimeException(\"Failed to load model "
                   "data resource: \" + e.getMessage(), e);\n"
-                  "    }\n"
-                  "  }\n");
+                  "  }\n"
+                  "}\n");
 
   return content;
 }

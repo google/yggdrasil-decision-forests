@@ -135,5 +135,15 @@ TEST(QuoteString, Basic) {
   EXPECT_EQ(QuoteString("hello\nworld"), "\"hello\\nworld\"");
 }
 
+TEST(IndentString, Basic) {
+  EXPECT_EQ(IndentString("hello", 2), "  hello");
+  EXPECT_EQ(IndentString("hello\nworld", 2), "  hello\n  world");
+  EXPECT_EQ(IndentString("hello\nworld\n", 2), "  hello\n  world\n");
+  EXPECT_EQ(IndentString("", 2), "");
+  EXPECT_EQ(IndentString("hello", 0), "hello");
+  EXPECT_EQ(IndentString("\n", 2), "\n");
+  EXPECT_EQ(IndentString("a\n\nb", 2), "  a\n\n  b");
+}
+
 }  // namespace
 }  // namespace yggdrasil_decision_forests::serving::embed

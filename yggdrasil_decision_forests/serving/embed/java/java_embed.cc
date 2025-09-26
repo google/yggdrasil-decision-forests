@@ -528,16 +528,18 @@ public final class $0 {
 )",
                             options.name());
 
+  std::string model_code;
+
   // Categorical dictionary
   ASSIGN_OR_RETURN(const auto categorical_dict,
                    GenCategoricalStringDictionaries(model, options,
                                                     internal_options, stats));
-  absl::StrAppend(&code, categorical_dict);
+  absl::StrAppend(&model_code, categorical_dict);
 
   // Instance struct.
   ASSIGN_OR_RETURN(const auto instance_struct,
                    GenInstanceStruct(model, options, internal_options, stats));
-  absl::StrAppend(&code, instance_struct);
+  absl::StrAppend(&model_code, instance_struct, "\n");
 
   // Model data
   // Data stored in the nodes.
@@ -546,7 +548,7 @@ public final class $0 {
   if (options.algorithm() == proto::Algorithm::ROUTING) {
     RETURN_IF_ERROR(internal::GenRoutingModelDataJava(
         model, model.data_spec(), *df_interface, stats, specialized_conversion,
-        options, internal_options, &code, &bank));
+        options, internal_options, &model_code, &bank));
   } else {
     return absl::UnimplementedError(
         absl::StrCat("Unsupported algorithm for tha Java export: ",
@@ -572,14 +574,16 @@ public final class $0 {
   }
   STATUS_CHECK(!predict_output_type.empty());
 
-  absl::SubstituteAndAppend(&code, R"(
+  absl::SubstituteAndAppend(&model_code, R"(
 public static $0 predict(Instance instance) {
 )",
                             predict_output_type);
 
-  absl::StrAppend(&code, predict_body);
+  absl::StrAppend(&model_code, predict_body);
 
-  absl::StrAppend(&code, "}\n");
+  absl::StrAppend(&model_code, "}\n");
+
+  absl::StrAppend(&code, IndentString(model_code, 2));
 
   // Close define and namespace.
   absl::SubstituteAndAppend(&code, R"(
@@ -781,7 +785,7 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
                   stats.num_classification_classes, stats.num_trees);
             }
           } else {
-            spec.return_prediction = "return accumulator;\n";
+            spec.return_prediction = "  return accumulator;\n";
           }
           break;
       }

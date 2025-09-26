@@ -16,8 +16,10 @@
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
 
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/check.h"
@@ -25,6 +27,8 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 
@@ -364,6 +368,23 @@ int NumLeavesToNumNodes(int num_leaves) {
 
 std::string QuoteString(absl::string_view input) {
   return absl::StrCat("\"", absl::CEscape(input), "\"");
+}
+
+std::string IndentString(absl::string_view input, int num_spaces) {
+  DCHECK_GE(num_spaces, 0);
+  if (input.empty()) {
+    return "";
+  }
+  std::string prefix = std::string(num_spaces, ' ');
+  std::vector<std::string> lines;
+  for (const auto& line : absl::StrSplit(input, '\n')) {
+    if (!line.empty()) {
+      lines.push_back(absl::StrCat(prefix, line));
+    } else {
+      lines.push_back("");
+    }
+  }
+  return absl::StrJoin(lines, "\n");
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed
