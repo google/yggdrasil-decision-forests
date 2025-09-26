@@ -65,15 +65,19 @@ struct ModelDataBank {
     Int64OrFloat sentinel = int64_t{0};
     std::vector<float> oblique_weights;
     std::vector<size_t> oblique_features;
+    std::vector<float> leaf_values;
   };
 
   absl::Status AddNode(const AddNodeOptions& options);
 
-  absl::Status AddRootDelta(int64_t root_delta);
+  absl::Status AddRootDelta(int64_t new_root_delta);
 
-  absl::Status AddConditionTypes(const std::vector<uint8_t>& condition_types);
+  absl::Status AddConditionTypes(
+      const std::vector<uint8_t>& new_condition_types);
 
   absl::StatusOr<size_t> GetObliqueFeaturesSize() const;
+
+  absl::StatusOr<size_t> GetLeafValuesSize() const;
 
   // Set the Java types of the arrays. This function must be called after the
   // nodes have been added.
@@ -158,6 +162,10 @@ struct ModelDataBank {
   // This array is not serialized if the model contains only a single type of
   // condition.
   std::optional<NodeDataArray> condition_types;
+  // For multi-output leaves, the bank storing all leaf outputs.
+  //
+  // This array is not serialized if the model uses single-output leaves.
+  std::optional<NodeDataArray> leaf_values;
 };
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

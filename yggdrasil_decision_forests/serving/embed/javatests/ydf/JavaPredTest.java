@@ -19,6 +19,12 @@ import ydf.models.TestModelAdultBinaryClassRFWTASmallScoreRouting;
 import ydf.models.TestModelIrisMultiClassGBDTV2ClassRouting;
 import ydf.models.TestModelIrisMultiClassGBDTV2ProbaRouting;
 import ydf.models.TestModelIrisMultiClassGBDTV2ScoreRouting;
+import ydf.models.TestModelIrisMultiClassRFNWTASmallClassRouting;
+import ydf.models.TestModelIrisMultiClassRFNWTASmallProbaRouting;
+import ydf.models.TestModelIrisMultiClassRFNWTASmallScoreRouting;
+import ydf.models.TestModelIrisMultiClassRFWTASmallClassRouting;
+import ydf.models.TestModelIrisMultiClassRFWTASmallProbaRouting;
+import ydf.models.TestModelIrisMultiClassRFWTASmallScoreRouting;
 
 @RunWith(JUnit4.class)
 public class JavaPredTest {
@@ -401,5 +407,147 @@ public class JavaPredTest {
                     TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VIRGINICA)])
         .isWithin(0.00001f)
         .of(-2.029691f);
+  }
+
+  // Iris RF WTA
+
+  @Test
+  public void testIrisMultiClassRFWTASmallClassRouting_knownOutput() {
+    var instance =
+        new TestModelIrisMultiClassRFWTASmallClassRouting.Instance(
+            /* sepal_Length= */ 5.1f,
+            /* sepal_Width= */ 3.5f,
+            /* petal_Length= */ 1.4f,
+            /* petal_Width= */ 0.2f);
+    assertThat(TestModelIrisMultiClassRFWTASmallClassRouting.predict(instance))
+        .isEqualTo(TestModelIrisMultiClassRFWTASmallClassRouting.Label.SETOSA);
+  }
+
+  @Test
+  public void testIrisMultiClassRFWTASmallScoreRouting_knownOutput() {
+    var instance =
+        new TestModelIrisMultiClassRFWTASmallScoreRouting.Instance(
+            /* sepal_Length= */ 5.1f,
+            /* sepal_Width= */ 3.5f,
+            /* petal_Length= */ 1.4f,
+            /* petal_Width= */ 0.2f);
+    byte[] scores = TestModelIrisMultiClassRFWTASmallScoreRouting.predict(instance);
+    assertThat(scores).hasLength(3);
+    assertThat(
+            scores[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.SETOSA)])
+        .isEqualTo((byte) 10);
+    assertThat(
+            scores[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VERSICOLOR)])
+        .isEqualTo((byte) 0);
+    assertThat(
+            scores[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VIRGINICA)])
+        .isEqualTo((byte) 0);
+  }
+
+  @Test
+  public void testIrisMultiClassRFWTASmallProbaRouting_knownOutput() {
+    var instance =
+        new TestModelIrisMultiClassRFWTASmallProbaRouting.Instance(
+            /* sepal_Length= */ 5.1f,
+            /* sepal_Width= */ 3.5f,
+            /* petal_Length= */ 1.4f,
+            /* petal_Width= */ 0.2f);
+    float[] proba = TestModelIrisMultiClassRFWTASmallProbaRouting.predict(instance);
+    assertThat(proba).hasLength(3);
+    assertThat(
+            proba[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.SETOSA)])
+        .isEqualTo(1.f);
+    assertThat(
+            proba[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VERSICOLOR)])
+        .isEqualTo(0.f);
+    assertThat(
+            proba[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VIRGINICA)])
+        .isEqualTo(0.f);
+  }
+
+  // Iris RF NWTA
+
+  @Test
+  public void testIrisMultiClassRFNWTASmallClassRouting_knownOutput() {
+    var instance =
+        new TestModelIrisMultiClassRFNWTASmallClassRouting.Instance(
+            /* sepal_Length= */ 5.1f,
+            /* sepal_Width= */ 3.5f,
+            /* petal_Length= */ 1.4f,
+            /* petal_Width= */ 0.2f);
+    assertThat(TestModelIrisMultiClassRFNWTASmallClassRouting.predict(instance))
+        .isEqualTo(TestModelIrisMultiClassRFNWTASmallClassRouting.Label.SETOSA);
+  }
+
+  @Test
+  public void testIrisMultiClassRFNWTASmallScoreRouting_knownOutput() {
+    var instance =
+        new TestModelIrisMultiClassRFNWTASmallScoreRouting.Instance(
+            /* sepal_Length= */ 5.1f,
+            /* sepal_Width= */ 3.5f,
+            /* petal_Length= */ 1.4f,
+            /* petal_Width= */ 0.2f);
+    float[] scores = TestModelIrisMultiClassRFNWTASmallScoreRouting.predict(instance);
+    assertThat(scores).hasLength(3);
+    assertThat(
+            scores[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.SETOSA)])
+        .isWithin(0.00001f)
+        .of(1.f);
+    assertThat(
+            scores[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VERSICOLOR)])
+        .isWithin(0.00001f)
+        .of(0.f);
+    assertThat(
+            scores[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VIRGINICA)])
+        .isWithin(0.00001f)
+        .of(0.f);
+  }
+
+  @Test
+  public void testIrisMultiClassRFNWTASmallProbaRouting_knownOutput() {
+    var instance =
+        new TestModelIrisMultiClassRFNWTASmallProbaRouting.Instance(
+            /* sepal_Length= */ 5.1f,
+            /* sepal_Width= */ 3.5f,
+            /* petal_Length= */ 1.4f,
+            /* petal_Width= */ 0.2f);
+    float[] proba = TestModelIrisMultiClassRFNWTASmallProbaRouting.predict(instance);
+    assertThat(proba).hasLength(3);
+    assertThat(
+            proba[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.SETOSA)])
+        .isWithin(0.00001f)
+        .of(1.f);
+    assertThat(
+            proba[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VERSICOLOR)])
+        .isWithin(0.00001f)
+        .of(0.f);
+    assertThat(
+            proba[
+                TestModelIrisMultiClassGBDTV2ProbaRouting.getLabelIndex(
+                    TestModelIrisMultiClassGBDTV2ProbaRouting.Label.VIRGINICA)])
+        .isWithin(0.00001f)
+        .of(0.f);
   }
 }

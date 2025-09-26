@@ -34,6 +34,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -277,17 +278,22 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
   return absl::OkStatus();
 }
 
-absl::Status SpecializedConversion::Validate() const {
+absl::Status SpecializedConversion::Validate(
+    const proto::Options& options) const {
   STATUS_CHECK(!accumulator_type.empty());
   STATUS_CHECK(!accumulator_initial_value.empty());
   STATUS_CHECK(!return_prediction.empty());
   STATUS_CHECK(!accumulator_type.empty());
   STATUS_CHECK_GT(leaf_value_spec.dims, 0);
   STATUS_CHECK_NE(leaf_value_spec.dtype, proto::DType::UNDEFINED);
-
-  STATUS_CHECK(set_node_ifelse_fn);
   STATUS_CHECK(leaf_value_fn);
-  STATUS_CHECK(!routing_node.empty());
+
+  if (options.algorithm() == proto::Algorithm::IF_ELSE) {
+    STATUS_CHECK(set_node_ifelse_fn);
+  }
+  if (options.algorithm() == proto::Algorithm::ROUTING) {
+    STATUS_CHECK(!routing_node.empty());
+  }
   return absl::OkStatus();
 }
 // Computes the mapping from feature idx to condition type.

@@ -124,10 +124,17 @@ ModelDataBank::ModelDataBank(
   node_pos.emplace(NodeDataArray{
       .java_name = "nodePos",
       .java_type = JavaInteger(internal_options.node_offset_bytes)});
-  node_val.emplace(NodeDataArray{
-      .java_name = "nodeVal",
-      .java_type =
-          DTypeToJavaType(specialized_conversion.leaf_value_spec.dtype)});
+  if (specialized_conversion.leaf_value_spec.dims == 1) {
+    node_val.emplace(NodeDataArray{
+        .java_name = "nodeVal",
+        .java_type =
+            DTypeToJavaType(specialized_conversion.leaf_value_spec.dtype)});
+  } else {
+    node_val.emplace(NodeDataArray{
+        .java_name = "nodeVal",
+        .java_type = JavaInteger(MaxUnsignedValueToNumBytes(
+            stats.num_leaves / specialized_conversion.leaf_value_spec.dims))});
+  }
   node_feat.emplace(NodeDataArray{
       .java_name = "nodeFeat",
       .java_type = JavaInteger(internal_options.feature_index_bytes)});
@@ -163,6 +170,10 @@ ModelDataBank::ModelDataBank(
         .java_name = "obliqueFeatures",
         .java_type = JavaInteger(internal_options.feature_index_bytes)});
   }
+  if (specialized_conversion.leaf_value_spec.dims > 1) {
+    leaf_values.emplace(
+        NodeDataArray{.java_name = "leafValues", .java_type = "float"});
+  }
 }
 
 absl::StatusOr<size_t> ModelDataBank::GetObliqueFeaturesSize() const {
@@ -170,6 +181,13 @@ absl::StatusOr<size_t> ModelDataBank::GetObliqueFeaturesSize() const {
     return absl::InternalError("No oblique features used.");
   }
   return oblique_features->data.size();
+}
+
+absl::StatusOr<size_t> ModelDataBank::GetLeafValuesSize() const {
+  if (!leaf_values.has_value()) {
+    return absl::InternalError("No external leaf values used.");
+  }
+  return leaf_values->data.size();
 }
 
 absl::Status ModelDataBank::AddNode(const AddNodeOptions& options) {
@@ -213,6 +231,14 @@ absl::Status ModelDataBank::AddNode(const AddNodeOptions& options) {
     }
     oblique_features->data.push_back(static_cast<int64_t>(val));
   }
+  for (const float val : options.leaf_values) {
+    if (!leaf_values.has_value()) {
+      return absl::InternalError(
+          "Expected array leaf_values to push node to, but no array was "
+          "found.");
+    }
+    leaf_values->data.push_back(val);
+  }
 
   return absl::OkStatus();
 }
@@ -253,9 +279,9 @@ absl::Status ModelDataBank::AddConditionTypes(
 
 std::vector<const std::optional<NodeDataArray>*>
 ModelDataBank::GetOrderedNodeDataArrays() const {
-  return {&node_pos,        &node_val,        &node_feat,   &node_thr,
-          &node_cat,        &node_obl,        &root_deltas, &condition_types,
-          &oblique_weights, &oblique_features};
+  return {&node_pos,        &node_val,         &node_feat,   &node_thr,
+          &node_cat,        &node_obl,         &root_deltas, &condition_types,
+          &oblique_weights, &oblique_features, &leaf_values};
 }
 
 absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(

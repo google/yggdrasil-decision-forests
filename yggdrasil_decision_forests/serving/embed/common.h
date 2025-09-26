@@ -244,7 +244,7 @@ struct SpecializedConversion {
   std::string routing_node;
 
   // Validate the object.
-  absl::Status Validate() const;
+  absl::Status Validate(const proto::Options& options) const;
 };
 
 // Computes the statistics of the model.

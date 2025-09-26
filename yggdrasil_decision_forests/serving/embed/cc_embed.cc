@@ -203,7 +203,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
     } else {
       return absl::InvalidArgumentError("The model type is not supported.");
     }
-    RETURN_IF_ERROR(specialized_conversion.Validate());
+    RETURN_IF_ERROR(specialized_conversion.Validate(options));
   }
 
   // Generate the code.

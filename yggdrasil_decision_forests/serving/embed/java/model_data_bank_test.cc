@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -45,6 +46,7 @@ class ModelDataBankTest : public ::testing::Test {
     internal_options_.feature_value_bytes = 4;
 
     specialized_conversion_.leaf_value_spec.dtype = proto::DType::FLOAT32;
+    specialized_conversion_.leaf_value_spec.dims = 1;
   }
 
   ModelStatistics stats_;
@@ -55,19 +57,20 @@ class ModelDataBankTest : public ::testing::Test {
 TEST_F(ModelDataBankTest, SerializeData) {
   ModelDataBank bank(internal_options_, stats_, specialized_conversion_);
   ASSERT_OK(bank.AddNode({.pos = 1,
-                          .val = 2.0f,
+                          .val = 2.f,
                           .feat = 3,
-                          .thr = static_cast<int64_t>(4),
+                          .thr = int64_t{4},
                           .cat = 5,
                           .obl = 0}));
   ASSERT_OK(bank.AddNode({.pos = 10,
-                          .val = 20.0f,
+                          .val = 20.f,
                           .feat = 30,
-                          .thr = static_cast<int64_t>(40),
+                          .thr = int64_t{40},
                           .cat = 50,
                           .obl = 2,
-                          .oblique_weights = {1.0, 2.0},
-                          .oblique_features = {100, 200}}));
+                          .oblique_weights = {1.f, 2.f},
+                          .oblique_features = {100, 200},
+                          .leaf_values = {}}));
   bank.categorical = {true, false, true};
   ASSERT_OK(bank.AddRootDelta(10));
   ASSERT_OK(bank.AddRootDelta(20));
@@ -81,7 +84,7 @@ TEST_F(ModelDataBankTest, SerializeData) {
   expected_data += std::string("\0\0\0\2", 4);
   expected_data += std::string("\0\0\0\1", 4);
   expected_data += std::string("\0\0\0\12", 4);
-  // node_val: size=2, val={2.0f, 20.0f} (float)
+  // node_val: size=2, val={2.f, 20.f} (float)
   expected_data += std::string("\0\0\0\2", 4);
   expected_data += std::string("@\0\0\0", 4);
   expected_data += std::string("A\xa0\0\0", 4);
@@ -105,7 +108,7 @@ TEST_F(ModelDataBankTest, SerializeData) {
   expected_data += std::string("\0\0\0\2", 4);
   expected_data += std::string("\0\0\0\12", 4);
   expected_data += std::string("\0\0\0\24", 4);
-  // oblique_weights: size=2, val={1.0, 2.0} (float)
+  // oblique_weights: size=2, val={1.f, 2.f} (float)
   expected_data += std::string("\0\0\0\2", 4);
   expected_data += std::string("?\x80\0\0", 4);
   expected_data += std::string("@\0\0\0", 4);
@@ -113,6 +116,85 @@ TEST_F(ModelDataBankTest, SerializeData) {
   expected_data += std::string("\0\0\0\2", 4);
   expected_data += std::string("\0\144", 2);
   expected_data += std::string("\0\310", 2);
+  // categorical bank: num_longs=1, val=5
+  expected_data += std::string("\0\0\0\1", 4);
+  expected_data += std::string("\0\0\0\0\0\0\0\5", 8);
+
+  EXPECT_EQ(serialized_data, expected_data);
+}
+
+TEST_F(ModelDataBankTest, SerializeDataWithMultiDimLeaves) {
+  specialized_conversion_.leaf_value_spec.dims = 3;
+  ModelDataBank bank(internal_options_, stats_, specialized_conversion_);
+  ASSERT_OK(bank.AddNode({.pos = 1,
+                          .val = int64_t{0},  // Leaf index
+                          .feat = 3,
+                          .thr = int64_t{4},
+                          .cat = 5,
+                          .obl = 0,
+                          .leaf_values = {1.f, 2.f, 3.f}}));
+  ASSERT_OK(bank.AddNode({.pos = 10,
+                          .val = int64_t{1},  // Leaf index
+                          .feat = 30,
+                          .thr = int64_t{40},
+                          .cat = 50,
+                          .obl = 2,
+                          .oblique_weights = {1.f, 2.f},
+                          .oblique_features = {100, 200},
+                          .leaf_values = {4.f, 5.f, 6.f}}));
+  bank.categorical = {true, false, true};
+  ASSERT_OK(bank.AddRootDelta(10));
+  ASSERT_OK(bank.AddRootDelta(20));
+  ASSERT_OK(bank.FinalizeJavaTypes());
+
+  ASSERT_OK_AND_ASSIGN(const std::string serialized_data,
+                       bank.SerializeData(internal_options_));
+
+  std::string expected_data;
+  // node_pos: size=2, val={1, 10} (int)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0\0\0\1", 4);
+  expected_data += std::string("\0\0\0\12", 4);
+  // node_val: size=2, val={0, 1} (byte)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0", 1);
+  expected_data += std::string("\1", 1);
+  // node_feat: size=2, val={3, 30} (short)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0\3", 2);
+  expected_data += std::string("\0\36", 2);
+  // node_thr: size=2, val={4, 40} (int)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0\0\0\4", 4);
+  expected_data += std::string("\0\0\0\50", 4);
+  // node_cat: size=2, val={5, 50} (short)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0\5", 2);
+  expected_data += std::string("\0\62", 2);
+  // node_obl: size=2, val={0, 2} (byte)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0", 1);
+  expected_data += std::string("\2", 1);
+  // root_deltas: size=2, val={10, 20} (int)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0\0\0\12", 4);
+  expected_data += std::string("\0\0\0\24", 4);
+  // oblique_weights: size=2, val={1.f, 2.f} (float)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("?\x80\0\0", 4);
+  expected_data += std::string("@\0\0\0", 4);
+  // oblique_features: size=2, val={100, 200} (short)
+  expected_data += std::string("\0\0\0\2", 4);
+  expected_data += std::string("\0\144", 2);
+  expected_data += std::string("\0\310", 2);
+  // leaf_values: size=6, val={1.f, 2.f, 3.f, 4.f, 5.f, 6.f} (float)
+  expected_data += std::string("\0\0\0\6", 4);
+  expected_data += std::string("?\x80\0\0", 4);
+  expected_data += std::string("@\0\0\0", 4);
+  expected_data += std::string("@\x40\0\0", 4);
+  expected_data += std::string("@\x80\0\0", 4);
+  expected_data += std::string("@\xa0\0\0", 4);
+  expected_data += std::string("@\xc0\0\0", 4);
   // categorical bank: num_longs=1, val=5
   expected_data += std::string("\0\0\0\1", 4);
   expected_data += std::string("\0\0\0\0\0\0\0\5", 8);
@@ -129,16 +211,12 @@ TEST_F(ModelDataBankTest, SerializeDataWithSentinels) {
       [model::decision_tree::proto::Condition::kContainsCondition] = true;
   ModelDataBank bank(internal_options_, stats_without_oblique,
                      specialized_conversion_);
-  ASSERT_OK(bank.AddNode({.pos = 1,
-                          .val = 2.0f,
-                          .feat = 3,
-                          .thr = static_cast<int64_t>(4),
-                          .cat = 5}));
+  ASSERT_OK(bank.AddNode(
+      {.pos = 1, .val = 2.f, .feat = 3, .thr = int64_t{4}, .cat = 5}));
   // A leaf node. `feat`, `thr`, `cat`, are not set and should get
   // sentinel values.
   ASSERT_OK(bank.AddNode({.val = 123.45f}));
-  ASSERT_OK(
-      bank.AddNode({.pos = 10, .feat = 30, .thr = static_cast<int64_t>(40)}));
+  ASSERT_OK(bank.AddNode({.pos = 10, .feat = 30, .thr = int64_t{40}}));
   bank.categorical = {true, false, true};
   ASSERT_OK(bank.AddRootDelta(10));
   ASSERT_OK(bank.AddRootDelta(20));
@@ -153,7 +231,7 @@ TEST_F(ModelDataBankTest, SerializeDataWithSentinels) {
   expected_data += std::string("\0\0\0\1", 4);
   expected_data += std::string("\0\0\0\0", 4);
   expected_data += std::string("\0\0\0\12", 4);
-  // node_val: size=3, val={2.0f, 123.45f, 0.} (float)
+  // node_val: size=3, val={2.f, 123.45f, 0.} (float)
   expected_data += std::string("\0\0\0\3", 4);
   expected_data += std::string("@\0\0\0", 4);
   expected_data += std::string("B\xf6\xe6\x66", 4);
@@ -187,12 +265,12 @@ TEST_F(ModelDataBankTest, SerializeDataWithSentinels) {
 TEST_F(ModelDataBankTest, GenerateJavaCode) {
   ModelDataBank bank(internal_options_, stats_, specialized_conversion_);
   ASSERT_OK(bank.AddNode({.pos = 1,
-                          .val = 2.0f,
+                          .val = 2.f,
                           .feat = 3,
-                          .thr = static_cast<int64_t>(4),
+                          .thr = int64_t{4},
                           .cat = 5,
                           .obl = 0,
-                          .oblique_weights = {1.0f},
+                          .oblique_weights = {1.f},
                           .oblique_features = {10}}));
   bank.categorical = {true, false, true};
   ASSERT_OK(bank.AddRootDelta(10));
@@ -261,6 +339,110 @@ TEST_F(ModelDataBankTest, GenerateJavaCode) {
     obliqueFeatures = new short[obliqueFeaturesLength];
     for (int i = 0; i < obliqueFeaturesLength; i++) {
       obliqueFeatures[i] = dis.readShort();
+    }
+    int categoricalBankNumLongs = dis.readInt();
+    if (categoricalBankNumLongs > 0) {
+      long[] longs = new long[categoricalBankNumLongs];
+      for (int i = 0; i < categoricalBankNumLongs; i++) {
+        longs[i] = dis.readLong();
+      }
+      categoricalBank = BitSet.valueOf(longs);
+    } else {
+      categoricalBank = new BitSet();
+    }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+    }
+  }
+)";
+  EXPECT_EQ(java_code, expected_code);
+}
+
+TEST_F(ModelDataBankTest, GenerateJavaCodeWithMultiDimLeaves) {
+  specialized_conversion_.leaf_value_spec.dims = 3;
+  ModelDataBank bank(internal_options_, stats_, specialized_conversion_);
+  ASSERT_OK(bank.AddNode({.pos = 1,
+                          .val = int64_t{0},  // Leaf index
+                          .feat = 3,
+                          .thr = int64_t{4},
+                          .cat = 5,
+                          .obl = 0,
+                          .oblique_weights = {1.f},
+                          .oblique_features = {10},
+                          .leaf_values = {1.f, 2.f, 3.f}}));
+  bank.categorical = {true, false, true};
+  ASSERT_OK(bank.AddRootDelta(10));
+  ASSERT_OK(bank.FinalizeJavaTypes());
+
+  ASSERT_OK_AND_ASSIGN(
+      const std::string java_code,
+      bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin"));
+
+  const std::string expected_code =
+      R"(  private static final int[] nodePos;
+  private static final byte[] nodeVal;
+  private static final short[] nodeFeat;
+  private static final int[] nodeThr;
+  private static final short[] nodeCat;
+  private static final byte[] nodeObl;
+  private static final int[] rootDeltas;
+  private static final float[] obliqueWeights;
+  private static final short[] obliqueFeatures;
+  private static final float[] leafValues;
+  private static final BitSet categoricalBank;
+
+  static {
+    try (InputStream is = MyModel.class.getResourceAsStream("MyModelData.bin");
+         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+    int nodePosLength = dis.readInt();
+    nodePos = new int[nodePosLength];
+    for (int i = 0; i < nodePosLength; i++) {
+      nodePos[i] = dis.readInt();
+    }
+    int nodeValLength = dis.readInt();
+    nodeVal = new byte[nodeValLength];
+    for (int i = 0; i < nodeValLength; i++) {
+      nodeVal[i] = dis.readByte();
+    }
+    int nodeFeatLength = dis.readInt();
+    nodeFeat = new short[nodeFeatLength];
+    for (int i = 0; i < nodeFeatLength; i++) {
+      nodeFeat[i] = dis.readShort();
+    }
+    int nodeThrLength = dis.readInt();
+    nodeThr = new int[nodeThrLength];
+    for (int i = 0; i < nodeThrLength; i++) {
+      nodeThr[i] = dis.readInt();
+    }
+    int nodeCatLength = dis.readInt();
+    nodeCat = new short[nodeCatLength];
+    for (int i = 0; i < nodeCatLength; i++) {
+      nodeCat[i] = dis.readShort();
+    }
+    int nodeOblLength = dis.readInt();
+    nodeObl = new byte[nodeOblLength];
+    for (int i = 0; i < nodeOblLength; i++) {
+      nodeObl[i] = dis.readByte();
+    }
+    int rootDeltasLength = dis.readInt();
+    rootDeltas = new int[rootDeltasLength];
+    for (int i = 0; i < rootDeltasLength; i++) {
+      rootDeltas[i] = dis.readInt();
+    }
+    int obliqueWeightsLength = dis.readInt();
+    obliqueWeights = new float[obliqueWeightsLength];
+    for (int i = 0; i < obliqueWeightsLength; i++) {
+      obliqueWeights[i] = dis.readFloat();
+    }
+    int obliqueFeaturesLength = dis.readInt();
+    obliqueFeatures = new short[obliqueFeaturesLength];
+    for (int i = 0; i < obliqueFeaturesLength; i++) {
+      obliqueFeatures[i] = dis.readShort();
+    }
+    int leafValuesLength = dis.readInt();
+    leafValues = new float[leafValuesLength];
+    for (int i = 0; i < leafValuesLength; i++) {
+      leafValues[i] = dis.readFloat();
     }
     int categoricalBankNumLongs = dis.readInt();
     if (categoricalBankNumLongs > 0) {

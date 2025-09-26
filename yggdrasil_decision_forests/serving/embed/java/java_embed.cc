@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <variant>
 #include <vector>
@@ -65,28 +66,46 @@ absl::Status AddTreeToBank(const dataset::proto::DataSpecification& dataspec,
   if (node.IsLeaf()) {
     const auto leaf_value = specialized_conversion.leaf_value_fn(node.node());
     if (specialized_conversion.leaf_value_spec.dims > 1) {
-      return absl::UnimplementedError(
-          "Multi-output nodes (e.g for multi-class Random Forests) are not yet "
-          "supported");
-    }
-    Int64OrFloat val;
-    if (std::holds_alternative<std::vector<bool>>(leaf_value)) {
-      const auto& v = std::get<std::vector<bool>>(leaf_value);
-      if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
-      val = static_cast<int64_t>(v.front());
-    } else if (std::holds_alternative<std::vector<int32_t>>(leaf_value)) {
-      const auto& v = std::get<std::vector<int32_t>>(leaf_value);
-      if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
-      val = static_cast<int64_t>(v.front());
-    } else if (std::holds_alternative<std::vector<float>>(leaf_value)) {
-      const auto& v = std::get<std::vector<float>>(leaf_value);
-      if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
-      val = v.front();
+      ASSIGN_OR_RETURN(const auto leaf_value_size, bank->GetLeafValuesSize());
+      const auto leaf_value_and_remainder = std::div(
+          leaf_value_size, specialized_conversion.leaf_value_spec.dims);
+      const int64_t encoded_leaf_value = leaf_value_and_remainder.quot;
+      STATUS_CHECK_EQ(leaf_value_and_remainder.rem, 0);
+
+      // Add the leaf values to the bank.
+      if (std::holds_alternative<std::vector<float>>(leaf_value)) {
+        const auto& typed_values = std::get<std::vector<float>>(leaf_value);
+        STATUS_CHECK_EQ(typed_values.size(),
+                        specialized_conversion.leaf_value_spec.dims);
+
+        std::vector<float> leaf_values(typed_values.begin(),
+                                       typed_values.end());
+        RETURN_IF_ERROR(bank->AddNode(
+            {.pos = 0, .val = encoded_leaf_value, .leaf_values = leaf_values}));
+        return absl::OkStatus();
+      } else {
+        return absl::InvalidArgumentError("Unsupported leaf type");
+      }
     } else {
-      return absl::InvalidArgumentError("Unsupported leaf type.");
+      Int64OrFloat val;
+      if (std::holds_alternative<std::vector<bool>>(leaf_value)) {
+        const auto& v = std::get<std::vector<bool>>(leaf_value);
+        if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
+        val = static_cast<int64_t>(v.front());
+      } else if (std::holds_alternative<std::vector<int32_t>>(leaf_value)) {
+        const auto& v = std::get<std::vector<int32_t>>(leaf_value);
+        if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
+        val = static_cast<int64_t>(v.front());
+      } else if (std::holds_alternative<std::vector<float>>(leaf_value)) {
+        const auto& v = std::get<std::vector<float>>(leaf_value);
+        if (v.empty()) return absl::InvalidArgumentError("Empty leaf value");
+        val = v.front();
+      } else {
+        return absl::InvalidArgumentError("Unsupported leaf type.");
+      }
+      RETURN_IF_ERROR(bank->AddNode({.pos = 0, .val = val}));
+      return absl::OkStatus();
     }
-    RETURN_IF_ERROR(bank->AddNode({.pos = 0, .val = val}));
-    return absl::OkStatus();
   }
 
   // This is the node offset between a parent node and the positive node. Note
@@ -481,7 +500,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelJava(
     } else {
       return absl::InvalidArgumentError("The model type is not supported.");
     }
-    RETURN_IF_ERROR(specialized_conversion.Validate());
+    RETURN_IF_ERROR(specialized_conversion.Validate(options));
   }
 
   // Generate the code.
@@ -648,18 +667,6 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
               JavaInteger(MaxSignedValueToNumBytes(stats.num_trees));
           // No memory saving by using bool over int here.
           spec.leaf_value_spec = {.dtype = proto::DType::INT8, .dims = 1};
-          spec.set_node_ifelse_fn =
-              [](const model::decision_tree::proto::Node& node, const int depth,
-                 const int tree_idx,
-                 absl::string_view prefix) -> absl::StatusOr<std::string> {
-            const int node_value = node.classifier().top_value();
-            if (node_value == 2) {
-              return absl::StrCat(prefix, "accumulator++;\n");
-            } else {
-              return "";
-            }
-          };
-
           spec.leaf_value_fn =
               [](const model::decision_tree::proto::Node& node) -> LeafValue {
             const int node_value = node.classifier().top_value();
@@ -673,22 +680,6 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
           // We accumulate the probability vote for the positive class.
           spec.accumulator_type = "float";
           spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
-
-          spec.set_node_ifelse_fn =
-              [&](const model::decision_tree::proto::Node& node,
-                  const int depth, const int tree_idx,
-                  absl::string_view prefix) -> absl::StatusOr<std::string> {
-            const float node_value =
-                node.classifier().distribution().counts(2) /
-                (node.classifier().distribution().sum() * stats.num_trees);
-            if (node_value == 0) {
-              return "";
-            } else {
-              return absl::StrCat(prefix, "accumulator += ", node_value,
-                                  "f;\n");
-            }
-          };
-
           spec.leaf_value_fn =
               [&](const model::decision_tree::proto::Node& node) -> LeafValue {
             const float node_value =
@@ -702,8 +693,56 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
 )";
         }
       } else {
-        return absl::UnimplementedError(
-            "Multi-class classification is not implemented for Java.");
+        if (model.winner_take_all_inference()) {
+          // We accumulate the count of votes for each class.
+          spec.accumulator_type = absl::StrCat(
+              JavaInteger(MaxSignedValueToNumBytes(stats.num_trees)), "[]");
+          spec.accumulator_initial_value = absl::StrCat(
+              "new ", JavaInteger(MaxSignedValueToNumBytes(stats.num_trees)),
+              "[", stats.num_classification_classes, "]");
+          spec.leaf_value_spec = {
+              .dtype = UnsignedIntegerToDtype(
+                  MaxUnsignedValueToNumBytes(stats.num_classification_classes)),
+              .dims = 1};
+
+          spec.leaf_value_fn =
+              [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+            const int32_t node_value = node.classifier().top_value() - 1;
+            return std::vector<int32_t>{node_value};
+          };
+
+          spec.routing_node = R"(
+    accumulator[nodeVal[currentNodeIndex]]++;
+)";
+        } else {
+          // We accumulate the probability for each class.
+          spec.accumulator_type = "float[]";
+          spec.accumulator_initial_value =
+              absl::StrCat("new float[", stats.num_classification_classes, "]");
+          spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32,
+                                  .dims = stats.num_classification_classes};
+          spec.leaf_value_fn =
+              [&](const model::decision_tree::proto::Node& node) -> LeafValue {
+            std::vector<float> values;
+            for (int output_idx = 0;
+                 output_idx < stats.num_classification_classes; output_idx++) {
+              const float node_value =
+                  node.classifier().distribution().counts(output_idx + 1) /
+                  (node.classifier().distribution().sum() * stats.num_trees);
+              values.push_back(node_value);
+            }
+            return values;
+          };
+
+          spec.routing_node =
+              absl::Substitute(R"(
+    int offset = nodeVal[currentNodeIndex] * $0;
+    for(int dim=0; dim!=$0; dim++) {
+      accumulator[dim] += leafValues[offset + dim];
+    }
+)",
+                               stats.num_classification_classes);
+        }
       }
       // Return accumulator
       switch (options.classification_output()) {
@@ -713,7 +752,14 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
                 "  return Label.values()[accumulator > $0 ? 1 : 0];\n",
                 stats.num_trees / 2);
           } else {
-            // This case is not yet supported.
+            spec.return_prediction =
+                ("  int maxIndex = 0;\n"
+                 "  for (int i = 1; i < accumulator.length; i++) {\n"
+                 "    if (accumulator[i] > accumulator[maxIndex]) {\n"
+                 "      maxIndex = i;\n"
+                 "    }\n"
+                 "  }\n"
+                 "  return Label.values()[maxIndex];\n");
           }
           break;
         case proto::ClassificationOutput::SCORE:
@@ -725,7 +771,14 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
               spec.return_prediction = absl::Substitute(
                   "  return (float) accumulator / $0f;\n", stats.num_trees);
             } else {
-              // This case is not yet supported.
+              spec.return_prediction = absl::Substitute(
+                  R"(  float[] probas = new float[$0];
+  for (int i = 0; i < $0; i++) {
+    probas[i] = (float) accumulator[i] / $1f;
+  }
+  return probas;
+)",
+                  stats.num_classification_classes, stats.num_trees);
             }
           } else {
             spec.return_prediction = "return accumulator;\n";
@@ -738,13 +791,6 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
       spec.accumulator_type = "float";
       spec.return_prediction = "  return accumulator;\n";
       spec.leaf_value_spec = {.dtype = proto::DType::FLOAT32, .dims = 1};
-
-      spec.set_node_ifelse_fn =
-          [&](const model::decision_tree::proto::Node& node, const int depth,
-              const int tree_idx,
-              absl::string_view prefix) -> absl::StatusOr<std::string> {
-        return absl::UnimplementedError("IF_ELSE not implemented for Java");
-      };
 
       spec.leaf_value_fn =
           [&](const model::decision_tree::proto::Node& node) -> LeafValue {
@@ -762,7 +808,9 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
           "Unsupported task: ", model::proto::Task_Name(stats.task)));
   }
 
-  spec.accumulator_initial_value = "0";
+  if (spec.accumulator_initial_value.empty()) {
+    spec.accumulator_initial_value = "0";
+  }
   return spec;
 }
 
@@ -778,14 +826,6 @@ SpecializedConversionGradientBoostedTreesJava(
       // Leaf setter
       if (stats.is_binary_classification()) {
         spec.accumulator_type = "float";
-
-        spec.set_node_ifelse_fn =
-            [](const model::decision_tree::proto::Node& node, const int depth,
-               const int tree_idx,
-               absl::string_view prefix) -> absl::StatusOr<std::string> {
-          return absl::UnimplementedError("IF_ELSE not implemented for Java");
-        };
-
         spec.leaf_value_fn =
             [&](const model::decision_tree::proto::Node& node) -> LeafValue {
           const float node_value = node.regressor().top_value();
@@ -798,14 +838,6 @@ SpecializedConversionGradientBoostedTreesJava(
 
       } else {
         spec.accumulator_type = absl::StrCat("float[]");
-
-        spec.set_node_ifelse_fn =
-            [&](const model::decision_tree::proto::Node& node, const int depth,
-                const int tree_idx,
-                absl::string_view prefix) -> absl::StatusOr<std::string> {
-          return absl::UnimplementedError("IF_ELSE not implemented for Java");
-        };
-
         spec.leaf_value_fn =
             [&](const model::decision_tree::proto::Node& node) -> LeafValue {
           const float node_value = node.regressor().top_value();
@@ -873,14 +905,6 @@ SpecializedConversionGradientBoostedTreesJava(
     case model::proto::Task::REGRESSION:
       spec.accumulator_type = "float";
       spec.return_prediction = "  return accumulator;\n";
-
-      spec.set_node_ifelse_fn =
-          [](const model::decision_tree::proto::Node& node, const int depth,
-             const int tree_idx,
-             absl::string_view prefix) -> absl::StatusOr<std::string> {
-        return absl::UnimplementedError("IF_ELSE not implemented for Java");
-      };
-
       spec.leaf_value_fn =
           [&](const model::decision_tree::proto::Node& node) -> LeafValue {
         const float node_value = node.regressor().top_value();
