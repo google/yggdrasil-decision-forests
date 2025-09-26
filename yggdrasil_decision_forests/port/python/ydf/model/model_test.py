@@ -846,7 +846,7 @@ Use `model.describe()` for more details.
         original_predictions, deserialized_predictions, decimal=5
     )
 
-  def test_model_embed(self):
+  def test_model_embed_cc(self):
     model = model_lib.load_model(
         os.path.join(self._model_dir, "adult_binary_class_gbdt_v2")
     )
@@ -879,6 +879,42 @@ Use `model.describe()` for more details.
             "golden",
             "embed",
             "adult_binary_class_gbdt_v2_probability_routing.h.golden",
+        ),
+    )
+
+  def test_model_embed_java(self):
+    model = model_lib.load_model(
+        os.path.join(self._model_dir, "adult_binary_class_gbdt_v2")
+    )
+    while model.num_trees() > 3:
+      model.remove_tree(model.num_trees() - 1)
+    embedded_model_files = model.to_standalone_java(
+        package_name="com.google.ydf",
+        classification_output="PROBABILITY",
+    )
+    self.assertIsInstance(embedded_model_files, dict)
+    self.assertLen(embedded_model_files, 2)
+    self.assertIn("YdfModel.java", embedded_model_files)
+    self.assertIn("YdfModelData.bin", embedded_model_files)
+
+    test_utils.golden_check_string(
+        self,
+        embedded_model_files["YdfModel.java"].decode(),
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_probability_routing.java.golden",
+        ),
+    )
+    test_utils.golden_check_bytes(
+        self,
+        embedded_model_files["YdfModelData.bin"],
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_probability_routing_data.bin.golden",
         ),
     )
 

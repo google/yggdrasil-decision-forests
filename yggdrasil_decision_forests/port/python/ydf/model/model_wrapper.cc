@@ -408,13 +408,15 @@ absl::StatusOr<py::bytes> GenericCCModel::Serialize() const {
   return py::bytes(serialized_model);
 }
 
-absl::StatusOr<std::unordered_map<std::string, std::string>>
+absl::StatusOr<std::unordered_map<std::string, py::bytes>>
 GenericCCModel::EmbedModel(
     const serving::embed::proto::Options& options) const {
-  std::unordered_map<std::string, std::string> std_result;
+  std::unordered_map<std::string, py::bytes> std_result;
   ASSIGN_OR_RETURN(const auto absl_result,
                    serving::embed::EmbedModel(*model_, options));
-  std_result.insert(absl_result.begin(), absl_result.end());
+  for (const auto& [key, value] : absl_result) {
+    std_result[key] = py::bytes(value);
+  }
   return std_result;
 }
 

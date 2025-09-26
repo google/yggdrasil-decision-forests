@@ -793,7 +793,7 @@ Use `model.describe()` for more details.
       algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
       categorical_from_string: bool = False,
-  ) -> Union[str, Dict[str, str]]:
+  ) -> Union[str, Dict[str, bytes]]:
     """Generates standalone, dependency-free C++ code for model inference.
 
     This method is ideal for size-critical applications. See `to_cpp` for an
@@ -857,6 +857,76 @@ Use `model.describe()` for more details.
     Returns:
       A string with the C++ source code, or a dictionary of filename to source
       code if multiple files are generated.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def to_standalone_java(
+      self,
+      name: str = "YdfModel",
+      package_name: str = "com.example.ydfmodel",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+  ) -> Dict[str, bytes]:
+    """Generates standalone, dependency-free Java code for model inference.
+
+    This method is ideal for size-critical applications.
+
+    **How to use:**
+
+    1.  Call this function to get the generated code and data:
+        ```python
+        model = ydf.load_model(...)
+        java_files = model.to_standalone_java(
+            name="MyYdfModel",
+            package_name="com.mycompany.myproject"
+        )
+        ```
+
+    2.  The function returns a dictionary containing two items:
+        - Key: `{name}.java` (e.g., "MyYdfModel.java"): Value is the Java source
+          code as bytes.
+        - Key: `{name}Data.bin` (e.g., "MyYdfModelData.bin"): Value is the
+          binary model data as bytes.
+
+    3.  Save these files to your Java project:
+        ```python
+        with open(f"{name}.java", "wb") as f:
+            f.write(java_files[f"{name}.java"])
+        with open(f"{name}Data.bin", "wb") as f:
+            f.write(java_files[f"{name}Data.bin"])
+        ```
+        Place the `{name}Data.bin` file in the Java classpath, typically in the
+        resources directory.
+
+    4.  In your Java code, import the generated class and use the static
+        `predict` method:
+        ```java
+        import com.mycompany.myproject.MyYdfModel;
+
+        // Create an Instance with feature values.
+        // Categorical features are represented by enums in the generated class.
+        MyYdfModel.Instance instance = new MyYdfModel.Instance(
+            5.0f, // Numerical feature
+            MyYdfModel.FeatureF2.kRed // Categorical feature
+        );
+
+        // Get the prediction.
+        float prediction = MyYdfModel.predict(instance);
+        ```
+        The `predict` function is thread-safe. The generated class also
+        contains enums for all categorical features.
+
+    Args:
+      name: A name for the model, used to create the Java class name.
+      package_name: The Java package name for the generated class.
+      classification_output: The output format for classification models. -
+        "CLASS" (default): The predicted class enum. - "SCORE": The raw scores
+        (e.g., logits) for all classes. - "PROBABILITY": The probabilities for
+        all classes.
+
+    Returns:
+      A dictionary of filename to source code. This includes the Java source
+      file and a binary resource file containing the model data.
     """
     raise NotImplementedError
 
@@ -1937,7 +2007,7 @@ class GenericCCModel(GenericModel):
       algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
       categorical_from_string: bool = False,
-  ) -> Union[str, Dict[str, str]]:
+  ) -> Union[str, Dict[str, bytes]]:
     options = embed_pb2.Options(
         name=name,
         classification_output=embed_pb2.ClassificationOutput.Enum.Value(
@@ -1949,9 +2019,24 @@ class GenericCCModel(GenericModel):
     )
     results = self._model.EmbedModel(options)
     if len(results) == 1:
-      return list(results.values())[0]
+      return list(results.values())[0].decode()
     else:
       return results
+
+  def to_standalone_java(
+      self,
+      name: str = "YdfModel",
+      package_name: str = "com.example.ydfmodel",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+  ) -> Dict[str, bytes]:
+    options = embed_pb2.Options(
+        name=name,
+        classification_output=embed_pb2.ClassificationOutput.Enum.Value(
+            classification_output
+        ),
+        java=embed_pb2.Java(package_name=package_name),
+    )
+    return self._model.EmbedModel(options)
 
   # TODO: Change default value of "mode" before 1.0 release.
   def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value
