@@ -268,6 +268,10 @@ void init_model(py::module_& m) {
            &GradientBoostedTreesCCModel::initial_predictions)
       .def("set_initial_predictions",
            &GradientBoostedTreesCCModel::set_initial_predictions)
+      .def("output_logits",
+           WithStatusOr(&GradientBoostedTreesCCModel::output_logits))
+      .def("set_output_logits",
+           WithStatus(&GradientBoostedTreesCCModel::set_output_logits))
       .def("validation_evaluation",
            &GradientBoostedTreesCCModel::validation_evaluation)
       .def("training_logs", &GradientBoostedTreesCCModel::training_logs)

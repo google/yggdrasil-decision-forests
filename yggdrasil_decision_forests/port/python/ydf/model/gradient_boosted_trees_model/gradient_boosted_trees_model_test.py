@@ -321,6 +321,64 @@ class GradientBoostedTreesTest(parameterized.TestCase):
   def test_num_trees_per_iterations(self):
     self.assertEqual(self.adult_binary_class_gbdt.num_trees_per_iteration(), 1)
 
+  def test_set_output_logits_classification(self):
+    dataset = pd.read_csv(
+        os.path.join(
+            test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+        ),
+        nrows=10,
+    )
+    model = self.adult_binary_class_gbdt
+    # Predictions are probabilities if output_logits=False
+    model.set_output_logits(False)
+    self.assertFalse(model.output_logits())
+    proba_predictions = model.predict(dataset)
+    self.assertEqual(proba_predictions.shape, (10,))
+    npt.assert_array_less(proba_predictions, 1.001)
+    npt.assert_array_less(-0.001, proba_predictions)
+
+    # If output_logits=True, predictions are logits
+    model.set_output_logits(True)
+    self.assertTrue(model.output_logits())
+    logit_predictions = model.predict(dataset)
+    self.assertEqual(logit_predictions.shape, (10,))
+
+    # Check relation between logits and probabilities
+    def sigmoid(x):
+      return 1.0 / (1.0 + np.exp(-x))
+
+    npt.assert_allclose(
+        sigmoid(logit_predictions), proba_predictions, rtol=1e-5
+    )
+
+    # Setting output_logits back to False gives probabilities
+    model.set_output_logits(False)
+    self.assertFalse(model.output_logits())
+    proba_predictions_2 = model.predict(dataset)
+    npt.assert_allclose(proba_predictions_2, proba_predictions, rtol=1e-5)
+
+  def test_set_output_logits_regression_raises_error(self):
+    model = self.abalone_regression_gbdt
+    with self.assertRaisesRegex(
+        ValueError, "output_logits is only supported for classification tasks"
+    ):
+      model.output_logits()
+    with self.assertRaisesRegex(
+        ValueError, "output_logits is only supported for classification tasks"
+    ):
+      model.set_output_logits(True)
+
+  def test_set_output_logits_ranking_raises_error(self):
+    model = self.synthetic_ranking_gbdt
+    with self.assertRaisesRegex(
+        ValueError, "output_logits is only supported for classification tasks"
+    ):
+      model.output_logits()
+    with self.assertRaisesRegex(
+        ValueError, "output_logits is only supported for classification tasks"
+    ):
+      model.set_output_logits(True)
+
   def test_predict_distance(self):
     dataset = pd.read_csv(
         os.path.join(
