@@ -36,6 +36,11 @@ RandomForestLearner::PredefinedHyperParameters() const {
       field->set_name(kHParamWinnerTakeAll);
       field->mutable_value()->set_categorical("true");
     }
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(kHParamKernelMethod);
+      field->mutable_value()->set_categorical("true");  
+    }
     param_sets.push_back(std::move(config));
   }
   {
@@ -48,6 +53,11 @@ RandomForestLearner::PredefinedHyperParameters() const {
       auto field = config.mutable_parameters()->add_fields();
       field->set_name(kHParamWinnerTakeAll);
       field->mutable_value()->set_categorical("true");
+    }
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(kHParamKernelMethod);
+      field->mutable_value()->set_categorical("true");  
     }
     {
       auto field = config.mutable_parameters()->add_fields();
