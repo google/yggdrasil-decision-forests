@@ -1091,22 +1091,6 @@ absl::Status GenerateTreeInferenceRoutingJava(
   // Note: emplace_back currently fails with the older GCC from the open-source
   // build.
   std::vector<RoutingConditionCode> conditions;
-  conditions.push_back(
-      {RoutingConditionType::HIGHER_CONDITION,
-       {},
-       absl::Substitute(
-           R"(        $0 numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
-        $0 threshold = nodeThr[currentNodeIndex];
-        conditionResult = numericalFeatureValue >= threshold;
-)",
-           numerical_type)});
-  conditions.push_back(
-      {RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP,
-       {},
-       R"(        int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
-        int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
-        conditionResult = categoricalBank.get(bitIndex);
-)"});
   if (stats.has_conditions[model::decision_tree::proto::Condition::TypeCase::
                                kObliqueCondition]) {
     ASSIGN_OR_RETURN(const auto oblique_feature_type,
@@ -1127,6 +1111,22 @@ absl::Status GenerateTreeInferenceRoutingJava(
 )",
              oblique_feature_type, numerical_type)});
   }
+  conditions.push_back(
+      {RoutingConditionType::HIGHER_CONDITION,
+       {},
+       absl::Substitute(
+           R"(        $0 numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+        $0 threshold = nodeThr[currentNodeIndex];
+        conditionResult = numericalFeatureValue >= threshold;
+)",
+           numerical_type)});
+  conditions.push_back(
+      {RoutingConditionType::CONTAINS_CONDITION_BUFFER_BITMAP,
+       {},
+       R"(        int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
+        int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
+        conditionResult = categoricalBank.get(bitIndex);
+)"});
   RETURN_IF_ERROR(AddRoutingConditionsJava(conditions, routing_bank, content));
 
   // Middle of the loop: Select the next node.
