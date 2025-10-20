@@ -1,0 +1,11 @@
+name: Actions Runner Controller Demo
+on:
+  workflow_dispatch:
+
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: linux-x86-n2-64
+    container:
+      image: us-docker.pkg.dev/ml-oss-artifacts-published/ml-public-container/ml-build:latest
+    steps:
+    - run: echo "🎉 This job uses runner scale set runners!"
