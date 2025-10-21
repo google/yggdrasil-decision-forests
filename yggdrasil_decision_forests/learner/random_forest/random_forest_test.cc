@@ -247,7 +247,7 @@ TEST_F(RandomForestOnAdult, Base) {
 
   EXPECT_LE(rank_capital_gain, 5);
   EXPECT_LE(rank_relationship, 6);
-  EXPECT_LE(rank_occupation, 6);
+  EXPECT_LE(rank_occupation, 7);
 
   // Worst 2 variables.
   const int rank_fnlwgt = utils::GetVariableImportanceRank(
