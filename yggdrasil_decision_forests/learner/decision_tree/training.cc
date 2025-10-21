@@ -2296,6 +2296,28 @@ FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
   }
 }
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureNumericalHistogram<true>(
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
+    const std::vector<float>& labels, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, utils::RandomEngine* random,
+    proto::NodeCondition* condition);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureNumericalHistogram<false>(
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
+    const std::vector<float>& labels, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, utils::RandomEngine* random,
+    proto::NodeCondition* condition);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelRegressionFeatureNumericalHistogram(
@@ -2520,6 +2542,34 @@ FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
     const NodeConstraints& constraints, int8_t monotonic_direction,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    int num_bins, const std::vector<float>& gradients,
+    const std::vector<float>& hessians, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
+    double sum_hessian, double sum_weights, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    int num_bins, const std::vector<float>& gradients,
+    const std::vector<float>& hessians, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
+    double sum_hessian, double sum_weights, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
@@ -2635,6 +2685,32 @@ FindSplitLabelRegressionFeatureNumericalCart<false>(
     int32_t attribute_idx, const InternalTrainConfig& internal_config,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureDiscretizedNumericalCart<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    const int num_bins, const std::vector<float>& labels,
+    const dataset::DiscretizedNumericalIndex na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureDiscretizedNumericalCart<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    const int num_bins, const std::vector<float>& labels,
+    const dataset::DiscretizedNumericalIndex na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
@@ -2726,6 +2802,34 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelClassificationFeatureNA(
     }
   }
 }
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureNA<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::AbstractColumn* attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureNA<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::AbstractColumn* attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
 
 template <bool weighted>
 absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureNA(
@@ -2884,6 +2988,32 @@ FindSplitLabelRegressionFeatureBoolean<false>(
     int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureBoolean<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    bool na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureBoolean<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    bool na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureBoolean(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
@@ -2922,6 +3052,34 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureBoolean(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureCategorical<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const int32_t num_attribute_classes, int32_t na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureCategorical<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const int32_t num_attribute_classes, int32_t na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
@@ -2986,6 +3144,28 @@ FindSplitLabelHessianRegressionFeatureCategorical(
       return absl::InvalidArgumentError("Non supported");
   }
 }
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureCategorical<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& labels, const int32_t num_attribute_classes,
+    int32_t na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureCategorical<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& labels, const int32_t num_attribute_classes,
+    int32_t na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 template <bool weighted>
 absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureCategorical(
