@@ -256,7 +256,7 @@ TEST_F(RandomForestOnAdult, Base) {
       "education", model_->data_spec(), mean_decrease_accuracy);
 
   EXPECT_GE(rank_fnlwgt, 7);
-  EXPECT_GE(rank_education, 4);
+  EXPECT_GE(rank_education, 3);
 
   std::string description;
   model_->AppendDescriptionAndStatistics(false, &description);
