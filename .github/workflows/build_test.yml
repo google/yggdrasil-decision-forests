@@ -1,6 +1,11 @@
 name: Yggdrasil Decision Forests Build and Test
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 3 * * *'
 
 jobs:
   CC-Build-And-Test:
