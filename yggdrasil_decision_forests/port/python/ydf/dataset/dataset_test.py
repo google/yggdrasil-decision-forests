@@ -3223,6 +3223,9 @@ f1,f2
 """,
     )
 
+  def test_failure_for_ci_testing(self):
+    self.fail("Fail for testing again")
+
 
 if __name__ == "__main__":
   absltest.main()

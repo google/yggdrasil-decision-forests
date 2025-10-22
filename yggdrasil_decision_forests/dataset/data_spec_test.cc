@@ -674,6 +674,8 @@ TEST(Dataset, UnstackedColumnNamesV2) {
   EXPECT_THAT(UnstackedColumnNamesV2("a", 0), ElementsAre());
 }
 
+TEST(Canary, FailingTest) { FAIL(); }
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
