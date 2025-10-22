@@ -1,0 +1,59 @@
+name: "Handle Test Outcome"
+description: "Reports test failures, uploads logs on failure, and optionally fails the job."
+inputs:
+  test_outcome:
+    description: "The outcome of the test step."
+    required: true
+    type: string
+  reporter_name:
+    description: "Name to use for the dorny/test-reporter."
+    required: true
+    type: string
+  testlogs_xml_path:
+    description: "Path pattern for JUnit XML test result files."
+    required: true
+    type: string
+  artifact_name:
+    description: "Name for the uploaded log artifact."
+    required: true
+    type: string
+  testlogs_log_path:
+    description: "Path pattern for test log files to upload."
+    required: true
+    type: string
+  failure_message:
+    description: "Message echoed to the console if tests fail."
+    required: true
+    type: string
+  working_directory:
+    description: "Optional working directory for artifact upload."
+    required: false
+    type: string
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - name: Report Test Failures
+      if: always() && inputs.test_outcome == 'failure'
+      uses: dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3
+      with:
+        name: ${{ inputs.reporter_name }}
+        path: ${{ inputs.testlogs_xml_path }}
+        reporter: junit
+        fail-on-error: false
+
+    - name: Upload Test Logs on Failure
+      if: inputs.test_outcome == 'failure'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ inputs.testlogs_log_path }}
+        working-directory: ${{ inputs.working_directory }}
+        retention-days: 14
+
+    - name: Fail Job if Tests Failed
+      if: inputs.test_outcome == 'failure'
+      shell: bash
+      run: |
+        echo "${{ inputs.failure_message }}"
+        exit 1

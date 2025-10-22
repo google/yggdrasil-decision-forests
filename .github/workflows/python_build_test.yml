@@ -1,0 +1,88 @@
+name: Python Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      container_image:
+        required: false
+        type: string
+        default: us-docker.pkg.dev/ml-oss-artifacts-published/ml-public-container/ml-build:latest
+      python_version:
+        required: true
+        type: string
+        description: "The Python version to set up (e.g., '3.9', '3.10'). Currently unused."
+
+jobs:
+  build-test:
+    runs-on: ${{ inputs.runner }}
+    container:
+      image: ${{ inputs.container_image }}
+    env:
+      BAZEL_PY_FLAGS: >-
+        --repository_cache=../../../.bazel-cache/repository
+        --disk_cache=../../../.bazel-cache/disk
+        --config=linux_cpp17
+        --config=linux_avx2
+        --features=-fully_static_link
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Cache Bazel Dependencies (Python ${{ inputs.python_version }})
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .bazel-cache
+          key: ${{ runner.os }}-bazel-py-${{ inputs.python_version }}-${{ hashFiles('**/WORKSPACE', '.bazelrc') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-py-${{ inputs.python_version }}-
+            ${{ runner.os }}-bazel-py-
+
+      - name: Create Bazel Cache Directories
+        run: mkdir -p .bazel-cache/repository .bazel-cache/disk
+
+      - name: Cache pip dependencies (Python ${{ inputs.python_version }})
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ inputs.python_version }}-${{ hashFiles('yggdrasil_decision_forests/port/python/requirements.txt', 'yggdrasil_decision_forests/port/python/dev_requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ inputs.python_version }}-
+            ${{ runner.os }}-pip-
+
+      - name: Install Python Dependencies
+        working-directory: yggdrasil_decision_forests/port/python
+        run: |
+          python --version
+          python -m pip install -q -r dev_requirements.txt
+          python -m pip install -q -r requirements.txt
+          pip list
+
+      - name: Build Python
+        working-directory: yggdrasil_decision_forests/port/python
+        run: |
+          bazel version
+          bazel build //ydf/...:all \
+            ${{ env.BAZEL_PY_FLAGS }}
+
+      - name: Test Python
+        working-directory: yggdrasil_decision_forests/port/python
+        id: py_test
+        continue-on-error: true
+        run: |
+          bazel test //ydf/...:all \
+            ${{ env.BAZEL_PY_FLAGS }} \
+            --test_output=errors \
+            --output_groups=+test_xml
+
+      - uses: ./.github/actions/handle-test-outcome
+        with:
+          test_outcome: ${{ steps.py_test.outcome }}
+          reporter_name: "Bazel Python Tests (${{ inputs.python_version }})"
+          testlogs_xml_path: yggdrasil_decision_forests/port/python/bazel-testlogs/**/*.xml
+          artifact_name: py-test-logs-${{ inputs.python_version }}
+          testlogs_log_path: bazel-testlogs/**/*.log
+          failure_message: "Python tests failed for Python ${{ inputs.python_version }}. See annotations in the Checks tab for details, or 'py-test-logs-${{ inputs.python_version }}' artifact for full logs."
+          working_directory: yggdrasil_decision_forests/port/python

@@ -1,4 +1,4 @@
-name: Yggdrasil Decision Forests Build and Test
+name: Build and Test
 
 permissions:
   contents: read
@@ -11,123 +11,29 @@ on:
   schedule:
     - cron: '0 3 * * *'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  CC-Build-And-Test:
-    runs-on: linux-x86-n2-32
-    container:
-      image: us-docker.pkg.dev/ml-oss-artifacts-published/ml-public-container/ml-build:latest
-    env:
-      BAZEL_COMMON_FLAGS: >-
-        --repository_cache=.bazel-cache/repository
-        --disk_cache=.bazel-cache/disk
-        --config=linux_cpp17
-        --config=linux_avx2
-        --features=-fully_static_link
-        --build_tag_filters=-tf_dep,-cuda_dep
-        --test_tag_filters=-tf_dep,-cuda_dep
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
+  cc-build-test-matrix:
+    name: "C++ Build & Test (Compiler: ${{ matrix.compiler_config }})"
+    uses: ./.github/workflows/cc_build_test.yml
+    with:
+      runner: linux-x86-n2-32
+      compiler_config: ${{ matrix.compiler_config }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler_config: ["gcc", "clang"]
 
-      - name: Cache Bazel Dependencies (C++)
-        uses: actions/cache@v4
-        with:
-          path: .bazel-cache
-          key: ${{ runner.os }}-bazel-cc-${{ hashFiles('**/WORKSPACE', '.bazelrc') }}
-          restore-keys: |
-            ${{ runner.os }}-bazel-cc-
-            ${{ runner.os }}-bazel-
-      - name: Create Bazel Cache Directories
-        run: mkdir -p .bazel-cache/repository .bazel-cache/disk
-      - name: Build C++
-        run: |
-          bazel build //yggdrasil_decision_forests/...:all //examples:beginner_cc \
-            ${{ env.BAZEL_COMMON_FLAGS }}
-      - name: Test C++
-        id: cc_test
-        continue-on-error: true
-        run: |
-          bazel test //yggdrasil_decision_forests/...:all \
-            ${{ env.BAZEL_COMMON_FLAGS }}
-      - name: Upload Test Logs on Failure
-        if: steps.cc_test.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: cc-test-logs
-          path: bazel-testlogs/**/*.log
-          retention-days: 30
-      - name: Fail Job if Tests Failed
-        if: steps.cc_test.outcome == 'failure'
-        run: |
-          echo "CC tests failed. See 'cc-test-logs' artifact for details."
-          exit 1
-
-  Python-Build-And-Test:
-    runs-on: linux-x86-n2-32
-    container:
-      image: us-docker.pkg.dev/ml-oss-artifacts-published/ml-public-container/ml-build:latest
-    env:
-      BAZEL_PY_FLAGS: >-
-        --repository_cache=../../../.bazel-cache/repository
-        --disk_cache=../../../.bazel-cache/disk
-        --config=linux_cpp17
-        --config=linux_avx2
-        --features=-fully_static_link
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
-
-      - name: Cache Bazel Dependencies (Python)
-        uses: actions/cache@v4
-        with:
-          path: .bazel-cache
-          key: ${{ runner.os }}-bazel-py-${{ hashFiles('**/WORKSPACE', '.bazelrc') }}
-          restore-keys: |
-            ${{ runner.os }}-bazel-py-
-            ${{ runner.os }}-bazel-
-      - name: Create Bazel Cache Directories
-        run: mkdir -p .bazel-cache/repository .bazel-cache/disk
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('yggdrasil_decision_forests/port/python/requirements.txt', 'yggdrasil_decision_forests/port/python/dev_requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install Python Dependencies
-        working-directory: yggdrasil_decision_forests/port/python
-        run: |
-          python --version
-          python -m pip install -q -r dev_requirements.txt
-          python -m pip install -q -r requirements.txt
-          pip list
-      - name: Build Python
-        working-directory: yggdrasil_decision_forests/port/python
-        run: |
-          bazel version
-          bazel build //ydf/...:all \
-            ${{ env.BAZEL_PY_FLAGS }}
-      - name: Test Python
-        working-directory: yggdrasil_decision_forests/port/python
-        id: py_test
-        continue-on-error: true
-        run: |
-          bazel test //ydf/...:all \
-            ${{ env.BAZEL_PY_FLAGS }} \
-            --test_output=errors
-      - name: Upload Test Logs on Failure
-        if: steps.py_test.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: py-test-logs
-          working-directory: yggdrasil_decision_forests/port/python
-          path: bazel-testlogs/**/*.log
-          retention-days: 30
-      - name: Fail Job if Tests Failed
-        if: steps.py_test.outcome == 'failure'
-        run: |
-          echo "Python tests failed. See 'py-test-logs' artifact for details."
-          exit 1
-
+  python-build-test-matrix:
+    name: "Python Build & Test (Python ${{ matrix.python_version }})"
+    uses: ./.github/workflows/python_build_test.yml
+    with:
+      runner: linux-x86-n2-32
+      python_version: ${{ matrix.python_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ['3.12']  # Currently unused

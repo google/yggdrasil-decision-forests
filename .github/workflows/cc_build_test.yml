@@ -1,0 +1,74 @@
+name: C++ Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+        description: "The GitHub runner label (e.g., linux-x86-n2-32)"
+      container_image:
+        required: false
+        type: string
+        default: us-docker.pkg.dev/ml-oss-artifacts-published/ml-public-container/ml-build:latest
+        description: "The Docker container image to use"
+      compiler_config:
+        required: false
+        type: string
+        default: "gcc"
+        description: "Configuration for the C++ compiler (e.g., 'gcc', 'clang')."
+
+jobs:
+  build-test:
+    runs-on: ${{ inputs.runner }}
+    container:
+      image: ${{ inputs.container_image }}
+    env:
+      BAZEL_COMMON_FLAGS: >-
+        --repository_cache=.bazel-cache/repository
+        --disk_cache=.bazel-cache/disk
+        --config=linux_cpp17
+        --config=linux_avx2
+        --features=-fully_static_link
+        --build_tag_filters=-tf_dep,-cuda_dep
+        --test_tag_filters=-tf_dep,-cuda_dep
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Cache Bazel Dependencies (C++ - ${{ inputs.compiler_config }})
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: .bazel-cache
+          key: ${{ runner.os }}-bazel-cc-${{ inputs.compiler_config }}-${{ hashFiles('**/WORKSPACE', '.bazelrc') }}
+          restore-keys: |
+            ${{ runner.os }}-bazel-cc-${{ inputs.compiler_config }}-
+            ${{ runner.os }}-bazel-cc-
+
+      - name: Create Bazel Cache Directories
+        run: mkdir -p .bazel-cache/repository .bazel-cache/disk
+
+      - name: Build C++
+        run: |
+          bazel build //yggdrasil_decision_forests/...:all //examples:beginner_cc \
+            ${{ env.BAZEL_COMMON_FLAGS }} \
+            --repo_env=CC=${{ inputs.compiler_config }}
+
+      - name: Test C++
+        id: cc_test
+        continue-on-error: true
+        run: |
+          bazel test //yggdrasil_decision_forests/...:all \
+            ${{ env.BAZEL_COMMON_FLAGS }} \
+            --repo_env=CC=${{ inputs.compiler_config }} \
+            --test_output=errors \
+            --output_groups=+test_xml
+
+      - uses: ./.github/actions/handle-test-outcome
+        with:
+          test_outcome: ${{ steps.cc_test.outcome }}
+          reporter_name: "Bazel C++ Tests (${{ inputs.compiler_config }})"
+          testlogs_xml_path: bazel-testlogs/**/*.xml
+          artifact_name: cc-test-logs-${{ inputs.compiler_config }}
+          testlogs_log_path: bazel-testlogs/**/*.log
+          failure_message: "CC tests failed for compiler config '${{ inputs.compiler_config }}'. See annotations in the Checks tab for details, or 'cc-test-logs-${{ inputs.compiler_config }}' artifact for full logs."
