@@ -67,7 +67,9 @@ jobs:
         run: |
           bazel version
           bazel build //ydf/...:all \
-            ${{ env.BAZEL_PY_FLAGS }}
+            ${{ env.BAZEL_PY_FLAGS }} \
+            --explain=cache_explain.log \
+            --verbose_explanations
 
       - name: Test Python
         working-directory: yggdrasil_decision_forests/port/python
@@ -88,3 +90,4 @@ jobs:
           testlogs_log_path: bazel-testlogs/**/*.log
           failure_message: "Python tests failed for Python ${{ inputs.python_version }}. See annotations in the Checks tab for details, or 'py-test-logs-${{ inputs.python_version }}' artifact for full logs."
           working_directory: yggdrasil_decision_forests/port/python
+          explain_log_path: cache_explain.log

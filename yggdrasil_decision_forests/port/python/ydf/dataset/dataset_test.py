@@ -3223,6 +3223,8 @@ f1,f2
 """,
     )
 
+  def test_fails_for_testing(self):
+     self.fail("Fail for testing")
 
 if __name__ == "__main__":
   absltest.main()
