@@ -27,6 +27,8 @@ jobs:
         --config=linux_cpp17
         --config=linux_avx2
         --features=-fully_static_link
+        --explain=cache_explain.log
+        --verbose_explanations
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -88,3 +90,4 @@ jobs:
           testlogs_log_path: bazel-testlogs/**/*.log
           failure_message: "Python tests failed for Python ${{ inputs.python_version }}. See annotations in the Checks tab for details, or 'py-test-logs-${{ inputs.python_version }}' artifact for full logs."
           working_directory: yggdrasil_decision_forests/port/python
+          explain_log_path: cache_explain.log

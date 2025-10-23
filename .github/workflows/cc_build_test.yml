@@ -76,3 +76,4 @@ jobs:
           artifact_name: cc-test-logs-${{ inputs.compiler_config }}
           testlogs_log_path: bazel-testlogs/**/*.log
           failure_message: "CC tests failed for compiler config '${{ inputs.compiler_config }}'. See annotations in the Checks tab for details, or 'cc-test-logs-${{ inputs.compiler_config }}' artifact for full logs."
+          explain_log_path: cache_explain.log

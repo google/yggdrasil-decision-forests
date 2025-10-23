@@ -43,7 +43,7 @@ runs:
       with:
         name: ${{ inputs.reporter_name }}
         path: ${{ inputs.testlogs_xml_path }}
-        reporter: junit
+        reporter: jest-junit
         fail-on-error: false
 
     - name: Upload Test Logs on Failure
