@@ -62,7 +62,7 @@ namespace yggdrasil_decision_forests::port::python {
 
 absl::StatusOr<std::shared_ptr<const serving::FastEngine>>
 GenericCCModel::GetEngine() {
-  utils::concurrency::MutexLock lock(engine_mutex_);
+  utils::concurrency::MutexLock lock(&engine_mutex_);
   if (engine_ == nullptr || invalidate_engine_) {
     RETURN_IF_ERROR(model_->Validate());
     ASSIGN_OR_RETURN(engine_, model_->BuildFastEngine(force_engine_name_));
