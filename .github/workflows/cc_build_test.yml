@@ -54,8 +54,8 @@ jobs:
         run: |
           bazel build //yggdrasil_decision_forests/...:all //examples:beginner_cc \
             ${{ env.BAZEL_COMMON_FLAGS }} \
-            --repo_env=CC=${{ inputs.compiler_config }}
-            --explain=cache_explain.log
+            --repo_env=CC=${{ inputs.compiler_config }} \
+            --explain=cache_explain.log \
             --verbose_explanations
 
       - name: Test C++

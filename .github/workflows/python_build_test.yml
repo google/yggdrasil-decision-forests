@@ -67,8 +67,8 @@ jobs:
         run: |
           bazel version
           bazel build //ydf/...:all \
-            ${{ env.BAZEL_PY_FLAGS }}
-            --explain=cache_explain.log
+            ${{ env.BAZEL_PY_FLAGS }} \
+            --explain=cache_explain.log \
             --verbose_explanations
 
       - name: Test Python
