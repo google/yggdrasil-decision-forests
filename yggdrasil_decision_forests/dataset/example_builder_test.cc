@@ -28,7 +28,7 @@ using test::EqualsProto;
 TEST(ExampleProtoBuilder, Base) {
   proto::DataSpecification data_spec;
   AddNumericalColumn("a", &data_spec);
-  
+
   AddColumn("b", proto::ColumnType::DISCRETIZED_NUMERICAL, &data_spec);
   AddColumn("c", proto::ColumnType::CATEGORICAL, &data_spec);
   AddCategoricalColumn("d", {"X", "Y", "Z"}, &data_spec);
@@ -56,6 +56,10 @@ TEST(ExampleProtoBuilder, Base) {
         attributes { categorical_set { values: 1 values: 2 } }
       )pb");
   EXPECT_THAT(builder.example(), EqualsProto(expected));
+}
+
+TEST(FailsForTesting, Base) {
+  FAIL();
 }
 
 }  // namespace
