@@ -28,6 +28,7 @@ using test::EqualsProto;
 TEST(ExampleProtoBuilder, Base) {
   proto::DataSpecification data_spec;
   AddNumericalColumn("a", &data_spec);
+  
   AddColumn("b", proto::ColumnType::DISCRETIZED_NUMERICAL, &data_spec);
   AddColumn("c", proto::ColumnType::CATEGORICAL, &data_spec);
   AddCategoricalColumn("d", {"X", "Y", "Z"}, &data_spec);

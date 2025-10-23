@@ -29,7 +29,7 @@ inputs:
     description: "Optional working directory for artifact upload."
     required: false
     type: string
-    default: ""
+    default: "."
   explain_log_path:
     description: "Path pattern for cache explanations."
     required: true
@@ -51,8 +51,8 @@ runs:
       with:
         name: ${{ inputs.artifact_name }}
         path: |
-          ${{ inputs.testlogs_log_path }}
-          ${{ inputs.explain_log_path }}
+          ${{ inputs.working_directory }}/${{ inputs.testlogs_log_path }}
+          ${{ inputs.working_directory }}/${{ inputs.explain_log_path }}
         working-directory: ${{ inputs.working_directory }}
         retention-days: 14
 

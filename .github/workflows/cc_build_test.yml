@@ -32,8 +32,6 @@ jobs:
         --features=-fully_static_link
         --build_tag_filters=-tf_dep,-cuda_dep
         --test_tag_filters=-tf_dep,-cuda_dep
-        --explain=cache_explain.log
-        --verbose_explanations
     steps:
       - name: Checkout Repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
@@ -57,6 +55,8 @@ jobs:
           bazel build //yggdrasil_decision_forests/...:all //examples:beginner_cc \
             ${{ env.BAZEL_COMMON_FLAGS }} \
             --repo_env=CC=${{ inputs.compiler_config }}
+            --explain=cache_explain.log
+            --verbose_explanations
 
       - name: Test C++
         id: cc_test
