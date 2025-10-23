@@ -30,6 +30,10 @@ inputs:
     required: false
     type: string
     default: ""
+  explain_log_path:
+    description: "Path pattern for cache explanations."
+    required: true
+    type: string
 runs:
   using: "composite"
   steps:
@@ -43,11 +47,12 @@ runs:
         fail-on-error: false
 
     - name: Upload Test Logs on Failure
-      if: inputs.test_outcome == 'failure'
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: ${{ inputs.artifact_name }}
-        path: ${{ inputs.testlogs_log_path }}
+        path: |
+          ${{ inputs.testlogs_log_path }}
+          ${{ inputs.explain_log_path }}
         working-directory: ${{ inputs.working_directory }}
         retention-days: 14
 
