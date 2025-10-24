@@ -27,7 +27,6 @@ jobs:
       BAZEL_COMMON_FLAGS: >-
         --repository_cache=.bazel-cache/repository
         --disk_cache=.bazel-cache/disk
-        --config=linux_cpp17
         --config=linux_avx2
         --features=-fully_static_link
         --build_tag_filters=-tf_dep,-cuda_dep
