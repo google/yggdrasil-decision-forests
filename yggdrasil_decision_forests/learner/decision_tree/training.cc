@@ -1984,7 +1984,7 @@ const int   num_splits) {
   if (idx < 0)           return -1;
   if (idx >= num_splits) idx = num_splits - 1;
 
-  // Optional: Sometimes above is off-by-one vs. std::upper_bound due to floating point arithmetic
+  // Sometimes above is off-by-one vs. std::upper_bound due to floating point arithmetic
   // Below's a 1-step correction to match std::upper_bound() on the actual thresholds.
   // Compute thresholds using the exact same arithmetic as in GenHistogramBins:
   // T[j] = min_value + (range * (j + 0.5f)) / num_splits;
