@@ -29,7 +29,7 @@ inputs:
     description: "Optional working directory for artifact upload."
     required: false
     type: string
-    default: ""
+    default: "."
 runs:
   using: "composite"
   steps:
@@ -39,7 +39,7 @@ runs:
       with:
         name: ${{ inputs.reporter_name }}
         path: ${{ inputs.testlogs_xml_path }}
-        reporter: junit
+        reporter: jest-junit
         fail-on-error: false
 
     - name: Upload Test Logs on Failure
@@ -47,8 +47,7 @@ runs:
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: ${{ inputs.artifact_name }}
-        path: ${{ inputs.testlogs_log_path }}
-        working-directory: ${{ inputs.working_directory }}
+        path: ${{ inputs.working_directory }}/${{ inputs.testlogs_log_path }}
         retention-days: 14
 
     - name: Fail Job if Tests Failed
