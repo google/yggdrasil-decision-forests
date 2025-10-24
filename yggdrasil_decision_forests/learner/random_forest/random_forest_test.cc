@@ -1119,7 +1119,7 @@ TEST(RandomForest, PredefinedHyperParameters) {
       train_config.MutableExtension(random_forest::proto::random_forest_config);
   rf_config->set_num_trees(150);
   train_config.set_learner(RandomForestLearner::kRegisteredName);
-  utils::TestPredefinedHyperParametersAdultDataset(train_config, 2, 0.86);
+  utils::TestPredefinedHyperParametersAdultDataset(train_config, 4, 0.86);
 }
 
 class RandomForestOnSimPTE : public utils::TrainAndTestTester {
