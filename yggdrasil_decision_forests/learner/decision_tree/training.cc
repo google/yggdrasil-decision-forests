@@ -1970,6 +1970,51 @@ absl::StatusOr<bool> FindBestCondition(
   return false;
 }
 
+// Returns the index k of the last equal-width threshold <= a
+// (or –1 when a is smaller than the first threshold).
+static inline int EqualWidthThresholdIndex(const float attribute,
+                                           const float min_value,
+                                           const float max_value,
+                                           const int num_splits) {
+  if (num_splits <= 0) return -1;
+
+  const float range = max_value - min_value;
+  if (range <= 0.0f) return -1;
+
+  // Fast bucketing via Bin Width arithmetic
+  const float width = range / static_cast<float>(num_splits);
+  const float x = (attribute - min_value) / width - 0.5f;
+  int idx = static_cast<int>(floorf(x));
+
+  // Clamp to the nominal range (with "below first threshold" as -1)
+  if (idx < 0) return -1;
+  if (idx >= num_splits) idx = num_splits - 1;
+
+  // Sometimes above is off-by-one vs. std::upper_bound due to floating point
+  // arithmetic Below's a 1-step correction to match std::upper_bound() on the
+  // actual thresholds. Compute thresholds using the exact same arithmetic as in
+  // GenHistogramBins: T[j] = min_value + (range * (j + 0.5f)) / num_splits;
+  const float Nf = static_cast<float>(num_splits);
+  const float jf = static_cast<float>(idx);
+  const float Tj = min_value + (range * (jf + 0.5f)) / Nf;
+
+  if (attribute <
+      Tj) {  // attribute falls before this bin's threshold: move left by one
+    --idx;
+    return (idx >= 0) ? idx : -1;
+  }
+
+  if (idx + 1 < num_splits) {
+    // Next threshold: j+1 -> (j + 1.5f)
+    const float Tnext = min_value + (range * (jf + 1.5f)) / Nf;
+    if (attribute >= Tnext) {
+      // a reaches past next threshold; move right by one
+      ++idx;
+    }
+  }
+  return idx;
+}
+
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelClassificationFeatureNumericalHistogram(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
@@ -2023,6 +2068,10 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
     candidate_split.threshold = bins[split_idx];
   }
 
+  const bool use_equal_width_fast_path =
+      (dt_config.numerical_split().type() ==
+       proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
+
   // Compute the split score of each threshold.
   for (const auto example_idx : selected_examples) {
     const int32_t label = labels[example_idx];
@@ -2031,15 +2080,49 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
     if (std::isnan(attribute)) {
       attribute = na_replacement;
     }
-    auto it_split = std::upper_bound(
-        candidate_splits.begin(), candidate_splits.end(), attribute,
-        [](const float a, const CandidateSplit& b) { return a < b.threshold; });
-    if (it_split == candidate_splits.begin()) {
-      continue;
+
+    if (use_equal_width_fast_path) {
+      const int idx =
+          EqualWidthThresholdIndex(attribute, min_value, max_value,
+                                   static_cast<int>(candidate_splits.size()));
+
+      // Matches the original behavior when upper_bound(...) == begin()
+      if (idx < 0) {
+        continue;
+      }
+
+      auto& it_split = candidate_splits[idx];
+
+// Check fast binning choice against std::upper_bound()
+#ifndef NDEBUG
+      auto it_ref = std::upper_bound(
+          candidate_splits.begin(), candidate_splits.end(), attribute,
+          [](float a, const CandidateSplit& b) { return a < b.threshold; });
+
+      int idx_ref = (it_ref == candidate_splits.begin())
+                        ? -1
+                        : static_cast<int>(std::distance(
+                              candidate_splits.begin(), --it_ref));
+      DCHECK_EQ(idx, idx_ref)
+          << "Fast equal-width binning disagrees with std::upper_bound at "
+          << idx;
+#endif
+
+      it_split.num_positive_examples_without_weights++;
+      it_split.pos_label_distribution.Add(label, weight);
+    } else {
+      auto it_split = std::upper_bound(
+          candidate_splits.begin(), candidate_splits.end(), attribute,
+          [](const float a, const CandidateSplit& b) {
+            return a < b.threshold;
+          });
+      if (it_split == candidate_splits.begin()) {
+        continue;
+      }
+      --it_split;
+      it_split->num_positive_examples_without_weights++;
+      it_split->pos_label_distribution.Add(label, weight);
     }
-    --it_split;
-    it_split->num_positive_examples_without_weights++;
-    it_split->pos_label_distribution.Add(label, weight);
   }
 
   for (int split_idx = candidate_splits.size() - 2; split_idx >= 0;
