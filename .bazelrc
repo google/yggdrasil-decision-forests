@@ -46,6 +46,7 @@ common --enable_platform_specific_config
 build -c opt
 build --announce_rc
 build --noincompatible_strict_action_env
+build --cxxopt='-std=c++17'
 
 # Enable after adding python headers to protobuf.
 build --define=use_fast_cpp_protos=true
