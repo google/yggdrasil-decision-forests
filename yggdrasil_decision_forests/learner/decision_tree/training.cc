@@ -605,6 +605,11 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegressionHessianGain(
     return absl::InternalError("Fake error");
   }
 
+  if (attribute_idx < 0 ||
+      attribute_idx >= train_dataset.data_spec().columns_size()) {
+    return absl::OutOfRangeError("The attribute index is out of bounds");
+  }
+
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
@@ -4994,7 +4999,8 @@ absl::Status DivideMonotonicConstraintToChildren(
 int8_t MonotonicConstraintSign(
     const model::proto::TrainingConfigLinking& config_link,
     const int attribute_idx) {
-  if (config_link.per_columns_size() == 0) {
+  if (config_link.per_columns_size() == 0 || attribute_idx < 0 ||
+      attribute_idx >= config_link.per_columns_size()) {
     return 0;
   }
   const auto& link_condition_attribute = config_link.per_columns(attribute_idx);
