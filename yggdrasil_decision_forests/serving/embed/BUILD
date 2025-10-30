@@ -166,7 +166,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/types:optional",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -179,7 +179,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -218,7 +218,7 @@ cc_test(
         ":test_model_iris_multi_class_rf_wta_small_proba",
         ":test_model_iris_multi_class_rf_wta_small_proba_routing",
         ":test_model_iris_multi_class_rf_wta_small_score",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 

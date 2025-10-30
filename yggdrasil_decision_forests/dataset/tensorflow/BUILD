@@ -126,7 +126,7 @@ cc_test(
         "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -140,6 +140,6 @@ cc_test(
         "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )

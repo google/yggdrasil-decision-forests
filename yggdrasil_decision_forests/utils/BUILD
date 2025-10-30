@@ -248,8 +248,8 @@ cc_library_ydf(
         ":uid",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf",
+        "@googletest//:gtest",
     ],
 )
 
@@ -696,7 +696,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
-        "@com_google_googletest//:gtest",
+        "@googletest//:gtest",
     ],
 )
 
@@ -1044,7 +1044,7 @@ cc_test(
     deps = [
         ":logging",
         "@com_google_absl//absl/log",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1058,8 +1058,8 @@ cc_test(
         ":filesystem",
         ":sharded_io",
         ":test",
-        # "@com_google_googletest//:gtest_main",  # When fixed
-        "@com_google_googletest//:gtest_main",
+        # "@googletest//:gtest_main",  # When fixed
+        "@googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -1071,7 +1071,7 @@ cc_test(
     srcs = ["regex_test.cc"],
     deps = [
         ":regex",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1082,8 +1082,8 @@ cc_test(
     deps = [
         ":distribution_cc_proto",
         ":filesystem",
-        # "@com_google_googletest//:gtest_main",  # When fixed
-        "@com_google_googletest//:gtest_main",
+        # "@googletest//:gtest_main",  # When fixed
+        "@googletest//:gtest_main",
         ":test",
     ],
 )
@@ -1102,7 +1102,7 @@ cc_test(
         ":uid",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1112,7 +1112,7 @@ cc_test(
     deps = [
         ":distribution_cc_proto",
         ":protobuf",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1128,7 +1128,7 @@ cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1141,7 +1141,7 @@ cc_test(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1152,7 +1152,7 @@ cc_test(
         ":testing_macros",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1162,8 +1162,8 @@ cc_test(
     deps = [
         ":bytestream",
         ":test",
-        # "@com_google_googletest//:gtest_main",  # When fixed
-        "@com_google_googletest//:gtest_main",
+        # "@googletest//:gtest_main",  # When fixed
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1175,8 +1175,8 @@ cc_test(
     ],
     deps = [
         ":csv",
-        # "@com_google_googletest//:gtest_main",  # When fixed
-        "@com_google_googletest//:gtest_main",
+        # "@googletest//:gtest_main",  # When fixed
+        "@googletest//:gtest_main",
         ":test",
         ":filesystem",
         "@com_google_absl//absl/log",
@@ -1189,7 +1189,7 @@ cc_test(
     srcs = ["accurate_sum_test.cc"],
     deps = [
         ":accurate_sum",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1199,8 +1199,8 @@ cc_test(
     deps = [
         ":concurrency",
         ":test",
-        # "@com_google_googletest//:gtest_main",  # When fixed
-        "@com_google_googletest//:gtest_main",
+        # "@googletest//:gtest_main",  # When fixed
+        "@googletest//:gtest_main",
         "@com_google_absl//absl/status",
     ],
 )
@@ -1210,8 +1210,8 @@ cc_test(
     srcs = ["html_test.cc"],
     deps = [
         ":html",
-        # "@com_google_googletest//:gtest_main",  # When fixed
-        "@com_google_googletest//:gtest_main",
+        # "@googletest//:gtest_main",  # When fixed
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1223,8 +1223,8 @@ cc_test(
         ":distribution",
         ":distribution_cc_proto",
         ":test",
-        # "@com_google_googletest//:gtest_main",  # When fixed
-        "@com_google_googletest//:gtest_main",
+        # "@googletest//:gtest_main",  # When fixed
+        "@googletest//:gtest_main",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -1253,7 +1253,7 @@ cc_test(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1265,7 +1265,7 @@ cc_test(
         ":test",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1280,7 +1280,7 @@ cc_test(
         ":logging",
         ":test",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1292,7 +1292,7 @@ cc_test(
         ":logging",
         ":random",
         "@com_google_absl//absl/log",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1301,7 +1301,7 @@ cc_test(
     srcs = ["adaptive_work_test.cc"],
     deps = [
         ":adaptive_work",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1321,7 +1321,7 @@ cc_test(
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ] + select({
         "//yggdrasil_decision_forests:use_tensorflow_io": [":sharded_io_tfrecord"],
         "//conditions:default": [],
@@ -1333,7 +1333,7 @@ cc_test(
     srcs = ["circular_buffer_test.cc"],
     deps = [
         ":circular_buffer",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1349,7 +1349,7 @@ cc_test(
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1362,7 +1362,7 @@ cc_test(
         ":test",
         ":testing_macros",
         "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1372,7 +1372,7 @@ cc_test(
     deps = [
         ":math",
         "@com_google_absl//absl/random",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1387,7 +1387,7 @@ cc_test(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1422,7 +1422,7 @@ cc_test(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1443,7 +1443,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/random_forest",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1454,7 +1454,7 @@ cc_test(
     deps = [
         ":html_content",
         ":test",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1463,7 +1463,7 @@ cc_test(
     srcs = ["own_or_borrow_test.cc"],
     deps = [
         ":own_or_borrow",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1479,7 +1479,7 @@ cc_test(
         ":zlib",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1489,7 +1489,7 @@ cc_test(
     deps = [
         ":time",
         "@com_google_absl//absl/time",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -1518,6 +1518,6 @@ cc_test(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )

@@ -55,7 +55,7 @@ cc_test(
         ":wrapper_generator",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",

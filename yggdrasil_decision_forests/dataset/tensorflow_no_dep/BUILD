@@ -74,7 +74,6 @@ cc_library_ydf(
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/types:variant",
         "@com_google_absl//absl/utility",
-        "@com_google_absl//absl/utility:if_constexpr",
     ] + select({
         "//yggdrasil_decision_forests:use_ydf_tensorflow_proto": [":tf_example_cc_proto"],
         "//conditions:default": ["//yggdrasil_decision_forests/dataset/tensorflow"],
@@ -107,7 +106,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -125,6 +124,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )

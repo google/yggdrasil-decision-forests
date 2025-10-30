@@ -57,6 +57,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/log",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )

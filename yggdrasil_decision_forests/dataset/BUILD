@@ -439,7 +439,7 @@ cc_test(
     deps = [
         ":formats",
         ":formats_cc_proto",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -456,8 +456,8 @@ cc_test(
         ":data_spec_cc_proto",
         ":data_spec_inference",
         ":example_cc_proto",
-        #"@com_google_googletest//:gtest_main", # When fixed
-        "@com_google_googletest//:gtest_main",
+        #"@googletest//:gtest_main", # When fixed
+        "@googletest//:gtest_main",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
@@ -481,8 +481,8 @@ cc_test(
         ":example_cc_proto",
         ":example_reader",
         ":example_reader_interface",
-        #"@com_google_googletest//:gtest_main", # When fixed
-        "@com_google_googletest//:gtest_main",
+        #"@googletest//:gtest_main", # When fixed
+        "@googletest//:gtest_main",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -507,8 +507,8 @@ cc_test(
         ":vertical_dataset_io",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        #"@com_google_googletest//:gtest_main", # When fixed
-        "@com_google_googletest//:gtest_main",
+        #"@googletest//:gtest_main", # When fixed
+        "@googletest//:gtest_main",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
@@ -527,8 +527,8 @@ cc_test(
         ":example_cc_proto",
         ":vertical_dataset",
         ":vertical_dataset_io",
-        #"@com_google_googletest//:gtest_main", # When fixed
-        "@com_google_googletest//:gtest_main",
+        #"@googletest//:gtest_main", # When fixed
+        "@googletest//:gtest_main",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -550,7 +550,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -569,8 +569,8 @@ cc_test(
         ":formats_cc_proto",
         ":synthetic_dataset",
         ":synthetic_dataset_cc_proto",
-        #"@com_google_googletest//:gtest_main", # When fixed
-        "@com_google_googletest//:gtest_main",
+        #"@googletest//:gtest_main", # When fixed
+        "@googletest//:gtest_main",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -592,8 +592,8 @@ cc_test(
         ":data_spec_inference",
         ":vertical_dataset",
         ":vertical_dataset_io",
-        #"@com_google_googletest//:gtest_main", # When fixed
-        "@com_google_googletest//:gtest_main",
+        #"@googletest//:gtest_main", # When fixed
+        "@googletest//:gtest_main",
         ":vertical_dataset_html",
         "@com_google_absl//absl/strings",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -614,7 +614,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -635,7 +635,7 @@ cc_test(
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -647,7 +647,7 @@ cc_test(
         ":example_builder",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/types:span",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -665,7 +665,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -686,6 +686,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )

@@ -146,7 +146,7 @@ cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
 
@@ -159,6 +159,6 @@ cc_test(
         ":decision_tree",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/utils:test",
-        "@com_google_googletest//:gtest_main",
+        "@googletest//:gtest_main",
     ],
 )
