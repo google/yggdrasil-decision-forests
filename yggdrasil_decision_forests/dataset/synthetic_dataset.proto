@@ -19,7 +19,7 @@ package yggdrasil_decision_forests.dataset.proto;
 
 // Options for the synthetic generation of dataset.
 message SyntheticDatasetOptions {
-  // Next ID: 21
+  // Next ID: 24
 
   // Number of examples in the dataset.
   optional int32 num_examples = 1 [default = 5000];
@@ -31,6 +31,11 @@ message SyntheticDatasetOptions {
   // (e.g. "num(erical)", "cat(egorical)")  and "{index}" being the feature
   // index (among other features of the same type).
   optional string feature_name = 3 [default = "{type}_{index}"];
+
+  // Name of the column that indicates the data split (e.g., TRAIN, VALID, TEST)
+  // for each example. If specified, all examples are exported into a single
+  // file. Otherwise, examples are split into separate files for each split.
+  optional string split_column_name = 23;
 
   // Number of features by semantic.
   //

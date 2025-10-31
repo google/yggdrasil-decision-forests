@@ -78,6 +78,7 @@
 #include "yggdrasil_decision_forests/utils/hash.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace dataset {
@@ -720,14 +721,27 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
   DCHECK_GE(1.0 - ratio_test - ratio_valid, 0.0);
   DCHECK_LE(1.0 - ratio_test - ratio_valid, 1.0);
 
-  if (typed_path_valid.empty() && ratio_valid > 0) {
-    return absl::InvalidArgumentError(
-        "\"valid\" cannot be empty if \"ratio_valid\" >0.");
-  }
+  std::string split_column_name = options.split_column_name();
 
-  if (typed_path_test.empty() && ratio_test > 0) {
-    return absl::InvalidArgumentError(
-        "\"test\" cannot be empty if \"ratio_test\" >0.");
+  if (split_column_name.empty()) {
+    if (typed_path_valid.empty() && ratio_valid > 0) {
+      return absl::InvalidArgumentError(
+          "\"valid\" cannot be empty if \"ratio_valid\" >0.");
+    }
+
+    if (typed_path_test.empty() && ratio_test > 0) {
+      return absl::InvalidArgumentError(
+          "\"test\" cannot be empty if \"ratio_test\" >0.");
+    }
+  } else {
+    if (!typed_path_valid.empty()) {
+      return absl::InvalidArgumentError(
+          "\"valid\" must be empty if split_column_name is given.");
+    }
+    if (!typed_path_test.empty()) {
+      return absl::InvalidArgumentError(
+          "\"test\" must be empty if split_column_name is given.");
+    }
   }
 
   auto rnd = CreateRandomGenerator(options);
@@ -743,7 +757,7 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
   // Random generator seeded with the example group. Only used for ranking.
   utils::RandomEngine ground_rnd;
 
-  for (const auto& example : examples) {
+  for (auto& example : examples) {
     // Destination of the example among train, valid and test.
     float dst;
 
@@ -756,25 +770,42 @@ absl::Status GenerateSyntheticDatasetTrainValidTest(
       dst = uniform(rnd);
     }
 
-    if (dst < ratio_valid) {
-      example_valid.push_back(example);
-    } else if (dst < ratio_valid + ratio_test) {
-      example_test.push_back(example);
+    if (split_column_name.empty()) {
+      if (dst < ratio_valid) {
+        example_valid.push_back(example);
+      } else if (dst < ratio_valid + ratio_test) {
+        example_test.push_back(example);
+      } else {
+        example_train.push_back(example);
+      }
     } else {
-      example_train.push_back(example);
+      absl::string_view split_value;
+      if (dst < ratio_valid) {
+        split_value = "VALID";
+      } else if (dst < ratio_valid + ratio_test) {
+        split_value = "TEST";
+      } else {
+        split_value = "TRAIN";
+      }
+      SetCategoricalStringFeature(split_column_name, split_value, &example);
     }
   }
 
   LOG(INFO) << "Write examples";
 
-  RETURN_IF_ERROR(WriteExamples(example_train, typed_path_train,
-                                options.num_examples_per_shards()));
-  if (!typed_path_valid.empty()) {
-    RETURN_IF_ERROR(WriteExamples(example_valid, typed_path_valid,
+  if (split_column_name.empty()) {
+    RETURN_IF_ERROR(WriteExamples(example_train, typed_path_train,
                                   options.num_examples_per_shards()));
-  }
-  if (!typed_path_test.empty()) {
-    RETURN_IF_ERROR(WriteExamples(example_test, typed_path_test,
+    if (!typed_path_valid.empty()) {
+      RETURN_IF_ERROR(WriteExamples(example_valid, typed_path_valid,
+                                    options.num_examples_per_shards()));
+    }
+    if (!typed_path_test.empty()) {
+      RETURN_IF_ERROR(WriteExamples(example_test, typed_path_test,
+                                    options.num_examples_per_shards()));
+    }
+  } else {
+    RETURN_IF_ERROR(WriteExamples(examples, typed_path_train,
                                   options.num_examples_per_shards()));
   }
   return absl::OkStatus();
