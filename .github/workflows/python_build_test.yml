@@ -116,7 +116,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Check pip cache hit
-        run: echo "Pip Cache Hit: ${{ steps.pip-cache.outputs.cache-hit }}"
+        run: echo "Pip Cache Hit ${{ steps.pip-cache.outputs.cache-hit }}"
 
       # --- Build and Test Steps ---
       - name: Install Python Dependencies

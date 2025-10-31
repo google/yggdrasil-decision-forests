@@ -27,6 +27,9 @@ jobs:
   cc-build-test-matrix:
     name: "C++ Build & Test (Compiler: ${{ matrix.compiler_config }})"
     uses: ./.github/workflows/cc_build_test.yml
+    permissions:
+      actions: write  # For gh cache delete
+      contents: read
     with:
       runner: linux-x86-n2-32
       compiler_config: ${{ matrix.compiler_config }}
@@ -40,6 +43,9 @@ jobs:
   python-build-test-matrix:
     name: "Python Build & Test (Python ${{ matrix.python_version }})"
     uses: ./.github/workflows/python_build_test.yml
+    permissions:
+      actions: write  # For gh cache delete
+      contents: read
     with:
       runner: linux-x86-n2-32
       python_version: ${{ matrix.python_version }}
