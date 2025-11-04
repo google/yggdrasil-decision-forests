@@ -7,6 +7,7 @@ load("//third_party/eigen3:workspace.bzl", eigen = "deps")
 load("//third_party/farmhash:workspace.bzl", farmhash = "deps")
 load("//third_party/grpc:workspace.bzl", grpc = "deps")
 load("//third_party/gtest:workspace.bzl", gtest = "deps")
+load("//third_party/highway:workspace.bzl", highway = "deps")
 load("//third_party/nlohmann_json:workspace.bzl", nlohmann_json = "deps")
 load("//third_party/protobuf:workspace.bzl", protobuf = "deps")
 load("//third_party/zlib:workspace.bzl", zlib = "deps")
@@ -35,6 +36,9 @@ def load_dependencies(repo_name = "", exclude_repo = []):
 
     if "eigen" not in exclude_repo:
         eigen()
+
+    if "highway" not in exclude_repo:
+        highway()
 
     if "nlohmann_json" not in exclude_repo:
         nlohmann_json()
