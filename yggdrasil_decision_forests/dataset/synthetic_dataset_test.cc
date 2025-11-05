@@ -27,7 +27,6 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
-#include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -167,6 +166,51 @@ TEST(SyntheticDataset, WriteToCsv) {
   const auto data_spec = GetDataSpec(dst_path);
   std::string readable_representation = PrintHumanReadable(data_spec, true);
   LOG(INFO) << "SPEC:\n" << readable_representation;
+}
+
+TEST(SyntheticDataset, SplitColumnDataSpec) {
+  proto::SyntheticDatasetOptions options;
+  options.set_split_column_name("my_split_col");
+  const auto dst_path = absl::StrCat(
+      "tfrecord:", file::JoinPath(test::TmpDirectory(), "dataset.tfr"));
+  CHECK_OK(GenerateSyntheticDatasetTrainValidTest(options, dst_path, "", "",
+                                                  0.2, 0.2));
+
+  const auto data_spec = GetDataSpec(dst_path);
+  std::string readable_representation = PrintHumanReadable(data_spec, true);
+  LOG(INFO) << "SPEC:\n" << readable_representation;
+
+  // Check that the split column exists and has the correct type and values.
+  bool found_split_column = false;
+  for (const auto& col : data_spec.columns()) {
+    if (col.name() == "my_split_col") {
+      EXPECT_EQ(col.type(), proto::ColumnType::CATEGORICAL);
+      const auto& items = col.categorical().items();
+      EXPECT_EQ(items.size(), 4);  // OOV + TRAIN, VALID, TEST
+
+      bool has_train = false;
+      bool has_valid = false;
+      bool has_test = false;
+
+      for (const auto& item : items) {
+        if (item.second.index() == 0) {
+          EXPECT_EQ(item.first, "<OOD>");
+        } else if (item.first == "TRAIN") {
+          has_train = true;
+        } else if (item.first == "VALID") {
+          has_valid = true;
+        } else if (item.first == "TEST") {
+          has_test = true;
+        }
+      }
+      EXPECT_TRUE(has_train);
+      EXPECT_TRUE(has_valid);
+      EXPECT_TRUE(has_test);
+      found_split_column = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_split_column);
 }
 
 TEST(SyntheticDataset, Ranking) {

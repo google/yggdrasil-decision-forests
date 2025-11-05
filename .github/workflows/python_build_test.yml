@@ -1,0 +1,180 @@
+name: Python Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+      container_image:
+        required: false
+        type: string
+        default: us-docker.pkg.dev/ml-oss-artifacts-published/ml-public-container/ml-build:latest
+      python_version:
+        required: true
+        type: string
+        description: "The Python version to set up (e.g., '3.9', '3.10')."
+      refresh_cache:
+        required: false
+        type: boolean
+        default: false
+        description: "Force refresh the cache"
+      pull_request_base_sha:
+        required: false
+        type: string
+        description: "Force refresh the cache"
+
+jobs:
+  build-test:
+    runs-on: ${{ inputs.runner }}
+    container:
+      image: ${{ inputs.container_image }}
+    env:
+      BAZEL_PY_FLAGS: >-
+        --repository_cache=../../../.bazel-cache/repository
+        --disk_cache=../../../.bazel-cache/disk
+        --config=linux_cpp17
+        --config=linux_avx2
+        --features=-fully_static_link
+      REFRESH_CACHE: ${{ inputs.refresh_cache }}
+      GH_TOKEN: ${{ github.token }} # Required for gh cache delete
+    permissions:
+      actions: write  # For gh cache delete
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Set safe directory  # https://github.com/actions/checkout/issues/2031
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # --- Bazel Cache Setup ---
+      - name : Set up Bazel cache keys
+        id: bazel-cache-keys
+        run: |
+          CACHE_PREFIX="${{ runner.os }}-bazel-py-${{ inputs.python_version }}"
+          CACHE_RESTORE_KEY_2="$CACHE_PREFIX"
+          CACHE_RESTORE_KEY_1="$CACHE_RESTORE_KEY_2-${{ hashFiles('**/WORKSPACE', '.bazelrc') }}"
+          CACHE_RESTORE_KEY_0="$CACHE_RESTORE_KEY_1-${{ hashFiles('**/BUILD*') }}"
+          CACHE_KEY="$CACHE_RESTORE_KEY_0-${{ github.sha }}"
+          echo "CACHE_RESTORE_KEY_2=$CACHE_RESTORE_KEY_2" >> "$GITHUB_OUTPUT"
+          echo "CACHE_RESTORE_KEY_1=$CACHE_RESTORE_KEY_1" >> "$GITHUB_OUTPUT"
+          echo "CACHE_RESTORE_KEY_0=$CACHE_RESTORE_KEY_0" >> "$GITHUB_OUTPUT"
+          echo "CACHE_KEY=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+          if [[ -n "${{ inputs.pull_request_base_sha }}" ]]; then
+            CACHE_RESTORE_KEY_HEAD="$CACHE_RESTORE_KEY_0-${{ inputs.pull_request_base_sha }}"
+            echo "CACHE_RESTORE_KEY_HEAD=$CACHE_RESTORE_KEY_HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clean Bazel build outputs if cache is being refreshed
+        if: env.REFRESH_CACHE == 'true'
+        run: |
+          bazel clean --expunge
+          rm -rf .bazel-cache
+
+      - name: Restore Bazel cache
+        id: bazel-cache
+        if: env.REFRESH_CACHE != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .bazel-cache
+          key: ${{ steps.bazel-cache-keys.outputs.CACHE_KEY }}
+          restore-keys: |
+            ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_HEAD }}
+            ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_0 }}-
+            ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_1 }}-
+            ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_2 }}-
+
+      - name: Check Bazel cache hit
+        run: |
+          echo "Bazel Cache Hit: ${{ steps.bazel-cache.outputs.cache-hit }}"
+          echo "Bazel Cache Primary Key: ${{ steps.bazel-cache.outputs.cache-primary-key }}"
+          echo "Bazel Cache Matched Key: ${{ steps.bazel-cache.outputs.cache-matched-key }}"
+
+      - name: Create Bazel Cache Directories
+        run: mkdir -p .bazel-cache/repository .bazel-cache/disk
+
+      # --- pip Cache Setup ---
+      - name: Set up pip cache key
+        id: pip-cache-key
+        run: |
+          echo "CACHE_KEY=${{ runner.os }}-pip-${{ inputs.python_version }}-${{ hashFiles('yggdrasil_decision_forests/port/python/requirements.txt', 'yggdrasil_decision_forests/port/python/dev_requirements.txt') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Clean pip cache if refresh is enabled
+        if: env.REFRESH_CACHE == 'true'
+        run: rm -rf ~/.cache/pip
+
+      - name: Restore pip cache
+        id: pip-cache
+        if: env.REFRESH_CACHE != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ steps.pip-cache-key.outputs.CACHE_KEY }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ inputs.python_version }}-
+            ${{ runner.os }}-pip-
+
+      - name: Check pip cache hit
+        run: echo "Pip Cache Hit ${{ steps.pip-cache.outputs.cache-hit }}"
+
+      # --- Build and Test Steps ---
+      - name: Install Python Dependencies
+        working-directory: yggdrasil_decision_forests/port/python
+        run: |
+          python --version
+          python -m pip install -q -r dev_requirements.txt
+          python -m pip install -q -r requirements.txt
+          pip list
+
+      - name: Build Python
+        working-directory: yggdrasil_decision_forests/port/python
+        run: |
+          bazel version
+          bazel build //ydf/...:all \
+            ${{ env.BAZEL_PY_FLAGS }}
+
+      - name: Test Python
+        working-directory: yggdrasil_decision_forests/port/python
+        id: py_test
+        continue-on-error: true
+        run: |
+          bazel test //ydf/...:all \
+            ${{ env.BAZEL_PY_FLAGS }} \
+            --test_output=errors \
+            --output_groups=+test_xml
+
+      - uses: ./.github/actions/handle-test-outcome
+        with:
+          test_outcome: ${{ steps.py_test.outcome }}
+          reporter_name: "Bazel Python Tests (${{ inputs.python_version }})"
+          testlogs_xml_path: yggdrasil_decision_forests/port/python/bazel-testlogs/**/*.xml
+          artifact_name: py-test-logs-${{ inputs.python_version }}
+          testlogs_log_path: bazel-testlogs/**/*.log
+          failure_message: "Python tests failed for Python ${{ inputs.python_version }}. See annotations in the Checks tab for details, or 'py-test-logs-${{ inputs.python_version }}' artifact for full logs."
+          working_directory: yggdrasil_decision_forests/port/python
+
+      # --- Cache Saving ---
+      - name: Remove old Bazel cache if refreshing
+        if: env.REFRESH_CACHE == 'true'
+        continue-on-error: true # Ignore errors when cache is not found.
+        run: gh cache delete ${{ steps.bazel-cache-keys.outputs.CACHE_KEY }} --confirm
+
+      - name: Save Bazel cache
+        uses: actions/cache/save@v4
+        if: env.REFRESH_CACHE == 'true' || steps.bazel-cache.outputs.cache-hit != 'true'
+        with:
+          path: .bazel-cache
+          key: ${{ steps.bazel-cache-keys.outputs.CACHE_KEY }}
+
+      - name: Remove old pip cache if refreshing
+        if: env.REFRESH_CACHE == 'true'
+        continue-on-error: true # Ignore errors when cache is not found.
+        run: gh cache delete ${{ steps.pip-cache-key.outputs.CACHE_KEY }} --confirm
+
+      - name: Save pip cache
+        uses: actions/cache/save@v4
+        if: env.REFRESH_CACHE == 'true' || steps.pip-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/pip
+          key: ${{ steps.pip-cache-key.outputs.CACHE_KEY }}

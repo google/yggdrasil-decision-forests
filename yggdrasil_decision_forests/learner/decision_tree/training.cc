@@ -605,6 +605,11 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegressionHessianGain(
     return absl::InternalError("Fake error");
   }
 
+  if (attribute_idx < 0 ||
+      attribute_idx >= train_dataset.data_spec().columns_size()) {
+    return absl::OutOfRangeError("The attribute index is out of bounds");
+  }
+
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
@@ -1967,9 +1972,10 @@ absl::StatusOr<bool> FindBestCondition(
 
 // Returns the index k of the last equal-width threshold <= a
 // (or –1 when a is smaller than the first threshold).
-static inline int EqualWidthThresholdIndex(
-const float attribute, const float min_value, const float max_value,
-const int   num_splits) {
+static inline int EqualWidthThresholdIndex(const float attribute,
+                                           const float min_value,
+                                           const float max_value,
+                                           const int num_splits) {
   if (num_splits <= 0) return -1;
 
   const float range = max_value - min_value;
@@ -1977,22 +1983,23 @@ const int   num_splits) {
 
   // Fast bucketing via Bin Width arithmetic
   const float width = range / static_cast<float>(num_splits);
-  const float x     = (attribute - min_value) / width - 0.5f;
-  int idx           = static_cast<int>(floorf(x));
+  const float x = (attribute - min_value) / width - 0.5f;
+  int idx = static_cast<int>(floorf(x));
 
   // Clamp to the nominal range (with "below first threshold" as -1)
-  if (idx < 0)           return -1;
+  if (idx < 0) return -1;
   if (idx >= num_splits) idx = num_splits - 1;
 
-  // Sometimes above is off-by-one vs. std::upper_bound due to floating point arithmetic
-  // Below's a 1-step correction to match std::upper_bound() on the actual thresholds.
-  // Compute thresholds using the exact same arithmetic as in GenHistogramBins:
-  // T[j] = min_value + (range * (j + 0.5f)) / num_splits;
-  const float Nf   = static_cast<float>(num_splits);
-  const float jf   = static_cast<float>(idx);
-  const float Tj   = min_value + (range * (jf + 0.5f)) / Nf;
+  // Sometimes above is off-by-one vs. std::upper_bound due to floating point
+  // arithmetic Below's a 1-step correction to match std::upper_bound() on the
+  // actual thresholds. Compute thresholds using the exact same arithmetic as in
+  // GenHistogramBins: T[j] = min_value + (range * (j + 0.5f)) / num_splits;
+  const float Nf = static_cast<float>(num_splits);
+  const float jf = static_cast<float>(idx);
+  const float Tj = min_value + (range * (jf + 0.5f)) / Nf;
 
-  if (attribute < Tj) { // attribute falls before this bin's threshold: move left by one
+  if (attribute <
+      Tj) {  // attribute falls before this bin's threshold: move left by one
     --idx;
     return (idx >= 0) ? idx : -1;
   }
@@ -2062,7 +2069,8 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
   }
 
   const bool use_equal_width_fast_path =
-(dt_config.numerical_split().type() == proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
+      (dt_config.numerical_split().type() ==
+       proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
 
   // Compute the split score of each threshold.
   for (const auto example_idx : selected_examples) {
@@ -2074,43 +2082,48 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
     }
 
     if (use_equal_width_fast_path) {
-      const int idx = EqualWidthThresholdIndex(
-      attribute, min_value, max_value, static_cast<int>(candidate_splits.size()));
-      
+      const int idx =
+          EqualWidthThresholdIndex(attribute, min_value, max_value,
+                                   static_cast<int>(candidate_splits.size()));
+
       // Matches the original behavior when upper_bound(...) == begin()
-      if (idx < 0) { continue; }
+      if (idx < 0) {
+        continue;
+      }
 
       auto& it_split = candidate_splits[idx];
 
-      // Check fast binning choice against std::upper_bound()
-      #ifndef NDEBUG
-          auto it_ref = std::upper_bound(
-              candidate_splits.begin(), candidate_splits.end(), attribute,
-              [](float a, const CandidateSplit& b) { return a < b.threshold; });
+// Check fast binning choice against std::upper_bound()
+#ifndef NDEBUG
+      auto it_ref = std::upper_bound(
+          candidate_splits.begin(), candidate_splits.end(), attribute,
+          [](float a, const CandidateSplit& b) { return a < b.threshold; });
 
-          int idx_ref = (it_ref == candidate_splits.begin())
-                            ? -1
-                            : static_cast<int>(std::distance(candidate_splits.begin(),
-                                                            --it_ref));
-          DCHECK_EQ(idx, idx_ref)
-              << "Fast equal-width binning disagrees with std::upper_bound at " << idx;
-      #endif
+      int idx_ref = (it_ref == candidate_splits.begin())
+                        ? -1
+                        : static_cast<int>(std::distance(
+                              candidate_splits.begin(), --it_ref));
+      DCHECK_EQ(idx, idx_ref)
+          << "Fast equal-width binning disagrees with std::upper_bound at "
+          << idx;
+#endif
 
       it_split.num_positive_examples_without_weights++;
       it_split.pos_label_distribution.Add(label, weight);
-  } else {
-
-    auto it_split = std::upper_bound(
-        candidate_splits.begin(), candidate_splits.end(), attribute,
-        [](const float a, const CandidateSplit& b) { return a < b.threshold; });
-    if (it_split == candidate_splits.begin()) {
-      continue;
+    } else {
+      auto it_split = std::upper_bound(
+          candidate_splits.begin(), candidate_splits.end(), attribute,
+          [](const float a, const CandidateSplit& b) {
+            return a < b.threshold;
+          });
+      if (it_split == candidate_splits.begin()) {
+        continue;
+      }
+      --it_split;
+      it_split->num_positive_examples_without_weights++;
+      it_split->pos_label_distribution.Add(label, weight);
     }
-    --it_split;
-    it_split->num_positive_examples_without_weights++;
-    it_split->pos_label_distribution.Add(label, weight);
   }
-}
 
   for (int split_idx = candidate_splits.size() - 2; split_idx >= 0;
        split_idx--) {
@@ -2371,6 +2384,28 @@ FindSplitLabelClassificationFeatureDiscretizedNumericalCart(
   }
 }
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureNumericalHistogram<true>(
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
+    const std::vector<float>& labels, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, utils::RandomEngine* random,
+    proto::NodeCondition* condition);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureNumericalHistogram<false>(
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, absl::Span<const float> attributes,
+    const std::vector<float>& labels, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    int32_t attribute_idx, utils::RandomEngine* random,
+    proto::NodeCondition* condition);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelRegressionFeatureNumericalHistogram(
@@ -2595,6 +2630,34 @@ FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
     const NodeConstraints& constraints, int8_t monotonic_direction,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    int num_bins, const std::vector<float>& gradients,
+    const std::vector<float>& hessians, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
+    double sum_hessian, double sum_weights, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    int num_bins, const std::vector<float>& gradients,
+    const std::vector<float>& hessians, float na_replacement,
+    UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config, double sum_gradient,
+    double sum_hessian, double sum_weights, int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
@@ -2710,6 +2773,32 @@ FindSplitLabelRegressionFeatureNumericalCart<false>(
     int32_t attribute_idx, const InternalTrainConfig& internal_config,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureDiscretizedNumericalCart<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    const int num_bins, const std::vector<float>& labels,
+    const dataset::DiscretizedNumericalIndex na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureDiscretizedNumericalCart<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const std::vector<dataset::DiscretizedNumericalIndex>& attributes,
+    const int num_bins, const std::vector<float>& labels,
+    const dataset::DiscretizedNumericalIndex na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelRegressionFeatureDiscretizedNumericalCart(
@@ -2801,6 +2890,34 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelClassificationFeatureNA(
     }
   }
 }
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureNA<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::AbstractColumn* attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureNA<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const dataset::VerticalDataset::AbstractColumn* attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
 
 template <bool weighted>
 absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureNA(
@@ -2959,6 +3076,32 @@ FindSplitLabelRegressionFeatureBoolean<false>(
     int32_t attribute_idx, proto::NodeCondition* condition,
     SplitterPerThreadCache* cache);
 
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureBoolean<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    bool na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureBoolean<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int8_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    bool na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache);
+
 template <bool weighted>
 absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureBoolean(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
@@ -2997,6 +3140,34 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureBoolean(
       selected_examples, feature_filler, label_filler, initializer, min_num_obs,
       attribute_idx, condition, &cache->cache_v2);
 }
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureCategorical<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const int32_t num_attribute_classes, int32_t na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelHessianRegressionFeatureCategorical<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& gradients, const std::vector<float>& hessians,
+    const int32_t num_attribute_classes, int32_t na_replacement,
+    const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const double sum_gradient, const double sum_hessian,
+    const double sum_weights, const int32_t attribute_idx,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 template <bool weighted>
 absl::StatusOr<SplitSearchResult>
@@ -3061,6 +3232,28 @@ FindSplitLabelHessianRegressionFeatureCategorical(
       return absl::InvalidArgumentError("Non supported");
   }
 }
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureCategorical<true>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& labels, const int32_t num_attribute_classes,
+    int32_t na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
+
+template absl::StatusOr<SplitSearchResult>
+FindSplitLabelRegressionFeatureCategorical<false>(
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights, const std::vector<int32_t>& attributes,
+    const std::vector<float>& labels, const int32_t num_attribute_classes,
+    int32_t na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const utils::NormalDistributionDouble& label_distribution,
+    const int32_t attribute_idx, proto::NodeCondition* condition,
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 template <bool weighted>
 absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureCategorical(
@@ -4889,7 +5082,8 @@ absl::Status DivideMonotonicConstraintToChildren(
 int8_t MonotonicConstraintSign(
     const model::proto::TrainingConfigLinking& config_link,
     const int attribute_idx) {
-  if (config_link.per_columns_size() == 0) {
+  if (config_link.per_columns_size() == 0 || attribute_idx < 0 ||
+      attribute_idx >= config_link.per_columns_size()) {
     return 0;
   }
   const auto& link_condition_attribute = config_link.per_columns(attribute_idx);
@@ -4954,8 +5148,6 @@ absl::StatusOr<std::vector<float>> GenHistogramBins(
       for (auto& candidate_split : candidate_splits) {
         candidate_split = threshold_distribution(*random);
       }
-      // This is unnecessary in Equal Width, since bin thresholds are incremental
-      std::sort(candidate_splits.begin(), candidate_splits.end());
     } break;
     case proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH: {
       for (int split_idx = 0; split_idx < candidate_splits.size();
@@ -4968,6 +5160,7 @@ absl::StatusOr<std::vector<float>> GenHistogramBins(
     default:
       return absl::InvalidArgumentError("Numerical histogram not implemented");
   }
+  std::sort(candidate_splits.begin(), candidate_splits.end());
   return candidate_splits;
 }
 

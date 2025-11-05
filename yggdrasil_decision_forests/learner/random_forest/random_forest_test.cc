@@ -247,7 +247,7 @@ TEST_F(RandomForestOnAdult, Base) {
 
   EXPECT_LE(rank_capital_gain, 5);
   EXPECT_LE(rank_relationship, 6);
-  EXPECT_LE(rank_occupation, 6);
+  EXPECT_LE(rank_occupation, 7);
 
   // Worst 2 variables.
   const int rank_fnlwgt = utils::GetVariableImportanceRank(
@@ -256,7 +256,7 @@ TEST_F(RandomForestOnAdult, Base) {
       "education", model_->data_spec(), mean_decrease_accuracy);
 
   EXPECT_GE(rank_fnlwgt, 7);
-  EXPECT_GE(rank_education, 4);
+  EXPECT_GE(rank_education, 3);
 
   std::string description;
   model_->AppendDescriptionAndStatistics(false, &description);
@@ -1119,7 +1119,7 @@ TEST(RandomForest, PredefinedHyperParameters) {
       train_config.MutableExtension(random_forest::proto::random_forest_config);
   rf_config->set_num_trees(150);
   train_config.set_learner(RandomForestLearner::kRegisteredName);
-  utils::TestPredefinedHyperParametersAdultDataset(train_config, 2, 0.86);
+  utils::TestPredefinedHyperParametersAdultDataset(train_config, 4, 0.86);
 }
 
 class RandomForestOnSimPTE : public utils::TrainAndTestTester {

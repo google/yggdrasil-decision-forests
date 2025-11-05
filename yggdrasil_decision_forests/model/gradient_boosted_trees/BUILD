@@ -71,9 +71,11 @@ cc_test(
     deps = [
         ":gradient_boosted_trees",
         ":gradient_boosted_trees_cc_proto",
+        "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/model:model_library",
@@ -81,6 +83,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

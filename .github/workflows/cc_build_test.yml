@@ -1,0 +1,134 @@
+name: C++ Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        required: true
+        type: string
+        description: "The GitHub runner label (e.g., linux-x86-n2-32)"
+      container_image:
+        required: false
+        type: string
+        default: us-docker.pkg.dev/ml-oss-artifacts-published/ml-public-container/ml-build:latest
+        description: "The Docker container image to use"
+      compiler_config:
+        required: false
+        type: string
+        default: "gcc"
+        description: "Configuration for the C++ compiler (e.g., 'gcc', 'clang')."
+      refresh_cache:
+        required: false
+        type: boolean
+        default: false
+        description: "Force refresh the cache"
+      pull_request_base_sha:
+        required: false
+        type: string
+        description: "Force refresh the cache"
+
+jobs:
+  build-test:
+    runs-on: ${{ inputs.runner }}
+    container:
+      image: ${{ inputs.container_image }}
+    env:
+      BAZEL_COMMON_FLAGS: >-
+        --repository_cache=.bazel-cache/repository
+        --disk_cache=.bazel-cache/disk
+        --config=linux_avx2
+        --features=-fully_static_link
+        --build_tag_filters=-tf_dep,-cuda_dep
+        --test_tag_filters=-tf_dep,-cuda_dep
+      REFRESH_CACHE: ${{ inputs.refresh_cache }}
+    permissions:
+      actions: write  # For gh cache delete
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+      - name: Set safe directory  # https://github.com/actions/checkout/issues/2031
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name : Set up cache keys
+        id: cache-keys
+        run: |
+          CACHE_PREFIX="${{ runner.os }}-bazel-cc-${{ inputs.compiler_config }}"
+          CACHE_RESTORE_KEY_2="$CACHE_PREFIX"
+          CACHE_RESTORE_KEY_1="$CACHE_RESTORE_KEY_2-${{ hashFiles('**/WORKSPACE', '.bazelrc') }}"
+          CACHE_RESTORE_KEY_0="$CACHE_RESTORE_KEY_1-${{ hashFiles('**/BUILD*') }}"
+          CACHE_KEY="$CACHE_RESTORE_KEY_0-${{ github.sha }}"
+          echo "CACHE_RESTORE_KEY_2=$CACHE_RESTORE_KEY_2" >> "$GITHUB_OUTPUT"
+          echo "CACHE_RESTORE_KEY_1=$CACHE_RESTORE_KEY_1" >> "$GITHUB_OUTPUT"
+          echo "CACHE_RESTORE_KEY_0=$CACHE_RESTORE_KEY_0" >> "$GITHUB_OUTPUT"
+          echo "CACHE_KEY=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+          if [[ -n "${{ inputs.pull_request_base_sha }}" ]]; then
+            CACHE_RESTORE_KEY_HEAD="$CACHE_RESTORE_KEY_0-${{ inputs.pull_request_base_sha }}"
+            echo "CACHE_RESTORE_KEY_HEAD=$CACHE_RESTORE_KEY_HEAD" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clean build outputs if cache is being refreshed
+        if: env.REFRESH_CACHE == 'true'
+        run: |
+          bazel clean --expunge
+          rm -rf .bazel-cache
+
+      - name: Restore bazel cache
+        id: bazel-cache
+        if: env.REFRESH_CACHE != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: .bazel-cache
+          key: ${{ steps.cache-keys.outputs.CACHE_KEY }}
+          restore-keys: |
+            ${{ steps.cache-keys.outputs.CACHE_RESTORE_KEY_HEAD }}
+            ${{ steps.cache-keys.outputs.CACHE_RESTORE_KEY_0 }}-
+            ${{ steps.cache-keys.outputs.CACHE_RESTORE_KEY_1 }}-
+            ${{ steps.cache-keys.outputs.CACHE_RESTORE_KEY_2 }}-
+
+      - name: Check cache hit
+        run: |
+          echo "Cache Hit: ${{ steps.bazel-cache.outputs.cache-hit }}"
+          echo "Cache Primary Key: ${{ steps.bazel-cache.outputs.cache-primary-key }}"
+          echo "Cache Matched Key: ${{ steps.bazel-cache.outputs.cache-matched-key }}"
+
+      - name: Create Bazel Cache Directories
+        run: mkdir -p .bazel-cache/repository .bazel-cache/disk
+
+      - name: Build C++
+        run: |
+          bazel build //yggdrasil_decision_forests/...:all //examples:beginner_cc \
+            ${{ env.BAZEL_COMMON_FLAGS }} \
+            --repo_env=CC=${{ inputs.compiler_config }}
+
+      - name: Test C++
+        id: cc_test
+        continue-on-error: true
+        run: |
+          bazel test //yggdrasil_decision_forests/...:all \
+            ${{ env.BAZEL_COMMON_FLAGS }} \
+            --repo_env=CC=${{ inputs.compiler_config }} \
+            --test_output=errors \
+            --output_groups=+test_xml
+
+      - uses: ./.github/actions/handle-test-outcome
+        with:
+          test_outcome: ${{ steps.cc_test.outcome }}
+          reporter_name: "Bazel C++ Tests (${{ inputs.compiler_config }})"
+          testlogs_xml_path: bazel-testlogs/**/*.xml
+          artifact_name: cc-test-logs-${{ inputs.compiler_config }}
+          testlogs_log_path: bazel-testlogs/**/*.log
+          failure_message: "CC tests failed for compiler config \'${{ inputs.compiler_config }}\'. See annotations in the Checks tab for details, or \'cc-test-logs-${{ inputs.compiler_config }}\' artifact for full logs."
+
+      - name: Remove cache if cache is being refreshed
+        if: env.REFRESH_CACHE == 'true'
+        continue-on-error: true # Ignore errors when cache is not found.
+        run: gh cache delete ${{ steps.cache-keys.outputs.CACHE_KEY }}
+
+      - name: Save bazel cache
+        uses: actions/cache/save@v4
+        if: env.REFRESH_CACHE == 'true' || steps.bazel-cache.outputs.cache-hit != 'true'
+        with:
+          path: .bazel-cache
+          key: ${{ steps.cache-keys.outputs.CACHE_KEY }}
