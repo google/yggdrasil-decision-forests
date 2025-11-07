@@ -766,43 +766,42 @@ void ExpectEqualPredictions(
         } else if (predictions.size() == num_examples * num_classes) {
           compact_format = false;
         } else {
-          LOG(FATAL) << "predictions for classification are expected to be of "
-                        "size \"num_row\" (compact format) or \"num_rows * "
-                        "num_classes\" (classical format). Got num_classes="
-                     << num_classes
-                     << " predictions.size()=" << predictions.size()
-                     << " num_examples=" << num_examples << ".";
+          FAIL() << "predictions for classification are expected to be of "
+                    "size \"num_row\" (compact format) or \"num_rows * "
+                    "num_classes\" (classical format). Got num_classes="
+                 << num_classes << " predictions.size()=" << predictions.size()
+                 << " num_examples=" << num_examples << ".";
         }
 
         if (compact_format) {
-          CHECK_EQ(num_classes, 2)
+          ASSERT_EQ(num_classes, 2)
               << "Compact format only compatible with binary predictions.";
           // Generic predictions.
           const float pos_probability = get_probability(generic_prediction, 2);
-          CHECK_NEAR(pos_probability, predictions[prediction_idx], epsilon)
+          EXPECT_NEAR(pos_probability, predictions[prediction_idx], epsilon)
               << "row_idx:" << row_idx;
         } else {
           // Precomputed predictions.
           for (int class_idx = 0; class_idx < num_classes; class_idx++) {
             const float probability =
                 get_probability(generic_prediction, class_idx + 1);
-            CHECK_NEAR(probability,
-                       predictions[prediction_idx * num_classes + class_idx],
-                       epsilon)
+            EXPECT_NEAR(probability,
+                        predictions[prediction_idx * num_classes + class_idx],
+                        epsilon)
                 << "row_idx:" << row_idx;
           }
         }
       } break;
 
       case model::proto::Task::REGRESSION:
-        CHECK_NEAR(generic_prediction.regression().value(),
-                   predictions[prediction_idx], epsilon)
+        EXPECT_NEAR(generic_prediction.regression().value(),
+                    predictions[prediction_idx], epsilon)
             << "row_idx:" << row_idx;
         break;
 
       case model::proto::Task::RANKING:
-        CHECK_NEAR(generic_prediction.ranking().relevance(),
-                   predictions[prediction_idx], epsilon)
+        EXPECT_NEAR(generic_prediction.ranking().relevance(),
+                    predictions[prediction_idx], epsilon)
             << "row_idx:" << row_idx;
         break;
 
@@ -814,27 +813,27 @@ void ExpectEqualPredictions(
         for (int effect_idx = 0;
              effect_idx < generic_prediction.uplift().treatment_effect_size();
              effect_idx++) {
-          CHECK_NEAR(generic_prediction.uplift().treatment_effect(effect_idx),
-                     predictions[prediction_idx * num_effects + effect_idx],
-                     epsilon)
+          EXPECT_NEAR(generic_prediction.uplift().treatment_effect(effect_idx),
+                      predictions[prediction_idx * num_effects + effect_idx],
+                      epsilon)
               << "row_idx:" << row_idx;
         }
       } break;
 
       case model::proto::Task::ANOMALY_DETECTION:
-        CHECK_NEAR(generic_prediction.anomaly_detection().value(),
-                   predictions[prediction_idx], epsilon)
+        EXPECT_NEAR(generic_prediction.anomaly_detection().value(),
+                    predictions[prediction_idx], epsilon)
             << "row_idx:" << row_idx;
         break;
 
       case model::proto::Task::SURVIVAL_ANALYSIS:
-        CHECK_NEAR(generic_prediction.survival_analysis().log_hazard_ratio(),
-                   predictions[prediction_idx], epsilon)
+        EXPECT_NEAR(generic_prediction.survival_analysis().log_hazard_ratio(),
+                    predictions[prediction_idx], epsilon)
             << "row_idx:" << row_idx;
         break;
 
       default:
-        LOG(FATAL) << "Not supported task";
+        FAIL() << "Not supported task";
     }
     prediction_idx++;
   }
