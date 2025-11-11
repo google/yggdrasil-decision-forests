@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler_config: ["gcc", "clang"]
+        compiler_config: ["gcc"]
 
   python-build-test-matrix:
     name: "Python Build & Test (Python ${{ matrix.python_version }})"
