@@ -28,7 +28,6 @@
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -51,12 +50,12 @@
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
-#include "yggdrasil_decision_forests/utils/csv.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"  // IWYU pragma: keep
 
 namespace yggdrasil_decision_forests {
 namespace serving {
@@ -71,21 +70,6 @@ using testing::ElementsAre;
 std::string TestDataDir() {
   return file::JoinPath(test::DataRootDirectory(),
                         "yggdrasil_decision_forests/test_data");
-}
-
-// Loads a header-less csv containing a single numerical column.
-std::vector<float> LoadCsvToVectorOfFloat(const absl::string_view path) {
-  std::vector<float> result;
-  file::InputFileCloser closer(std::move(file::OpenInputFile(path).value()));
-  yggdrasil_decision_forests::utils::csv::Reader reader(closer.stream());
-  std::vector<absl::string_view>* row;
-  while (reader.NextRow(&row).value()) {
-    CHECK_EQ(row->size(), 1);
-    float value;
-    CHECK(absl::SimpleAtof((*row)[0], &value));
-    result.push_back(value);
-  }
-  return result;
 }
 
 // Load a dataset
@@ -237,107 +221,124 @@ using AllCompatibleEnginesTest =
     testing::TestWithParam<AllCompatibleEnginesTestParams>;
 
 // Test all the compatible engines. Make sure at least one engine is compatible.
-TEST_P(AllCompatibleEnginesTest, Automatic) {
+TEST_P(AllCompatibleEnginesTest, Checks) {
   const auto model = LoadModel(GetParam().model);
   const auto dataset = LoadDataset(model->data_spec(), GetParam().dataset,
                                    GetParam().dataset_format);
-  const auto factories = model->ListCompatibleFastEngines();
-  CHECK_GE(factories.size(), 1);
-  for (const auto& factory : factories) {
-    const auto engine = factory->CreateEngine(model.get()).value();
-    utils::ExpectEqualPredictions(dataset, *model, *engine);
+
+  {
+    SCOPED_TRACE("Compatible engines");
+    const auto factories = model->ListCompatibleFastEngines();
+    CHECK_GE(factories.size(), 1);
+    for (const auto& factory : factories) {
+      ASSERT_OK_AND_ASSIGN(const auto engine,
+                           factory->CreateEngine(model.get()));
+      utils::ExpectEqualPredictions(dataset, *model, *engine);
+    }
+
+    CheckCompatibleEngine(*model, GetParam().expected_engines);
   }
 
-  CheckCompatibleEngine(*model, GetParam().expected_engines);
-}
+  {
+    SCOPED_TRACE("Concurrent engine compilation");
+    // Concurrently compiles 100 DF models on 10 threads for each engine.
+    const std::vector<std::unique_ptr<model::FastEngineFactory>> factories =
+        model->ListCompatibleFastEngines();
 
-// Concurrently compiles 100 DF models on 10 threads for each engine.
-TEST_P(AllCompatibleEnginesTest, Concurent) {
-  const std::unique_ptr<model::AbstractModel> model =
-      LoadModel(GetParam().model);
-  const dataset::VerticalDataset dataset = LoadDataset(
-      model->data_spec(), GetParam().dataset, GetParam().dataset_format);
-  const std::vector<std::unique_ptr<model::FastEngineFactory>> factories =
-      model->ListCompatibleFastEngines();
+    const auto compile_model =
+        [model = model.get()](
+            const model::FastEngineFactory* factory) -> absl::Status {
+      ASSIGN_OR_RETURN(const auto engine, factory->CreateEngine(model));
+      // Note: Discard the engine.
+      return absl::OkStatus();
+    };
 
-  const auto compile_model =
-      [model = model.get()](
-          const model::FastEngineFactory* factory) -> absl::Status {
-    ASSIGN_OR_RETURN(const auto engine, factory->CreateEngine(model));
-    // Note: Discard the engine.
-    return absl::OkStatus();
-  };
+    const int num_repetitions = 100;
 
-  const int num_repetitions = 100;
+    for (const auto& factory : factories) {
+      utils::concurrency::StreamProcessor<const model::FastEngineFactory*,
+                                          absl::Status>
+          processor("model compiler", /*num_threads=*/10, compile_model);
+      processor.StartWorkers();
+      for (int rep_idx = 0; rep_idx < num_repetitions; rep_idx++) {
+        processor.Submit(factory.get());
+      }
+      processor.CloseSubmits();
 
-  for (const auto& factory : factories) {
-    utils::concurrency::StreamProcessor<const model::FastEngineFactory*,
-                                        absl::Status>
-        processor("model compiler", /*num_threads=*/10, compile_model);
-    processor.StartWorkers();
-    for (int rep_idx = 0; rep_idx < num_repetitions; rep_idx++) {
-      processor.Submit(factory.get());
-    }
-    processor.CloseSubmits();
-
-    for (int rep_idx = 0; rep_idx < num_repetitions; rep_idx++) {
-      const std::optional<absl::Status> result = processor.GetResult();
-      ASSERT_TRUE(result.has_value());
-      EXPECT_OK(*result);
-    }
-    processor.JoinAllAndStopThreads();
-  }
-}
-
-TEST_P(AllCompatibleEnginesTest, AutomaticForceCheckFail) {
-  const auto model = LoadModel(GetParam().model);
-
-  // Make it look like the model is not compatible with global imputation
-  // optimization.
-  if (dynamic_cast<GradientBoostedTreesModel*>(model.get())) {
-    dynamic_cast<GradientBoostedTreesModel*>(model.get())
-        ->Testing()
-        ->force_fail_check_structure_global_imputation_is_higher = true;
-  } else if (dynamic_cast<RandomForestModel*>(model.get())) {
-    dynamic_cast<RandomForestModel*>(model.get())
-        ->Testing()
-        ->force_fail_check_structure_global_imputation_is_higher = true;
-  } else {
-    // Nothing to test.
-    return;
-  }
-
-  // None of the Opt engines are compatible.
-  auto expected_engines = GetParam().expected_engines;
-  expected_engines.erase(gradient_boosted_trees::kOptPred);
-  expected_engines.erase(random_forest::kOptPred);
-
-  // Oblique conditions are not compatible with the generic engine if global
-  // imputation is not enabled.
-  if (dynamic_cast<GradientBoostedTreesModel*>(model.get())) {
-    if (!dynamic_cast<GradientBoostedTreesModel*>(model.get())
-             ->CheckStructure(model::decision_tree::CheckStructureOptions::
-                                  NoObliqueConditions())) {
-      return;
-    }
-  } else if (dynamic_cast<RandomForestModel*>(model.get())) {
-    if (!dynamic_cast<RandomForestModel*>(model.get())
-             ->CheckStructure(model::decision_tree::CheckStructureOptions::
-                                  NoObliqueConditions())) {
-      return;
+      for (int rep_idx = 0; rep_idx < num_repetitions; rep_idx++) {
+        const std::optional<absl::Status> result = processor.GetResult();
+        ASSERT_TRUE(result.has_value());
+        EXPECT_OK(*result);
+      }
+      processor.JoinAllAndStopThreads();
     }
   }
 
-  const auto dataset = LoadDataset(model->data_spec(), GetParam().dataset,
-                                   GetParam().dataset_format);
-  const auto factories = model->ListCompatibleFastEngines();
-  CHECK_GE(factories.size(), 1);
-  for (const auto& factory : factories) {
-    const auto engine = factory->CreateEngine(model.get()).value();
-    utils::ExpectEqualPredictions(dataset, *model, *engine);
-  }
+  {
+    SCOPED_TRACE("Force check fail");
 
-  CheckCompatibleEngine(*model, expected_engines);
+    // Make it look like the model is not compatible with global imputation
+    // optimization.
+    bool force_fail_global_imputation = false;
+    if (dynamic_cast<GradientBoostedTreesModel*>(model.get())) {
+      force_fail_global_imputation = true;
+      dynamic_cast<GradientBoostedTreesModel*>(model.get())
+          ->Testing()
+          ->force_fail_check_structure_global_imputation_is_higher = true;
+    } else if (dynamic_cast<RandomForestModel*>(model.get())) {
+      force_fail_global_imputation = true;
+      dynamic_cast<RandomForestModel*>(model.get())
+          ->Testing()
+          ->force_fail_check_structure_global_imputation_is_higher = true;
+    }
+
+    if (force_fail_global_imputation) {
+      // Oblique conditions are not compatible with the generic engine if global
+      // imputation is not enabled.
+      bool skip = false;
+      if (dynamic_cast<GradientBoostedTreesModel*>(model.get())) {
+        if (!dynamic_cast<GradientBoostedTreesModel*>(model.get())
+                 ->CheckStructure(model::decision_tree::CheckStructureOptions::
+                                      NoObliqueConditions())) {
+          skip = true;
+        }
+      } else if (dynamic_cast<RandomForestModel*>(model.get())) {
+        if (!dynamic_cast<RandomForestModel*>(model.get())
+                 ->CheckStructure(model::decision_tree::CheckStructureOptions::
+                                      NoObliqueConditions())) {
+          skip = true;
+        }
+      }
+
+      if (!skip) {
+        // None of the Opt engines are compatible.
+        auto expected_engines = GetParam().expected_engines;
+        expected_engines.erase(gradient_boosted_trees::kOptPred);
+        expected_engines.erase(random_forest::kOptPred);
+
+        const auto factories = model->ListCompatibleFastEngines();
+        CHECK_GE(factories.size(), 1);
+        for (const auto& factory : factories) {
+          ASSERT_OK_AND_ASSIGN(const auto engine,
+                               factory->CreateEngine(model.get()));
+          utils::ExpectEqualPredictions(dataset, *model, *engine);
+        }
+
+        CheckCompatibleEngine(*model, expected_engines);
+      }
+
+      // Restore flag.
+      if (dynamic_cast<GradientBoostedTreesModel*>(model.get())) {
+        dynamic_cast<GradientBoostedTreesModel*>(model.get())
+            ->Testing()
+            ->force_fail_check_structure_global_imputation_is_higher = false;
+      } else if (dynamic_cast<RandomForestModel*>(model.get())) {
+        dynamic_cast<RandomForestModel*>(model.get())
+            ->Testing()
+            ->force_fail_check_structure_global_imputation_is_higher = false;
+      }
+    }
+  }
 }
 
 std::unordered_set<std::string> AllGBTEngines() {
