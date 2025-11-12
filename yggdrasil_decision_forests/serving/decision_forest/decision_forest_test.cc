@@ -417,11 +417,18 @@ INSTANTIATE_TEST_SUITE_P(
           absl::StrReplaceAll(info.param.dataset, {{".", "_"}, {"-", "_"}}));
     });
 
-TEST(AdultBinaryClassGBDT, ManualGeneric) {
+using GBTClassificationTest = ::testing::TestWithParam<bool>;
+
+TEST_P(GBTClassificationTest, AdultBinaryClassGBDTManualGeneric) {
+  const bool output_logits = GetParam();
   const auto model = LoadModel("adult_binary_class_gbdt");
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
+  if (output_logits) {
+    model->set_classification_outputs_probabilities(false);
+    gbt_model->set_output_logits(true);
+  }
   const auto dataset = LoadDataset(model->data_spec(), "adult_test.csv", "csv");
 
-  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
   GradientBoostedTreesBinaryClassification engine;
   CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
 
@@ -457,11 +464,16 @@ TEST(AdultBinaryClassGBDT, ManualWithNonCompatibleEngines) {
   }
 }
 
-TEST(AdultBinaryClassGBDT, ManualNumCat32) {
+TEST_P(GBTClassificationTest, AdultBinaryClassGBDTManualNumCat32) {
+  const bool output_logits = GetParam();
   const auto model = LoadModel("adult_binary_class_gbdt_32cat");
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
+  if (output_logits) {
+    model->set_classification_outputs_probabilities(false);
+    gbt_model->set_output_logits(true);
+  }
   const auto dataset = LoadDataset(model->data_spec(), "adult_test.csv", "csv");
 
-  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
   GradientBoostedTreesBinaryClassificationNumericalAndCategorical engine;
   CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
 
@@ -469,11 +481,16 @@ TEST(AdultBinaryClassGBDT, ManualNumCat32) {
       dataset, *model, engine);
 }
 
-TEST(AdultBinaryClassGBDT, ManualNum) {
+TEST_P(GBTClassificationTest, AdultBinaryClassGBDTManualNum) {
+  const bool output_logits = GetParam();
   const auto model = LoadModel("adult_binary_class_gbdt_only_num");
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
+  if (output_logits) {
+    model->set_classification_outputs_probabilities(false);
+    gbt_model->set_output_logits(true);
+  }
   const auto dataset = LoadDataset(model->data_spec(), "adult_test.csv", "csv");
 
-  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
   GradientBoostedTreesBinaryClassificationNumericalOnly engine;
   CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
 
@@ -505,17 +522,25 @@ TEST(AdultBinaryClassRF, ManualNum) {
       dataset, *model, engine);
 }
 
-TEST(IrisMulticlassClassGBDT, ManualGeneric) {
+TEST_P(GBTClassificationTest, IrisMulticlassClassGBDTManualGeneric) {
+  const bool output_logits = GetParam();
   const auto model = LoadModel("iris_multi_class_gbdt");
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
+  if (output_logits) {
+    model->set_classification_outputs_probabilities(false);
+    gbt_model->set_output_logits(true);
+  }
   const auto dataset = LoadDataset(model->data_spec(), "iris.csv", "csv");
 
-  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model.get());
   GradientBoostedTreesMulticlassClassification engine;
   CHECK_OK(GenericToSpecializedModel(*gbt_model, &engine));
 
   utils::ExpectEqualPredictionsTemplate<decltype(engine), Predict>(
       dataset, *model, engine);
 }
+
+INSTANTIATE_TEST_SUITE_P(GBTClassificationTest, GBTClassificationTest,
+                         testing::Bool());
 
 TEST(IrisMulticlassClassRF, ManualGeneric) {
   const auto model = LoadModel("iris_multi_class_rf");

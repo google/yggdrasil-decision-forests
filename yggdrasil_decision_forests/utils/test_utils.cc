@@ -32,7 +32,6 @@
 #include <utility>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
 #include "absl/random/random.h"
@@ -59,6 +58,7 @@
 #include "yggdrasil_decision_forests/metric/report.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/model_engine_wrapper.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
@@ -73,7 +73,6 @@
 #include "yggdrasil_decision_forests/utils/sharded_io.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"
 
 namespace yggdrasil_decision_forests {
@@ -740,17 +739,23 @@ void ExpectEqualPredictions(
 
   const auto num_examples = end_example_idx - begin_example_idx;
 
-  // Current prediction being checked.
-  int prediction_idx = 0;
-
   const auto get_probability = [](const model::proto::Prediction& prediction,
                                   const int class_idx) {
     return prediction.classification().distribution().counts(class_idx) /
            prediction.classification().distribution().sum();
   };
 
-  for (dataset::VerticalDataset::row_t row_idx = begin_example_idx;
-       row_idx < end_example_idx; row_idx++) {
+  const auto get_logits = [](const model::proto::Prediction& prediction,
+                             const int class_idx) {
+    return prediction.classification().logits().counts(class_idx);
+  };
+
+  const auto* gbt_model = dynamic_cast<
+      const model::gradient_boosted_trees::GradientBoostedTreesModel*>(&model);
+  const bool output_logits = gbt_model != nullptr && gbt_model->output_logits();
+
+  for (int i = 0; i < num_examples; i++) {
+    const dataset::VerticalDataset::row_t row_idx = begin_example_idx + i;
     // Compute the prediction with the generic engine.
     model.Predict(dataset, row_idx, &generic_prediction);
 
@@ -778,31 +783,34 @@ void ExpectEqualPredictions(
           CHECK_EQ(num_classes, 2)
               << "Compact format only compatible with binary predictions.";
           // Generic predictions.
-          const float pos_probability = get_probability(generic_prediction, 2);
-          CHECK_NEAR(pos_probability, predictions[prediction_idx], epsilon)
+          const float slow_engine_output =
+              output_logits ? get_logits(generic_prediction, 2)
+                            : get_probability(generic_prediction, 2);
+          CHECK_NEAR(slow_engine_output, predictions[i], epsilon)
               << "row_idx:" << row_idx;
         } else {
           // Precomputed predictions.
           for (int class_idx = 0; class_idx < num_classes; class_idx++) {
-            const float probability =
-                get_probability(generic_prediction, class_idx + 1);
-            CHECK_NEAR(probability,
-                       predictions[prediction_idx * num_classes + class_idx],
-                       epsilon)
+            const float slow_engine_output =
+                output_logits
+                    ? get_logits(generic_prediction, class_idx + 1)
+                    : get_probability(generic_prediction, class_idx + 1);
+            CHECK_NEAR(slow_engine_output,
+                       predictions[i * num_classes + class_idx], epsilon)
                 << "row_idx:" << row_idx;
           }
         }
       } break;
 
       case model::proto::Task::REGRESSION:
-        CHECK_NEAR(generic_prediction.regression().value(),
-                   predictions[prediction_idx], epsilon)
+        CHECK_NEAR(generic_prediction.regression().value(), predictions[i],
+                   epsilon)
             << "row_idx:" << row_idx;
         break;
 
       case model::proto::Task::RANKING:
-        CHECK_NEAR(generic_prediction.ranking().relevance(),
-                   predictions[prediction_idx], epsilon)
+        CHECK_NEAR(generic_prediction.ranking().relevance(), predictions[i],
+                   epsilon)
             << "row_idx:" << row_idx;
         break;
 
@@ -815,28 +823,26 @@ void ExpectEqualPredictions(
              effect_idx < generic_prediction.uplift().treatment_effect_size();
              effect_idx++) {
           CHECK_NEAR(generic_prediction.uplift().treatment_effect(effect_idx),
-                     predictions[prediction_idx * num_effects + effect_idx],
-                     epsilon)
+                     predictions[i * num_effects + effect_idx], epsilon)
               << "row_idx:" << row_idx;
         }
       } break;
 
       case model::proto::Task::ANOMALY_DETECTION:
         CHECK_NEAR(generic_prediction.anomaly_detection().value(),
-                   predictions[prediction_idx], epsilon)
+                   predictions[i], epsilon)
             << "row_idx:" << row_idx;
         break;
 
       case model::proto::Task::SURVIVAL_ANALYSIS:
         CHECK_NEAR(generic_prediction.survival_analysis().log_hazard_ratio(),
-                   predictions[prediction_idx], epsilon)
+                   predictions[i], epsilon)
             << "row_idx:" << row_idx;
         break;
 
       default:
         LOG(FATAL) << "Not supported task";
     }
-    prediction_idx++;
   }
 }
 

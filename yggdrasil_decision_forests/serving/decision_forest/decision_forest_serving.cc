@@ -97,7 +97,7 @@ float IsolationForestActivation(const Model& model, const float value) {
 //
 // Note: Lambda default segfaults clang.
 template <typename Model>
-float Idendity(const Model& model, const float value) {
+float Identity(const Model& model, const float value) {
   return value;
 }
 
@@ -264,7 +264,7 @@ inline bool EvalCondition(const typename Model::NodeType* node,
 
 // Basic inference of a decision forest on a set of trees.
 template <typename Model,
-          float (*FinalTransform)(const Model&, const float) = Idendity<Model>>
+          float (*FinalTransform)(const Model&, const float) = Identity<Model>>
 inline void PredictHelper(
     const Model& model, const std::vector<typename Model::ValueType>& examples,
     int num_examples, std::vector<float>* predictions) {
@@ -289,7 +289,7 @@ inline void PredictHelper(
 }
 
 template <typename Model,
-          float (*FinalTransform)(const Model&, const float) /*= Idendity*/>
+          float (*FinalTransform)(const Model&, const float) /*= Identity*/>
 inline void PredictHelper(const Model& model,
                           const typename Model::ExampleSet& examples,
                           int num_examples, std::vector<float>* predictions) {
@@ -311,7 +311,7 @@ inline void PredictHelper(const Model& model,
 }
 
 template <typename Model,
-          float (*FinalTransform)(const Model&, const float) /*= Idendity*/>
+          float (*FinalTransform)(const Model&, const float) /*= Identity*/>
 inline void PredictHelperMultiDimensionTrees(
     const Model& model, const typename Model::ExampleSet& examples,
     int num_examples, std::vector<float>* predictions) {
@@ -365,7 +365,7 @@ inline void PredictHelperMultiDimensionFromSingleDimensionTrees(
 
 // See the documentation of "PredictOptimizedV1".
 template <typename Model,
-          float (*FinalTransform)(const Model&, const float) = Idendity<Model>,
+          float (*FinalTransform)(const Model&, const float) = Identity<Model>,
           int kTreeBatchSize = 5>
 inline void PredictHelperOptimizedV1(
     const Model& model, const std::vector<typename Model::ValueType>& examples,
@@ -477,9 +477,15 @@ void Predict(
 void Predict(const GradientBoostedTreesBinaryClassificationNumericalOnly& model,
              const std::vector<float>& examples, int num_examples,
              std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type,
-                ActivationGradientBoostedTreesBinomialLogLikelihood>(
-      model, examples, num_examples, predictions);
+  if (model.output_logits) {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationAddInitialPrediction>(model, examples, num_examples,
+                                                  predictions);
+  } else {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationGradientBoostedTreesBinomialLogLikelihood>(
+        model, examples, num_examples, predictions);
+  }
 }
 
 void Predict(
@@ -487,22 +493,28 @@ void Predict(
         model,
     const std::vector<NumericalOrCategoricalValue>& examples, int num_examples,
     std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type,
-                ActivationGradientBoostedTreesBinomialLogLikelihood>(
-      model, examples, num_examples, predictions);
+  if (model.output_logits) {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationAddInitialPrediction>(model, examples, num_examples,
+                                                  predictions);
+  } else {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationGradientBoostedTreesBinomialLogLikelihood>(
+        model, examples, num_examples, predictions);
+  }
 }
 
 void Predict(const RandomForestRegressionNumericalOnly& model,
              const std::vector<float>& examples, int num_examples,
              std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+  PredictHelper<std::remove_reference<decltype(model)>::type, Identity>(
       model, examples, num_examples, predictions);
 }
 
 void Predict(const RandomForestRegressionNumericalAndCategorical& model,
              const std::vector<NumericalOrCategoricalValue>& examples,
              int num_examples, std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+  PredictHelper<std::remove_reference<decltype(model)>::type, Identity>(
       model, examples, num_examples, predictions);
 }
 
@@ -544,7 +556,7 @@ void PredictOptimizedV1(
     std::vector<float>* predictions) {
   PredictHelperOptimizedV1<
       RandomForestBinaryClassificationNumericalFeatures,
-      Idendity<RandomForestBinaryClassificationNumericalFeatures>>(
+      Identity<RandomForestBinaryClassificationNumericalFeatures>>(
       model, examples, num_examples, predictions);
 }
 
@@ -555,7 +567,7 @@ void PredictOptimizedV1(
     std::vector<float>* predictions) {
   PredictHelperOptimizedV1<
       RandomForestBinaryClassificationNumericalAndCategoricalFeatures,
-      Idendity<
+      Identity<
           RandomForestBinaryClassificationNumericalAndCategoricalFeatures>>(
       model, examples, num_examples, predictions);
 }
@@ -585,7 +597,7 @@ void PredictOptimizedV1(const RandomForestRegressionNumericalOnly& model,
                         const std::vector<float>& examples, int num_examples,
                         std::vector<float>* predictions) {
   PredictHelperOptimizedV1<RandomForestRegressionNumericalOnly,
-                           Idendity<RandomForestRegressionNumericalOnly>>(
+                           Identity<RandomForestRegressionNumericalOnly>>(
       model, examples, num_examples, predictions);
 }
 
@@ -595,7 +607,7 @@ void PredictOptimizedV1(
     std::vector<float>* predictions) {
   PredictHelperOptimizedV1<
       RandomForestRegressionNumericalAndCategorical,
-      Idendity<RandomForestRegressionNumericalAndCategorical>>(
+      Identity<RandomForestRegressionNumericalAndCategorical>>(
       model, examples, num_examples, predictions);
 }
 
@@ -658,7 +670,7 @@ template <>
 void Predict(const RandomForestRegression& model,
              const typename RandomForestRegression::ExampleSet& examples,
              int num_examples, std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+  PredictHelper<std::remove_reference<decltype(model)>::type, Identity>(
       model, examples, num_examples, predictions);
 }
 
@@ -667,7 +679,7 @@ void Predict(const RandomForestCategoricalUplift& model,
              const typename RandomForestCategoricalUplift::ExampleSet& examples,
              int num_examples, std::vector<float>* predictions) {
   PredictHelperMultiDimensionTrees<std::remove_reference<decltype(model)>::type,
-                                   Idendity>(model, examples, num_examples,
+                                   Identity>(model, examples, num_examples,
                                              predictions);
 }
 
@@ -675,7 +687,7 @@ template <>
 void Predict(const RandomForestNumericalUplift& model,
              const typename RandomForestNumericalUplift::ExampleSet& examples,
              int num_examples, std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+  PredictHelper<std::remove_reference<decltype(model)>::type, Identity>(
       model, examples, num_examples, predictions);
 }
 
@@ -703,7 +715,7 @@ void Predict(const GenericRandomForestRegression<uint32_t>& model,
              const typename GenericRandomForestRegression<uint32_t>::ExampleSet&
                  examples,
              int num_examples, std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+  PredictHelper<std::remove_reference<decltype(model)>::type, Identity>(
       model, examples, num_examples, predictions);
 }
 
@@ -714,7 +726,7 @@ void Predict(
         examples,
     int num_examples, std::vector<float>* predictions) {
   PredictHelperMultiDimensionTrees<std::remove_reference<decltype(model)>::type,
-                                   Idendity>(model, examples, num_examples,
+                                   Identity>(model, examples, num_examples,
                                              predictions);
 }
 
@@ -724,7 +736,7 @@ void Predict(
     const typename GenericRandomForestNumericalUplift<uint32_t>::ExampleSet&
         examples,
     int num_examples, std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
+  PredictHelper<std::remove_reference<decltype(model)>::type, Identity>(
       model, examples, num_examples, predictions);
 }
 
@@ -753,9 +765,15 @@ void Predict(
     const typename GradientBoostedTreesBinaryClassification::ExampleSet&
         examples,
     int num_examples, std::vector<float>* predictions) {
-  PredictHelper<std::remove_reference<decltype(model)>::type,
-                ActivationGradientBoostedTreesBinomialLogLikelihood>(
-      model, examples, num_examples, predictions);
+  if (model.output_logits) {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationAddInitialPrediction>(model, examples, num_examples,
+                                                  predictions);
+  } else {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationGradientBoostedTreesBinomialLogLikelihood>(
+        model, examples, num_examples, predictions);
+  }
 }
 
 template <>
@@ -765,8 +783,9 @@ void Predict(
         uint32_t>::ExampleSet& examples,
     int num_examples, std::vector<float>* predictions) {
   if (model.output_logits) {
-    PredictHelper<std::remove_reference<decltype(model)>::type, Idendity>(
-        model, examples, num_examples, predictions);
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationAddInitialPrediction>(model, examples, num_examples,
+                                                  predictions);
   } else {
     PredictHelper<std::remove_reference<decltype(model)>::type,
                   ActivationGradientBoostedTreesBinomialLogLikelihood>(

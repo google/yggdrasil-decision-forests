@@ -280,6 +280,7 @@ struct GradientBoostedTreesBinaryClassificationNumericalOnly
       model::proto::Task::CLASSIFICATION;
   // Value to add on the predicted value.
   float initial_predictions = 0.f;
+  bool output_logits = false;
 };
 
 // Gradient Boosted Trees for binary classification with numerical and
@@ -292,6 +293,7 @@ struct GradientBoostedTreesBinaryClassificationNumericalAndCategorical
   // Output of the model before any tree is applied, and before the final
   // activation function.
   float initial_predictions = 0.f;
+  bool output_logits = false;
 };
 
 // Gradient Boosted Trees model for regression with numerical input
