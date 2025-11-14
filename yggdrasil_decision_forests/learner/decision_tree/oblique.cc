@@ -311,13 +311,25 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
   // Find a good split in the current_projection.
   SplitSearchResult result;
   if constexpr (is_same<LabelStats, ClassificationLabelStats>::value) {
+    if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
     ASSIGN_OR_RETURN(
         result,
         FindSplitLabelClassificationFeatureNumericalCart(
-            dense_example_idxs, selected_weights, projection_values,
+            dense_example_idxs, selected_weights,
+            projection_values,
             selected_labels, label_stats.num_label_classes, na_replacement,
             min_num_obs, dt_config, label_stats.label_distribution,
             first_attribute_idx, effective_internal_config, condition, cache));
+    }
+    else {
+      ASSIGN_OR_RETURN(
+          result,
+          FindSplitLabelClassificationFeatureNumericalHistogram(
+              dense_example_idxs, selected_weights, projection_values, min_value, max_value,
+              selected_labels, label_stats.num_label_classes, na_replacement,
+              min_num_obs, dt_config, label_stats.label_distribution,
+              first_attribute_idx, random, condition));
+    }
   } else if constexpr (is_same<LabelStats,
                                RegressionHessianLabelStats>::value) {
     if (!selected_weights.empty()) {
