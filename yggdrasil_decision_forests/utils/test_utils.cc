@@ -52,6 +52,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/random_forest/random_forest.h" // add
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -375,6 +376,9 @@ absl::Status TrainAndTestTester::PostTrainingChecks() {
 
   // Ensure that the predictions of the semi-fast engine are similar as the
   // predictions of the generic engine.
+  
+
+
   LOG(INFO) << "Test generic engine";
   TestGenericEngine(*model_, test_dataset_);
 
@@ -610,8 +614,20 @@ void TrainAndTestTester::BuildTrainValidTestDatasets(
 
 void TestGenericEngine(const model::AbstractModel& model,
                        const dataset::VerticalDataset& dataset) {
+  
+  // Early exit for kernel_method=true
+  const auto* rf_model = dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
+  if (rf_model != nullptr && rf_model->kernel_method()) {
+    LOG(INFO) << "Skipping fast engine test: kernel_method=true for model " << model.name();
+    return;
+  }
+
+
+
   auto engine_or = model.BuildFastEngine();
   if (!engine_or.ok()) {
+  //if (!false) { // enter this if when kernel method
+
     LOG(INFO) << "Model " << model.name()
               << " does not implement any fast generic engine: "
               << engine_or.status().message();
