@@ -16,8 +16,10 @@
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -50,18 +52,25 @@ using test::EqualsProto;
 
 // Detects the names and types of the columns. This is the first stage of the
 // full dataspec creation.
-void InferDataSpecType(const absl::string_view typed_path,
-                       const proto::DataSpecificationGuide& guide,
-                       proto::DataSpecification* data_spec) {
+absl::Status InferDataSpecType(
+    const absl::string_view typed_path,
+    const proto::DataSpecificationGuide& guide,
+    proto::DataSpecification* data_spec,
+    const std::optional<CreateDataSpecConfig> config = {}) {
   std::string sharded_path;
   proto::DatasetFormat format;
   std::tie(sharded_path, format) = GetDatasetPathAndType(typed_path);
   std::vector<std::string> paths;
-  CHECK_OK(utils::ExpandInputShards(sharded_path, &paths));
+  RETURN_IF_ERROR(utils::ExpandInputShards(sharded_path, &paths));
   const auto& format_name = proto::DatasetFormat_Name(format);
-  auto creator = AbstractDataSpecCreatorRegisterer::Create(format_name).value();
-  CHECK_OK(creator->InferColumnsAndTypes(paths, guide, data_spec));
+  ASSIGN_OR_RETURN(auto creator,
+                   AbstractDataSpecCreatorRegisterer::Create(format_name));
+  if (config.has_value()) {
+    creator->config = config;
+  }
+  RETURN_IF_ERROR(creator->InferColumnsAndTypes(paths, guide, data_spec));
   FinalizeInferTypes(guide, data_spec);
+  return absl::OkStatus();
 }
 
 std::string DatasetDir() {
@@ -746,16 +755,28 @@ TEST(Dataset, MergeColumnGuideTest5) {
 TEST(Dataset, InferDataSpecTypeCsv) {
   proto::DataSpecificationGuide guide;
   proto::DataSpecification data_spec;
-  InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec);
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyNoGuide();
   EXPECT_THAT(data_spec, EqualsProto(target));
+}
+
+TEST(Dataset, InferDataSpecTypeCsvInterrupt) {
+  proto::DataSpecificationGuide guide;
+  proto::DataSpecification data_spec;
+  CreateDataSpecConfig config;
+  std::atomic<bool> stop;
+  stop = true;
+  config.stop = &stop;
+  EXPECT_FALSE(
+      InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec, config)
+          .ok());
 }
 
 TEST(Dataset, InferDataSpecTypeCsvBoolAsNumerical) {
   proto::DataSpecificationGuide guide;
   guide.set_detect_boolean_as_numerical(true);
   proto::DataSpecification data_spec;
-  InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec);
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyNoGuide();
   // The new boolean columns are seen as numerical.
   EXPECT_EQ(data_spec.columns(7).type(), proto::ColumnType::NUMERICAL);
@@ -769,7 +790,7 @@ TEST(Dataset, InferDataSpecTypeCsvIntegerizedCat) {
   num_1->set_column_name_pattern("Num_1");
   num_1->set_type(proto::ColumnType::CATEGORICAL);
   num_1->mutable_categorial()->set_is_already_integerized(true);
-  InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec);
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyNoGuide();
   EXPECT_EQ(data_spec.columns(0).type(), proto::ColumnType::CATEGORICAL);
   EXPECT_TRUE(data_spec.columns(0).categorical().is_already_integerized());
@@ -779,7 +800,8 @@ TEST(Dataset, InferDataSpecTypeCsvIntegerizedCat) {
 TEST(Dataset, InferDataSpecTypeTFExampleTFRecord) {
   proto::DataSpecificationGuide guide;
   proto::DataSpecification data_spec;
-  InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide, &data_spec);
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide,
+                             &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyNoGuide(/*with_dtype=*/true);
   // Since tf.Example use dictionary, the columns can be in any random order.
   SortColumnByName(&data_spec);
@@ -787,10 +809,22 @@ TEST(Dataset, InferDataSpecTypeTFExampleTFRecord) {
   EXPECT_THAT(data_spec, EqualsProto(target));
 }
 
+TEST(Dataset, InferDataSpecTypeTFExampleTFRecordInterrupt) {
+  proto::DataSpecificationGuide guide;
+  proto::DataSpecification data_spec;
+  CreateDataSpecConfig config;
+  std::atomic<bool> stop;
+  stop = true;
+  config.stop = &stop;
+  EXPECT_FALSE(InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide,
+                                 &data_spec, config)
+                   .ok());
+}
+
 TEST(Dataset, InferDataSpecTypeCsvGuide2) {
   auto guide = ToyDatasetGuide2();
   proto::DataSpecification data_spec;
-  InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec);
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathCsv(), guide, &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyGuide2();
   EXPECT_THAT(data_spec, EqualsProto(target));
 }
@@ -798,7 +832,8 @@ TEST(Dataset, InferDataSpecTypeCsvGuide2) {
 TEST(Dataset, InferDataSpecTypeTFExampleTFRecordGuide2) {
   auto guide = ToyDatasetGuide2();
   proto::DataSpecification data_spec;
-  InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide, &data_spec);
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide,
+                             &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyGuide2(/*with_dtype=*/true);
   // Since tf.Example use dictionary, the columns can be in any random order.
   SortColumnByName(&data_spec);
@@ -1034,7 +1069,8 @@ TEST(Dataset, UnknownType) {
   proto::DataSpecificationGuide guide;
   guide.set_ignore_unknown_type_columns(true);
   proto::DataSpecification data_spec;
-  InferDataSpecType(absl::StrCat("csv:", dataset_path), guide, &data_spec);
+  CHECK_OK(
+      InferDataSpecType(absl::StrCat("csv:", dataset_path), guide, &data_spec));
   // The column "b" is ignored.
   proto::DataSpecification target = PARSE_TEST_PROTO(
       R"pb(

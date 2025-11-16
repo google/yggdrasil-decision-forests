@@ -1,0 +1,269 @@
+package com.google.ydf;
+
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.BitSet;
+
+public final class YdfModel {
+
+  public enum Label {
+    LT50K,
+    GT50K,
+  };
+
+  public enum FeatureWorkclass {
+    OUT_OF_VOCABULARY,
+    PRIVATE,
+    SELF_EMP_NOT_INC,
+    LOCAL_GOV,
+    STATE_GOV,
+    SELF_EMP_INC,
+    FEDERAL_GOV,
+    WITHOUT_PAY,
+  };
+
+  public enum FeatureEducation {
+    OUT_OF_VOCABULARY,
+    HS_GRAD,
+    SOME_COLLEGE,
+    BACHELORS,
+    MASTERS,
+    ASSOC_VOC,
+    V11TH,
+    ASSOC_ACDM,
+    V10TH,
+    V7TH_8TH,
+    PROF_SCHOOL,
+    V9TH,
+    V12TH,
+    DOCTORATE,
+    V5TH_6TH,
+    V1ST_4TH,
+    PRESCHOOL,
+  };
+
+  public enum FeatureMaritalStatus {
+    OUT_OF_VOCABULARY,
+    MARRIED_CIV_SPOUSE,
+    NEVER_MARRIED,
+    DIVORCED,
+    WIDOWED,
+    SEPARATED,
+    MARRIED_SPOUSE_ABSENT,
+    MARRIED_AF_SPOUSE,
+  };
+
+  public enum FeatureOccupation {
+    OUT_OF_VOCABULARY,
+    PROF_SPECIALTY,
+    EXEC_MANAGERIAL,
+    CRAFT_REPAIR,
+    ADM_CLERICAL,
+    SALES,
+    OTHER_SERVICE,
+    MACHINE_OP_INSPCT,
+    TRANSPORT_MOVING,
+    HANDLERS_CLEANERS,
+    FARMING_FISHING,
+    TECH_SUPPORT,
+    PROTECTIVE_SERV,
+    PRIV_HOUSE_SERV,
+  };
+
+  public enum FeatureRelationship {
+    OUT_OF_VOCABULARY,
+    HUSBAND,
+    NOT_IN_FAMILY,
+    OWN_CHILD,
+    UNMARRIED,
+    WIFE,
+    OTHER_RELATIVE,
+  };
+
+  public enum FeatureRace {
+    OUT_OF_VOCABULARY,
+    WHITE,
+    BLACK,
+    ASIAN_PAC_ISLANDER,
+    AMER_INDIAN_ESKIMO,
+    OTHER,
+  };
+
+  public enum FeatureSex {
+    OUT_OF_VOCABULARY,
+    MALE,
+    FEMALE,
+  };
+
+  public enum FeatureNativeCountry {
+    OUT_OF_VOCABULARY,
+    UNITED_STATES,
+    MEXICO,
+    PHILIPPINES,
+    GERMANY,
+    CANADA,
+    PUERTO_RICO,
+    INDIA,
+    EL_SALVADOR,
+    CUBA,
+    ENGLAND,
+    JAMAICA,
+    DOMINICAN_REPUBLIC,
+    SOUTH,
+    CHINA,
+    ITALY,
+    COLUMBIA,
+    GUATEMALA,
+    JAPAN,
+    VIETNAM,
+    TAIWAN,
+    IRAN,
+    POLAND,
+    HAITI,
+    NICARAGUA,
+    GREECE,
+    PORTUGAL,
+    ECUADOR,
+    FRANCE,
+    PERU,
+    THAILAND,
+    CAMBODIA,
+    IRELAND,
+    LAOS,
+    YUGOSLAVIA,
+    TRINADADTOBAGO,
+    HONDURAS,
+    HONG,
+    HUNGARY,
+    SCOTLAND,
+    OUTLYING_USGUAM_USVI_ETC,
+  };
+
+  private static final int NUM_FEATURES = 14;
+  private static final int NUM_TREES = 3;
+
+  public static class Instance {
+
+    private final int[] numericalFeatureValues;
+    private final int[] categoricalOrBooleanFeatureValues;
+
+    public Instance(int age, FeatureWorkclass workclass, int fnlwgt, FeatureEducation education, int educationNum, FeatureMaritalStatus maritalStatus, FeatureOccupation occupation, FeatureRelationship relationship, FeatureRace race, FeatureSex sex, int capitalGain, int capitalLoss, int hoursPerWeek, FeatureNativeCountry nativeCountry) {
+      this.numericalFeatureValues = new int[] {age, 0, fnlwgt, 0, educationNum, 0, 0, 0, 0, 0, capitalGain, capitalLoss, hoursPerWeek, 0};
+      this.categoricalOrBooleanFeatureValues = new int[] {-1, workclass.ordinal(), -1, education.ordinal(), -1, maritalStatus.ordinal(), occupation.ordinal(), relationship.ordinal(), race.ordinal(), sex.ordinal(), -1, -1, -1, nativeCountry.ordinal()};
+    }
+  }
+
+  private static final byte[] nodePos;
+  private static final float[] nodeVal;
+  private static final byte[] nodeFeat;
+  private static final short[] nodeCat;
+  private static final short[] nodeObl;
+  private static final byte[] rootDeltas;
+  private static final byte[] conditionTypes;
+  private static final float[] obliqueWeights;
+  private static final byte[] obliqueFeatures;
+  private static final BitSet categoricalBank;
+
+  static {
+    try (InputStream is = YdfModel.class.getResourceAsStream("YdfModelData.bin");
+         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+    int nodePosLength = dis.readInt();
+    nodePos = new byte[nodePosLength];
+    for (int i = 0; i < nodePosLength; i++) {
+      nodePos[i] = dis.readByte();
+    }
+    int nodeValLength = dis.readInt();
+    nodeVal = new float[nodeValLength];
+    for (int i = 0; i < nodeValLength; i++) {
+      nodeVal[i] = dis.readFloat();
+    }
+    int nodeFeatLength = dis.readInt();
+    nodeFeat = new byte[nodeFeatLength];
+    for (int i = 0; i < nodeFeatLength; i++) {
+      nodeFeat[i] = dis.readByte();
+    }
+    int nodeCatLength = dis.readInt();
+    nodeCat = new short[nodeCatLength];
+    for (int i = 0; i < nodeCatLength; i++) {
+      nodeCat[i] = dis.readShort();
+    }
+    int nodeOblLength = dis.readInt();
+    nodeObl = new short[nodeOblLength];
+    for (int i = 0; i < nodeOblLength; i++) {
+      nodeObl[i] = dis.readShort();
+    }
+    int rootDeltasLength = dis.readInt();
+    rootDeltas = new byte[rootDeltasLength];
+    for (int i = 0; i < rootDeltasLength; i++) {
+      rootDeltas[i] = dis.readByte();
+    }
+    int conditionTypesLength = dis.readInt();
+    conditionTypes = new byte[conditionTypesLength];
+    for (int i = 0; i < conditionTypesLength; i++) {
+      conditionTypes[i] = dis.readByte();
+    }
+    int obliqueWeightsLength = dis.readInt();
+    obliqueWeights = new float[obliqueWeightsLength];
+    for (int i = 0; i < obliqueWeightsLength; i++) {
+      obliqueWeights[i] = dis.readFloat();
+    }
+    int obliqueFeaturesLength = dis.readInt();
+    obliqueFeatures = new byte[obliqueFeaturesLength];
+    for (int i = 0; i < obliqueFeaturesLength; i++) {
+      obliqueFeatures[i] = dis.readByte();
+    }
+    int categoricalBankNumLongs = dis.readInt();
+    if (categoricalBankNumLongs > 0) {
+      long[] longs = new long[categoricalBankNumLongs];
+      for (int i = 0; i < categoricalBankNumLongs; i++) {
+        longs[i] = dis.readLong();
+      }
+      categoricalBank = BitSet.valueOf(longs);
+    } else {
+      categoricalBank = new BitSet();
+    }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+    }
+  }
+
+  public static float predict(Instance instance) {
+    float accumulator = -1.1631f;
+
+    int nodeIndex = 0;
+    for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+      int currentNodeIndex = nodeIndex;
+      while(nodePos[currentNodeIndex] != 0) {
+        boolean conditionResult;
+        byte featureIndex = nodeFeat[currentNodeIndex];
+        if (featureIndex == (byte) 127) {
+          short num_projs = obliqueFeatures[nodeObl[currentNodeIndex]];
+          float obliqueAcc = -obliqueWeights[nodeObl[currentNodeIndex]];
+          for (short projIdx = 0; projIdx < num_projs; projIdx++){
+            int off = nodeObl[currentNodeIndex] + projIdx + 1;
+            int numericalFeature = instance.numericalFeatureValues[obliqueFeatures[off]];
+            obliqueAcc += numericalFeature * obliqueWeights[off];
+          }
+          conditionResult = obliqueAcc >= 0;
+        } else if (conditionTypes[featureIndex] == 1) {
+          int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
+          int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
+          conditionResult = categoricalBank.get(bitIndex);
+        } else {
+          throw new AssertionError("Internal Error");
+        }
+        currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+      }
+      accumulator += nodeVal[currentNodeIndex];
+      nodeIndex += rootDeltas[treeIdx];
+    }
+
+    // Sigmoid
+    return 1.0f / (1.0f + (float) Math.exp(-accumulator));
+  }
+
+
+  private YdfModel() {} // Prevent instantiation
+}

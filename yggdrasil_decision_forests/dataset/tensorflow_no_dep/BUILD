@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_library_ydf")
 
 package(
@@ -55,8 +56,25 @@ cc_library_ydf(
     }),
     features = ["-layering_check"],
     deps = [
+        "@com_google_absl//absl/algorithm:container",
+        "@com_google_absl//absl/base:prefetch",
+        "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/container:fixed_array",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/crc:crc32c",
+        "@com_google_absl//absl/hash",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/types:variant",
+        "@com_google_absl//absl/utility",
+        "@com_google_absl//absl/utility:if_constexpr",
     ] + select({
         "//yggdrasil_decision_forests:use_ydf_tensorflow_proto": [":tf_example_cc_proto"],
         "//conditions:default": ["//yggdrasil_decision_forests/dataset/tensorflow"],

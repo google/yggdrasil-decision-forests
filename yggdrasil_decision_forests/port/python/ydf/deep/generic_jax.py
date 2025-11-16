@@ -516,7 +516,16 @@ class GenericJAXModel(generic_model.GenericModel):
       name: str = "ydf_model",
       algorithm: Literal["IF_ELSE", "ROUTING"] = "ROUTING",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
-  ) -> Union[str, Dict[str, str]]:
+      categorical_from_string: bool = False,
+  ) -> Union[str, Dict[str, bytes]]:
+    raise NotImplementedError
+
+  def to_standalone_java(
+      self,
+      name: str = "YdfModel",
+      package_name: str = "com.example.ydfmodel",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+  ) -> Dict[str, bytes]:
     raise NotImplementedError
 
   # TODO: Change default value of "mode" before 1.0 release.

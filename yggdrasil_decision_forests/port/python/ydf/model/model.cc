@@ -38,9 +38,8 @@
 #include "ydf/model/isolation_forest_model/isolation_forest_wrapper.h"
 #include "ydf/model/model_wrapper.h"
 #include "ydf/model/random_forest_model/random_forest_wrapper.h"
-#include "ydf/utils/custom_casters.h"
+#include "ydf/utils/custom_casters.h"  // IWYU pragma: keep
 #include "ydf/utils/status_casters.h"
-#include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.h"
 #include "yggdrasil_decision_forests/utils/model_analysis.pb.h"
@@ -207,6 +206,7 @@ void init_model(py::module_& m) {
                  "<model_cc.DecisionForestCCModel of type $0.", a.name());
            })
       .def("num_trees", &DecisionForestCCModel::num_trees)
+      .def("num_nodes", &DecisionForestCCModel::num_nodes)
       .def("set_node_format", &DecisionForestCCModel::set_node_format,
            py::arg("node_format"))
       .def("PredictLeaves", WithStatusOr(&DecisionForestCCModel::PredictLeaves),
@@ -268,6 +268,10 @@ void init_model(py::module_& m) {
            &GradientBoostedTreesCCModel::initial_predictions)
       .def("set_initial_predictions",
            &GradientBoostedTreesCCModel::set_initial_predictions)
+      .def("output_logits",
+           WithStatusOr(&GradientBoostedTreesCCModel::output_logits))
+      .def("set_output_logits",
+           WithStatus(&GradientBoostedTreesCCModel::set_output_logits))
       .def("validation_evaluation",
            &GradientBoostedTreesCCModel::validation_evaluation)
       .def("training_logs", &GradientBoostedTreesCCModel::training_logs)

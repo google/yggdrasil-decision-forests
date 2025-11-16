@@ -43,11 +43,11 @@ using ::testing::DoubleNear;
 using ::testing::ElementsAre;
 using ::testing::FieldsAre;
 
-constexpr double kMargin = 0.001;
+constexpr double kMargin = 0.0001;
 // Large margin when model training is involved.
 constexpr double kMargin2 = 0.02;
 
-double sigmoid(const double value) { return 1. / (1. + std::exp(-value)); }
+double sigmoid(const float value) { return 1.f / (1.f + std::exp(-value)); }
 
 // A model and a dataset.
 struct TestData {
@@ -337,11 +337,12 @@ TEST(ShapleyValues, ShapOnGBTRegressionAbalone) {
                           DoubleNear(-0.0415546, kMargin),  // LongestShell
                           DoubleNear(0.141024, kMargin),    // Diameter
                           DoubleNear(-0.137744, kMargin),   // Height
-                          DoubleNear(-0.0364439, kMargin),  // WholeWeight
-                          DoubleNear(0.56424, kMargin),     // ShuckedWeight
-                          DoubleNear(0.013551, kMargin),    // VisceraWeight
-                          DoubleNear(-1.52256, kMargin),    // ShellWeight
-                          DoubleNear(0, kMargin)            // Rings (label)
+                          // High correlation between the weights.
+                          DoubleNear(-0.0364439, kMargin2),  // WholeWeight
+                          DoubleNear(0.56424, kMargin2),     // ShuckedWeight
+                          DoubleNear(0.013551, kMargin2),    // VisceraWeight
+                          DoubleNear(-1.52256, kMargin2),    // ShellWeight
+                          DoubleNear(0, kMargin)             // Rings (label)
                           ));
 }
 
@@ -376,7 +377,7 @@ TEST(ShapleyValues, ShapOnGBTBinaryClassificationAdult) {
       "adult.csv", PARSE_TEST_PROTO(R"pb(
         task: CLASSIFICATION
         label: "income"
-        # Since "education" and "education_num" are requivalent, a change of
+        # Since "education" and "education_num" are equivalent, a change of
         # implementation in the random generator can lead to a random
         # distribution of shap values between the two features. Therefore, we
         # remove one.
@@ -400,7 +401,6 @@ TEST(ShapleyValues, ShapOnGBTBinaryClassificationAdult) {
   CHECK_OK(tree_shap(*test_data.model, example, &shap_values));
 
   // SHAP values are consistent with predictions.
-  // TODO: Understand why the two values are not that close.
   EXPECT_NEAR(sigmoid(shap_values.SumValues(0) + shap_values.bias()[0]),
               prediction.classification().distribution().counts(2) /
                   prediction.classification().distribution().sum(),

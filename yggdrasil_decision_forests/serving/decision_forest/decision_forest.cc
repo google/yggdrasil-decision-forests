@@ -932,6 +932,7 @@ absl::Status GenericToSpecializedModel(
       dst));
 
   dst->initial_predictions = src.initial_predictions()[0];
+  dst->output_logits = src.output_logits();
   return absl::OkStatus();
 }
 
@@ -953,6 +954,7 @@ absl::Status GenericToSpecializedModel(
       dst));
 
   dst->initial_predictions = src.initial_predictions()[0];
+  dst->output_logits = src.output_logits();
   return absl::OkStatus();
 }
 
@@ -1169,6 +1171,7 @@ absl::Status GenericToSpecializedModel(
         "The Gradient Boosted Tree is not trained for binary classification.");
   }
   dst->initial_predictions = src.initial_predictions()[0];
+  dst->output_logits = src.output_logits();
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
   return GenericToSpecializedGenericModelHelper(

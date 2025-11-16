@@ -82,5 +82,20 @@ TEST(Describe, TunedGBT) {
       {{"MODEL_SIZE", absl::StrCat(*model_size / 1024, " kB")}});
 }
 
+TEST(Describe, MultiDimGBT) {
+  std::unique_ptr<model::AbstractModel> model;
+  ASSERT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "synthetic_multidim_gbdt"),
+      &model));
+  const auto model_size = model->ModelSizeInBytes();
+  ASSERT_TRUE(model_size.has_value());
+  ASSERT_OK_AND_ASSIGN(const auto html, DescribeModelHtml(*model, "123"));
+  test::ExpectEqualGolden(
+      html,
+      "yggdrasil_decision_forests/test_data/"
+      "golden/synthetic_multidim_gbdt.html.expected",
+      {{"MODEL_SIZE", absl::StrCat(*model_size / 1024, " kB")}});
+}
+
 }  // namespace
 }  // namespace yggdrasil_decision_forests::model

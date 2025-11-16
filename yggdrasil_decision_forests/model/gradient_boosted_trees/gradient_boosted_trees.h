@@ -93,7 +93,6 @@ class GradientBoostedTreesModel : public AbstractModel,
   // stopping was triggered, (2) the model is trained with multiple trees per
   // iteration.
   size_t NumTrees() const { return decision_trees_.size(); }
-  int num_trees() const override { return NumTrees(); }
 
   // Number of times each feature is used in the model. Returns a map, indexed
   // by feature index, and counting the number of time a feature is used.

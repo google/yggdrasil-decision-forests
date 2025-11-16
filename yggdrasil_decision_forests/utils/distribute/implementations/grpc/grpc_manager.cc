@@ -241,9 +241,14 @@ absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
   if (worker->expected_address != worker->connected_address) {
     // The worker has moved.
 
-    LOG(INFO) << "Update address of worker #" << worker->worker_idx
-              << " from \"" << worker->connected_address << "\" to \""
-              << worker->expected_address << "\"";
+    if (worker->connected_address.empty()) {
+      LOG(INFO) << "Set address of worker #" << worker->worker_idx << " to \""
+                << worker->expected_address << "\"";
+    } else {
+      LOG(INFO) << "Update address of worker #" << worker->worker_idx
+                << " from \"" << worker->connected_address << "\" to \""
+                << worker->expected_address << "\"";
+    }
 
     worker->connected_address = worker->expected_address;
 

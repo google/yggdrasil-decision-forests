@@ -46,7 +46,7 @@ class ColumnSpec:
 def read_tf_record(
     path: dataset_io.Path,
     compressed: bool,
-    process: Optional[Callable[[tf.train.Example], tf.train.Example]],
+    process: Optional[Callable[[tf.train.Example], Optional[tf.train.Example]]],
     verbose: bool,
     threads: int,
 ) -> dataset_io.Data:
@@ -127,7 +127,7 @@ def _read_shard(
     reader_generator: Callable[
         [str], contextlib.AbstractContextManager[Iterator[bytes]]
     ],
-    process: Optional[Callable[[tf.train.Example], tf.train.Example]],
+    process: Optional[Callable[[tf.train.Example], Optional[tf.train.Example]]],
     verbose: bool,
 ) -> Tuple[int, Dict[str, Tuple[np.ndarray, ColumnSpec]]]:
   """Reads a single shard of data.
@@ -144,7 +144,7 @@ def _read_shard(
   """
 
   # Map to each column name, the list of observed values and the missing value.
-  local_data: Dict[str, Tuple[List[Any], ColumnSpec]] = {}
+  local_data: Dict[str, Tuple[List[Any], ColumnSpec, Optional[np.dtype]]] = {}
   local_num_examples = 0
 
   if verbose:
@@ -154,10 +154,12 @@ def _read_shard(
       example = tf.train.Example.FromString(record)
       if process is not None:
         example = process(example)
+        if example is None:
+          continue
 
       # Columns without values for this example
       example_keys = set(example.features.feature.keys())
-      for key, (values, spec) in local_data.items():
+      for key, (values, spec, _) in local_data.items():
         if key in example_keys:
           continue
         values.append(spec.default_value)
@@ -166,9 +168,11 @@ def _read_shard(
       for key, value in example.features.feature.items():
         dst_value = None
         single_default_value = None
+        dtype = None
         if value.HasField("float_list"):
           dst_value = value.float_list.value
           single_default_value = math.nan
+          dtype = np.float64
         elif value.HasField("bytes_list"):
           dst_value = value.bytes_list.value
           single_default_value = b""
@@ -201,6 +205,7 @@ def _read_shard(
                     default_value=default_value,
                     dim=dim,
                 ),
+                dtype,
             )
 
           local_data[key][0].append(dst_value)
@@ -213,10 +218,10 @@ def _read_shard(
 
   return local_num_examples, {
       key: (
-          np.array(values),
+          np.array(values, dtype=dtype),
           ColumnSpec(default_value=np.array(spec.default_value), dim=spec.dim),
       )
-      for key, (values, spec) in local_data.items()
+      for key, (values, spec, dtype) in local_data.items()
   }
 
 
@@ -225,7 +230,7 @@ def read_tensorflow_examples(
         [str], contextlib.AbstractContextManager[Iterator[bytes]]
     ],
     path: dataset_io.Path,
-    process: Optional[Callable[[tf.train.Example], tf.train.Example]],
+    process: Optional[Callable[[tf.train.Example], Optional[tf.train.Example]]],
     verbose: bool,
     threads: int,
 ) -> dataset_io.Data:

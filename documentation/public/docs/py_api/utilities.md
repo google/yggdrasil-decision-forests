@@ -22,6 +22,11 @@
 
 ::: ydf.strict
 
+<!---
+ May cause issues with the public documentation build, disable temporarily.
+# ::: ydf.Evaluation
+-->
+
 ::: ydf.ModelIOOptions
 
 ::: ydf.create_vertical_dataset

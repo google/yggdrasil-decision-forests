@@ -54,7 +54,7 @@ py_library(
     name = "log_book",
     srcs = ["log_book.py"],
     deps = [
-        # pandas dep,
+        # # pandas dep,
     ],
 )
 

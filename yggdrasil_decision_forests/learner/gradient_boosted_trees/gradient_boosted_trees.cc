@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <numeric>
@@ -199,10 +200,10 @@ absl::Status SplitShards(std::vector<std::string> all,
 std::vector<std::string> SampleTrainingShards(
     const std::vector<std::string>& candidates, const int num_selected,
     utils::RandomEngine* rnd) {
-  // Note: Could use std::sample in C++17.
-  std::vector<std::string> selected = candidates;
-  std::shuffle(selected.begin(), selected.end(), *rnd);
-  selected.resize(num_selected);
+  std::vector<std::string> selected;
+  selected.reserve(num_selected);
+  std::sample(candidates.begin(), candidates.end(),
+              std::back_inserter(selected), num_selected, *rnd);
   return selected;
 }
 
@@ -689,6 +690,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     RETURN_IF_ERROR(
         utils::ExpandInputShards(valid_dataset_path, &validation_shards));
     has_validation_dataset = !validation_shards.empty();
+    LOG(INFO) << "Found " << validation_shards.size() << " validation shards";
   } else {
     // Extract a validation dataset from training dataset.
     int num_validation_shards = std::lround(
@@ -700,6 +702,9 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     }
     RETURN_IF_ERROR(SplitShards(all_shards, num_validation_shards,
                                 &training_shards, &validation_shards, &random));
+    LOG(INFO) << "Extract validation shards from training shards: "
+              << num_validation_shards << "/" << all_shards.size() << " ("
+              << training_shards.size() << " remain in training)";
   }
 
   // Load and prepare the validation dataset.
@@ -722,16 +727,23 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
       config.gbt_config->early_stopping_initial_iteration());
 
   // Load the first sample of training dataset.
+  const float sampling_ratio =
+      config.gbt_config->stochastic_gradient_boosting().ratio();
+  if (sampling_ratio >= 1.f) {
+    LOG(WARNING)
+        << "The stochastic_gradient_boosting ratio should be less than 1";
+  }
   int num_sample_train_shards =
       std::lround(training_shards.size() *
                   config.gbt_config->stochastic_gradient_boosting().ratio());
   if (num_sample_train_shards == 0) {
     num_sample_train_shards = 1;
   }
+  LOG(INFO) << "Each block of training data is " << num_sample_train_shards
+            << "/" << training_shards.size() << " shards";
   std::unique_ptr<internal::CompleteTrainingDatasetForWeakLearner>
       current_train_dataset, next_train_dataset;
-  LOG(INFO) << "Loading first training sample dataset from "
-            << num_sample_train_shards << " shards";
+  LOG(INFO) << "Loading first block of training data";
   const auto begin_load_first_sample = absl::Now();
   ASSIGN_OR_RETURN(current_train_dataset,
                    internal::LoadCompleteDatasetForWeakLearner(
@@ -908,20 +920,20 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
       //
       // Note: We don't need to do it for the last tree.
       if (iter_idx < config.gbt_config->num_trees() - 1) {
-        // Compile the trees into an engine.
-        mdl->set_output_logits(true);
-        auto engine_or = mdl->BuildFastEngine();
-        mdl->set_output_logits(false);
-        if (engine_or.ok()) {
-          last_engine = std::move(engine_or.value());
-          num_trees_in_last_engine = mdl->NumTrees();
-        }
-
-        // Extract the trees of the current model.
         std::vector<decision_tree::DecisionTree*> trees;
-        for (int tree_idx = num_trees_in_last_engine;
-             tree_idx < mdl->NumTrees(); tree_idx++) {
-          trees.push_back(&*mdl->decision_trees()[tree_idx]);
+        if (iter_idx > 0) {
+          //  Compile the trees into an engine.
+          mdl->set_output_logits(true);
+          ASSIGN_OR_RETURN(auto engine, mdl->BuildFastEngine());
+          mdl->set_output_logits(false);
+          last_engine = std::move(engine);
+          num_trees_in_last_engine = mdl->NumTrees();
+
+          // Extract the trees of the current model.
+          for (int tree_idx = num_trees_in_last_engine;
+               tree_idx < mdl->NumTrees(); tree_idx++) {
+            trees.push_back(&*mdl->decision_trees()[tree_idx]);
+          }
         }
 
         thread_load_next_shards = std::make_unique<utils::concurrency::Thread>(
@@ -1033,9 +1045,9 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           training_loss_result.secondary_metrics.begin(),
           training_loss_result.secondary_metrics.end()};
 
-      std::string snippet =
-          absl::StrFormat("\tnum-trees:%d train-loss:%f", iter_idx + 1,
-                          training_loss_result.loss);
+      std::string snippet = absl::StrFormat(
+          "Train trees:%d/%d train-loss:%f", iter_idx + 1,
+          config.gbt_config->num_trees(), training_loss_result.loss);
 
       for (int secondary_metric_idx = 0;
            secondary_metric_idx <
@@ -1694,7 +1706,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
         (*mdl->mutable_decision_trees())[sub_iter_idx *
                                              mdl->num_trees_per_iter() +
                                          sub_tree_idx]
-            ->ScaleRegressorOutput(per_tree_weights[sub_iter_idx]);
+            -> ScaleRegressorOutput(per_tree_weights[sub_iter_idx]);
       }
     }
   }

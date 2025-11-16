@@ -108,7 +108,7 @@ class GenericCCModel {
   absl::StatusOr<py::bytes> Serialize() const;
 
   // Embedding of the model.
-  absl::StatusOr<std::unordered_map<std::string, std::string>> EmbedModel(
+  absl::StatusOr<std::unordered_map<std::string, py::bytes>> EmbedModel(
       const serving::embed::proto::Options& options) const;
 
   // TODO: Allow passing the output array as a parameter to reduce heap

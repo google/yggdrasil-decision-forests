@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_ABSTRACT_LEARNER_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_ABSTRACT_LEARNER_H_
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -172,6 +173,10 @@ class AbstractLearner {
   // cannot be stopped, and will continue until finished.
   void set_stop_training_trigger(std::atomic<bool>* trigger) {
     stop_training_trigger_ = trigger;
+  }
+
+  std::atomic<bool>* stop_training_trigger() const {
+    return stop_training_trigger_;
   }
 
   // Implementation of the "TrainWithStatus" function. Callers should call

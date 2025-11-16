@@ -30,6 +30,7 @@
 #include <unordered_set>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -41,11 +42,13 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/dataset/formats.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
+#include "yggdrasil_decision_forests/learner/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
 #include "ydf/learner/custom_loss.h"
@@ -75,8 +78,10 @@ void (*existing_signal_handler_alarm)(int) = nullptr;
 
 void ReceiveSignal(int signal) {
   if (!stop_training) {
+    LOG(INFO) << "Interrupting YDF training.";
     stop_training = true;
   } else {
+    LOG(INFO) << "Passing signal " << signal << ".";
     // Pass the signal to any existing handler.
     if (signal == SIGINT && existing_signal_handler_int) {
       existing_signal_handler_int(signal);
@@ -185,12 +190,20 @@ class GenericCCLearner {
       const dataset::proto::DataSpecificationGuide& data_spec_guide,
       const std::optional<std::string> validation_dataset_path) const {
     LOG(INFO) << "Data spec guide:\n" << data_spec_guide.DebugString();
-
+    LOG(INFO) << "Scanning dataset to build dataspec";
     ASSIGN_OR_RETURN(const std::string typed_dataset_path,
                      dataset::GetTypedPath(dataset_path));
     dataset::proto::DataSpecification generated_data_spec;
-    RETURN_IF_ERROR(dataset::CreateDataSpecWithStatus(
-        typed_dataset_path, false, data_spec_guide, &generated_data_spec));
+    dataset::CreateDataSpecConfig create_dataspec_config;
+    create_dataspec_config.stop = learner_->stop_training_trigger();
+
+    EnableUserInterruption();
+    const auto status = dataset::CreateDataSpecWithStatus(
+        typed_dataset_path, false, data_spec_guide, &generated_data_spec,
+        create_dataspec_config);
+    RETURN_IF_ERROR(DisableUserInterruption());
+    RETURN_IF_ERROR(status);
+
     return TrainFromPathWithDataSpec(typed_dataset_path, generated_data_spec,
                                      validation_dataset_path);
   }
@@ -222,6 +235,18 @@ class GenericCCLearner {
                          deployment_evaluation));
     RETURN_IF_ERROR(DisableUserInterruption());
     return evaluation;
+  }
+
+  absl::StatusOr<std::vector<dataset::UnsignedExampleIdx>> BootstrappingIndices(
+      const dataset::UnsignedExampleIdx num_examples, const int tree_idx) {
+    auto* rf_learner = dynamic_cast<model::random_forest::RandomForestLearner*>(
+        learner_.get());
+    if (rf_learner == nullptr) {
+      return absl::InvalidArgumentError(
+          "Bootstrapping indices are only available for Random Forest "
+          "Learners");
+    }
+    return rf_learner->GetTrainingExampleIndices(num_examples, tree_idx);
   }
 
  protected:
@@ -335,7 +360,10 @@ void init_learner(py::module_& m) {
            py::arg("validation_dataset_path"))
       .def("Evaluate", WithStatusOr(&GenericCCLearner::Evaluate),
            py::arg("dataset"), py::arg("fold_generator"),
-           py::arg("evaluation_options"), py::arg("deployment_evaluation"));
+           py::arg("evaluation_options"), py::arg("deployment_evaluation"))
+      .def("BootstrappingIndices",
+           WithStatusOr(&GenericCCLearner::BootstrappingIndices),
+           py::arg("num_examples"), py::arg("tree_idx"));
 }
 
 }  // namespace yggdrasil_decision_forests::port::python

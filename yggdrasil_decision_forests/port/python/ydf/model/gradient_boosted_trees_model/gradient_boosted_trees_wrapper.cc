@@ -25,6 +25,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 
 namespace yggdrasil_decision_forests::port::python {
@@ -65,6 +66,25 @@ void GradientBoostedTreesCCModel::set_initial_predictions(
     std_values[i] = values.at(i);
   }
   gbt_model_->set_initial_predictions(std::move(std_values));
+}
+
+absl::StatusOr<bool> GradientBoostedTreesCCModel::output_logits() const {
+  if (gbt_model_->task() != model::proto::CLASSIFICATION) {
+    return absl::InvalidArgumentError(
+        "output_logits is only supported for classification tasks.");
+  }
+  return gbt_model_->output_logits();
+}
+
+absl::Status GradientBoostedTreesCCModel::set_output_logits(
+    const bool output_logits) {
+  if (gbt_model_->task() != model::proto::CLASSIFICATION) {
+    return absl::InvalidArgumentError(
+        "output_logits is only supported for classification tasks.");
+  }
+  invalidate_engine_ = true;
+  gbt_model_->set_output_logits(output_logits);
+  return absl::OkStatus();
 }
 
 std::vector<GBTCCTrainingLogEntry> GradientBoostedTreesCCModel::training_logs()

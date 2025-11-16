@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_MODEL_DECISION_FOREST_INTERFACE_H_
 #define YGGDRASIL_DECISION_FORESTS_MODEL_DECISION_FOREST_INTERFACE_H_
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <string>
@@ -36,7 +37,12 @@ class DecisionForestInterface {
   virtual ~DecisionForestInterface() = default;
 
   // Number of trees in the models.
-  virtual int num_trees() const = 0;
+  std::size_t num_trees() const { return decision_trees().size(); }
+
+  // Number of nodes in the models.
+  std::size_t num_nodes() const {
+    return decision_tree::NumberOfNodes(decision_trees());
+  }
 
   // List of trees in the model.
   virtual const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&

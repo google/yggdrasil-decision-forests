@@ -33,6 +33,7 @@
 
 # Common flags.
 common --experimental_repo_remote_exec
+common --enable_platform_specific_config
 
 # Avoid long path issues on Windows
 # startup --output_user_root=C:/tmpbld
@@ -67,8 +68,8 @@ build:wasm --copt=-w
 build:wasm --host_copt=-w
 
 # Build mode.
-build:linux_cpp17 --cxxopt=-std=c++17
-build:linux_cpp17 --host_cxxopt=-std=c++17
+build:linux --cxxopt=-std=c++17
+build:linux --host_cxxopt=-std=c++17
 build:linux_cpp17 --config=linux
 
 build:macos --cxxopt=-std=c++17

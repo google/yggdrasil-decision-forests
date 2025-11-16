@@ -34,6 +34,9 @@ message Prediction {
     // following relation holds: "value == argmax_i(distribution[i])".
     optional utils.proto.IntegerDistributionFloat distribution = 2;
     optional int32 ground_truth = 3;
+    // Predicted logits over the possible classes. If specified, the
+    // following relation holds: "distribution[i] = sigmoid(logits[i])".
+    optional utils.proto.IntegerDistributionFloat logits = 4;
   }
 
   message Regression {

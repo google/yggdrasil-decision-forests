@@ -44,9 +44,87 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
 
   def set_initial_predictions(self, initial_predictions: Sequence[float]):
     """Sets the model's initial predictions (i.e. the model bias)."""
-    return self._model.set_initial_predictions(
+    self._model.set_initial_predictions(
         np.asarray(initial_predictions, np.float32)
     )
+
+  def output_logits(self) -> bool:
+    """If true, the model outputs logits instead of probabilities.
+
+    Only for classification models. If false, the model outputs probabilities.
+    This is `False` by default. Note that model probabilities are (by default)
+    not calibrated.
+
+    The value of `output_logits` is serialized with the model and persists if
+    the model is saved and loaded.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.GradientBoostedTreesLearner(
+        label="label", task=ydf.Task.CLASSIFICATION
+    ).train(train_ds)
+
+    # Check default value
+    print(f"Outputs logits: {model.output_logits()}")
+
+    # By default, predictions are probabilities
+    print("Probabilities:", model.predict(train_ds))
+
+    model.set_output_logits(True)
+    print(f"Outputs logits: {model.output_logits()}")
+    # Now, predictions are logits
+    print("Logits:", model.predict(train_ds))
+    ```
+
+    Returns:
+      Whether the model outputs logits.
+    """
+    return self._model.output_logits()
+
+  def set_output_logits(self, output_logits: bool) -> None:
+    """Sets whether the model outputs logits or probabilities.
+
+    Only for classification models. If false, the model outputs probabilities.
+    If true, the model outputs logits. This is `False` by default. Note that
+    model probabilities are (by default) not calibrated.
+
+    The value of `output_logits` is serialized with the model and persists if
+    the model is saved and loaded.
+
+    Usage example:
+
+    ```python
+    import pandas as pd
+    import ydf
+
+    # Train model
+    train_ds = pd.read_csv("train.csv")
+    model = ydf.GradientBoostedTreesLearner(
+        label="label", task=ydf.Task.CLASSIFICATION
+    ).train(train_ds)
+
+    # Check default value
+    print(f"Outputs logits: {model.output_logits()}")
+
+    # By default, predictions are probabilities
+    print("Probabilities:", model.predict(train_ds))
+
+    model.set_output_logits(True)
+    print(f"Outputs logits: {model.output_logits()}")
+    # Now, predictions are logits
+    print("Logits:", model.predict(train_ds))
+    ```
+
+    Args:
+      output_logits: Whether to output logits instead of probabilities.
+    """
+    self._model.set_output_logits(output_logits)
 
   def validation_evaluation(self) -> Optional[metric.Evaluation]:
     """Returns the validation evaluation of the model, if available.

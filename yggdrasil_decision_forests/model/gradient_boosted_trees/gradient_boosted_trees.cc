@@ -309,15 +309,18 @@ void GradientBoostedTreesModel::Predict(
       auto* dist = prediction->mutable_classification()->mutable_distribution();
       dist->mutable_counts()->Resize(3, 0.f);
       dist->set_sum(1.f);
-
-      float proba_true;
-      if (output_logits_) {
-        proba_true = accumulator;
-      } else {
-        proba_true = 1.f / (1.f + std::exp(-accumulator));
-      }
+      // Sigmoid.
+      const float proba_true = 1.f / (1.f + std::exp(-accumulator));
       dist->set_counts(1, 1.f - proba_true);
       dist->set_counts(2, proba_true);
+
+      if (output_logits_) {
+        auto* logits = prediction->mutable_classification()->mutable_logits();
+        logits->mutable_counts()->Resize(3, 0.f);
+        logits->set_counts(1, -accumulator);
+        logits->set_counts(2, accumulator);
+        logits->set_sum(0.f);
+      }
     } break;
 
     case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
@@ -344,6 +347,8 @@ void GradientBoostedTreesModel::Predict(
 
       // Top class.
       if (output_logits_) {
+        auto* logits = prediction->mutable_classification()->mutable_logits();
+        logits->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
         float sum_logit = 0;
         int highest_cell_idx = 0;
         float highest_cell_value = 0;
@@ -351,41 +356,42 @@ void GradientBoostedTreesModel::Predict(
              accumulator_idx++) {
           auto value = accumulator[accumulator_idx];
           sum_logit += value;
-          dist->set_counts(accumulator_idx + 1, value);
+          logits->set_counts(accumulator_idx + 1, value);
           if (value > highest_cell_value) {
             highest_cell_value = value;
             highest_cell_idx = accumulator_idx;
           }
         }
         prediction->mutable_classification()->set_value(highest_cell_idx + 1);
-        dist->set_sum(sum_logit);
-      } else {
-        // Sum logits.
-        float sum_exp = 0;
-        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-             accumulator_idx++) {
-          const float exp_val = std::exp(accumulator[accumulator_idx]);
-          sum_exp += exp_val;
-          // The offset of 1 between the class idx and the accumulator_idx is to
-          // skill the special OOD value with index 0.
-          dist->set_counts(accumulator_idx + 1, exp_val);
-        }
-        // Softmax
-        int highest_cell_idx = 0;
-        float highest_cell_value = 0;
-        const float normalization = (sum_exp > 0) ? (1.f / sum_exp) : 0.f;
-        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-             accumulator_idx++) {
-          const float value = dist->counts(accumulator_idx + 1);
-          dist->set_counts(accumulator_idx + 1, value * normalization);
-          if (value > highest_cell_value) {
-            highest_cell_value = value;
-            highest_cell_idx = accumulator_idx;
-          }
-        }
-        prediction->mutable_classification()->set_value(highest_cell_idx + 1);
-        dist->set_sum(1.f);
+        logits->set_sum(sum_logit);
       }
+      int highest_cell_idx = 0;
+      float highest_cell_value = 0;
+      // Sum logits.
+      float sum_exp = 0;
+      // After this loop, `accumulator` holds the exponential of its previous
+      // values.
+      for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+           accumulator_idx++) {
+        const float exp_val = std::exp(accumulator[accumulator_idx]);
+        sum_exp += exp_val;
+        accumulator[accumulator_idx] = exp_val;
+
+        if (exp_val > highest_cell_value) {
+          highest_cell_value = exp_val;
+          highest_cell_idx = accumulator_idx;
+        }
+      }
+      // Softmax
+      const float normalization = (sum_exp > 0) ? (1.f / sum_exp) : 0.f;
+      for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+           accumulator_idx++) {
+        dist->set_counts(accumulator_idx + 1,
+                         accumulator[accumulator_idx] * normalization);
+      }
+      prediction->mutable_classification()->set_value(highest_cell_idx + 1);
+      dist->set_sum(1.f);
+
     } break;
     case proto::Loss::MEAN_AVERAGE_ERROR:
     case proto::Loss::SQUARED_ERROR: {
@@ -459,13 +465,21 @@ void GradientBoostedTreesModel::Predict(
                        accumulator += node.regressor().top_value();
                      });
       const float proba_true = 1. / (1. + std::exp(-accumulator));
-      prediction->mutable_classification()->set_value(proba_true > 0.5f ? 2
+      prediction->mutable_classification()->set_value(accumulator > 0.f ? 2
                                                                         : 1);
       auto* dist = prediction->mutable_classification()->mutable_distribution();
       dist->mutable_counts()->Resize(3, 0.f);
       dist->set_sum(1.f);
       dist->set_counts(1, 1.f - proba_true);
       dist->set_counts(2, proba_true);
+
+      if (output_logits_) {
+        auto* logits = prediction->mutable_classification()->mutable_logits();
+        logits->mutable_counts()->Resize(3, 0.f);
+        logits->set_counts(1, -accumulator);
+        logits->set_counts(2, accumulator);
+        logits->set_sum(0.f);
+      }
     } break;
 
     case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
@@ -489,30 +503,51 @@ void GradientBoostedTreesModel::Predict(
       // Note: Why the "+1"? : "prediction" reserves the first value for the out
       // of vocabulary which is not taken into account in "accumulator'.
 
+      if (output_logits_) {
+        auto* logits = prediction->mutable_classification()->mutable_logits();
+        logits->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
+        float sum_logit = 0;
+        int highest_cell_idx = 0;
+        float highest_cell_value = 0;
+        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+             accumulator_idx++) {
+          auto value = accumulator[accumulator_idx];
+          sum_logit += value;
+          logits->set_counts(accumulator_idx + 1, value);
+          if (value > highest_cell_value) {
+            highest_cell_value = value;
+            highest_cell_idx = accumulator_idx;
+          }
+        }
+        prediction->mutable_classification()->set_value(highest_cell_idx + 1);
+        logits->set_sum(sum_logit);
+      }
       auto* dist = prediction->mutable_classification()->mutable_distribution();
       dist->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
 
       float sum_exp = 0;
+      float highest_cell_value = 0;
+      int highest_cell_idx = 0;
+      // After this loop, `accumulator` holds the exponential of its previous
+      // values.
       for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
            accumulator_idx++) {
         const float exp_val = std::exp(accumulator[accumulator_idx]);
         sum_exp += exp_val;
-        dist->set_counts(accumulator_idx + 1, exp_val);
+        accumulator[accumulator_idx] = exp_val;
+
+        if (exp_val > highest_cell_value) {
+          highest_cell_value = exp_val;
+          highest_cell_idx = accumulator_idx;
+        }
       }
 
       const float normalization = 1.f / sum_exp;
 
-      float highest_cell_value = 0;
-      int highest_cell_idx = 0;
-
       for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
            accumulator_idx++) {
-        const float value = dist->counts(accumulator_idx + 1);
-        if (value > highest_cell_value) {
-          highest_cell_value = value;
-          highest_cell_idx = accumulator_idx;
-        }
-        dist->set_counts(accumulator_idx + 1, value * normalization);
+        dist->set_counts(accumulator_idx + 1,
+                         accumulator[accumulator_idx] * normalization);
       }
       dist->set_sum(1.f);
       prediction->mutable_classification()->set_value(highest_cell_idx + 1);

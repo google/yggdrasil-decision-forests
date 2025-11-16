@@ -37,6 +37,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/time/time.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -407,13 +408,15 @@ absl::StatusOr<py::bytes> GenericCCModel::Serialize() const {
   return py::bytes(serialized_model);
 }
 
-absl::StatusOr<std::unordered_map<std::string, std::string>>
+absl::StatusOr<std::unordered_map<std::string, py::bytes>>
 GenericCCModel::EmbedModel(
     const serving::embed::proto::Options& options) const {
-  std::unordered_map<std::string, std::string> std_result;
+  std::unordered_map<std::string, py::bytes> std_result;
   ASSIGN_OR_RETURN(const auto absl_result,
-                   serving::embed::EmbedModelCC(*model_, options));
-  std_result.insert(absl_result.begin(), absl_result.end());
+                   serving::embed::EmbedModel(*model_, options));
+  for (const auto& [key, value] : absl_result) {
+    std_result[key] = py::bytes(value);
+  }
   return std_result;
 }
 
@@ -426,7 +429,11 @@ model::proto::Metadata GenericCCModel::metadata() const {
 absl::StatusOr<std::string> GenericCCModel::Describe(
     const bool full_details, const bool text_format) const {
   if (text_format) {
-    return model_->DescriptionAndStatistics(full_details);
+    const std::string model_report =
+        model_->DescriptionAndStatistics(full_details);
+    const std::string dataspec_report =
+        dataset::PrintHumanReadable(model_->data_spec());
+    return absl::StrCat(model_report, "\nDATASPEC:\n\n", dataspec_report);
   } else {
     return model::DescribeModelHtml(*model_, utils::GenUniqueId());
   }

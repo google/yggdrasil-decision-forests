@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_binary_ydf", "cc_library_ydf")
 
 package(
@@ -123,6 +124,15 @@ cc_test(
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "grpc_common_test",
+    srcs = ["grpc_common_test.cc"],
+    deps = [
+        ":grpc_common",
         "@com_google_googletest//:gtest_main",
     ],
 )

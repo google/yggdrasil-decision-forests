@@ -276,6 +276,7 @@ from $1model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from $1model.isolation_forest_model import isolation_forest_model
 from $1model.random_forest_model import random_forest_model
 from $1utils import func_helpers
+from $1cc import ydf
 )",
                                          prefix, pydf_prefix);
 
@@ -299,7 +300,7 @@ compilation.
 
 # pytype: skip-file
 # TODO: b/362480899 - Re-enable typing after pytype issue is fixed.
-from typing import Dict, Optional, Sequence, Set, Union
+from typing import Dict, List, Optional, Sequence, Set, Union
 $0
 
 )",
@@ -797,6 +798,7 @@ $8
       support_monotonic_constraints=$5,
       require_label=$6,
       support_custom_loss=$7,
+      support_return_in_bag_example_indices=$8,
     )
 )",
       /*$0*/ bool_rep(capabilities.support_max_training_duration()),
@@ -806,7 +808,8 @@ $8
       /*$4*/ bool_rep(capabilities.support_max_model_size_in_memory()),
       /*$5*/ bool_rep(capabilities.support_monotonic_constraints()),
       /*$6*/ bool_rep(capabilities.require_label()),
-      /*$7*/ bool_rep(capabilities.support_custom_loss()));
+      /*$7*/ bool_rep(capabilities.support_custom_loss()),
+      /*$8*/ bool_rep(capabilities.support_return_in_bag_example_indices()));
 
   if (hp_template_dict == "{}") {
     absl::StrAppend(&wrapper, R"(
@@ -849,6 +852,63 @@ $8
 )",
                               /*$0*/ hp_template_dict, /*$1*/ class_name,
                               /*$2*/ first_template_name);
+  }
+
+  if (capabilities.support_return_in_bag_example_indices()) {
+    absl::SubstituteAndAppend(&wrapper, R"(
+  def in_bag_example_indices(self, *, num_examples: int, tree_idx: int) -> List[int]:
+    r"""Returns the indices of the in-bag samples used for training a specific tree.
+
+    During the training of a Random Forest model, each tree is typically trained
+    on a bootstrap sample (a random sample with replacement) of the original
+    training dataset. This function allows you to retrieve the indices of the
+    examples from the original dataset that were included in the bootstrap
+    sample used to train the tree at the given index `tree_idx`.
+
+    Note that this method only returns reliable results when it is run with the
+    same YDF build on the same machine as used when training the model. The
+    sequence of indices depends on the random seed used during training as
+    configured in the `random_seed` hyperparameter.
+
+    Usage example:
+    ```python
+    import ydf
+    import pandas as pd
+
+    dataset = pd.read_csv("data.csv")
+    # Train a Random Forest model with 10 trees.
+    learner = ydf.RandomForestLearner(label="label", num_trees=10,
+    random_seed=1234)
+    model = learner.train(dataset)
+
+    # Get the indices for the 3rd tree (index 2).
+    indices = learner.in_bag_example_indices(
+        num_examples=dataset.shape[0], tree_idx=2
+    )
+    print(f"Indices for tree 2: {indices}")
+    ```
+
+    Args:
+      num_examples: The total number of examples in the training dataset that
+        the model is trained on. This should match the number of rows in the
+        training data.
+      tree_idx: The 0-based index of the tree within the forest for which to
+        retrieve the in-bag indices. This must be between 0 and `num_trees - 1`.
+
+    Returns:
+      A sorted list of integers representing the 0-based indices of the training
+      examples that were sampled to form the training set for the specified
+      tree.
+      The list will contain duplicates if an example was sampled multiple times.
+    """
+    if num_examples <= 0:
+      raise ValueError(f"The number of examples must be positive, got {num_examples}")
+    if tree_idx < 0:
+      raise ValueError(f"The tree index must not be negative, got {tree_idx}")
+    learner = self._get_learner()
+    return learner.BootstrappingIndices(num_examples, tree_idx)
+)",
+                              /*$0*/ hp_template_dict, /*$1*/ class_name);
   }
 
   return wrapper;

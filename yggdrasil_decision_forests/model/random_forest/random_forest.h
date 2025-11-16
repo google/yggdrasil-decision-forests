@@ -126,8 +126,6 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   // Number of trees in the model.
   size_t NumTrees() const { return decision_trees_.size(); }
 
-  int num_trees() const override { return NumTrees(); }
-
   // Number of times each feature is used in the model. Returns a map, indexed
   // by feature index, and counting the number of time a feature is used.
   void CountFeatureUsage(

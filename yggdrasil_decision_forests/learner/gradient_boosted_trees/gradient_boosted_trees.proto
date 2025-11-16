@@ -64,37 +64,42 @@ message GradientBoostedTreesTrainingConfig {
     // is large (e.g. >10B values).
     SampleInMemory sample_in_memory = 32;
 
-    // The entire dataset is NOT loaded in memory, and "subsample" and
+    // The entire dataset is NOT loaded in memory. Instead, "subsample" and
     // "validation_set_ratio" are applied at the shard level. This method
     // consumes less memory (great if your dataset does not fit in memory) but
-    // requires more IO and CPU operations and the final model might (or not)
-    // require more trees to reach the same quality as the first method. For the
-    // sampling to be of high quality (and the model to train well), the number
-    // of shards should be large enough (>=1000 shards is good situation).
+    // requires more IO and CPU operations. The final model might require more
+    // trees to reach the same quality as in-memory sampling. For the sampling
+    // to be of high quality (and the model to train well), the number of shards
+    // should be large enough (e.g., >=1000 shards is a good situation).
     //
     // In the logs:
-    //   - "loader-blocking" indicates how much of the time the training
-    //     is stopped to wait for IO. A good value is 0%. This value can be
-    //     optimized by locating the dataset "near" the job, using appropriate
-    //     amount of sharding (i.e. not too much; 100 shards per sample works
-    //     well) and compression (is uncompressing the dataset is too
-    //     expensive), increasing the sample size (i.e. making the training more
-    //     complex) or recycling the samples (with "num_recycling").
+    //   - "loader-blocking" indicates how much time the training is stopped
+    //     while waiting for IO. A good value is 0%. This value can be optimized
+    //     by:
+    //     *   Locating the dataset "near" the job.
+    //     *   Using an appropriate amount of sharding (e.g., not too much; 100
+    //         shards per sample works well).
+    //     *   Using compression (if uncompressing the dataset is too
+    //     expensive).
+    //     *   Increasing the sample size (i.e., making the training more
+    //     complex).
+    //     *   Recycling the samples (with "num_recycling").
     //  - "preprocessing-load" indicates how much of the preparation time (IO +
-    //    preprocessing) is spent preprocessing the data. High value are not an
-    //    issue as long as "loader-blocking" is small.
+    //    preprocessing) is spent on preprocessing the data. High values are not
+    //    an issue as long as "loader-blocking" is small.
     //
     // Constraints:
-    //  - The code raise an error is the number of shards is <10.
+    //  - The code raises an error if the number of shards is <10.
     //  - No support (yet) for ranking or dart.
     //
-    // In details, each tree is trained on a random subset of shards (controlled
+    // In detail, each tree is trained on a random subset of shards (controlled
     // by "subsample"). Once the tree is trained, the random subset of shards is
-    // discarded and the training continue. A same shard can be used multiple
-    // times for different trees. The loading of the next shard and the training
-    // of the current tree are done in parallel. Ideally, both should run at the
-    // same speed. The amount of time without training and waiting for the shard
-    // loading and preparation is displayed in the logs as "loader-blocking").
+    // discarded, and the training continues. The same shard can be used
+    // multiple times for different trees. The loading of the next shard and the
+    // training of the current tree are done in parallel. Ideally, both should
+    // run at the same speed. The amount of time spent not training, while
+    // waiting for shard loading and preparation, is displayed in the logs as
+    // "loader-blocking".
     SampleWithShards sample_with_shards = 31;
   }
 

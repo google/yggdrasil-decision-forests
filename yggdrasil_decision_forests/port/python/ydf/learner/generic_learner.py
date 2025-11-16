@@ -368,6 +368,9 @@ Class: ydf.{self.__class__.__name__}
 Hyper-parameters: ydf.{self._hyperparameters}
 """
 
+  def __repr__(self) -> str:
+    return f"<ydf.{self.__class__.__name__}>"
+
   def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
     """Builds DS args with user inputs and guides for labels / special columns.
 
@@ -734,6 +737,14 @@ class GenericCCLearner(GenericLearner):
             num_folds=folds,
         )
     )
+    if self._task == Task.RANKING:
+      if self._ranking_group is None:
+        raise ValueError(
+            "The ranking_group must be provided for RANKING tasks."
+        )
+      fold_generator.cross_validation.fold_group.group_attribute = (
+          self._ranking_group
+      )
 
     if isinstance(bootstrapping, bool):
       bootstrapping_samples = 2000 if bootstrapping else -1

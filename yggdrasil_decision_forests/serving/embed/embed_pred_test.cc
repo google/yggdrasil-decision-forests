@@ -31,6 +31,7 @@ print(model.predict(ds[:1]))
 */
 
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 #include "gtest/gtest.h"
@@ -43,6 +44,7 @@ print(model.predict(ds[:1]))
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba_routing.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_score.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_rf_nwta_small_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_rf_nwta_small_proba.h"
@@ -86,6 +88,24 @@ namespace {
       .native_country = FeatureNativeCountry::kUnitedStates, \
   }
 
+#define ADULT_EXAMPLE_STRING_CAT                                         \
+  {                                                                      \
+      .age = 39,                                                         \
+      .workclass = FeatureWorkclassFromString("State-gov"),              \
+      .fnlwgt = 77516,                                                   \
+      .education = FeatureEducationFromString("Bachelors"),              \
+      .education_num = 13,                                               \
+      .marital_status = FeatureMaritalStatusFromString("Never-married"), \
+      .occupation = FeatureOccupationFromString("Adm-clerical"),         \
+      .relationship = FeatureRelationshipFromString("Not-in-family"),    \
+      .race = FeatureRaceFromString("White"),                            \
+      .sex = FeatureSexFromString("Male"),                               \
+      .capital_gain = 2174,                                              \
+      .capital_loss = 0,                                                 \
+      .hours_per_week = 40,                                              \
+      .native_country = FeatureNativeCountryFromString("United-States"), \
+  }
+
 #define IRIS_EXAMPLE        \
   {                         \
       .sepal_length = 5.1f, \
@@ -104,6 +124,18 @@ namespace {
       .shuckedweight = 0.2245f, \
       .visceraweight = 0.101f,  \
       .shellweight = 0.15f,     \
+  }
+
+#define ABALONE_EXAMPLE_WITH_NA \
+  {                             \
+      .type = FeatureType::kM,  \
+      .longestshell = NAN,      \
+      .diameter = 0.365f,       \
+      .height = NAN,            \
+      .wholeweight = 0.514f,    \
+      .shuckedweight = NAN,     \
+      .visceraweight = NAN,     \
+      .shellweight = NAN,       \
   }
 
 constexpr double eps = 0.00001;
@@ -131,6 +163,13 @@ TEST(Embed, test_model_adult_binary_class_gbdt_v2_proba) {
 TEST(Embed, test_model_adult_binary_class_gbdt_v2_proba_routing) {
   using namespace test_model_adult_binary_class_gbdt_v2_proba_routing;
   const float pred = Predict(ADULT_EXAMPLE);
+  EXPECT_NEAR(pred, 0.01860435, eps);
+}
+
+TEST(Embed,
+     test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab) {
+  using namespace test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab;
+  const float pred = Predict(ADULT_EXAMPLE_STRING_CAT);
   EXPECT_NEAR(pred, 0.01860435, eps);
 }
 
@@ -314,6 +353,33 @@ TEST(Embed, test_model_iris_multi_class_rf_wta_small_proba_routing) {
   EXPECT_NEAR(pred[(int)Label::kSetosa], 1., eps);
   EXPECT_NEAR(pred[(int)Label::kVersicolor], 0., eps);
   EXPECT_NEAR(pred[(int)Label::kVirginica], 0., eps);
+}
+
+//
+// NA Values
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_no_na_handling) {
+  using namespace test_model_abalone_regression_gbdt_v2;
+  const float pred = Predict(ABALONE_EXAMPLE);
+  EXPECT_NEAR(pred, 9.815921, eps);
+}
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_routing_no_na_handling) {
+  using namespace test_model_abalone_regression_gbdt_v2_routing;
+  const float pred = Predict(ABALONE_EXAMPLE);
+  EXPECT_NEAR(pred, 9.815921, eps);
+}
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_with_na) {
+  using namespace test_model_abalone_regression_gbdt_v2;
+  const float pred = Predict(ABALONE_EXAMPLE_WITH_NA);
+  EXPECT_NEAR(pred, 9.362932, eps);
+}
+
+TEST(Embed, test_model_abalone_regression_gbdt_v2_routing_with_na) {
+  using namespace test_model_abalone_regression_gbdt_v2_routing;
+  const float pred = Predict(ABALONE_EXAMPLE_WITH_NA);
+  EXPECT_NEAR(pred, 9.362932, eps);
 }
 
 }  // namespace

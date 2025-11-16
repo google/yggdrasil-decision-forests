@@ -288,6 +288,9 @@ message LearnerCapabilities {
 
   // If true, the learner supports custom losses.
   optional bool support_custom_loss = 8 [default = false];
+
+  // If true, the learner supports returning the indices of in-bag examples.
+  optional bool support_return_in_bag_example_indices = 9 [default = false];
 }
 
 // Monotonic constraints between model's output and numerical input features.

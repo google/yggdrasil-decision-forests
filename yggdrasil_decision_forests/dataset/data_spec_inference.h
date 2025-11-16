@@ -23,7 +23,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_DATASET_DATA_SPEC_INFERENCE_H_
 #define YGGDRASIL_DECISION_FORESTS_DATASET_DATA_SPEC_INFERENCE_H_
 
+#include <atomic>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -37,11 +39,17 @@
 namespace yggdrasil_decision_forests {
 namespace dataset {
 
+struct CreateDataSpecConfig {
+  // If set and true, stop the data ingestion.
+  std::atomic<bool>* stop = nullptr;
+};
+
 // Computes a data spec given a dataset and a dataspec guide.
 absl::Status CreateDataSpecWithStatus(
     absl::string_view typed_path, bool use_flume,
     const proto::DataSpecificationGuide& guide,
-    proto::DataSpecification* data_spec);
+    proto::DataSpecification* data_spec,
+    const CreateDataSpecConfig& config = {});
 
 // Alternative form with StatusOr.
 absl::StatusOr<proto::DataSpecification> CreateDataSpec(
@@ -90,6 +98,12 @@ class AbstractDataSpecCreator {
 
   // Counts the number of examples.
   virtual absl::StatusOr<int64_t> CountExamples(absl::string_view path) = 0;
+
+  bool should_stop() const {
+    return config.has_value() && config.value().stop && *config.value().stop;
+  }
+
+  std::optional<CreateDataSpecConfig> config;
 };
 
 REGISTRATION_CREATE_POOL(AbstractDataSpecCreator);

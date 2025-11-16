@@ -1,5 +1,24 @@
 # Changelog
 
+## HEAD
+
+### API Changes
+
+-   The `Uplift` task is not currently compatible with the `honest=True`
+    hyperparameter. Support for honest uplift trees is not yet implemented.
+    Training an uplift model with `honest=True` will now raise an error. Please
+    reach out to the YDF team if you have a use case for this functionality.
+
+
+### Feature
+
+-   Added new versions of the hyperparameter templates for Random Forests with
+    `winner_take_all=False`.
+-   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random 
+    Forest Learner to retrieve the indices of the in-bag samples used for
+    training each tree.
+-   Add export to standalone Java.
+
 ## 0.13.0 - 2025-07-15
 
 ### API Changes

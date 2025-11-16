@@ -35,6 +35,10 @@ class DecisionForestModel(generic_model.GenericCCModel):
     """Returns the number of trees in the decision forest."""
     return self._model.num_trees()
 
+  def num_nodes(self) -> int:
+    """Returns the number of nodes in the decision forest."""
+    return self._model.num_nodes()
+
   def get_tree(self, tree_idx: int) -> tree_lib.Tree:
     """Gets a single tree of the model.
 

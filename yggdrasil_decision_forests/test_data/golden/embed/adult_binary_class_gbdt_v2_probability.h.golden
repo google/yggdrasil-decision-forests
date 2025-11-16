@@ -594,6 +594,7 @@ inline float Predict(const Instance& instance) {
 
   // Sigmoid
   return 1.f / (1.f + std::exp(-accumulator));
+
 }
 
 }  // namespace ydf_model

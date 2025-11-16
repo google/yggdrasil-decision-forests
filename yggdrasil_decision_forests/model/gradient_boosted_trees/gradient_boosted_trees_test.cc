@@ -15,15 +15,18 @@
 
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 
+#include <cmath>
 #include <memory>
 #include <string>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
@@ -288,6 +291,109 @@ TEST(GradientBoostedTrees, GetLossName) {
   model.set_loss(proto::Loss::XE_NDCG_MART, loss_config);
   EXPECT_EQ(model.GetLossName(), "XE_NDCG_MART@10");
 }
+
+class OutputLogitsTest : public testing::TestWithParam<bool> {};
+
+TEST_P(OutputLogitsTest, OutputLogitsBinaryClassification) {
+  const bool use_predict_on_example = GetParam();
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &model));
+  auto* gbt_model =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model.get());
+  ASSERT_EQ(gbt_model->loss(), proto::BINOMIAL_LOG_LIKELIHOOD);
+
+  dataset::VerticalDataset dataset;
+  EXPECT_OK(dataset::LoadVerticalDataset(
+      absl::StrCat("csv:",
+                   file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
+      gbt_model->data_spec(), &dataset));
+
+  for (int i = 0; i < 100 && i < dataset.nrow(); ++i) {
+    gbt_model->set_output_logits(false);
+    model::proto::Prediction prediction_proba;
+    if (use_predict_on_example) {
+      dataset::proto::Example example;
+      dataset.ExtractExample(i, &example);
+      gbt_model->Predict(example, &prediction_proba);
+    } else {
+      gbt_model->Predict(dataset, i, &prediction_proba);
+    }
+    EXPECT_FALSE(prediction_proba.classification().has_logits());
+
+    gbt_model->set_output_logits(true);
+    model::proto::Prediction prediction_logit;
+    gbt_model->Predict(dataset, i, &prediction_logit);
+    EXPECT_TRUE(prediction_logit.classification().has_logits());
+    EXPECT_TRUE(prediction_logit.classification().has_distribution());
+
+    const float proba =
+        prediction_proba.classification().distribution().counts(2);
+    const float logit = prediction_logit.classification().logits().counts(2);
+
+    EXPECT_EQ(proba,
+              prediction_logit.classification().distribution().counts(2));
+    EXPECT_NEAR(proba, 1.f / (1.f + std::exp(-logit)), 0.0001f);
+  }
+}
+
+TEST_P(OutputLogitsTest, OutputLogitsMultiClassClassification) {
+  const bool use_predict_on_example = GetParam();
+  std::unique_ptr<model::AbstractModel> model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "iris_multi_class_gbdt"), &model));
+  auto* gbt_model =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+          model.get());
+  ASSERT_EQ(gbt_model->loss(), proto::MULTINOMIAL_LOG_LIKELIHOOD);
+
+  dataset::VerticalDataset dataset;
+  EXPECT_OK(dataset::LoadVerticalDataset(
+      absl::StrCat("csv:",
+                   file::JoinPath(TestDataDir(), "dataset", "iris.csv")),
+      gbt_model->data_spec(), &dataset));
+
+  for (int i = 0; i < 100 && i < dataset.nrow(); ++i) {
+    gbt_model->set_output_logits(false);
+    model::proto::Prediction prediction_proba;
+    if (use_predict_on_example) {
+      dataset::proto::Example example;
+      dataset.ExtractExample(i, &example);
+      gbt_model->Predict(example, &prediction_proba);
+    } else {
+      gbt_model->Predict(dataset, i, &prediction_proba);
+    }
+    EXPECT_FALSE(prediction_proba.classification().has_logits());
+
+    gbt_model->set_output_logits(true);
+    model::proto::Prediction prediction_logit;
+    gbt_model->Predict(dataset, i, &prediction_logit);
+    EXPECT_TRUE(prediction_logit.classification().has_logits());
+    EXPECT_TRUE(prediction_logit.classification().has_distribution());
+
+    float sum_exp_logits = 0;
+    for (int j = 1;
+         j < prediction_logit.classification().logits().counts_size(); ++j) {
+      sum_exp_logits +=
+          std::exp(prediction_logit.classification().logits().counts(j));
+    }
+
+    for (int j = 1;
+         j < prediction_logit.classification().distribution().counts_size();
+         ++j) {
+      const float proba =
+          prediction_proba.classification().distribution().counts(j);
+      const float logit = prediction_logit.classification().logits().counts(j);
+      EXPECT_EQ(proba,
+                prediction_logit.classification().distribution().counts(j));
+      EXPECT_NEAR(proba, std::exp(logit) / sum_exp_logits, 0.0001f);
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(UseExamplePredict, OutputLogitsTest, testing::Bool());
 
 }  // namespace
 }  // namespace gradient_boosted_trees

@@ -469,7 +469,7 @@ absl::Status AbstractDataSpecCreator::CreateDataspec(
 absl::Status CreateDataSpecWithStatus(
     const absl::string_view typed_path, const bool use_flume,
     const proto::DataSpecificationGuide& guide,
-    proto::DataSpecification* data_spec) {
+    proto::DataSpecification* data_spec, const CreateDataSpecConfig& config) {
   if (use_flume) {
     return absl::InvalidArgumentError(
         "Dataspec inference with flume is not implemented");
@@ -487,7 +487,9 @@ absl::Status CreateDataSpecWithStatus(
 
   // Create the dataspec creator.
   const auto& format_name = proto::DatasetFormat_Name(format);
-  auto creator = AbstractDataSpecCreatorRegisterer::Create(format_name).value();
+  ASSIGN_OR_RETURN(auto creator,
+                   AbstractDataSpecCreatorRegisterer::Create(format_name));
+  creator->config = config;
   RETURN_IF_ERROR(creator->CreateDataspec(paths, guide, data_spec));
 
   LOG(INFO) << "Finalizing [" << data_spec->created_num_rows()

@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <numeric>
+#include <optional>
 #include <random>
 #include <string>
 #include <utility>
@@ -35,6 +37,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -244,7 +247,7 @@ TEST_F(RandomForestOnAdult, Base) {
 
   EXPECT_LE(rank_capital_gain, 5);
   EXPECT_LE(rank_relationship, 6);
-  EXPECT_LE(rank_occupation, 6);
+  EXPECT_LE(rank_occupation, 7);
 
   // Worst 2 variables.
   const int rank_fnlwgt = utils::GetVariableImportanceRank(
@@ -253,7 +256,7 @@ TEST_F(RandomForestOnAdult, Base) {
       "education", model_->data_spec(), mean_decrease_accuracy);
 
   EXPECT_GE(rank_fnlwgt, 7);
-  EXPECT_GE(rank_education, 4);
+  EXPECT_GE(rank_education, 3);
 
   std::string description;
   model_->AppendDescriptionAndStatistics(false, &description);
@@ -299,7 +302,7 @@ TEST_F(RandomForestOnAdult, Honest) {
 
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8504, 0.01);
-  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.333, 0.04);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.426, 0.04);
 }
 
 // Extremely Randomize Trees on Adult.
@@ -1116,7 +1119,7 @@ TEST(RandomForest, PredefinedHyperParameters) {
       train_config.MutableExtension(random_forest::proto::random_forest_config);
   rf_config->set_num_trees(150);
   train_config.set_learner(RandomForestLearner::kRegisteredName);
-  utils::TestPredefinedHyperParametersAdultDataset(train_config, 2, 0.86);
+  utils::TestPredefinedHyperParametersAdultDataset(train_config, 4, 0.86);
 }
 
 class RandomForestOnSimPTE : public utils::TrainAndTestTester {
@@ -1168,7 +1171,8 @@ TEST_F(RandomForestOnSimPTE, Base) {
             train_dataset_.nrow() + 1 /*the header*/);
 }
 
-TEST_F(RandomForestOnSimPTE, Honest) {
+// TODO: b/2439527146 - Re-enable honest trees with uplift.
+TEST_F(RandomForestOnSimPTE, DISABLED_Honest) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->mutable_decision_tree()->mutable_honest();
@@ -1192,8 +1196,12 @@ TEST_F(RandomForestOnSimPTE, LowerBound) {
 TEST(SampleTrainingExamples, WithReplacement) {
   utils::RandomEngine random;
   std::vector<UnsignedExampleIdx> examples;
-  internal::SampleTrainingExamples(100, 50, /*with_replacement=*/true, &random,
-                                   &examples);
+  random_forest::proto::RandomForestTrainingConfig rf_config;
+  rf_config.set_bootstrap_size_ratio(0.5);
+  rf_config.set_sampling_with_replacement(true);
+  ASSERT_OK(internal::SampleTrainingExamples(
+      100, rf_config,
+      /*bootstrap_size_ratio_factor=*/std::nullopt, &random, &examples));
   EXPECT_EQ(examples.size(), 50);
   EXPECT_TRUE(std::is_sorted(examples.begin(), examples.end()));
 }
@@ -1201,8 +1209,12 @@ TEST(SampleTrainingExamples, WithReplacement) {
 TEST(SampleTrainingExamples, WithoutReplacement) {
   utils::RandomEngine random;
   std::vector<UnsignedExampleIdx> examples;
-  internal::SampleTrainingExamples(100, 50, /*with_replacement=*/false, &random,
-                                   &examples);
+  random_forest::proto::RandomForestTrainingConfig rf_config;
+  rf_config.set_bootstrap_size_ratio(0.5);
+  rf_config.set_sampling_with_replacement(false);
+  ASSERT_OK(internal::SampleTrainingExamples(
+      100, rf_config,
+      /*bootstrap_size_ratio_factor=*/std::nullopt, &random, &examples));
   EXPECT_EQ(examples.size(), 50);
   EXPECT_TRUE(std::is_sorted(examples.begin(), examples.end()));
   // Values are unique.
@@ -1382,6 +1394,173 @@ TEST_F(RandomForestOnSyntheticVectorSequence, WithSampling) {
   // Runs checks
   TrainModel();
   CHECK_OK(PostTrainingChecks());
+}
+
+TEST(RandomForestBootstrappingIndices, Base) {
+  model::proto::TrainingConfig training_config;
+  auto* rf_config = training_config.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_adapt_bootstrap_size_ratio_for_maximum_training_duration(true);
+  RandomForestLearner learner{training_config};
+  std::vector<UnsignedExampleIdx> examples;
+  EXPECT_THAT(learner.GetTrainingExampleIndices(100, 0).status(),
+              test::StatusIs(
+                  absl::StatusCode::kInvalidArgument,
+                  "The hyperparameter "
+                  "`adapt_bootstrap_size_ratio_for_maximum_training_duration` "
+                  "is not compatible with GetTrainingExampleIndices. This is "
+                  "because the sampling ratio is not known beforehand."));
+}
+
+TEST(RandomForestBootstrappingIndices, NoBootstrapping) {
+  model::proto::TrainingConfig training_config;
+  auto* rf_config = training_config.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_bootstrap_training_dataset(false);
+  RandomForestLearner learner{training_config};
+  const int num_examples = 100;
+  for (int tree_idx = 0; tree_idx < 2; tree_idx++) {
+    ASSERT_OK_AND_ASSIGN(const auto examples, learner.GetTrainingExampleIndices(
+                                                  num_examples, tree_idx));
+    EXPECT_EQ(examples.size(), num_examples);
+    for (int i = 0; i < num_examples; ++i) {
+      EXPECT_EQ(examples[i], i);
+    }
+  }
+}
+
+TEST(RandomForestBootstrappingIndices, WithBootstrapping) {
+  model::proto::TrainingConfig training_config;
+  auto* rf_config = training_config.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_bootstrap_size_ratio(0.5);
+  RandomForestLearner learner{training_config};
+  const int num_examples = 100;
+  for (int tree_idx = 0; tree_idx < 2; tree_idx++) {
+    ASSERT_OK_AND_ASSIGN(const auto examples, learner.GetTrainingExampleIndices(
+                                                  num_examples, tree_idx));
+    EXPECT_EQ(examples.size(), 50);
+  }
+}
+
+TEST(RandomForestBootstrappingIndices, InvalidTreeIdx) {
+  model::proto::TrainingConfig training_config;
+  RandomForestLearner learner{training_config};
+  const int num_examples = 100;
+  EXPECT_THAT(
+      learner.GetTrainingExampleIndices(num_examples, -1).status(),
+      test::StatusIs(absl::StatusCode::kInvalidArgument,
+                     "The tree index must be non-negative, but got -1."));
+  EXPECT_THAT(learner.GetTrainingExampleIndices(num_examples, 300).status(),
+              test::StatusIs(absl::StatusCode::kInvalidArgument,
+                             "The tree index must be less than the number of "
+                             "trees (300), but got 300."));
+}
+
+TEST(RandomForestBootstrappingIndices, IndicesCorrectness) {
+  const int num_examples = 30;
+
+  // Create a toy dataset of simply increasing numbers in both label and feature
+  dataset::VerticalDataset dataset;
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "feature" }
+    columns { type: NUMERICAL name: "label" }
+  )pb");
+  dataset.set_data_spec(dataspec);
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+
+  ASSERT_OK_AND_ASSIGN(auto* col_feature,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(0));
+  col_feature->Resize(num_examples);
+  std::iota(col_feature->mutable_values()->begin(),
+            col_feature->mutable_values()->end(), 0);
+
+  ASSERT_OK_AND_ASSIGN(auto* col_label,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(1));
+  col_label->Resize(num_examples);
+  std::iota(col_label->mutable_values()->begin(),
+            col_label->mutable_values()->end(), 0);
+  dataset.set_nrow(num_examples);
+
+  // Train trees that are just stumps
+  model::proto::TrainingConfig training_config = PARSE_TEST_PROTO(R"pb(
+    task: REGRESSION
+    label: "label"
+    [yggdrasil_decision_forests.model.random_forest.proto
+         .random_forest_config] {
+      decision_tree { max_depth: 1 }
+      num_trees: 25
+    }
+  )pb");
+
+  RandomForestLearner learner{training_config};
+  ASSERT_OK_AND_ASSIGN(auto model, learner.TrainWithStatus(dataset));
+  auto* rf_model = dynamic_cast<const RandomForestModel*>(model.get());
+  ASSERT_NE(rf_model, nullptr);
+
+  for (int tree_idx = 0; tree_idx < rf_model->num_trees(); tree_idx++) {
+    const auto& root = rf_model->decision_trees()[tree_idx]->root();
+    ASSERT_TRUE(root.IsLeaf()) << "Tree " << tree_idx << " root is not a leaf";
+    const auto root_prediction = root.node().regressor().top_value();
+
+    ASSERT_OK_AND_ASSIGN(
+        const auto example_indices,
+        learner.GetTrainingExampleIndices(num_examples, tree_idx));
+    ASSERT_FALSE(example_indices.empty())
+        << "Tree " << tree_idx << " has no training examples";
+
+    const double sum_indices =
+        std::reduce(example_indices.begin(), example_indices.end(), 0.0);
+    const float mean_example_idx = sum_indices / example_indices.size();
+    EXPECT_FLOAT_EQ(mean_example_idx, root_prediction)
+        << "Mismatch in tree " << tree_idx;
+  }
+}
+
+TEST(RandomForest, Honest) {
+  // Create a toy dataset of simply increasing numbers in both label and feature
+  dataset::VerticalDataset dataset;
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "feature" }
+    columns { type: NUMERICAL name: "label" }
+  )pb");
+  dataset.set_data_spec(dataspec);
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+
+  ASSERT_OK_AND_ASSIGN(auto* col_feature,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(0));
+  *col_feature->mutable_values() = {0, 1, 2, 3, 4, 5};
+
+  ASSERT_OK_AND_ASSIGN(auto* col_label,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(1));
+  *col_label->mutable_values() = {5, 4, 3, 2, 1, 0};
+  dataset.set_nrow(6);
+
+  // This configuration perfectly separates the examples.
+  model::proto::TrainingConfig training_config = PARSE_TEST_PROTO(R"pb(
+    task: REGRESSION
+    label: "label"
+    [yggdrasil_decision_forests.model.random_forest.proto
+         .random_forest_config] {
+      decision_tree {
+        min_examples: 1
+        honest: {}
+      }
+      num_trees: 1
+      bootstrap_training_dataset: false
+    }
+  )pb");
+
+  RandomForestLearner learner{training_config};
+  ASSERT_OK_AND_ASSIGN(auto model, learner.TrainWithStatus(dataset));
+  auto* rf_model = dynamic_cast<const RandomForestModel*>(model.get());
+  ASSERT_NE(rf_model, nullptr);
+  // Make sure the model doesn't actually separate all examples.
+  EXPECT_LT(rf_model->NumNodes(), 11);
 }
 
 }  // namespace

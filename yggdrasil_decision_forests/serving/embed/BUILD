@@ -1,4 +1,5 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("//yggdrasil_decision_forests/serving/embed:embed.bzl", "cc_ydf_standalone_model")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "cc_binary_ydf", "cc_library_ydf")
 
@@ -15,26 +16,19 @@ cc_library_ydf(
     srcs = ["embed.cc"],
     hdrs = ["embed.h"],
     deps = [
+        ":cc_embed",
+        ":common",
         ":embed_cc_proto",
-        ":utils",
-        "//yggdrasil_decision_forests/dataset:data_spec",
-        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
-        "//yggdrasil_decision_forests/model/decision_tree",
-        "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
-        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
-        "//yggdrasil_decision_forests/utils:bitmap",
-        "//yggdrasil_decision_forests/utils:status_macros",
-        "@com_google_absl//absl/container:btree",
+        "//yggdrasil_decision_forests/serving/embed/java:java_embed",
         "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -51,6 +45,59 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "cc_embed",
+    srcs = ["cc_embed.cc"],
+    hdrs = ["cc_embed.h"],
+    deps = [
+        ":common",
+        ":embed_cc_proto",
+        ":utils",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/random_forest",
+        "//yggdrasil_decision_forests/utils:bitmap",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/container:node_hash_map",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library_ydf(
+    name = "common",
+    srcs = ["common.cc"],
+    hdrs = ["common.h"],
+    deps = [
+        ":embed_cc_proto",
+        ":utils",
+        "//yggdrasil_decision_forests/dataset:data_spec",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
+        "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/container:btree",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
 # Binaries
 # ========
 
@@ -59,7 +106,6 @@ cc_binary_ydf(
     srcs = ["write_embed.cc"],
     deps = [
         ":embed",
-        ":embed_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:filesystem",
@@ -70,6 +116,7 @@ cc_binary_ydf(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -94,13 +141,15 @@ all_proto_library(
 # =====
 
 cc_test(
-    name = "embed_test",
-    srcs = ["embed_test.cc"],
+    name = "cc_embed_test",
+    srcs = ["cc_embed_test.cc"],
     data = [
         "//yggdrasil_decision_forests/test_data",
         "//yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_filegroup",
     ],
     deps = [
+        ":cc_embed",
+        ":common",
         ":embed",
         ":embed_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec",
@@ -125,6 +174,7 @@ cc_test(
     name = "utils_test",
     srcs = ["utils_test.cc"],
     deps = [
+        ":embed_cc_proto",
         ":utils",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:test",
@@ -146,6 +196,7 @@ cc_test(
         ":test_model_adult_binary_class_gbdt_v2_class",
         ":test_model_adult_binary_class_gbdt_v2_proba",
         ":test_model_adult_binary_class_gbdt_v2_proba_routing",
+        ":test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab",
         ":test_model_adult_binary_class_gbdt_v2_score",
         ":test_model_adult_binary_class_rf_nwta_small_class",
         ":test_model_adult_binary_class_rf_nwta_small_proba",
@@ -207,6 +258,15 @@ cc_ydf_standalone_model(
 cc_ydf_standalone_model(
     name = "test_model_adult_binary_class_gbdt_v2_proba_routing",
     algorithm = "ROUTING",
+    classification_output = "PROBABILITY",
+    data = "//yggdrasil_decision_forests/test_data",
+    path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",
+)
+
+cc_ydf_standalone_model(
+    name = "test_model_adult_binary_class_gbdt_v2_proba_routing_with_string_vocab",
+    algorithm = "ROUTING",
+    categorical_from_string = True,
     classification_output = "PROBABILITY",
     data = "//yggdrasil_decision_forests/test_data",
     path = "yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_v2",

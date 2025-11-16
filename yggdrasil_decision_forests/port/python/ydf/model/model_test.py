@@ -632,7 +632,10 @@ class GenericModelTest(parameterized.TestCase):
         test_utils.ydf_test_data_path(), "dataset", "abalone.csv"
     )
     test_df = pd.read_csv(dataset_path)
-    with self.assertRaisesRegex(ValueError, "an integer greater than 100"):
+    with self.assertRaisesRegex(
+        ValueError,
+        "`bootstrapping` must be a boolean or an integer >= 100, but got 1.",
+    ):
       self.abalone_regression_gbdt.evaluate(test_df, bootstrapping=1)
 
   def test_prefixed_model_loading_autodetection(self):
@@ -691,10 +694,12 @@ Use `model.describe()` for more details.
     )
 
   def test_model_describe_text(self):
-    self.assertIn(
-        'Type: "GRADIENT_BOOSTED_TREES"',
-        self.adult_binary_class_gbdt.describe("text"),
-    )
+    text_description = self.adult_binary_class_gbdt.describe("text")
+    # Model description
+    self.assertIn('Type: "GRADIENT_BOOSTED_TREES"', text_description)
+    # Dataspec description
+    self.assertIn("DATASPEC:", text_description)
+    self.assertIn("Number of records:", text_description)
 
   def test_model_describe_html(self):
     html_description = self.adult_binary_class_gbdt.describe("html")
@@ -841,7 +846,7 @@ Use `model.describe()` for more details.
         original_predictions, deserialized_predictions, decimal=5
     )
 
-  def test_model_embed(self):
+  def test_model_embed_cc(self):
     model = model_lib.load_model(
         os.path.join(self._model_dir, "adult_binary_class_gbdt_v2")
     )
@@ -851,6 +856,7 @@ Use `model.describe()` for more details.
     embedded_model_routing_proba = model.to_standalone_cc(
         algorithm="ROUTING",
         classification_output="PROBABILITY",
+        categorical_from_string=False,
     )
     self.assertIsInstance(embedded_model_if_else_class, str)
     self.assertIsInstance(embedded_model_routing_proba, str)
@@ -873,6 +879,42 @@ Use `model.describe()` for more details.
             "golden",
             "embed",
             "adult_binary_class_gbdt_v2_probability_routing.h.golden",
+        ),
+    )
+
+  def test_model_embed_java(self):
+    model = model_lib.load_model(
+        os.path.join(self._model_dir, "adult_binary_class_gbdt_v2")
+    )
+    while model.num_trees() > 3:
+      model.remove_tree(model.num_trees() - 1)
+    embedded_model_files = model.to_standalone_java(
+        package_name="com.google.ydf",
+        classification_output="PROBABILITY",
+    )
+    self.assertIsInstance(embedded_model_files, dict)
+    self.assertLen(embedded_model_files, 2)
+    self.assertIn("YdfModel.java", embedded_model_files)
+    self.assertIn("YdfModelData.bin", embedded_model_files)
+
+    test_utils.golden_check_string(
+        self,
+        embedded_model_files["YdfModel.java"].decode(),
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_probability_routing.java.golden",
+        ),
+    )
+    test_utils.golden_check_bytes(
+        self,
+        embedded_model_files["YdfModelData.bin"],
+        os.path.join(
+            test_utils.ydf_test_data_path(),
+            "golden",
+            "embed",
+            "adult_binary_class_gbdt_v2_probability_routing_data.bin.golden",
         ),
     )
 

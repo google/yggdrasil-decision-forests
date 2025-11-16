@@ -22,6 +22,7 @@
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
@@ -406,6 +407,29 @@ TEST(AbstractLearner, MaximumModelSizeInMemoryInBytes) {
       "-1 } }")));
   EXPECT_FALSE(
       learner.training_config().has_maximum_model_size_in_memory_in_bytes());
+}
+
+TEST(AbstractLearner, CheckConfigurationOODItems) {
+  proto::TrainingConfig training_config;
+  training_config.set_label("A");
+  training_config.set_task(proto::Task::CLASSIFICATION);
+
+  dataset::proto::DataSpecification data_spec;
+  auto* col_a = data_spec.add_columns();
+  col_a->set_name("A");
+  col_a->set_type(dataset::proto::ColumnType::CATEGORICAL);
+  (*col_a->mutable_categorical()
+        ->mutable_items())[dataset::kOutOfDictionaryItemKey]
+      .set_count(1);
+
+  proto::TrainingConfigLinking config_link;
+  ASSERT_OK(AbstractLearner::LinkTrainingConfig(training_config, data_spec,
+                                                &config_link));
+
+  EXPECT_THAT(AbstractLearner::CheckConfiguration(data_spec, training_config,
+                                                  config_link, {}),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "contains out-of-dictionary values"));
 }
 
 }  // namespace

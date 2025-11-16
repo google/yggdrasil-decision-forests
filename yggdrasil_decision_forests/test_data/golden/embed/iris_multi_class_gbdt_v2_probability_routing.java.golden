@@ -1,0 +1,127 @@
+package com.google.ydf;
+
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
+public final class YdfModel {
+
+  public enum Label {
+    SETOSA,
+    VERSICOLOR,
+    VIRGINICA,
+  };
+
+  /**
+   * Returns the index in the prediction array corresponding to the given label.
+   * @param label The label.
+   * @return The index in the prediction array.
+   */
+  // ordinal() is safe here because this code is generated and the Label enum is not expected to change.
+  @SuppressWarnings("EnumOrdinal")
+  public static int getLabelIndex(Label label) {
+    return label.ordinal();
+  }
+
+  private static final int NUM_FEATURES = 4;
+  private static final int NUM_TREES = 3;
+
+  public static class Instance {
+
+    private final float[] numericalFeatureValues;
+
+    public Instance(float sepal_Length, float sepal_Width, float petal_Length, float petal_Width) {
+      // NaN substitutions are required to handle missing values correctly.
+      // If no missing numerical values are used, this block can be removed.
+      sepal_Length = Float.isNaN(sepal_Length) ? 5.84333f : sepal_Length;
+      sepal_Width = Float.isNaN(sepal_Width) ? 3.05733f : sepal_Width;
+      petal_Length = Float.isNaN(petal_Length) ? 3.758f : petal_Length;
+      petal_Width = Float.isNaN(petal_Width) ? 1.19933f : petal_Width;
+
+      this.numericalFeatureValues = new float[] {sepal_Length, sepal_Width, petal_Length, petal_Width};
+    }
+  }
+
+  private static final byte[] nodePos;
+  private static final float[] nodeVal;
+  private static final byte[] nodeFeat;
+  private static final float[] nodeThr;
+  private static final byte[] rootDeltas;
+
+  static {
+    try (InputStream is = YdfModel.class.getResourceAsStream("YdfModelData.bin");
+         DataInputStream dis = new DataInputStream(new BufferedInputStream(is))) {
+    int nodePosLength = dis.readInt();
+    nodePos = new byte[nodePosLength];
+    for (int i = 0; i < nodePosLength; i++) {
+      nodePos[i] = dis.readByte();
+    }
+    int nodeValLength = dis.readInt();
+    nodeVal = new float[nodeValLength];
+    for (int i = 0; i < nodeValLength; i++) {
+      nodeVal[i] = dis.readFloat();
+    }
+    int nodeFeatLength = dis.readInt();
+    nodeFeat = new byte[nodeFeatLength];
+    for (int i = 0; i < nodeFeatLength; i++) {
+      nodeFeat[i] = dis.readByte();
+    }
+    int nodeThrLength = dis.readInt();
+    nodeThr = new float[nodeThrLength];
+    for (int i = 0; i < nodeThrLength; i++) {
+      nodeThr[i] = dis.readFloat();
+    }
+    int rootDeltasLength = dis.readInt();
+    rootDeltas = new byte[rootDeltasLength];
+    for (int i = 0; i < rootDeltasLength; i++) {
+      rootDeltas[i] = dis.readByte();
+    }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
+    }
+  }
+
+  public static float[] predict(Instance instance) {
+    float[] accumulator = {0f, 0f, 0f};
+
+    int nodeIndex = 0;
+    for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+      int currentNodeIndex = nodeIndex;
+      while(nodePos[currentNodeIndex] != 0) {
+        boolean conditionResult;
+        byte featureIndex = nodeFeat[currentNodeIndex];
+          float numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+          float threshold = nodeThr[currentNodeIndex];
+          conditionResult = numericalFeatureValue >= threshold;
+
+        currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+      }
+      accumulator[treeIdx % 3] += nodeVal[currentNodeIndex];
+      nodeIndex += rootDeltas[treeIdx];
+    }
+
+    // Softmax
+    float[] probas = new float[3];
+    float maxLogit = Float.NEGATIVE_INFINITY;
+    for (float val : accumulator) {
+      if (val > maxLogit) {
+        maxLogit = val;
+      }
+    }
+
+    float sumExps = 0.0f;
+    for (int i = 0; i < 3; i++) {
+      probas[i] = (float) Math.exp(accumulator[i] - maxLogit);
+      sumExps += probas[i];
+    }
+
+    for (int i = 0; i < 3; i++) {
+      probas[i] /= sumExps;
+    }
+    return probas;
+  }
+
+
+  private YdfModel() {} // Prevent instantiation
+}

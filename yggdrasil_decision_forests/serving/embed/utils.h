@@ -25,16 +25,32 @@
 
 namespace yggdrasil_decision_forests::serving::embed {
 
-// Checks that a model name is valid. A model name can only contain letters,
-// numbers, and _.
-absl::Status CheckModelName(absl::string_view value);
+// Checks that a model name is valid. A model name can only contain certain
+// letters depending on the language.
+absl::Status CheckModelName(absl::string_view value,
+                            proto::Options::LanguageCase language);
 absl::Status CheckFeatureName(absl::string_view value);
 
-// Converts any string into a c++ constant (with the "k") e.g. "HELLO_WOLRD_1".
+// Converts any string into a C++ constant (with the "k") e.g. "HELLO_WORLD_1".
 std::string StringToConstantSymbol(absl::string_view input);
+
+// Converts any string into a Java Enum constant e.g. "HELLO_WORLD_1".
+std::string StringToJavaEnumConstant(absl::string_view input);
 
 // Converts any string into a c++ variable name e.g. "hello_world_1".
 std::string StringToVariableSymbol(absl::string_view input);
+
+// Converts any string into upper Camel Case.
+// If "ensure_letter_first=true", adds a "V" character in front if the first
+// character is not a letter.
+std::string StringToCamelCase(absl::string_view input,
+                              bool ensure_letter_first = true);
+
+// Converts any string into lower Camel Case.
+// If "ensure_letter_first=true", adds a "V" character in front if the first
+// character is not a letter.
+std::string StringToLowerCamelCase(absl::string_view input,
+                                   bool ensure_letter_first = true);
 
 // Converts any string into a c++ struct name e.g. "HelloWorld1".
 // If "ensure_letter_first=true", adds a "V" character in front if the first
@@ -42,10 +58,17 @@ std::string StringToVariableSymbol(absl::string_view input);
 std::string StringToStructSymbol(absl::string_view input,
                                  bool ensure_letter_first = true);
 
+// Convert any string to a quoted string that can be used to initialize a string
+// variable (event if the string contains " characters or line returns).
+std::string QuoteString(absl::string_view input);
+
 // Computes the number of bytes to encode an unsigned value. Can return 1, 2,
 // or 4. For example, "MaxUnsignedValueToNumBytes" returns 2 for value=600
 // (since using a single byte cannot encode a value greater than 255).
 int MaxUnsignedValueToNumBytes(uint32_t value);
+
+// Maximum signed value to encode with "bytes" bytes.
+int32_t NumBytesToMaxSignedValue(int bytes);
 
 // Maximum unsigned value to encode with "bytes" bytes.
 uint32_t NumBytesToMaxUnsignedValue(int bytes);
@@ -53,19 +76,27 @@ uint32_t NumBytesToMaxUnsignedValue(int bytes);
 // Same as MaxUnsignedValueToNumBytes, but for signed values.
 int MaxSignedValueToNumBytes(int32_t value);
 
-// Convert a proto dtype to the corresponding c++ class.
+// Convert a proto dtype to the corresponding C++ class.
 std::string DTypeToCCType(proto::DType::Enum value);
+
+// Convert a proto dtype to the corresponding Java primitive type.
+std::string DTypeToJavaType(proto::DType::Enum value);
 
 // Integer representation to dtype.
 proto::DType::Enum UnsignedIntegerToDtype(int bytes);
 
-// Integer representation e.g. uint16_t.
+// C++ Integer representation e.g. uint16_t.
 std::string UnsignedInteger(int bytes);
 std::string SignedInteger(int bytes);
+// Java integer representation. There are no unsigned primitive types in Java.
+std::string JavaInteger(int bytes);
 
 // Computes the number of nodes (leaves and non-leaves) in a tree given the
 // number of leaves. Note: The trees are binary trees.
 int NumLeavesToNumNodes(int num_leaves);
+
+// Indents every line of the string by the given number of spaces.
+std::string IndentString(absl::string_view input, int num_spaces);
 
 }  // namespace yggdrasil_decision_forests::serving::embed
 

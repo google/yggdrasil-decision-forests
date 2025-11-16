@@ -428,6 +428,7 @@ AbstractLearner::TrainWithStatusImpl(
                                                       data_spec, &link_config));
   auto dataset_loading_config = OptimalDatasetLoadingConfig(link_config);
   dataset_loading_config.num_threads = deployment().num_io_threads();
+  dataset_loading_config.stop = this->stop_training_trigger_;
 
   dataset::VerticalDataset train_dataset;
   RETURN_IF_ERROR(LoadVerticalDataset(typed_path, data_spec, &train_dataset,
@@ -476,11 +477,20 @@ absl::Status CheckGenericHyperParameterSpecification(
         }
         const auto& possible_values =
             spec_field_it->second.categorical().possible_values();
+        std::string possible_values_str;
+        if (possible_values.size() > 10) {
+          possible_values_str = absl::StrJoin(
+              possible_values.begin(), possible_values.begin() + 10, ", ");
+          possible_values_str += ", ...";
+        } else {
+          possible_values_str = absl::StrJoin(possible_values, ", ");
+        }
         if (std::find(possible_values.begin(), possible_values.end(),
                       param.value().categorical()) == possible_values.end()) {
-          return absl::InvalidArgumentError(
-              absl::StrCat("Unknown value \"", param.value().categorical(),
-                           "\" for the parameter \"", param.name(), "\"."));
+          return absl::InvalidArgumentError(absl::StrCat(
+              "Unknown value \"", param.value().categorical(),
+              "\" for the parameter \"", param.name(),
+              "\". Possible values are: ", possible_values_str, "."));
         }
       } break;
       case proto::GenericHyperParameterSpecification::Value::kInteger: {
@@ -559,7 +569,7 @@ absl::Status AbstractLearner::CheckConfiguration(
       return absl::InvalidArgumentError(
           "The \"task\" field is not defined in the TrainingConfig proto.");
       break;
-    case model::proto::Task::CLASSIFICATION:
+    case model::proto::Task::CLASSIFICATION: {
       if (label_col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
         return absl::InvalidArgumentError(absl::StrCat(
             "The label column \"", config.label(),
@@ -568,7 +578,18 @@ absl::Status AbstractLearner::CheckConfiguration(
             "a "
             "dataspec guide, even for a binary classification task."));
       }
-      break;
+      // Check for the count for OOD items.
+      const auto it_ood_item = label_col_spec.categorical().items().find(
+          dataset::kOutOfDictionaryItemKey);
+      if (it_ood_item != label_col_spec.categorical().items().end() &&
+          it_ood_item->second.count() > 0) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The categorical training label column \"", config.label(),
+            "\" contains out-of-dictionary values. This is not allowed. Make "
+            "sure the Dataspec guide of the label column is configured with "
+            "`min_vocab_frequency=0` and `max_vocab_count=-1`."));
+      }
+    } break;
     case model::proto::Task::REGRESSION:
       if (label_col_spec.type() != dataset::proto::ColumnType::NUMERICAL) {
         return absl::InvalidArgumentError(

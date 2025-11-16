@@ -20,16 +20,29 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
 namespace {
 
-TEST(Embed, CheckModelName) {
-  EXPECT_OK(CheckModelName("my_model_123"));
-  EXPECT_THAT(CheckModelName("my-model"),
+TEST(Embed, CheckModelNameCC) {
+  EXPECT_OK(CheckModelName("my_model_123", proto::Options::kCc));
+  EXPECT_THAT(CheckModelName("my-model", proto::Options::kCc),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(CheckModelName("my model"),
+  EXPECT_THAT(CheckModelName("MyModel", proto::Options::kCc),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CheckModelName("my model", proto::Options::kCc),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(Embed, CheckModelNameJava) {
+  EXPECT_OK(CheckModelName("MyModel", proto::Options::kJava));
+  EXPECT_THAT(CheckModelName("my_model_123", proto::Options::kJava),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CheckModelName("my-model", proto::Options::kJava),
+              test::StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CheckModelName("my model", proto::Options::kJava),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
@@ -48,7 +61,7 @@ TEST(Embed, StringToUpperCaseVariable) {
   EXPECT_EQ(StringToConstantSymbol("123AAA!"), "V123AAA");
   EXPECT_EQ(StringToConstantSymbol(""), "");
 
-  EXPECT_EQ(StringToConstantSymbol("A<B"), "ALtB");
+  EXPECT_EQ(StringToConstantSymbol("A<B"), "ALTB");
 }
 
 TEST(Embed, StringToLowerCaseVariable) {
@@ -114,6 +127,22 @@ TEST(NumBytesToMaxUnsignedValue, Basic) {
   EXPECT_EQ(NumBytesToMaxUnsignedValue(1), 0xff);
   EXPECT_EQ(NumBytesToMaxUnsignedValue(2), 0xffff);
   EXPECT_EQ(NumBytesToMaxUnsignedValue(4), 0xffffffff);
+}
+
+TEST(QuoteString, Basic) {
+  EXPECT_EQ(QuoteString("hello"), "\"hello\"");
+  EXPECT_EQ(QuoteString("hello\"world"), "\"hello\\\"world\"");
+  EXPECT_EQ(QuoteString("hello\nworld"), "\"hello\\nworld\"");
+}
+
+TEST(IndentString, Basic) {
+  EXPECT_EQ(IndentString("hello", 2), "  hello");
+  EXPECT_EQ(IndentString("hello\nworld", 2), "  hello\n  world");
+  EXPECT_EQ(IndentString("hello\nworld\n", 2), "  hello\n  world\n");
+  EXPECT_EQ(IndentString("", 2), "");
+  EXPECT_EQ(IndentString("hello", 0), "hello");
+  EXPECT_EQ(IndentString("\n", 2), "\n");
+  EXPECT_EQ(IndentString("a\n\nb", 2), "  a\n\n  b");
 }
 
 }  // namespace

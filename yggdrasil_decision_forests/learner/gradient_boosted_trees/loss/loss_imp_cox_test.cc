@@ -41,6 +41,7 @@ using ::testing::Not;
 using ::testing::Pair;
 using ::yggdrasil_decision_forests::dataset::proto::DataSpecification;
 using ::yggdrasil_decision_forests::model::proto::TrainingConfigLinking;
+using Update = CoxProportionalHazardLoss::Update;
 
 // Margin of error for numerical tests.
 constexpr float kTestPrecision = 0.000001f;
@@ -83,25 +84,6 @@ class CoxProportionalHazardLossTest : public ::testing::Test {
   int label_col_idx_;
   dataset::VerticalDataset full_dataset_;
 };
-
-TEST_F(CoxProportionalHazardLossTest, CacheCreation) {
-  const TrainingConfigLinking config = PARSE_TEST_PROTO(
-      R"pb(label: 0 label_event_observed: 1 label_entry_age: 2)pb");
-
-  auto dataset = GetDatasetWithTruncation();
-
-  ASSERT_OK_AND_ASSIGN(const auto loss,
-                       CoxProportionalHazardLoss::RegistrationCreate(
-                           {config,
-                            {},
-                            model::proto::Task::SURVIVAL_ANALYSIS,
-                            dataset.data_spec().columns(0)}));
-  ASSERT_OK_AND_ASSIGN(auto cache, loss->CreateLossCache(dataset));
-  const auto* cox_cache =
-      dynamic_cast<const CoxProportionalHazardLoss::Cache*>(cache.get());
-  EXPECT_THAT(cox_cache->risk_set_sizes,
-              ElementsAre(Pair(2, 4), Pair(0, 3), Pair(4, 2)));
-}
 
 TEST_F(CoxProportionalHazardLossTest, RightCensoringAndLeftTruncation) {
   const TrainingConfigLinking config = PARSE_TEST_PROTO(

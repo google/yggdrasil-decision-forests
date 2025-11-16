@@ -169,7 +169,7 @@ struct Instance {
 struct __attribute__((packed)) Node {
   uint8_t pos = 0;
   union {
-    struct {
+    struct __attribute__((packed)) {
       uint8_t feat;
       union {
         int32_t thr;
@@ -177,7 +177,7 @@ struct __attribute__((packed)) Node {
         uint8_t obl;
       };
     } cond;
-    struct {
+    struct __attribute__((packed)) {
       float val;
     } leaf;
   };
@@ -397,6 +397,7 @@ inline float Predict(const Instance& instance) {
 
   // Sigmoid
   return 1.f / (1.f + std::exp(-accumulator));
+
 }
 
 }  // namespace ydf_model

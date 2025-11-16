@@ -18,7 +18,6 @@
 #include <optional>
 #include <vector>
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
 #include "absl/status/statusor.h"
@@ -29,13 +28,10 @@
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
 #include "ydf/learner/wrapper/wrapper_generator.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
-#include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace {
-
-using ::testing::HasSubstr;
 
 class FakeLearner1 : public model::AbstractLearner {
  public:
@@ -385,6 +381,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       support_monotonic_constraints=False,
       require_label=False,
       support_custom_loss=False,
+      support_return_in_bag_example_indices=False,
     )
 
   @classmethod

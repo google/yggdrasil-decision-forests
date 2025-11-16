@@ -528,6 +528,8 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     predictions = model.predict(data)
     self.assertEqual(predictions.shape, (2,))
 
+    _ = model.describe(output_format="html")
+
   def test_multidimensional_features_with_feature_arg(self):
     ds = {
         "f1": np.random.uniform(size=(100, 5)),
@@ -971,6 +973,13 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     model = specialized_learners.RandomForestLearner(label="my_label").train(ds)
     self.assertEqual(model.label_col_idx(), 0)
     self.assertEqual(model.label(), "my_label")
+
+  def test_in_bag_example_indices(self):
+    learner = specialized_learners.RandomForestLearner(label="income")
+    in_bag_indices = learner.in_bag_example_indices(
+        num_examples=500, tree_idx=4
+    )
+    self.assertLen(in_bag_indices, 500)
 
 
 if __name__ == "__main__":

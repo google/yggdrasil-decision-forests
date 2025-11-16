@@ -39,6 +39,20 @@ message Options {
 
   // Add a monitor of the library used in the generated code.
   optional bool monitor_usage = 6 [default = false];
+
+  // If true, generates functions to create categorical feature values from
+  // strings. For example, for a categorical feature "X" with an associated
+  // "FeatureX" enum class, the method "FeatureXFromString(absl::string_view
+  // name) -> FeatureX" is created.
+  //
+  // Enabling this option might increase the binary size.
+  optional bool categorical_from_string = 7 [default = false];
+
+  // Which programming language should be produced.
+  oneof language {
+    CC cc = 8;
+    Java java = 9;
+  }
 }
 
 // Output of a classification model.
@@ -101,4 +115,10 @@ message Algorithm {
     // sometime be faster).
     ROUTING = 2;
   }
+}
+
+message CC {}
+
+message Java {
+  optional string package_name = 1 [default = "com.google.ydf"];
 }

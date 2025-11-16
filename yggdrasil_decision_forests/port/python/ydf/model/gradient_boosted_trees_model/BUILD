@@ -19,6 +19,7 @@ pybind_library(
         "@com_google_absl//absl/status:statusor",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",

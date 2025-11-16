@@ -1,5 +1,6 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
 load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -64,7 +65,6 @@ cc_test(
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
-        "@ydf_cc//yggdrasil_decision_forests/utils:test",
         "@ydf_cc//yggdrasil_decision_forests/utils:testing_macros",
     ],
 )

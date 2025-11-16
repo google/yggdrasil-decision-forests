@@ -156,6 +156,39 @@ def golden_check_string(
   test.assertEqual(value, golden_data)
 
 
+def golden_check_bytes(
+    test, value: bytes, golden_path: str, postfix: str = ""
+) -> None:
+  """Ensures that "value" is equal to the content of the file "golden_path".
+
+  Args:
+    test: A test.
+    value: Value to test.
+    golden_path: Path to golden file expressed from the root of the repo.
+    postfix: Optional postfix to the path of the file containing the actual
+      value.
+  """
+
+  with open(os.path.join(data_root_path(), golden_path), "rb") as f:
+    golden_data = f.read()
+
+  if value != golden_data:
+    value_path = os.path.join(
+        absltest.TEST_TMPDIR.value, os.path.basename(golden_path) + postfix
+    )
+    logging.info("os.path.dirname(value_path): %s", os.path.dirname(value_path))
+    os.makedirs(os.path.dirname(value_path), exist_ok=True)
+    logging.info(
+        "Golden test failed for %s. Save the effective value to %s",
+        golden_path,
+        value_path,
+    )
+    with open(value_path, "wb") as f:
+      f.write(value)
+
+  test.assertEqual(value, golden_data)
+
+
 def assert_almost_equal(a, b):
   msg = _test_almost_equal(a, b)
   if msg is not None:
