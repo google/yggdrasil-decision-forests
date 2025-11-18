@@ -44,7 +44,6 @@
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -81,11 +80,6 @@ class ClassificationLabelFiller {
     bucket->value.Clear();
     bucket->value.SetNumClasses(num_classes_);
     bucket->count = 0;
-  }
-
-  void Prefetch(const ExampleIndex example_idx) const {
-    PREFETCH(&labels_[example_idx]);
-    if (!weights_.empty()) PREFETCH(&weights_[example_idx]);
   }
 
   void Add(const ExampleIndex example_idx, Accumulator* accumulator) const {
@@ -144,11 +138,6 @@ class RegressionLabelFiller {
   void InitializeAndZeroBucket(LabelBucket* bucket) const {
     bucket->value.Clear();
     bucket->count = 0;
-  }
-
-  void Prefetch(const ExampleIndex example_idx) const {
-    PREFETCH(&labels_[example_idx]);
-    if (!weights_.empty()) PREFETCH(&weights_[example_idx]);
   }
 
   void Add(const ExampleIndex example_idx, Accumulator* accumulator) const {
@@ -211,12 +200,6 @@ class RegressionWithHessianLabelFiller {
     bucket->value.Clear();
     bucket->sum_hessian = 0;
     bucket->count = 0;
-  }
-
-  void Prefetch(const ExampleIndex example_idx) const {
-    PREFETCH(&labels_[example_idx]);
-    PREFETCH(&hessians_[example_idx]);
-    if (!weights_.empty()) PREFETCH(&weights_[example_idx]);
   }
 
   void Add(const ExampleIndex example_idx, Accumulator* accumulator) const {

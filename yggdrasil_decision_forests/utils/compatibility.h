@@ -37,12 +37,6 @@ inline std::optional<std::string> UserName() {
    return {};
 }
 
-#if defined(__GNUC__)
-#define PREFETCH(addr) __builtin_prefetch(addr)
-#else
-#define PREFETCH(addr)
-#endif
-
 // Similar as std::accumulate introduced in c++20.
 template <class Iter, class Result>
 Result accumulate(Iter first, Iter last, Result acc) {

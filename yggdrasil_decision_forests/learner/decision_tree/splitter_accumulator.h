@@ -44,6 +44,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -52,7 +53,6 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
@@ -971,53 +971,36 @@ struct LabelNumericalOneValueBucket {
     }
 
     template <typename ExampleIdx>
-    void AddDirectToScoreAcc(const ExampleIdx example_idx,
-                             LabelNumericalScoreAccumulator* acc) const {
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void MoveDirectFromPosToNegScoreAcc(
+        const ExampleIdx example_idx, LabelNumericalScoreAccumulator* pos,
+        LabelNumericalScoreAccumulator* neg) const {
+      const float label_val = label_[example_idx];
       if constexpr (weighted) {
-        acc->label.Add(label_[example_idx], weights_[example_idx]);
+        const float weight_val = weights_[example_idx];
+        pos->label.Sub(label_val, weight_val);
+        neg->label.Add(label_val, weight_val);
       } else {
-        acc->label.Add(label_[example_idx]);
+        pos->label.Sub(label_val);
+        neg->label.Add(label_val);
       }
     }
 
     template <typename ExampleIdx>
-    void SubDirectToScoreAcc(const ExampleIdx example_idx,
-                             LabelNumericalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->label.Sub(label_[example_idx], weights_[example_idx]);
-      } else {
-        acc->label.Sub(label_[example_idx]);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void AddDirectToScoreAccWithDuplicates(
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void
+    MoveDirectFromPosToNegScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
-        LabelNumericalScoreAccumulator* acc) const {
+        LabelNumericalScoreAccumulator* pos,
+        LabelNumericalScoreAccumulator* neg) const {
+      const float label_val = label_[example_idx];
       if constexpr (weighted) {
-        acc->label.Add(label_[example_idx],
-                       weights_[example_idx] * num_duplicates);
+        const float weight_val = weights_[example_idx] * num_duplicates;
+        pos->label.Sub(label_val, weight_val);
+        neg->label.Add(label_val, weight_val);
       } else {
-        acc->label.Add(label_[example_idx], static_cast<float>(num_duplicates));
+        const float weight_val = static_cast<float>(num_duplicates);
+        pos->label.Sub(label_val, weight_val);
+        neg->label.Add(label_val, weight_val);
       }
-    }
-
-    template <typename ExampleIdx>
-    void SubDirectToScoreAccWithDuplicates(
-        const ExampleIdx example_idx, const int num_duplicates,
-        LabelNumericalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->label.Sub(label_[example_idx],
-                       weights_[example_idx] * num_duplicates);
-      } else {
-        acc->label.Sub(label_[example_idx], static_cast<float>(num_duplicates));
-      }
-    }
-
-    template <typename ExampleIdx>
-    void Prefetch(const ExampleIdx example_idx) const {
-      PREFETCH(&label_[example_idx]);
-      if constexpr (weighted) PREFETCH(&weights_[example_idx]);
     }
 
    private:
@@ -1167,59 +1150,39 @@ struct LabelHessianNumericalOneValueBucket {
     }
 
     template <typename ExampleIdx>
-    void AddDirectToScoreAcc(const ExampleIdx example_idx,
-                             LabelHessianNumericalScoreAccumulator* acc) const {
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void
+    MoveDirectFromPosToNegScoreAcc(
+        const ExampleIdx example_idx,
+        LabelHessianNumericalScoreAccumulator* pos,
+        LabelHessianNumericalScoreAccumulator* neg) const {
+      const float gradient_val = gradients_[example_idx];
+      const float hessian_val = hessians_[example_idx];
       if constexpr (weighted) {
-        acc->Add(gradients_[example_idx], hessians_[example_idx],
-                 weights_[example_idx]);
+        const float weight_val = weights_[example_idx];
+        pos->Sub(gradient_val, hessian_val, weight_val);
+        neg->Add(gradient_val, hessian_val, weight_val);
       } else {
-        acc->Add(gradients_[example_idx], hessians_[example_idx], 1.f);
+        pos->Sub(gradient_val, hessian_val, 1.f);
+        neg->Add(gradient_val, hessian_val, 1.f);
       }
     }
 
     template <typename ExampleIdx>
-    void SubDirectToScoreAcc(const ExampleIdx example_idx,
-                             LabelHessianNumericalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->Sub(gradients_[example_idx], hessians_[example_idx],
-                 weights_[example_idx]);
-      } else {
-        acc->Sub(gradients_[example_idx], hessians_[example_idx], 1.f);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void AddDirectToScoreAccWithDuplicates(
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void
+    MoveDirectFromPosToNegScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
-        LabelHessianNumericalScoreAccumulator* acc) const {
+        LabelHessianNumericalScoreAccumulator* pos,
+        LabelHessianNumericalScoreAccumulator* neg) const {
+      const float gradient_val = gradients_[example_idx];
+      const float hessian_val = hessians_[example_idx];
       if constexpr (weighted) {
-        acc->Add(gradients_[example_idx], hessians_[example_idx],
-                 weights_[example_idx] * num_duplicates);
+        const float weight_val = weights_[example_idx] * num_duplicates;
+        pos->Sub(gradient_val, hessian_val, weight_val);
+        neg->Add(gradient_val, hessian_val, weight_val);
       } else {
-        acc->Add<float>(gradients_[example_idx], hessians_[example_idx],
-                        num_duplicates);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void SubDirectToScoreAccWithDuplicates(
-        const ExampleIdx example_idx, const int num_duplicates,
-        LabelHessianNumericalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->Sub(gradients_[example_idx], hessians_[example_idx],
-                 weights_[example_idx] * num_duplicates);
-      } else {
-        acc->Sub<float>(gradients_[example_idx], hessians_[example_idx],
-                        num_duplicates);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void Prefetch(const ExampleIdx example_idx) const {
-      PREFETCH(&gradients_[example_idx]);
-      PREFETCH(&hessians_[example_idx]);
-      if constexpr (weighted) {
-        PREFETCH(&weights_[example_idx]);
+        const float weight_val = static_cast<float>(num_duplicates);
+        pos->Sub(gradient_val, hessian_val, weight_val);
+        neg->Add(gradient_val, hessian_val, weight_val);
       }
     }
 
@@ -1330,54 +1293,35 @@ struct LabelCategoricalOneValueBucket {
     }
 
     template <typename ExampleIdx>
-    void AddDirectToScoreAcc(const ExampleIdx example_idx,
-                             LabelCategoricalScoreAccumulator* acc) const {
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void MoveDirectFromPosToNegScoreAcc(
+        const ExampleIdx example_idx, LabelCategoricalScoreAccumulator* pos,
+        LabelCategoricalScoreAccumulator* neg) const {
+      const int label_val = label_[example_idx];
       if constexpr (weighted) {
-        acc->label.Add(label_[example_idx], weights_[example_idx]);
+        const float weight_val = weights_[example_idx];
+        pos->label.Sub(label_val, weight_val);
+        neg->label.Add(label_val, weight_val);
       } else {
-        acc->label.Add(label_[example_idx]);
+        pos->label.Sub(label_val);
+        neg->label.Add(label_val);
       }
     }
 
     template <typename ExampleIdx>
-    void SubDirectToScoreAcc(const ExampleIdx example_idx,
-                             LabelCategoricalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->label.Sub(label_[example_idx], weights_[example_idx]);
-      } else {
-        acc->label.Sub(label_[example_idx]);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void AddDirectToScoreAccWithDuplicates(
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void
+    MoveDirectFromPosToNegScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
-        LabelCategoricalScoreAccumulator* acc) const {
+        LabelCategoricalScoreAccumulator* pos,
+        LabelCategoricalScoreAccumulator* neg) const {
+      const int label_val = label_[example_idx];
       if constexpr (weighted) {
-        acc->label.Add(label_[example_idx],
-                       weights_[example_idx] * num_duplicates);
+        const float weight_val = weights_[example_idx] * num_duplicates;
+        pos->label.Sub(label_val, weight_val);
+        neg->label.Add(label_val, weight_val);
       } else {
-        acc->label.Add(label_[example_idx], num_duplicates);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void SubDirectToScoreAccWithDuplicates(
-        const ExampleIdx example_idx, const int num_duplicates,
-        LabelCategoricalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->label.Sub(label_[example_idx],
-                       weights_[example_idx] * num_duplicates);
-      } else {
-        acc->label.Sub(label_[example_idx], num_duplicates);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void Prefetch(const ExampleIdx example_idx) const {
-      PREFETCH(&label_[example_idx]);
-      if constexpr (weighted) {
-        PREFETCH(&weights_[example_idx]);
+        const float weight_val = static_cast<float>(num_duplicates);
+        pos->label.Sub(label_val, weight_val);
+        neg->label.Add(label_val, weight_val);
       }
     }
 
@@ -1497,56 +1441,36 @@ struct LabelBinaryCategoricalOneValueBucket {
     }
 
     template <typename ExampleIdx>
-    void AddDirectToScoreAcc(
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void MoveDirectFromPosToNegScoreAcc(
         const ExampleIdx example_idx,
-        LabelBinaryCategoricalScoreAccumulator* acc) const {
+        LabelBinaryCategoricalScoreAccumulator* pos,
+        LabelBinaryCategoricalScoreAccumulator* neg) const {
+      const bool label_val = label_[example_idx] == 2;
       if constexpr (weighted) {
-        acc->AddOne(label_[example_idx] == 2, weights_[example_idx]);
+        const float weight_val = weights_[example_idx];
+        pos->SubOne(label_val, weight_val);
+        neg->AddOne(label_val, weight_val);
       } else {
-        acc->AddOne(label_[example_idx] == 2);
+        pos->SubOne(label_val);
+        neg->AddOne(label_val);
       }
     }
 
     template <typename ExampleIdx>
-    void SubDirectToScoreAcc(
-        const ExampleIdx example_idx,
-        LabelBinaryCategoricalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->SubOne(label_[example_idx] == 2, weights_[example_idx]);
-      } else {
-        acc->SubOne(label_[example_idx] == 2);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void AddDirectToScoreAccWithDuplicates(
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void
+    MoveDirectFromPosToNegScoreAccWithDuplicates(
         const ExampleIdx example_idx, const int num_duplicates,
-        LabelBinaryCategoricalScoreAccumulator* acc) const {
+        LabelBinaryCategoricalScoreAccumulator* pos,
+        LabelBinaryCategoricalScoreAccumulator* neg) const {
+      const bool label_val = label_[example_idx] == 2;
       if constexpr (weighted) {
-        acc->AddOne(label_[example_idx] == 2,
-                    weights_[example_idx] * num_duplicates);
+        const float weight_val = weights_[example_idx] * num_duplicates;
+        pos->SubOne(label_val, weight_val);
+        neg->AddOne(label_val, weight_val);
       } else {
-        acc->AddOne(label_[example_idx] == 2, num_duplicates);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void SubDirectToScoreAccWithDuplicates(
-        const ExampleIdx example_idx, const int num_duplicates,
-        LabelBinaryCategoricalScoreAccumulator* acc) const {
-      if constexpr (weighted) {
-        acc->SubOne(label_[example_idx] == 2,
-                    weights_[example_idx] * num_duplicates);
-      } else {
-        acc->SubOne(label_[example_idx] == 2, num_duplicates);
-      }
-    }
-
-    template <typename ExampleIdx>
-    void Prefetch(const ExampleIdx example_idx) const {
-      PREFETCH(&label_[example_idx]);
-      if constexpr (weighted) {
-        PREFETCH(&weights_[example_idx]);
+        const float weight_val = static_cast<float>(num_duplicates);
+        pos->SubOne(label_val, weight_val);
+        neg->AddOne(label_val, weight_val);
       }
     }
 
