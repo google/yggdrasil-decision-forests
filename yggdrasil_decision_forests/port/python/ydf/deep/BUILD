@@ -1,5 +1,7 @@
+load("@rules_python//python:py_library.bzl", "py_library")
+
 # Dataset bindings for PYDF
-# pytype test and library
+load("@rules_python//python:py_test.bzl", "py_test")
 load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
 
 package(

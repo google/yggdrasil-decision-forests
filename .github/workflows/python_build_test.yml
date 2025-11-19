@@ -98,7 +98,7 @@ jobs:
       - name: Set up pip cache key
         id: pip-cache-key
         run: |
-          echo "CACHE_KEY=${{ runner.os }}-pip-${{ inputs.python_version }}-${{ hashFiles('yggdrasil_decision_forests/port/python/requirements.txt', 'yggdrasil_decision_forests/port/python/dev_requirements.txt') }}" >> "$GITHUB_OUTPUT"
+          echo "CACHE_KEY=${{ runner.os }}-pip-${{ inputs.python_version }}-${{ hashFiles('yggdrasil_decision_forests/port/python/requirements.txt', 'yggdrasil_decision_forests/port/python/dev_requirements.txt') }}-v2" >> "$GITHUB_OUTPUT"
 
       - name: Clean pip cache if refresh is enabled
         if: env.REFRESH_CACHE == 'true'
@@ -125,6 +125,7 @@ jobs:
           python --version
           python -m pip install -q -r dev_requirements.txt
           python -m pip install -q -r requirements.txt
+          python -m pip uninstall -y ydf
           pip list
 
       - name: Build Python
