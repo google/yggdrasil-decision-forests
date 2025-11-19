@@ -5689,7 +5689,7 @@ line: {
         }
     }
 })();
-</script></div></div></div><div id="my_report_body_pva" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="my_report_variable_importance_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('my_report_variable_importance_vi')"><option value="MEAN_DECREASE_IN_ACCURACY">MEAN_DECREASE_IN_ACCURACY</option><option value="MEAN_DECREASE_IN_AP_>50K_VS_OTHERS">MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS</option></select><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_ACCURACY" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.051694 ################
+</script></div></div></div><div id="my_report_body_pva" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="my_report_variable_importance_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('my_report_variable_importance_vi')"><option value="MEAN_DECREASE_IN_ACCURACY">MEAN_DECREASE_IN_ACCURACY</option><option value="MEAN_DECREASE_IN_AP_>50K_VS_OTHERS">MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS</option><option value="SHAP_VALUE">SHAP_VALUE</option></select><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_ACCURACY" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.051694 ################
     2. &quot;marital_status&quot;  0.048111 ##############
     3.            &quot;age&quot;  0.026001 ########
     4.     &quot;occupation&quot;  0.021599 ######
@@ -5745,6 +5745,20 @@ line: {
    12.            &quot;sex&quot;  0.002180 
    13. &quot;native_country&quot;  0.000545 
    14.           &quot;race&quot;  0.000413 
+</pre></div><div id="my_report_variable_importance_vi_body_SHAP_VALUE" class="content"><pre class="ydf_pre">    1. &quot;marital_status&quot;  1.218327 ################
+    2.            &quot;age&quot;  1.039380 #############
+    3.   &quot;capital_gain&quot;  0.551696 #######
+    4.     &quot;occupation&quot;  0.332411 ####
+    5. &quot;hours_per_week&quot;  0.323666 ####
+    6.      &quot;education&quot;  0.197957 ##
+    7.  &quot;education_num&quot;  0.159464 #
+    8.   &quot;capital_loss&quot;  0.142992 #
+    9.            &quot;sex&quot;  0.136002 #
+   10.         &quot;fnlwgt&quot;  0.105765 #
+   11.   &quot;relationship&quot;  0.083717 
+   12.      &quot;workclass&quot;  0.059830 
+   13.           &quot;race&quot;  0.047931 
+   14. &quot;native_country&quot;  0.019518 
 </pre></div></div></div><div id="my_report_body_model" class="tab_content"><pre>Type: &quot;GRADIENT_BOOSTED_TREES&quot;
 Task: CLASSIFICATION
 Label: &quot;income&quot;

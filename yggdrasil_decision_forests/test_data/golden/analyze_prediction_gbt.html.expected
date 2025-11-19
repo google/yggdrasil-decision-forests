@@ -102,7 +102,7 @@ function ydfShowVariableImportance(block_id) {
 }
 
 </script>
-  <div class="tab_block" id="my_prefix"><div class="header"><a id="my_prefix_fvar" class="tab selected" onclick="ydfShowTab('my_prefix', 'fvar')">Feature Variation</a></div><div class="body"><div id="my_prefix_body_fvar" class="tab_content selected"><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_my_prefix_feature_variation_0" style="display: inline-block;" ></div><script>
+  <div class="tab_block" id="my_prefix"><div class="header"><a id="my_prefix_fvar" class="tab selected" onclick="ydfShowTab('my_prefix', 'fvar')">Feature Variation</a><a id="my_prefix_shap" class="tab" onclick="ydfShowTab('my_prefix', 'shap')">SHAP values</a></div><div class="body"><div id="my_prefix_body_fvar" class="tab_content selected"><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_my_prefix_feature_variation_0" style="display: inline-block;" ></div><script>
 (function() {
     function user_code(Plotly) {
         console.log("Running user code");
@@ -1544,4 +1544,4 @@ name: 'selected',
         }
     }
 })();
-</script></div></div></div>
+</script></div><div id="my_prefix_body_shap" class="tab_content"><table class="ydf_tuning_table"><tr><th>Feature</th><th>&gt;50K</th></tr><tr><td>capital_gain</td><td><pre>-1.886441    ----------------|                </pre></td></tr><tr><td>marital_status</td><td><pre>-1.100345           ---------|                </pre></td></tr><tr><td>age</td><td><pre>0.716264                    |++++++          </pre></td></tr><tr><td>sex</td><td><pre>0.277010                    |++              </pre></td></tr><tr><td>education</td><td><pre>0.273067                    |++              </pre></td></tr><tr><td>education_num</td><td><pre>0.193953                    |++              </pre></td></tr><tr><td>fnlwgt</td><td><pre>-0.177138                  --|                </pre></td></tr><tr><td>hours_per_week</td><td><pre>-0.111370                   -|                </pre></td></tr><tr><td>occupation</td><td><pre>-0.106828                   -|                </pre></td></tr><tr><td>workclass</td><td><pre>-0.069678                   -|                </pre></td></tr><tr><td>capital_loss</td><td><pre>-0.058397                    |                </pre></td></tr><tr><td>relationship</td><td><pre>0.040649                    |                </pre></td></tr><tr><td>native_country</td><td><pre>0.005779                    |                </pre></td></tr><tr><td>race</td><td><pre>-0.002856                    |                </pre></td></tr></table></div></div></div>
