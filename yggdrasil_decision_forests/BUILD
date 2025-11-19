@@ -69,7 +69,7 @@ selects.config_setting_group(
 # TensorFlow is used for reading TFRecord dataset, and serializing models (if
 # TFRecord is selected as the format container). If
 # tensorflow_with_header_lib=1, TensorFlow is linked with "head only"
-# dependencies. This option make sense when injecting Yggdrasil as a dynamic
+# dependencies. This option makes sense when injecting Yggdrasil as a dynamic
 # library in TensorFlow. It requires the "release_or_nightly" setting from
 # Tensorflow Decision Forests, see this repository for details.
 config_setting(
