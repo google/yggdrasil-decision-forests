@@ -633,6 +633,8 @@ struct LabelNumericalScoreAccumulator {
 
   double WeightedNumExamples() const { return label.NumObservations(); }
 
+  void SetZero() { label.Clear(); }
+
   void ImportLabelStats(const proto::LabelStatistics& src) {
     label.Load(src.regression().labels());
   }
@@ -654,6 +656,11 @@ struct LabelNumericalWithHessianScoreAccumulator {
   double Score() const { return label.VarTimesSumWeights(); }
 
   double WeightedNumExamples() const { return label.NumObservations(); }
+
+  void SetZero() {
+    label.Clear();
+    sum_hessian = 0.;
+  }
 
   void ImportLabelStats(const proto::LabelStatistics& src) {
     label.Load(src.regression_with_hessian().labels());
@@ -971,6 +978,17 @@ struct LabelNumericalOneValueBucket {
     }
 
     template <typename ExampleIdx>
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void AddDirectToScoreAcc(
+        const ExampleIdx example_idx,
+        LabelNumericalScoreAccumulator* acc) const {
+      if constexpr (weighted) {
+        acc->label.Add(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->label.Add(label_[example_idx]);
+      }
+    }
+
+    template <typename ExampleIdx>
     ABSL_ATTRIBUTE_ALWAYS_INLINE void MoveDirectFromPosToNegScoreAcc(
         const ExampleIdx example_idx, LabelNumericalScoreAccumulator* pos,
         LabelNumericalScoreAccumulator* neg) const {
@@ -1150,8 +1168,7 @@ struct LabelHessianNumericalOneValueBucket {
     }
 
     template <typename ExampleIdx>
-    ABSL_ATTRIBUTE_ALWAYS_INLINE void
-    MoveDirectFromPosToNegScoreAcc(
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void MoveDirectFromPosToNegScoreAcc(
         const ExampleIdx example_idx,
         LabelHessianNumericalScoreAccumulator* pos,
         LabelHessianNumericalScoreAccumulator* neg) const {

@@ -859,6 +859,98 @@ TEST(SplitExamplesInPlace, Base) {
   EXPECT_THAT(example_split.negative_examples.inactive, ElementsAre(2, 3));
 }
 
+TEST(EvaluateGreatherThanSplitOnLabelRegression, Valid) {
+  SplitterPerThreadCache cache;
+  std::vector<float> attributes = {2.f, 3.f, 4.f, 1.f};
+  std::vector<float> labels = {0.f, 1.f, 1.f, 0.f};
+
+  utils::NormalDistributionDouble label_distribution;
+  for (const float label : labels) {
+    label_distribution.Add(label);
+  }
+
+  ASSERT_OK_AND_ASSIGN(const auto stats,
+                       EvaluateGreatherThanSplitOnLabelRegression(
+                           /*num_examples=*/attributes.size(),
+                           /*attributes=*/attributes,
+                           /*labels=*/labels, /*weights=*/{},
+                           /*label_distribution=*/label_distribution,
+                           /*min_num_obs=*/1, /*threshold=*/2.5f,
+                           /*cache=*/&cache));
+
+  EXPECT_TRUE(stats.valid);
+  EXPECT_NEAR(stats.score, 0.25, kTestPrecision);
+  EXPECT_EQ(stats.nonweighted_num_pos_examples, 2);
+  EXPECT_EQ(stats.nonweighted_num_examples, 4);
+  EXPECT_NEAR(stats.weighted_num_pos_examples, 2.0, kTestPrecision);
+  EXPECT_NEAR(stats.weighted_num_examples, 4.0, kTestPrecision);
+}
+
+TEST(EvaluateGreatherThanSplitOnLabelRegression, Invalid) {
+  SplitterPerThreadCache cache;
+  std::vector<float> attributes = {2.f, 3.f, 4.f, 1.f};
+  std::vector<float> labels = {0.f, 1.f, 1.f, 0.f};
+
+  utils::NormalDistributionDouble label_distribution;
+  for (const float label : labels) {
+    label_distribution.Add(label);
+  }
+
+  ASSERT_OK_AND_ASSIGN(const auto stats,
+                       EvaluateGreatherThanSplitOnLabelRegression(
+                           /*num_examples=*/attributes.size(),
+                           /*attributes=*/attributes,
+                           /*labels=*/labels, /*weights=*/{},
+                           /*label_distribution=*/label_distribution,
+                           /*min_num_obs=*/2, /*threshold=*/1.5f,
+                           /*cache=*/&cache));
+
+  EXPECT_FALSE(stats.valid);
+}
+
+TEST(SampleGuidedProjection, Base) {
+  dataset::proto::DataSpecification data_spec;
+  dataset::AddColumn("l", dataset::proto::NUMERICAL, &data_spec);
+  dataset::AddColumn("f1", dataset::proto::NUMERICAL, &data_spec);
+  dataset::AddColumn("f2", dataset::proto::NUMERICAL, &data_spec);
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.add_numerical_features(1);
+  config_link.add_numerical_features(2);
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  // High chance to sample both features.
+  dt_config.mutable_guided_oblique_split()->set_avg_num_dim(100.0);
+
+  const std::vector<float> labels = {-1, -1, -1, 1, 1, 1};
+  const std::vector<float> f1 = {-3, -2, -1, 1, 2, 3};
+  const std::vector<float> f2 = {0, 0, 0, -10, -10, -10};
+  const std::vector<const std::vector<float>*> numerical_attributes = {
+      nullptr, &f1, &f2};
+
+  std::vector<UnsignedExampleIdx> selected_examples(labels.size());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+
+  internal::Projection projection;
+  float threshold = 0.f;
+  int8_t monotonic_direction = 0;
+  utils::RandomEngine random(12345);
+
+  internal::SampleGuidedProjection(
+      config_link.numerical_features(), dt_config, data_spec, config_link,
+      numerical_attributes, labels, absl::MakeConstSpan(selected_examples),
+      &projection, &threshold, &monotonic_direction, &random, true);
+
+  EXPECT_EQ(monotonic_direction, 0);
+  ASSERT_EQ(projection.size(), 2);
+
+  EXPECT_EQ(projection[0].attribute_idx, 1);
+  EXPECT_EQ(projection[1].attribute_idx, 2);
+  EXPECT_NEAR(projection[0].weight, 2, 0.001);
+  EXPECT_NEAR(projection[1].weight, -5, 0.001);
+  EXPECT_NEAR(threshold, 25, 0.001);
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

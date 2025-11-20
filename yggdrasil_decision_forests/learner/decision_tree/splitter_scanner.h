@@ -54,6 +54,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <optional>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -842,6 +843,64 @@ SplitSearchResult ScanSplits(
   }
 }
 
+// Metrics for the evaluation of a split.
+struct SplitStats {
+  bool valid;
+  float score = 0.f;
+  UnsignedExampleIdx nonweighted_num_pos_examples = 0;
+  UnsignedExampleIdx nonweighted_num_examples = 0;
+  double weighted_num_pos_examples = 0;
+  double weighted_num_examples = 0;
+};
+
+// Evaluates the quality of a greater-than split.
+template <bool weighted, typename LabelFiller, typename Initializer,
+          typename LabelScoreAccumulator>
+SplitStats EvalSplit(const UnsignedExampleIdx num_examples,
+                     const absl::Span<const float> attributes,
+                     const LabelFiller& label_filler,
+                     const Initializer& initializer, const int min_num_obs,
+                     const float threshold, PerThreadCacheV2* cache) {
+  // Initialize the accumulators.
+  LabelScoreAccumulator& neg =
+      *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(false, cache);
+  LabelScoreAccumulator& pos =
+      *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(true, cache);
+  initializer.InitEmpty(&neg);
+  initializer.InitEmpty(&pos);
+
+  UnsignedExampleIdx num_pos_examples = 0;
+  for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+       example_idx++) {
+    const float attribute = attributes[example_idx];
+    if (attribute >= threshold) {
+      num_pos_examples++;
+      label_filler.AddDirectToScoreAcc(example_idx, &pos);
+    } else {
+      label_filler.AddDirectToScoreAcc(example_idx, &neg);
+    }
+  }
+
+  const UnsignedExampleIdx num_neg_examples = num_examples - num_pos_examples;
+  if (num_pos_examples < min_num_obs || num_neg_examples < min_num_obs) {
+    // Invalid split.
+    return SplitStats{.valid = false};
+  }
+
+  const double weighted_num_examples =
+      pos.WeightedNumExamples() + neg.WeightedNumExamples();
+
+  const float score = Score<>(initializer, weighted_num_examples, pos, neg);
+  return SplitStats{
+      .valid = true,
+      .score = score,
+      .nonweighted_num_pos_examples = num_pos_examples,
+      .nonweighted_num_examples = num_examples,
+      .weighted_num_pos_examples = pos.WeightedNumExamples(),
+      .weighted_num_examples = weighted_num_examples,
+  };
+}
+
 // Scans the buckets (similarly to "ScanSplits"), but in the order specified by
 // "bucket_order[i].second" (instead of the bucket order).
 template <typename ExampleBucketSet, typename LabelScoreAccumulator,
@@ -1371,6 +1430,12 @@ constexpr auto FindBestSplit_LabelRegressionFeatureNumerical =
     FindBestSplit<FeatureNumericalLabelNumericalOneValue<weighted>,
                   LabelNumericalScoreAccumulator,
                   /*require_label_sorting*/ false>;
+
+template <bool weighted>
+constexpr auto EvalSplit_LabelRegressionFeatureNumerical =
+    EvalSplit<weighted, typename LabelNumericalOneValueBucket<weighted>::Filler,
+              typename LabelNumericalOneValueBucket<weighted>::Initializer,
+              LabelNumericalScoreAccumulator>;
 
 template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureDiscretizedNumerical =

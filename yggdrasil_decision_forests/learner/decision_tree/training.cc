@@ -1381,6 +1381,7 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
       break;
     case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
     case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
+    case proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit:
       ASSIGN_OR_RETURN(
           found_good_condition,
           FindBestConditionOblique(
@@ -1556,7 +1557,9 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
 
   if (config_link.numerical_features_size() > 0) {
     if (dt_config.split_axis_case() ==
-        proto::DecisionTreeTrainingConfig::kSparseObliqueSplit) {
+            proto::DecisionTreeTrainingConfig::kSparseObliqueSplit ||
+        dt_config.split_axis_case() ==
+            proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit) {
       num_oblique_projections =
           GetNumProjections(dt_config, config_link.numerical_features_size());
 
@@ -2748,6 +2751,34 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelRegressionFeatureNumericalCart(
         min_num_obs, attribute_idx, condition, &cache->cache_v2);
   } else {
     return absl::InvalidArgumentError("Non supported strategy");
+  }
+}
+
+absl::StatusOr<SplitStats> EvaluateGreatherThanSplitOnLabelRegression(
+    const UnsignedExampleIdx num_examples,
+    const absl::Span<const float> attributes, const std::vector<float>& labels,
+    const std::vector<float>& weights,
+    const utils::NormalDistributionDouble& label_distribution,
+    const UnsignedExampleIdx min_num_obs, const float threshold,
+    SplitterPerThreadCache* cache) {
+  if (weights.empty()) {
+    typename LabelNumericalOneValueBucket<false>::Filler label_filler(labels,
+                                                                      weights);
+    typename LabelNumericalOneValueBucket<false>::Initializer initializer(
+        label_distribution);
+
+    return EvalSplit_LabelRegressionFeatureNumerical<false>(
+        num_examples, attributes, label_filler, initializer, min_num_obs,
+        threshold, &cache->cache_v2);
+  } else {
+    typename LabelNumericalOneValueBucket<true>::Filler label_filler(labels,
+                                                                     weights);
+    typename LabelNumericalOneValueBucket<true>::Initializer initializer(
+        label_distribution);
+
+    return EvalSplit_LabelRegressionFeatureNumerical<true>(
+        num_examples, attributes, label_filler, initializer, min_num_obs,
+        threshold, &cache->cache_v2);
   }
 }
 
@@ -4406,11 +4437,19 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
 
   if (sorting_strategy == Internal::PRESORTED ||
       sorting_strategy == Internal::FORCE_PRESORTED) {
-    if (config->has_sparse_oblique_split() ||
-        config->has_mhld_oblique_split() ||
-        config->missing_value_policy() !=
+    switch (config->split_axis_case()) {
+      case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
+      case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
+      case proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit:
+        sorting_strategy = Internal::IN_NODE;
+        break;
+      case proto::DecisionTreeTrainingConfig::kAxisAlignedSplit:
+      case proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET:
+        if (config->missing_value_policy() !=
             proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION) {
-      sorting_strategy = Internal::IN_NODE;
+          sorting_strategy = Internal::IN_NODE;
+        }
+        break;
     }
   }
 
