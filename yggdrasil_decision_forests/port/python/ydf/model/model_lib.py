@@ -82,6 +82,7 @@ def transform_tfdf_categorical_columns(
 def load_model(
     directory: str,
     advanced_options: generic_model.ModelIOOptions = generic_model.ModelIOOptions(),
+    verbose: bool = True,
 ) -> generic_model.ModelType:
   """Load a YDF model from disk.
 
@@ -115,18 +116,20 @@ def load_model(
   Args:
     directory: Directory containing the model.
     advanced_options: Advanced options for model loading.
+    verbose: Print information.
 
   Returns:
     Model to use for inference, evaluation or inspection
   """
-  if advanced_options.file_prefix is not None:
-    log.info(
-        "Loading model with prefix %s from %s",
-        advanced_options.file_prefix,
-        directory,
-    )
-  else:
-    log.info("Loading model from %s", directory)
+  if verbose:
+    if advanced_options.file_prefix is not None:
+      log.info(
+          "Loading model with prefix %s from %s",
+          advanced_options.file_prefix,
+          directory,
+      )
+    else:
+      log.info("Loading model from %s", directory)
   model_is_tfdf = is_saved_model(directory)
 
   if model_is_tfdf:
