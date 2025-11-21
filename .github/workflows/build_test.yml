@@ -1,0 +1,57 @@
+name: Build and Test
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      refresh_cache:
+        description: 'Force refresh the cache for all child workflows'
+        type: boolean
+        default: false
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 3 * * *'
+  pull_request:
+    branches:
+    - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cc-build-test-matrix:
+    name: "C++ Build & Test (Compiler: ${{ matrix.compiler_config }})"
+    uses: ./.github/workflows/cc_build_test.yml
+    permissions:
+      actions: write  # For gh cache delete
+      contents: read
+    with:
+      runner: linux-x86-n2-32
+      compiler_config: ${{ matrix.compiler_config }}
+      refresh_cache: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.refresh_cache == 'true') }}
+      pull_request_base_sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler_config: ["gcc"]
+
+  python-build-test-matrix:
+    name: "Python Build & Test (Python ${{ matrix.python_version }})"
+    uses: ./.github/workflows/python_build_test.yml
+    permissions:
+      actions: write  # For gh cache delete
+      contents: read
+    with:
+      runner: linux-x86-n2-32
+      python_version: ${{ matrix.python_version }}
+      refresh_cache: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.refresh_cache == 'true') }}
+      pull_request_base_sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python_version: ['3.12']  # Currently unused

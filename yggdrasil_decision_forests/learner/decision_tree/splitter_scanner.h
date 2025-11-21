@@ -51,10 +51,9 @@
 #include <stddef.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
-#include <iterator>
 #include <limits>
-#include <random>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -62,13 +61,11 @@
 #include "absl/base/attributes.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
-#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -110,7 +107,6 @@ struct ExampleBucketSet {
 // Used bucket sets.
 
 // Label: Numerical.
-// TODO Add unweighted versions for other LabelNumericalBuckets.
 template <bool weighted>
 using FeatureNumericalLabelNumericalOneValue =
     ExampleBucketSet<ExampleBucket<FeatureNumericalBucket,
@@ -1075,9 +1071,6 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
       }
     }
 
-    // Prefetch the label information needed at the end of the loop body.
-    label_filler.Prefetch(example_idx);
-
     // Test Split
     if (new_attribute_value) {
       if (num_pos_examples >= min_num_obs &&
@@ -1108,12 +1101,11 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
     // negative accumulator.
     if constexpr (duplicate_examples) {
       const int count = selected_examples_mask[example_idx];
-      label_filler.AddDirectToScoreAccWithDuplicates(example_idx, count, &neg);
-      label_filler.SubDirectToScoreAccWithDuplicates(example_idx, count, &pos);
+      label_filler.MoveDirectFromPosToNegScoreAccWithDuplicates(
+          example_idx, count, &pos, &neg);
       num_pos_examples -= count;
     } else {
-      label_filler.AddDirectToScoreAcc(example_idx, &neg);
-      label_filler.SubDirectToScoreAcc(example_idx, &pos);
+      label_filler.MoveDirectFromPosToNegScoreAcc(example_idx, &pos, &neg);
       num_pos_examples--;
     }
   }

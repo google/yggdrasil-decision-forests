@@ -15,6 +15,9 @@
 
 // This files defines the pre-configured hyper-parameter templates.
 
+#include <utility>
+#include <vector>
+
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.h"
 
@@ -40,6 +43,19 @@ RandomForestLearner::PredefinedHyperParameters() const {
   }
   {
     model::proto::PredefinedHyperParameterTemplate config;
+    config.set_name("better_default");
+    config.set_version(2);
+    config.set_description(
+        R"(A configuration that is generally better than the default parameters without being more expensive.)");
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(kHParamWinnerTakeAll);
+      field->mutable_value()->set_categorical("false");
+    }
+    param_sets.push_back(std::move(config));
+  }
+  {
+    model::proto::PredefinedHyperParameterTemplate config;
     config.set_name("benchmark_rank1");
     config.set_version(1);
     config.set_description(
@@ -48,6 +64,44 @@ RandomForestLearner::PredefinedHyperParameters() const {
       auto field = config.mutable_parameters()->add_fields();
       field->set_name(kHParamWinnerTakeAll);
       field->mutable_value()->set_categorical("true");
+    }
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(decision_tree::kHParamCategoricalAlgorithm);
+      field->mutable_value()->set_categorical(
+          decision_tree::kCategoricalAlgorithmRandom);
+    }
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(decision_tree::kHParamSplitAxis);
+      field->mutable_value()->set_categorical(
+          decision_tree::kHParamSplitAxisSparseOblique);
+    }
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(
+          decision_tree::kHParamSplitAxisSparseObliqueNormalization);
+      field->mutable_value()->set_categorical(
+          decision_tree::kHParamSplitAxisSparseObliqueNormalizationMinMax);
+    }
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(
+          decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent);
+      field->mutable_value()->set_real(1.f);
+    }
+    param_sets.push_back(std::move(config));
+  }
+  {
+    model::proto::PredefinedHyperParameterTemplate config;
+    config.set_name("benchmark_rank1");
+    config.set_version(2);
+    config.set_description(
+        R"(Top ranking hyper-parameters on our benchmark slightly modified to run in reasonable time.)");
+    {
+      auto field = config.mutable_parameters()->add_fields();
+      field->set_name(kHParamWinnerTakeAll);
+      field->mutable_value()->set_categorical("false");
     }
     {
       auto field = config.mutable_parameters()->add_fields();

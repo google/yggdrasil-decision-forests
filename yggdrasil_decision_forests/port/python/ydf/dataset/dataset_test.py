@@ -179,6 +179,110 @@ class GenericDatasetTest(parameterized.TestCase):
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
+  @parameterized.parameters(
+      np.float16,
+      np.float32,
+      np.float64,
+      np.int8,
+      np.int16,
+      np.int32,
+      np.int64,
+  )
+  def test_create_vds_np_numerical(self, dtype):
+    ds = dataset_lib.create_vertical_dataset(
+        {"feature": np.array([1.0, 2.0, 3.0], dtype)}
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.NUMERICAL,
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
+                    min_value=1,
+                    max_value=3,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  @parameterized.parameters(
+      np.bytes_,
+      np.str_,
+      object,
+  )
+  def test_create_vds_np_numerical_invalid_dtype(self, dtype):
+    data = {"f1": np.array(["a", "b", "c"], dtype=dtype)}
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot convert NUMERICAL column 'f1'.*to np.float32 values",
+    ):
+      dataset_lib.create_vertical_dataset(
+          data, columns=[("f1", Semantic.NUMERICAL)]
+      )
+
+  def test_create_vds_list_numerical_infer_semantic_fails(self):
+    data = {"f1": [1.0, 2.0, 3.0]}
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot infer automatically the semantic of column 'f1' with"
+        " type=<class 'list'>",
+    ):
+      dataset_lib.create_vertical_dataset(data)
+
+  def test_create_vds_list_numerical_explicit_semantic(self):
+    data = {"f1": [1.0, 2.0, 3.0]}
+    ds = dataset_lib.create_vertical_dataset(
+        data, columns=[("f1", Semantic.NUMERICAL)]
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.NUMERICAL,
+                dtype=ds_pb.DType.DTYPE_FLOAT32,
+                count_nas=0,
+                numerical=ds_pb.NumericalSpec(
+                    mean=2,
+                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
+                    min_value=1,
+                    max_value=3,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+    self.assertEqual(ds._dataset.DebugString(), "f1\n1\n2\n3\n")
+
+  def test_create_vds_list_numerical_invalid_type(self):
+    data = {"f1": ["a", "b", "c"]}
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot convert NUMERICAL column 'f1'.*to np.float32 values",
+    ):
+      dataset_lib.create_vertical_dataset(
+          data, columns=[("f1", Semantic.NUMERICAL)]
+      )
+
+  @parameterized.parameters(Semantic.NUMERICAL, Semantic.DISCRETIZED_NUMERICAL)
+  def test_create_vds_numerical_multidim_error(self, semantic):
+    data = {"f1": np.array([[1, 2], [3, 4]])}
+    expected_error_msg = (
+        "The column 'f1' is multi-dimensional with shape \\(2, 2\\). However,"
+        " this column is expected to be single-dimensional \\(e.g., shape="
+        "\\[num_examples\\]\\)."
+    )
+    with self.assertRaisesRegex(ValueError, expected_error_msg):
+      dataset_lib.create_vertical_dataset(
+          data, columns=[("f1", semantic)], dont_unroll_columns=["f1"]
+      )
+
   def test_create_vds_pd_categorical_string(self):
     df = pd.DataFrame({
         "col1": ["A", "A", "B", "B", "C"],
@@ -910,29 +1014,6 @@ B,3""")
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
-  def test_numerical_float(self):
-    ds = dataset_lib.create_vertical_dataset(
-        {"feature": np.array([1.0, 2.0, 3.0], np.float32)}
-    )
-    expected_data_spec = ds_pb.DataSpecification(
-        created_num_rows=3,
-        columns=(
-            ds_pb.Column(
-                name="feature",
-                type=ds_pb.ColumnType.NUMERICAL,
-                dtype=ds_pb.DType.DTYPE_FLOAT32,
-                count_nas=0,
-                numerical=ds_pb.NumericalSpec(
-                    mean=2,
-                    standard_deviation=0.8164965809277263,  # ~math.sqrt(2 / 3)
-                    min_value=1,
-                    max_value=3,
-                ),
-            ),
-        ),
-    )
-    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
-
   def test_categorical_invalid_type_float(self):
     with self.assertRaisesRegex(
         ValueError,
@@ -1354,6 +1435,38 @@ B,3""")
     ):
       _ = dataset_lib.create_vertical_dataset({"feature": np.zeros((3, 3, 3))})
 
+  def test_multidimensional_mixed_unrolling(self):
+    data = {
+        "f1_unroll": np.array([[1, 2], [3, 4]]),
+        "f2_no_unroll": np.array([[5, 6], [7, 8]]),
+        "f3_single": np.array([9, 10]),
+    }
+    with self.assertRaisesRegex(
+        ValueError, "The column 'f2_no_unroll' is multi-dimensional"
+    ):
+      dataset_lib.create_vertical_dataset(
+          data,
+          columns=[
+              ("f1_unroll", Semantic.NUMERICAL),
+              ("f2_no_unroll", Semantic.NUMERICAL),
+              ("f3_single", Semantic.NUMERICAL),
+          ],
+          dont_unroll_columns=["f2_no_unroll"],
+      )
+
+    # Successful case
+    ds = dataset_lib.create_vertical_dataset(
+        {
+            "f1_unroll": np.array([[1, 2], [3, 4]]),
+            "f3_single": np.array([9, 10]),
+        },
+        dont_unroll_columns=[],
+    )
+    self.assertCountEqual(
+        [c.name for c in ds.data_spec().columns],
+        ["f1_unroll.0_of_2", "f1_unroll.1_of_2", "f3_single"],
+    )
+
   def test_list_of_csv_datasets(self):
     df = pd.DataFrame({
         "col_str": ["A", "string", "column with", "four entries"],
@@ -1654,6 +1767,125 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
       _ = dataset_lib.create_vertical_dataset(
           data, columns=[("f1", dataspec_lib.Semantic.CATEGORICAL)]
       )
+
+  @parameterized.parameters(np.int8, np.int16, np.int32, np.int64)
+  def test_integerized_categorical_valid_dtypes(self, dtype):
+    data = {"f1": np.array([0, 1, 2, -1, -1, 2, 3, 2], dtype=dtype)}
+    ds = dataset_lib.create_vertical_dataset(
+        data,
+        columns=[
+            Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+        ],
+    )
+    self.assertEqual(
+        ds._dataset.DebugString(), "f1\n0\n1\n2\nNA\nNA\n2\n3\n2\n"
+    )
+
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=8,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                count_nas=2,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=2,
+                    is_already_integerized=True,
+                    number_of_unique_values=4,
+                    min_value_count=1,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_integerized_categorical_too_small(self):
+    data = {"f1": np.array([0, 1, -2], dtype=np.int32)}
+    with self.assertRaisesRegex(ValueError, "contains values smaller than -1"):
+      dataset_lib.create_vertical_dataset(
+          data,
+          columns=[
+              Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+          ],
+      )
+
+  def test_integerized_categorical_as_label(self):
+    data = {"f1": np.array([0, 1, 1], dtype=np.int32)}
+    with self.assertRaisesRegex(ValueError, "not yet supported for labels"):
+      dataset_lib.create_vertical_dataset(
+          data,
+          columns=[
+              Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+          ],
+          label="f1",
+      )
+
+  def test_integerized_categorical_too_large(self):
+    data = {
+        "f1": np.array(
+            [0, 1, dataset_lib._MAX_INTEGERIZED_CATEGORIES + 1], dtype=np.int32
+        )
+    }
+    with self.assertRaisesRegex(
+        ValueError, "exceeds the maximum allowed number"
+    ):
+      dataset_lib.create_vertical_dataset(
+          data,
+          columns=[
+              Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+          ],
+      )
+
+  def test_integerized_categorical_multidim(self):
+    data = {"f1": np.array([[-1, 1], [2, -1], [2, 1]], dtype=np.int32)}
+    ds = dataset_lib.create_vertical_dataset(
+        data,
+        columns=[
+            Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+        ],
+    )
+
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="f1.0_of_2",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DTYPE_INT32,
+                count_nas=1,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=2,
+                    is_already_integerized=True,
+                    number_of_unique_values=3,
+                    min_value_count=1,
+                ),
+                is_unstacked=True,
+            ),
+            ds_pb.Column(
+                name="f1.1_of_2",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DTYPE_INT32,
+                count_nas=1,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=1,
+                    is_already_integerized=True,
+                    number_of_unique_values=2,
+                    min_value_count=1,
+                ),
+                is_unstacked=True,
+            ),
+        ),
+        unstackeds=(
+            ds_pb.Unstacked(
+                original_name="f1",
+                begin_column_idx=0,
+                size=2,
+                type=ds_pb.CATEGORICAL,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
 
 class CategoricalSetTest(absltest.TestCase):

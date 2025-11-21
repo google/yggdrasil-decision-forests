@@ -555,8 +555,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     learner = specialized_learners.RandomForestLearner(label="label")
     with self.assertRaisesRegex(
         test_utils.AbslInvalidArgumentError,
-        "The column 'label' is multi-dimensional \\(shape=\\(2, 2\\)\\) while"
-        " the model requires this column to be single-dimensional",
+        "The column 'label' is multi-dimensional",
     ):
       _ = learner.train(ds)
 
@@ -571,8 +570,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     )
     with self.assertRaisesRegex(
         test_utils.AbslInvalidArgumentError,
-        "The column 'weight' is multi-dimensional \\(shape=\\(2, 2\\)\\) while"
-        " the model requires this column to be single-dimensional",
+        "The column 'weight' is multi-dimensional",
     ):
       _ = learner.train(ds)
 

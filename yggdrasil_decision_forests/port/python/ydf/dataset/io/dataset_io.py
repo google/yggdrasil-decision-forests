@@ -104,8 +104,8 @@ def _unroll_column(
 
   if not allow_unroll:
     raise ValueError(
-        f"The column {name!r} is multi-dimensional (shape={src.shape}) while"
-        " the model requires this column to be single-dimensional (e.g."
+        f"The column {name!r} is multi-dimensional with shape {src.shape}."
+        " However, this column is expected to be single-dimensional (e.g.,"
         " shape=[num_examples])."
     )
 

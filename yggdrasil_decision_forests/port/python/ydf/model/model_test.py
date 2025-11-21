@@ -339,6 +339,7 @@ class GenericModelTest(parameterized.TestCase):
             "MEAN_DECREASE_IN_AP_>50K_VS_OTHERS",
             "MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS",
             "MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS",
+            "SHAP_VALUE",
             "[In model] NUM_NODES",
             "[In model] NUM_AS_ROOT",
             "[In model] SUM_SCORE",
@@ -480,6 +481,7 @@ class GenericModelTest(parameterized.TestCase):
         set(analysis.variable_importances()),
         set([
             "MEAN_INCREASE_IN_RMSE",
+            "SHAP_VALUE",
             "[In model] INV_MEAN_MIN_DEPTH",
             "[In model] SUM_SCORE",
             "[In model] NUM_NODES",
@@ -526,6 +528,7 @@ class GenericModelTest(parameterized.TestCase):
         set(analysis.variable_importances()),
         set([
             "MEAN_DECREASE_IN_NDCG",
+            "SHAP_VALUE",
             "[In model] SUM_SCORE",
             "[In model] NUM_NODES",
             "[In model] INV_MEAN_MIN_DEPTH",

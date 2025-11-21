@@ -3395,7 +3395,7 @@ name: 'cdf',
         }
     }
 })();
-</script></div></div></div><div id="my_report_body_pva" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="my_report_variable_importance_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('my_report_variable_importance_vi')"><option value="MEAN_INCREASE_IN_RMSE">MEAN_INCREASE_IN_RMSE</option></select><div id="my_report_variable_importance_vi_body_MEAN_INCREASE_IN_RMSE" class="content selected"><pre class="ydf_pre">    1. &quot;ShuckedWeight&quot;  1.998020 ################
+</script></div></div></div><div id="my_report_body_pva" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="my_report_variable_importance_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('my_report_variable_importance_vi')"><option value="MEAN_INCREASE_IN_RMSE">MEAN_INCREASE_IN_RMSE</option><option value="SHAP_VALUE">SHAP_VALUE</option></select><div id="my_report_variable_importance_vi_body_MEAN_INCREASE_IN_RMSE" class="content selected"><pre class="ydf_pre">    1. &quot;ShuckedWeight&quot;  1.998020 ################
     2.   &quot;ShellWeight&quot;  1.756332 #############
     3.   &quot;WholeWeight&quot;  0.378215 ##
     4.        &quot;Height&quot;  0.225732 
@@ -3403,6 +3403,14 @@ name: 'cdf',
     6.      &quot;Diameter&quot;  0.127522 
     7.          &quot;Type&quot;  0.121398 
     8.  &quot;LongestShell&quot;  0.109570 
+</pre></div><div id="my_report_variable_importance_vi_body_SHAP_VALUE" class="content"><pre class="ydf_pre">    1.   &quot;ShellWeight&quot;  1.588224 ################
+    2. &quot;ShuckedWeight&quot;  0.947428 #########
+    3.   &quot;WholeWeight&quot;  0.313260 ##
+    4.        &quot;Height&quot;  0.305364 ##
+    5.          &quot;Type&quot;  0.231827 #
+    6.  &quot;LongestShell&quot;  0.131862 
+    7.      &quot;Diameter&quot;  0.119886 
+    8. &quot;VisceraWeight&quot;  0.091720 
 </pre></div></div></div><div id="my_report_body_model" class="tab_content"><pre>Type: &quot;GRADIENT_BOOSTED_TREES&quot;
 Task: REGRESSION
 Label: &quot;Rings&quot;

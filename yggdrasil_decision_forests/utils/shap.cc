@@ -18,6 +18,7 @@
 #include <stddef.h>
 
 #include <cmath>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
@@ -42,16 +43,38 @@ namespace yggdrasil_decision_forests::utils::shap {
 
 namespace {
 
-// Get the number of training examples in a node.
-double GetNumNodeExamples(const model::decision_tree::NodeWithChildren& node) {
-  // TODO: Add support for weighted trainings. Need to work for non-leaf
-  // nodes.
-  DCHECK(node.node().has_num_pos_training_examples_without_weight());
-  return node.node().num_pos_training_examples_without_weight();
+// Get the number of training examples in a non-leaf node. This function queries
+// the node's condition, since the node itself does not store a weighted number
+// of examples.
+absl::StatusOr<double> GetWeightedNumExamples(
+    const model::decision_tree::NodeWithChildren& node) {
+  DCHECK(!node.IsLeaf());
+  STATUS_CHECK(node.node().has_condition());
+  double result = node.node().condition().num_training_examples_with_weight();
+  STATUS_CHECK_GT(result, 0);
+  return result;
 }
 
-bool HasNumNodeExamples(const model::decision_tree::NodeWithChildren& node) {
-  return node.node().has_num_pos_training_examples_without_weight();
+struct NodeChildrenWeights {
+  double neg;
+  double pos;
+};
+
+absl::StatusOr<NodeChildrenWeights> GetChildrenWeightedNumExamples(
+    const model::decision_tree::NodeWithChildren& node) {
+  ASSIGN_OR_RETURN(const double current_node_weight,
+                   GetWeightedNumExamples(node));
+  double pos_weight =
+      node.node().condition().num_pos_training_examples_with_weight();
+  double neg_weight = current_node_weight - pos_weight;
+  STATUS_CHECK_GT(pos_weight, 0);
+  STATUS_CHECK_GT(neg_weight, 0);
+  return NodeChildrenWeights{neg_weight, pos_weight};
+}
+
+bool HasInnerNodeNumNodeExamples(
+    const model::decision_tree::NodeWithChildren& node) {
+  return node.node().condition().has_num_training_examples_with_weight();
 }
 
 double GetRegressionNodeValue(
@@ -211,9 +234,11 @@ absl::Status recurse(const model::decision_tree::NodeWithChildren& node,
     ASSIGN_OR_RETURN(const bool eval, model::decision_tree::EvalCondition(
                                           node.node().condition(), example));
 
+    bool swapped = false;
     auto hot_node = node.pos_child();
     auto cold_node = node.neg_child();
     if (!eval) {
+      swapped = true;
       std::swap(hot_node, cold_node);
     }
 
@@ -232,13 +257,21 @@ absl::Status recurse(const model::decision_tree::NodeWithChildren& node,
       unwind(*path_index, path);
     }
 
-    const double num_examples = GetNumNodeExamples(node);
-    const double hot_zero_fraction =
-        GetNumNodeExamples(*hot_node) / num_examples;
-    const double cold_zero_fraction =
-        GetNumNodeExamples(*cold_node) / num_examples;
-    DCHECK_GT(hot_zero_fraction, 0);
-    DCHECK_GT(cold_zero_fraction, 0);
+    ASSIGN_OR_RETURN(const double num_weighted_examples,
+                     GetWeightedNumExamples(node));
+    double cold_zero_fraction =
+        1. - node.node().condition().num_pos_training_examples_with_weight() /
+                 num_weighted_examples;
+    double hot_zero_fraction =
+        node.node().condition().num_pos_training_examples_with_weight() /
+        num_weighted_examples;
+    if (swapped) {
+      std::swap(cold_zero_fraction, hot_zero_fraction);
+    }
+    STATUS_CHECK_GT(hot_zero_fraction, 0);
+    STATUS_CHECK_GT(cold_zero_fraction, 0);
+    STATUS_CHECK_LT(hot_zero_fraction, 1);
+    STATUS_CHECK_LT(cold_zero_fraction, 1);
 
     RETURN_IF_ERROR(
         recurse(*hot_node, incoming_zero_fraction * hot_zero_fraction,
@@ -332,44 +365,74 @@ absl::Status GetModelBias(const ModelAccessor& accessor,
                           std::vector<double>& bias) {
   bias.assign(accessor.num_outputs, 0.);
 
-  double num_examples = 0.;
+  double num_weighted_examples = 0.;
   const int num_trees = accessor.decision_forest->decision_trees().size();
+  // Number of trees that contain more than just the root node.
+  int num_nontrivial_trees = 0;
   for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
     const auto& tree = accessor.decision_forest->decision_trees()[tree_idx];
+    if (tree->root().IsLeaf()) {
+      continue;
+    }
+    num_nontrivial_trees++;
     const int output_idx_per_tree = tree_idx % accessor.num_outputs;
 
-    if (!HasNumNodeExamples(tree->root())) {
+    if (!HasInnerNodeNumNodeExamples(tree->root())) {
       return absl::InvalidArgumentError(
-          "The model does not have number of examples per nodes meta-data");
+          "The model does not have number of examples per nodes metadata");
     }
-
-    tree->IterateOnNodes([&accessor, &bias, &num_examples, output_idx_per_tree](
-                             const model::decision_tree::NodeWithChildren& node,
-                             const int depth) {
-      if (!node.IsLeaf()) {
-        return;
-      }
-      const auto num_examples_in_node = GetNumNodeExamples(node);
-      DCHECK_GT(num_examples_in_node, 0);
-      num_examples += num_examples_in_node;
+    auto process_leaf = [&](const model::decision_tree::NodeWithChildren& leaf,
+                            double node_num_weights_examples) {
+      DCHECK_GT(node_num_weights_examples, 0);
+      num_weighted_examples += node_num_weights_examples;
 
       if (accessor.multi_output_trees) {
         for (int output_idx = 0; output_idx < accessor.num_outputs;
              output_idx++) {
-          bias[output_idx] +=
-              accessor.node_value_fn(node, output_idx) * num_examples_in_node;
+          bias[output_idx] += accessor.node_value_fn(leaf, output_idx) *
+                              node_num_weights_examples;
         }
       } else {
         bias[output_idx_per_tree] +=
-            accessor.node_value_fn(node, 0) * num_examples_in_node;
+            accessor.node_value_fn(leaf, 0) * node_num_weights_examples;
       }
-    });
+    };
+
+    std::function<absl::Status(const model::decision_tree::NodeWithChildren&)>
+        process_subtree =
+            [&](const model::decision_tree::NodeWithChildren& node)
+        -> absl::Status {
+      if (node.IsLeaf()) {
+        // This can only happen if the subtree is a leaf, which has been
+        // excluded earlier for the root and below during the recursion.
+        DCHECK(false);
+        return absl::OkStatus();
+      }
+      ASSIGN_OR_RETURN(const auto child_weights,
+                       GetChildrenWeightedNumExamples(node));
+      if (node.pos_child()->IsLeaf()) {
+        process_leaf(*node.pos_child(), child_weights.pos);
+      } else {
+        RETURN_IF_ERROR(process_subtree(*node.pos_child()));
+      }
+      if (node.neg_child()->IsLeaf()) {
+        process_leaf(*node.neg_child(), child_weights.neg);
+      } else {
+        RETURN_IF_ERROR(process_subtree(*node.neg_child()));
+      }
+      return absl::OkStatus();
+    };
+    RETURN_IF_ERROR(process_subtree(tree->root()));
   }
 
   // Normalize the accumulated biases according to the number of examples and
   // extra scaling. If present, add the model zero-tree bias (after the
   // scaling).
-  const double scale = num_trees * accessor.scale / num_examples;
+  double scale = 1.0;
+  if (num_nontrivial_trees > 0) {
+    STATUS_CHECK_GT(num_weighted_examples, 0);
+    scale = num_nontrivial_trees * (accessor.scale / num_weighted_examples);
+  }
   for (int bias_idx = 0; bias_idx < bias.size(); bias_idx++) {
     double& b = bias[bias_idx];
     b *= scale;
@@ -430,11 +493,6 @@ absl::StatusOr<Shape> GetShape(const model::AbstractModel& model) {
 absl::Status tree_shap(const model::AbstractModel& model,
                        const dataset::proto::Example& example,
                        ExampleShapValues* shap_values, bool compute_bias) {
-  if (model.weights().has_value()) {
-    return absl::InvalidArgumentError(
-        "SHAP currently does not support weighted models");
-  }
-
   ASSIGN_OR_RETURN(const auto accessor, internal::GetModelAccessor(model));
 
   // Initialize the shap value accumulator.
@@ -445,15 +503,15 @@ absl::Status tree_shap(const model::AbstractModel& model,
     RETURN_IF_ERROR(GetModelBias(accessor, shap_values->bias()));
   }
 
-  // Transverse tree and populate the accumulator
+  // Traverse tree and populate the accumulator
   internal::Path path;
   const int num_trees = accessor.decision_forest->decision_trees().size();
   for (int tree_idx = 0; tree_idx < num_trees; tree_idx++) {
     const auto& tree = accessor.decision_forest->decision_trees()[tree_idx];
 
-    if (!HasNumNodeExamples(tree->root())) {
+    if (!tree->root().IsLeaf() && !HasInnerNodeNumNodeExamples(tree->root())) {
       return absl::InvalidArgumentError(
-          "The model does not have number of examples per nodes meta-data");
+          "The model does not have number of examples per nodes metadata");
     }
 
     path.clear();

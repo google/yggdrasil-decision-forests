@@ -34,7 +34,7 @@ build_and_maybe_test () {
 
    bazel version
 
-    local flags="--config=linux_cpp17 --config=linux_avx2 --features=-fully_static_link --repo_env=CC=${1} --build_tag_filters=-tf_dep,-cuda_dep --test_tag_filters=-tf_dep,-cuda_dep"
+    local flags="--config=linux_avx2 --features=-fully_static_link --repo_env=CC=${1} --build_tag_filters=-tf_dep,-cuda_dep --test_tag_filters=-tf_dep,-cuda_dep"
     # TODO: By default, disable GPU build with --@rules_cuda//cuda:enable=False
 
     time bazel build ${flags} -- //yggdrasil_decision_forests/...:all //examples:beginner_cc

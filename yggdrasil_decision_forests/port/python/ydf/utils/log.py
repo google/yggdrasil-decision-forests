@@ -69,6 +69,7 @@ class WarningMessage(enum.Enum):
   TRAINING_NEURAL_NET_WITHOUT_VALID = 13
   TRAIN_TRANSFORMER_ON_CPU = 14
   AD_PERMUTATION_VARIABLE_IMPORTANCE_NOT_ENABLED = 15
+  CAST_INTEGERIZED_CATEGORICAL_TO_INT32 = 16
 
 
 # List of already showed warning message that should not be displayed again.
