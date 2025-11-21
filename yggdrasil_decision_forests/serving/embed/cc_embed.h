@@ -92,7 +92,10 @@ struct FeatureDef {
   std::string underlying_type;  // Type to encode a feature e.g. "float".
   absl::optional<std::string> default_value = {};  // Optional default value.
   absl::optional<std::string> na_replacement =
-      {};  // NA Replacement value for numerical features.
+      {};  // NA Replacement value for numerical and integerized categorical
+           // features.
+  absl::optional<std::string> maximum_value =
+      {};  // Maximum value for integerized categorical features.
 };
 
 // Generates the definition of a feature in an instance struct.
