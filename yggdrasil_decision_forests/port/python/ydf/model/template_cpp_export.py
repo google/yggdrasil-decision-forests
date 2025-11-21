@@ -77,14 +77,25 @@ def template(
           f"  ASSIGN_OR_RETURN(m.{variable},"
           f' m.features->GetCategoricalFeatureId("{_cc_string(col_spec.name)}"));'
       )
-      feature_sets_1.append(
-          f'  examples->SetCategorical(/*example_idx=*/0, {variable}, "A",'
-          " *features);"
-      )
-      feature_sets_2.append(
-          f'  examples->SetCategorical(/*example_idx=*/1, {variable}, "B",'
-          " *features);"
-      )
+      if col_spec.categorical.is_already_integerized:
+        feature_sets_1.append(
+            f"  examples->SetCategorical(/*example_idx=*/0, {variable}, 1,"
+            " *features);"
+        )
+        feature_sets_2.append(
+            f"  examples->SetCategorical(/*example_idx=*/1, {variable}, 2,"
+            " *features);"
+        )
+      else:
+        feature_sets_1.append(
+            f'  examples->SetCategorical(/*example_idx=*/0, {variable}, "A",'
+            " *features);"
+        )
+        feature_sets_2.append(
+            f'  examples->SetCategorical(/*example_idx=*/1, {variable}, "B",'
+            " *features);"
+        )
+
     elif col_spec.type == data_spec_pb2.ColumnType.BOOLEAN:
       feature_vars.append(f"  serving_api::BooleanFeatureId {variable};")
       feature_index.append(
