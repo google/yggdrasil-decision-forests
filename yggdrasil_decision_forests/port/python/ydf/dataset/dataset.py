@@ -36,6 +36,10 @@ from ydf.utils import paths
 
 InputDataset = Union[dataset_io_types.IODataset, "VerticalDataset"]
 
+# Maximum number of categories for "already integerized" categories.
+# This limit is already very generous,
+_MAX_INTEGERIZED_CATEGORIES = 50_000
+
 
 class VerticalDataset:
   """Dataset for fast column-wise iteration."""
@@ -124,13 +128,21 @@ class VerticalDataset:
     elif column.semantic == dataspec_lib.Semantic.BOOLEAN:
       self._add_boolean_column(column, column_data, column_idx)
     elif column.semantic == dataspec_lib.Semantic.CATEGORICAL:
-      self._add_categorical_column(
-          column,
-          column_data,
-          inference_args,
-          column_idx,
-          is_label,
-      )
+      if column.is_already_integerized:
+        self._add_integerized_categorical_column(
+            column,
+            column_data,
+            column_idx,
+            is_label,
+        )
+      else:
+        self._add_categorical_column(
+            column,
+            column_data,
+            inference_args,
+            column_idx,
+            is_label,
+        )
     elif column.semantic == dataspec_lib.Semantic.CATEGORICAL_SET:
       self._add_categorical_set_column(
           column,
@@ -168,7 +180,7 @@ class VerticalDataset:
     original_type = _type(column_data)
     if not isinstance(column_data, np.ndarray):
       try:
-        column_data = np.array(column_data, np.float32)
+        column_data = np.asarray(column_data, np.float32)
       except ValueError as e:
         raise ValueError(
             f"Cannot convert {column.semantic.name} column {column.name!r} of"
@@ -245,7 +257,7 @@ class VerticalDataset:
 
     if not isinstance(column_data, np.ndarray):
       try:
-        column_data = np.array(column_data, np.bool_)
+        column_data = np.asarray(column_data, np.bool_)
       except ValueError as e:
         raise ValueError(
             f"Cannot convert BOOLEAN column {column.name!r} of type"
@@ -349,6 +361,107 @@ class VerticalDataset:
           f" {column.name!r}"
       )
 
+  def _add_integerized_categorical_column(
+      self,
+      column: dataspec_lib.Column,
+      column_data: Any,
+      column_idx: Optional[int],
+      is_label: bool,
+  ):
+    """Adds an already integerized categorical column."""
+    assert column.semantic is not None  # Appease pylint.
+    original_type = _type(column_data)
+    if not isinstance(column_data, np.ndarray):
+      try:
+        column_data = np.asarray(column_data, np.int32)
+      except ValueError as e:
+        raise ValueError(
+            f"Cannot convert {column.semantic.name} column {column.name!r} of"
+            f" type {original_type} to np.int32 values.\nNote:"
+            " If the column is a label, make sure the training task is"
+            " compatible. For example, you cannot train a regression model"
+            " (task=ydf.Task.REGRESSION) on a string column."
+        ) from e
+    ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
+    if column_data.dtype.type not in dataspec_lib.NP_SUPPORTED_INT_DTYPE:
+      raise ValueError(
+          f"Column {column.name!r} is marked as already integerized but its"
+          f" data type is {column_data.dtype.name}, which is not a"
+          " supported integer type."
+      )
+    if is_label:
+      raise ValueError(
+          f"Column {column.name!r} is marked as already integerized, but"
+          " integerized categorical columns are not yet supported for"
+          " labels."
+      )
+
+    # YDF C++ internally represents categorical columns as int32.
+    if column_data.dtype != np.int32:
+      log.warning(
+          "Column '%s' with %s semantic has dtype %s. Casting value to int32.",
+          column.name,
+          column.semantic.name,
+          column_data.dtype.name,
+          message_id=log.WarningMessage.CAST_INTEGERIZED_CATEGORICAL_TO_INT32,
+          is_strict=True,
+      )
+
+      try:
+        column_data = column_data.astype(np.int32)
+      except ValueError as e:
+        raise ValueError(
+            f"Cannot convert {column.semantic.name} column {column.name!r} of"
+            f" type {_type(column_data)} and with content={column_data!r} to"
+            " np.int32 values."
+        ) from e
+    if column_data.ndim != 1:
+      raise ValueError(
+          f"Cannot convert {column.semantic.name} column {column.name!r} "
+          f" with content={column_data!r} to a 1-dimensional array of"
+          " np.int32 values. Note: Unrolling multi-dimensional columns is"
+          " only supported for numpy arrays"
+      )
+
+    min_val = np.min(column_data)
+    max_val = np.max(column_data)
+    if min_val < -1:
+      raise ValueError(
+          f"Column {column.name!r} is marked as already integerized, but"
+          " contains values smaller than -1, which is not allowed.  Consider"
+          " deactivating `is_already_integerized`."
+      )
+    if max_val > _MAX_INTEGERIZED_CATEGORIES:
+      raise ValueError(
+          f"Column {column.name!r} is marked as already integerized, but"
+          f" the maximum value ({max_val}) exceeds the maximum"
+          f" allowed number of categories ({_MAX_INTEGERIZED_CATEGORIES})."
+          " Too many integerized categories can lead to poor models."
+          " Automatic pruning of categories is only active for"
+          " non-integerized columns. Consider deactivating"
+          " `is_already_integerized`, or reducing the number of unique"
+          " values."
+      )
+    if min_val == -1:
+      counts = np.bincount(column_data + 1)
+      num_missing = counts[0]
+      most_frequent_value = np.argmax(counts) - 1
+    else:
+      # No missing values
+      counts = np.bincount(column_data)
+      num_missing = 0
+      most_frequent_value = np.argmax(counts)
+
+    self._dataset.PopulateColumnCategoricalIntegerizedNPInt32(
+        column.name,
+        column_data,
+        ydf_dtype=ydf_dtype,
+        max_val=max_val,
+        most_frequent_value=most_frequent_value,
+        num_missing=num_missing,
+        column_idx=column_idx,  # May be None.
+    )
+
   def _add_categorical_set_column(
       self,
       column: dataspec_lib.Column,
@@ -439,7 +552,7 @@ class VerticalDataset:
     original_type = _type(column_data)
 
     if not isinstance(column_data, np.ndarray):
-      column_data = np.array(column_data, dtype=np.bytes_)
+      column_data = np.asarray(column_data, dtype=np.bytes_)
     ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
 
     if column_data.dtype.type in [
@@ -862,12 +975,17 @@ def create_vertical_dataset_from_dict_of_values(
             " tokenizer, but it is ignored when reading in-memory datasets."
         )
       else:
+        semantic = dataspec_lib.Semantic.from_proto_type(column_spec.type)
+        is_already_integerized = (
+            column_spec.categorical.is_already_integerized
+            if semantic == dataspec_lib.Semantic.CATEGORICAL
+            else None
+        )
         normalized_columns.append(
             dataspec_lib.Column(
                 name=column_spec.name,
-                semantic=dataspec_lib.Semantic.from_proto_type(
-                    column_spec.type
-                ),
+                semantic=semantic,
+                is_already_integerized=is_already_integerized,
             )
         )
     return normalized_columns

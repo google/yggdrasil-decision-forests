@@ -563,6 +563,23 @@ absl::StatusOr<dataset::proto::Column> CreateCategoricalColumnSpec(
   return column;
 }
 
+// Creates a column spec for an integerized categorical column.
+absl::StatusOr<dataset::proto::Column> CreateIntegerizedCategoricalColumnSpec(
+    const std::string& name, int max_val, int most_frequent_value,
+    int num_missing) {
+  // Create column spec
+  dataset::proto::Column column;
+  column.set_type(dataset::proto::CATEGORICAL);
+  column.set_name(name);
+  column.mutable_categorical()->set_is_already_integerized(true);
+  column.mutable_categorical()->set_min_value_count(1);
+  column.mutable_categorical()->set_number_of_unique_values(max_val + 1);
+  column.set_count_nas(num_missing);
+  column.mutable_categorical()->set_most_frequent_value(most_frequent_value);
+
+  return column;
+}
+
 // Append contents of `data` to a categorical column. If no `column_idx` is
 // given, a new column is created.
 //
@@ -634,6 +651,52 @@ absl::Status PopulateColumnCategoricalNPBytes(
       }
     }
     dst_values[offset + value_idx] = dst_value;
+  }
+
+  return absl::OkStatus();
+}
+
+// Append contents of `data` to a categorical column. If no `column_idx` is
+// given, a new column is created.
+//
+// Note that this function only creates the columns and copies the data, it does
+// not set `num_rows` on the dataset. Before using the dataset, `num_rows` has
+// to be set (e.g. using SetAndCheckNumRows).
+absl::Status PopulateColumnCategoricalIntegerizedNPInt32(
+    dataset::VerticalDataset& self, const std::string& name,
+    py::array_t<int32_t>& data, std::optional<dataset::proto::DType> ydf_dtype,
+    int max_val, int most_frequent_value, int num_missing,
+    std::optional<int> column_idx) {
+  StridedSpanInt32 src_values(data);
+  CategoricalColumn* column;
+  if (!column_idx.has_value()) {
+    // Create column spec
+    ASSIGN_OR_RETURN(auto column_spec,
+                     CreateIntegerizedCategoricalColumnSpec(
+                         name, max_val, most_frequent_value, num_missing));
+
+    if (ydf_dtype.has_value()) {
+      column_spec.set_dtype(*ydf_dtype);
+    }
+
+    ASSIGN_OR_RETURN(auto* abstract_column, self.AddColumn(column_spec));
+    // Import column data
+    ASSIGN_OR_RETURN(
+        column, abstract_column->MutableCastWithStatus<CategoricalColumn>());
+  } else {
+    // Note that when populating an existing vertical dataset column, we don't
+    // compute / update the dataspec. Callers should take care that the
+    // data spec is still consistent.
+    ASSIGN_OR_RETURN(column,
+                     self.MutableColumnWithCastWithStatus<CategoricalColumn>(
+                         column_idx.value()));
+  }
+
+  std::vector<int32_t>& dst_values = *column->mutable_values();
+  const size_t offset = dst_values.size();
+  dst_values.resize(offset + src_values.size());
+  for (size_t i = 0; i < src_values.size(); i++) {
+    dst_values[i + offset] = src_values[i];
   }
 
   return absl::OkStatus();
@@ -1169,6 +1232,11 @@ void init_dataset(py::module_& m) {
            py::arg("max_vocab_count") = -1, py::arg("min_vocab_frequency") = -1,
            py::arg("column_idx") = std::nullopt,
            py::arg("dictionary") = std::nullopt)
+      .def("PopulateColumnCategoricalIntegerizedNPInt32",
+           WithStatus(PopulateColumnCategoricalIntegerizedNPInt32),
+           py::arg("name"), py::arg("data").noconvert(), py::arg("ydf_dtype"),
+           py::arg("max_val"), py::arg("most_frequent_value"),
+           py::arg("num_missing"), py::arg("column_idx") = std::nullopt)
       .def("PopulateColumnNumericalNPFloat32",
            WithStatus(PopulateColumnNumericalNPFloat32), py::arg("name"),
            py::arg("data").noconvert(), py::arg("ydf_dtype"),

@@ -52,6 +52,43 @@ class CARTLearnerTest(learner_test_utils.LearnerTest):
         self.adult.test_pd.shape[0],
     )
 
+  def test_adult_integerized(self):
+    def map_col_to_int(df1, df2, name: str):
+      c = df1[name].astype("category")
+      d = dict(zip(c.cat.categories, range(1, len(c.cat.categories) + 1)))
+      d[np.nan] = -1
+      df1[name] = df1[name].map(d).astype(int)
+      df2[name] = df2[name].map(d).astype(int)
+
+    adult_integerized_train = self.adult.train_pd.copy(deep=True)
+    adult_integerized_test = self.adult.test_pd.copy(deep=True)
+
+    categorical_features = [
+        "workclass",
+        "education",
+        "marital_status",
+        "occupation",
+        "relationship",
+        "race",
+        "sex",
+        "native_country",
+    ]
+    for c in categorical_features:
+      map_col_to_int(adult_integerized_train, adult_integerized_test, c)
+
+    column_defs = [
+        Column(c, dataspec.Semantic.CATEGORICAL, is_already_integerized=True)
+        for c in categorical_features
+    ]
+
+    learner = specialized_learners.CartLearner(
+        label="income", include_all_columns=True, features=column_defs
+    )
+
+    model = learner.train(adult_integerized_train)
+    evaluation = model.evaluate(adult_integerized_test)
+    self.assertGreaterEqual(evaluation.accuracy, 0.86)
+
   def test_two_center_regression(self):
     learner = specialized_learners.CartLearner(
         label="target", task=generic_learner.Task.REGRESSION

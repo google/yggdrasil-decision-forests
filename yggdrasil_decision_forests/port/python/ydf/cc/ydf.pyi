@@ -41,6 +41,16 @@ class VerticalDataset:
       column_idx: Optional[int] = None,
       dictionary: Optional[npt.NDArray[np.bytes_]] = None,
   ) -> None: ...
+  def PopulateColumnCategoricalIntegerizedNPInt32(
+      self,
+      name: str,
+      data: npt.NDArray[np.int32],
+      ydf_dtype: data_spec_pb2.DType,
+      max_val: int,
+      most_frequent_value: int,
+      num_missing: int,
+      column_idx: Optional[int] = None,
+  ) -> None: ...
   def PopulateColumnCategoricalSetNPBytes(
       self,
       name: str,

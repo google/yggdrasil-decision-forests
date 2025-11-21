@@ -22,7 +22,6 @@
 #include <pybind11/stl.h>
 
 #include <cstddef>
-#include <string>
 #include <string_view>
 #include <vector>
 

@@ -1768,6 +1768,125 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
           data, columns=[("f1", dataspec_lib.Semantic.CATEGORICAL)]
       )
 
+  @parameterized.parameters(np.int8, np.int16, np.int32, np.int64)
+  def test_integerized_categorical_valid_dtypes(self, dtype):
+    data = {"f1": np.array([0, 1, 2, -1, -1, 2, 3, 2], dtype=dtype)}
+    ds = dataset_lib.create_vertical_dataset(
+        data,
+        columns=[
+            Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+        ],
+    )
+    self.assertEqual(
+        ds._dataset.DebugString(), "f1\n0\n1\n2\nNA\nNA\n2\n3\n2\n"
+    )
+
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=8,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                count_nas=2,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=2,
+                    is_already_integerized=True,
+                    number_of_unique_values=4,
+                    min_value_count=1,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_integerized_categorical_too_small(self):
+    data = {"f1": np.array([0, 1, -2], dtype=np.int32)}
+    with self.assertRaisesRegex(ValueError, "contains values smaller than -1"):
+      dataset_lib.create_vertical_dataset(
+          data,
+          columns=[
+              Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+          ],
+      )
+
+  def test_integerized_categorical_as_label(self):
+    data = {"f1": np.array([0, 1, 1], dtype=np.int32)}
+    with self.assertRaisesRegex(ValueError, "not yet supported for labels"):
+      dataset_lib.create_vertical_dataset(
+          data,
+          columns=[
+              Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+          ],
+          label="f1",
+      )
+
+  def test_integerized_categorical_too_large(self):
+    data = {
+        "f1": np.array(
+            [0, 1, dataset_lib._MAX_INTEGERIZED_CATEGORIES + 1], dtype=np.int32
+        )
+    }
+    with self.assertRaisesRegex(
+        ValueError, "exceeds the maximum allowed number"
+    ):
+      dataset_lib.create_vertical_dataset(
+          data,
+          columns=[
+              Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+          ],
+      )
+
+  def test_integerized_categorical_multidim(self):
+    data = {"f1": np.array([[-1, 1], [2, -1], [2, 1]], dtype=np.int32)}
+    ds = dataset_lib.create_vertical_dataset(
+        data,
+        columns=[
+            Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+        ],
+    )
+
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="f1.0_of_2",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DTYPE_INT32,
+                count_nas=1,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=2,
+                    is_already_integerized=True,
+                    number_of_unique_values=3,
+                    min_value_count=1,
+                ),
+                is_unstacked=True,
+            ),
+            ds_pb.Column(
+                name="f1.1_of_2",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DTYPE_INT32,
+                count_nas=1,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=1,
+                    is_already_integerized=True,
+                    number_of_unique_values=2,
+                    min_value_count=1,
+                ),
+                is_unstacked=True,
+            ),
+        ),
+        unstackeds=(
+            ds_pb.Unstacked(
+                original_name="f1",
+                begin_column_idx=0,
+                size=2,
+                type=ds_pb.CATEGORICAL,
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
 
 class CategoricalSetTest(absltest.TestCase):
 

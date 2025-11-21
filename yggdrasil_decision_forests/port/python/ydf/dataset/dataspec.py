@@ -97,7 +97,7 @@ def np_dtype_to_ydf_dtype(np_dtype: np.dtype) -> Optional["ds_pb.DType"]:
 
   return ydf_dtype
 
-
+# pyformat: disable
 class Semantic(enum.Enum):
   """Semantic (e.g. numerical, categorical) of a column.
 
@@ -109,19 +109,29 @@ class Semantic(enum.Enum):
       ordering. For example, the age of a person, or the number of items in a
       bag. Can be a float or an integer.  Missing values are represented by
       math.nan.
-    CATEGORICAL: A categorical value. Generally for a type/class in finite set
-      of possible values without ordering. For example, the color RED in the set
-      {RED, BLUE, GREEN}. Can be a string or an integer.  Missing values are
-      represented by "" (empty string) or value -2. An out-of-vocabulary value
-      (i.e. a value that was never seen in training) is represented by any new
-      string value or the value -1. Integer categorical values: (1) The training
-      logic and model representation is optimized with the assumption that
-      values are dense. (2) Internally, the value is stored as int32. The values
-      should be <~2B. (3) The number of possible values is computed
-      automatically from the training dataset. During inference, integer values
-      greater than any value seen during training will be treated as
-      out-of-vocabulary. (4) Minimum frequency and maximum vocabulary size
-      constraints do not apply.
+    CATEGORICAL: A categorical value, representing a type or class from a
+      finite set of possible values without inherent ordering (e.g., colors
+      {RED, BLUE, GREEN}).
+
+      Default Behavior:
+      - Input can be strings or integers.
+      - Integers are cast to strings.
+      - Missing values are represented by "" (empty string).
+      - YDF builds a vocabulary of unique values. Rare values might be pruned
+        and grouped into an out-of-vocabulary (OOV) sentinel.
+      - Values not seen during training are treated as OOV.
+
+      Integerized Behavior (`is_already_integerized=True`, advanced):
+      - Input must be integers. No casting to string occurs.
+      - Integers must be >= -1.
+      - `-1`: Represents a missing value.
+      - `0`: Represents the out-of-vocabulary (OOV) value.
+      - `1` to `N`: Represent the different categories, up to the maximum value
+        seen during training.
+      - Any positive integer **larger than the largest value seen during
+        training** is also treated as OOV.
+      - This mode is more efficient as it avoids vocabulary building and string
+        operations, but requires pre-integerized data.
     HASH: The hash of a string value. Used when only the equality between values
       is important (not the value itself). Currently, only used for groups in
       ranking problems e.g. the query in a query/document problem. The hashing
@@ -147,7 +157,7 @@ class Semantic(enum.Enum):
       is suited, for example, to represent a multi-variate time-series or a list
       of LLM tokens.
   """
-
+# pyformat: enable
   NUMERICAL = 1
   CATEGORICAL = 2
   HASH = 3
@@ -247,6 +257,7 @@ def _normalize_monotonic_constraint(
   )
 
 
+# pyformat: disable
 @dataclasses.dataclass
 class Column(object):
   """Semantic and parameters for a single column.
@@ -279,7 +290,25 @@ class Column(object):
       `Monotonic.INCREASING` (or +1) to ensure the model is monotonically
       increasing with the features. Use `Monotonic.DECREASING` (or -1) to ensure
       the model is monotonically decreasing with the features.
+    is_already_integerized: **(CATEGORICAL columns only, advanced)**
+      If True, the column's categorical values are already provided as integers.
+      See `Semantic.CATEGORICAL`'s "Integerized Behavior" for details.
+      - Integers must be >= -1.
+      - `-1`: Represents a missing value.
+      - `0`: Represents the out-of-vocabulary (OOV) value.
+      - `1` to `N`: Represent the different categories. These values should be
+        **dense**, meaning they should occupy the range [1, N] without large
+        gaps, where N is the number of unique categories.
+      - This mode is more efficient but requires pre-integerized data.
+      - **Warning:** This option is NOT suitable for sparse integer IDs like
+        user IDs or product IDs, as they would create an unnecessarily large
+        and sparse feature space. Use the default string-based categorical
+        handling for such cases or remove the feature if it's unlikely to be
+        discriminative.
+      - **Warning**: Tensorflow Decision Forests uses a different semantic for
+        integerized categorical features.
   """
+# pyformat: enable
 
   name: str
   semantic: Optional[Semantic] = None
@@ -287,6 +316,7 @@ class Column(object):
   min_vocab_frequency: Optional[int] = None
   num_discretized_numerical_bins: Optional[int] = None
   monotonic: MonotonicConstraint = None
+  is_already_integerized: Optional[bool] = None
 
   def __post_init__(self):
     if self.name is None:
@@ -324,6 +354,13 @@ class Column(object):
           " semantic=NUMERICAL or semantic=None (default). Got"
           f" semantic={self.semantic!r} instead."
       )
+
+    if self.semantic is not Semantic.CATEGORICAL:
+      if self.is_already_integerized is not None:
+        raise ValueError(
+            "Argument is_already_integerized requires semantic=CATEGORICAL. Got"
+            f" semantic={self.semantic!r} instead."
+        )
 
   @property
   def normalized_monotonic(self) -> Optional[Monotonic]:
