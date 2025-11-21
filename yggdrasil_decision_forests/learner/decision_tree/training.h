@@ -991,6 +991,15 @@ void SplitHonestExamples(
     std::vector<UnsignedExampleIdx>& leaf_examples,
     std::vector<UnsignedExampleIdx>& working_selected_examples);
 
+// Evaluates the score of a condition Attribute >= threshold, where threshold
+// is given.
+absl::StatusOr<SplitStats> EvaluateGreatherThanSplitOnLabelRegression(
+    UnsignedExampleIdx num_examples, absl::Span<const float> attributes,
+    const std::vector<float>& labels, const std::vector<float>& weights,
+    const utils::NormalDistributionDouble& label_distribution,
+    UnsignedExampleIdx min_num_obs, float threshold,
+    SplitterPerThreadCache* cache);
+
 namespace internal {
 
 // Initializes the item mask i.e. the bitmap of the items to consider or to

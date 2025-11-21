@@ -156,6 +156,15 @@ message DecisionTreeTrainingConfig {
     // Oblique splits from "Classification Based on Multivariate Contrast
     // Patterns" by  Canete-Sifuentes et al.
     MHLDObliqueSplit mhld_oblique_split = 25;
+
+    // Guided oblique splits are learned by generating and testing candidates
+    // directions using the feature, and possibly the label, values. The
+    // thresholds are estimated both with the exact method and stochastically
+    // from the feature/label values. Guided oblique splits aim to converge
+    // faster and to a better solution than sparse oblique splits.
+    //
+    // This method is currently only available for non-hessian GBTs.
+    GuidedObliqueSplit guided_oblique_split = 27;
   }
 
   // See "split_axis".
@@ -299,6 +308,46 @@ message DecisionTreeTrainingConfig {
     // If true, applies the attribute sampling in "num_candidate_attributes" and
     // "num_candidate_attributes_ratio". If false, all attributes are tested.
     optional bool sample_attributes = 2 [default = false];
+  }
+
+  message GuidedObliqueSplit {
+    // Number of training examples used to generate candidate oblique condition
+    // (both the direction and thresholds). Note: All the training examples are
+    // used to evaluate the split score. Decreasing this number leads to more
+    // exploratory candidates, while increasing this number leads to more local
+    // optimal candidates.
+    optional int32 num_sampled_examples = 1 [default = 200];
+
+    // Probability to run the exact split algorithm on a single random feature
+    // instead of the classical oblique algorithm.
+    optional float proba_exact_one_feature = 2 [default = 0.01];
+
+    // Average number of dimensions in the oblique split. At each trial, the
+    // number of dimensions is sampled from a binomial random value with an
+    // average of "avg_num_dim".
+    optional float avg_num_dim = 3 [default = 2];
+
+    // Maximum number of dimensions in the oblique splits. Set to -1 for no
+    // limits.
+    optional int32 max_num_dim = 4 [default = -1];
+
+    // Parameters to determine the number of candidate splits to evaluate. The
+    // number of candidates is `min(max_num_candidate, max(min_num_candidate,
+    // num_features ^ num_candidate_exponent))`, where `num_features` is the
+    // number of numerical features.
+    optional float num_candidate_exponent = 5 [default = 2];
+    optional int32 max_num_candidate = 6 [default = 6000];
+    optional int32 min_num_candidate = 7 [default = 1];
+
+    // Algorithm used to select the threshold value.
+    optional ThresholdSelection threshold_selection = 8 [default = MEAN];
+    enum ThresholdSelection {
+      ZERO = 0;  // The threshold is zero.
+      MEAN = 1;  // The threshold is the center of mass.
+      // TODO: Add an option for exact threshold selection.
+    }
+
+    // TODO: Add an option for direction sampling algorithm.
   }
 
   // Uplift specific hyper-parameters.

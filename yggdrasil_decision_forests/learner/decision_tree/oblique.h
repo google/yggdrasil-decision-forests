@@ -197,6 +197,10 @@ class ProjectionEvaluator {
     return na_replacement_value_[attribute_idx];
   }
 
+  const std::vector<const std::vector<float>*>& numerical_attributes() const {
+    return numerical_attributes_;
+  }
+
  private:
   // Non-owning pointer to numerical attributes.
   // Indexed by attribute idx.
@@ -210,7 +214,7 @@ class ProjectionEvaluator {
   absl::Status constructor_status_;
 };
 
-// Computes the SW and SB matricies needed to solve the LDA optimization.
+// Computes the SW and SB matrices needed to solve the LDA optimization.
 class LDACache {
  public:
   absl::Status ComputeClassification(
@@ -278,6 +282,20 @@ void SampleProjection(const absl::Span<const int>& features,
                       float projection_density,
                       internal::Projection* projection,
                       int8_t* monotonic_direction, utils::RandomEngine* random);
+
+// Randomly generates a projection guided by the provided feature and label
+// values.
+void SampleGuidedProjection(
+    const absl::Span<const int>& features,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const dataset::proto::DataSpecification& data_spec,
+    const model::proto::TrainingConfigLinking& config_link,
+    absl::Span<const std::vector<float>* const> numerical_attributes,
+    absl::Span<const float> labels,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    internal::Projection* projection, float* threshold,
+    int8_t* monotonic_direction, utils::RandomEngine* random,
+    bool debug = false);
 
 // Converts a Projection object + float threshold into a proto condition of the
 // same semantic. `projection` cannot be empty.

@@ -589,6 +589,32 @@ TEST_F(GradientBoostedTreesOnAdult, Base) {
   utils::ExpectEqualGoldenModel(*model_, "gbt_adult_base");
 }
 
+TEST_F(GradientBoostedTreesOnAdult, SparseOblique) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  deployment_config_.set_num_threads(5);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+
+  TrainAndEvaluateModel();
+
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.864250, 0.001, 0.864250);
+}
+
+TEST_F(GradientBoostedTreesOnAdult, GuidedOblique) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  deployment_config_.set_num_threads(5);
+  gbt_config->set_num_trees(100);
+  gbt_config->mutable_decision_tree()->mutable_guided_oblique_split();
+
+  TrainAndEvaluateModel();
+
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.862715, 0.001, 0.862715);
+}
+
 TEST_F(GradientBoostedTreesOnAdult, SubsamplingDeprecatedParam) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
