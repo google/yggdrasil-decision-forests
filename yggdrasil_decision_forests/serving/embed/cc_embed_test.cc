@@ -186,6 +186,12 @@ SIMPLE_PARAMETERIZED_TEST(
             proto::ClassificationOutput::PROBABILITY,
         },
         {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_proba_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
             "abalone_regression_rf_small",
             "abalone_regression_rf_small_if_else.h.golden",
             proto::Algorithm::IF_ELSE,
@@ -222,6 +228,18 @@ SIMPLE_PARAMETERIZED_TEST(
             "adult_binary_class_gbdt_oblique",
             "adult_binary_class_gbdt_oblique_proba_routing.h.golden",
             proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_gbdt_integerized",
+            "adult_binary_class_gbdt_integerized_proba_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_gbdt_integerized",
+            "adult_binary_class_gbdt_integerized_proba_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
             proto::ClassificationOutput::PROBABILITY,
         },
     }) {
