@@ -122,7 +122,17 @@ class VerticalDataset:
     ):
       assert column.semantic is not None  # Appease pylint.
       if not isinstance(column_data, np.ndarray):
-        column_data = np.array(column_data, np.float32)
+        try:
+          column_data = np.array(column_data, np.float32)
+        except ValueError as e:
+          raise ValueError(
+              f"Cannot convert {column.semantic.name} column {column.name!r} of"
+              f" type {_type(original_column_data)} and with"
+              " content={original_column_data!r} to np.float32 values.\nNote:"
+              " If the column is a label, make sure the training task is"
+              " compatible. For example, you cannot train a regression model"
+              " (task=ydf.Task.REGRESSION) on a string column."
+          ) from e
       ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
 
       if column_data.dtype != np.float32:
