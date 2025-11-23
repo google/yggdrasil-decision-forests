@@ -438,7 +438,11 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       `KL`: - p log (p/q) - `EUCLIDEAN_DISTANCE` or `ED`: (p-q)^2 -
       `CHI_SQUARED` or `CS`: (p-q)^2/q
         Default: "KULLBACK_LEIBLER".
-    winner_take_all: Control how classification trees vote. If true, each tree
+    winner_take_all: DEPRECATED, use winner_takes_all instead. Control how
+      classification trees vote. If true, each tree votes for one class. If
+      false, each tree vote for a distribution of classes.
+      winner_take_all_inference=false is often preferable. Default: True.
+    winner_takes_all: Control how classification trees vote. If true, each tree
       votes for one class. If false, each tree vote for a distribution of
       classes. winner_take_all_inference=false is often preferable. Default:
       True.
@@ -538,6 +542,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       uplift_min_examples_in_treatment: int = 5,
       uplift_split_score: str = "KULLBACK_LEIBLER",
       winner_take_all: bool = True,
+      winner_takes_all: bool = True,
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
@@ -635,6 +640,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         "uplift_min_examples_in_treatment": uplift_min_examples_in_treatment,
         "uplift_split_score": uplift_split_score,
         "winner_take_all": winner_take_all,
+        "winner_takes_all": winner_takes_all,
     }
     if explicit_args is None:
       raise ValueError("`explicit_args` must not be set by the user")
@@ -763,7 +769,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
                 "A configuration that is generally better than the default"
                 " parameters without being more expensive."
             ),
-            parameters={"winner_take_all": True},
+            parameters={"winner_takes_all": True},
         ),
         "benchmark_rank1v1": hyperparameters.HyperparameterTemplate(
             name="benchmark_rank1",
@@ -773,7 +779,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
                 " modified to run in reasonable time."
             ),
             parameters={
-                "winner_take_all": True,
+                "winner_takes_all": True,
                 "categorical_algorithm": "RANDOM",
                 "split_axis": "SPARSE_OBLIQUE",
                 "sparse_oblique_normalization": "MIN_MAX",
@@ -2498,7 +2504,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
   @classmethod
   def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
-        support_max_training_duration=False,
+        support_max_training_duration=True,
         resume_training=True,
         support_validation_dataset=True,
         support_partial_cache_dataset_format=True,
