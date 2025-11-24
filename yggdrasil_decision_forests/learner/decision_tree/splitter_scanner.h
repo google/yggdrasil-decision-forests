@@ -1243,14 +1243,25 @@ SplitSearchResult ScanSplitsRandomBuckets(
     num_pos_examples = 0;
     initializer.InitFull(&neg);
     initializer.InitEmpty(&pos);
+
+    constexpr int kNumBitsInRandom = 64;
+    uint64_t random_bits = 0;
+    int bits_left = 0;
+
     for (const int bucket_idx : active_bucket_idxs) {
-      if (((*random)() & 1) == 0) {
+      if (bits_left == 0) {
+        random_bits = (*random)();
+        bits_left = kNumBitsInRandom;
+      }
+      if ((random_bits & 1) == 0) {
         const auto& bucket = example_bucket_set.items[bucket_idx];
         num_pos_examples += bucket.label.count;
         bucket.label.SubToScoreAcc(&neg);
         bucket.label.AddToScoreAcc(&pos);
         pos_buckets.push_back(bucket_idx);
       }
+      random_bits >>= 1;
+      bits_left--;
     }
     num_neg_examples = num_examples - num_pos_examples;
 
