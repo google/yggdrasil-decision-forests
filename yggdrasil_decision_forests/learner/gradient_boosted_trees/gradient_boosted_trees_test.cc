@@ -1086,8 +1086,8 @@ TEST_F(GradientBoostedTreesOnAdult, RandomCategorical) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8642, 0.0097, 0.863);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2954, 0.0095, 0.294);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8642, 0.0097, 0.8676);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2954, 0.0095, 0.2941);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -1512,8 +1512,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0085, 0.859);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2945, 0.0103, 0.2934);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0085, 0.867);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2945, 0.0103, 0.2884);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
