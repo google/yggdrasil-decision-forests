@@ -560,18 +560,16 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
     }
   }
 
-  int trees_per_iteration = all_config->loss->Shape().gradient_dim;
   int specified_num_trees = all_config->gbt_config->num_trees();
   int specified_initial_iteration =
       all_config->gbt_config->early_stopping_initial_iteration();
-  if (specified_initial_iteration * trees_per_iteration > specified_num_trees) {
-    LOG(WARNING)
-        << "The model configuration specifies " << specified_num_trees
-        << " trees but computation of the validation loss will only start "
-           "at iteration "
-        << specified_initial_iteration << " with " << trees_per_iteration
-        << " trees per iteration. No validation loss will be "
-           "computed, early stopping is not used.";
+  if (specified_initial_iteration > specified_num_trees) {
+    LOG(WARNING) << "The model is configured to train for "
+                 << specified_num_trees
+                 << " iterations, but early stopping is configured to start "
+                    "checking after iteration "
+                 << specified_initial_iteration << ". "
+                 << "Therefore, early stopping will not trigger.";
   }
 
   return absl::OkStatus();
