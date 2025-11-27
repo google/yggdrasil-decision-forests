@@ -92,6 +92,8 @@ struct BaseInternalOptions {
     bool is_label;
   };
   absl::btree_map<int, CategoricalDict> categorical_dicts;
+  // If true, the model contains integerized categorical features.
+  bool has_integerized_categorical = false;
 };
 
 // Statistics about the model.

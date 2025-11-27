@@ -176,7 +176,7 @@ inline float Predict(const Instance& instance) {
         instance.education == FeatureEducation::kProfSchool ||
         instance.education == FeatureEducation::kDoctorate) {
       if (instance.capital_gain >= 5095.5) {
-        if (std::array<FeatureOccupation,12> mask = { FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+        if (std::array<FeatureOccupation,12> mask = {FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
             std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
           if (instance.age >= 79.5) {
             accumulator += 0.309737;
@@ -458,7 +458,7 @@ inline float Predict(const Instance& instance) {
       instance.relationship == FeatureRelationship::kWife) {
     if (instance.education_num >= 12.5) {
       if (instance.capital_gain >= 5095.5) {
-        if (std::array<FeatureOccupation,11> mask = { FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+        if (std::array<FeatureOccupation,11> mask = {FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
             std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
           if (instance.age >= 75.5) {
             accumulator += 0.186707;
@@ -514,7 +514,7 @@ inline float Predict(const Instance& instance) {
           }
         }
       } else {
-        if (std::array<FeatureOccupation,8> mask = { FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kTransportMoving, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+        if (std::array<FeatureOccupation,8> mask = {FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kTransportMoving, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
             std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
           if (instance.age >= 35.5) {
             accumulator += 0.078723;

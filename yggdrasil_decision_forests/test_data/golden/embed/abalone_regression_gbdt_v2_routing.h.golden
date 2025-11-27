@@ -249,14 +249,20 @@ static const uint8_t root_deltas[] = {63,63,63};
 
 static const std::bitset<24> categorical_bank {"101110110011101110110011"};
 
-// Predict on an instance with no NaN values. This function may give incorrect
-// predictions if `instance` contains missing values (e.g. NaN).
+// Predicts on an instance without any safety checks.
 //
-// Prefer using `Predict()` unless `instance` is guaranteed to not contain
-// missing values.
+// The caller must ensure that the instance meets the following conditions:
+// - Numerical features must not be NaN.
+// - Integerized categorical features must be within the range [0, max_value],
+//   where max_value is the maximum value observed during training.
+//
+// Failure to meet these conditions may result in undefined behavior.
+//
+// It is recommended to use `Predict()` instead, unless the instance has
+// already been sanitized.
 //
 // This function is called by `Predict()`.
-inline float PredictWithoutMissingValues(const Instance& instance) {
+inline float PredictUnsafe(const Instance& instance) {
   float accumulator {9.94246};
 
   const Node* root = nodes;
@@ -288,8 +294,7 @@ inline float PredictWithoutMissingValues(const Instance& instance) {
 
 // Prediction function.
 //
-// Replaces NaN numerical features by the global imputation of the model, and
-// then calls `PredictWithoutMissingValues()`.
+// Sanitizes the given instance, then calls `PredictUnsafe()`.
 inline float Predict(Instance instance) {
   instance.longestshell = std::isnan(instance.longestshell) ? 0.523992 : instance.longestshell;
   instance.diameter = std::isnan(instance.diameter) ? 0.407881 : instance.diameter;
@@ -299,7 +304,7 @@ inline float Predict(Instance instance) {
   instance.visceraweight = std::isnan(instance.visceraweight) ? 0.180594 : instance.visceraweight;
   instance.shellweight = std::isnan(instance.shellweight) ? 0.238831 : instance.shellweight;
 
-  return PredictWithoutMissingValues(instance);
+  return PredictUnsafe(instance);
 }
 
 }  // namespace ydf_model

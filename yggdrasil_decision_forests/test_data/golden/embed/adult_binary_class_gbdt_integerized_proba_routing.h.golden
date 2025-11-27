@@ -1,0 +1,311 @@
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <stdint.h>
+#include <cstring>
+#include <array>
+#include <algorithm>
+#include <cmath>
+#include <bitset>
+#include <cassert>
+
+namespace ydf_model {
+
+enum class Label : uint32_t {
+  kLt50K = 0,
+  kGt50K = 1,
+};
+
+constexpr const int kNumFeatures = 14;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  typedef int32_t Numerical;
+  // Integerized categorical features require special care.
+  // The PredictUnsafe() function has undefined behavior if an integerized
+  // categorical feature value is outside the range [0, max_value], where
+  // max_value is the maximum value seen during training. To ensure
+  // safe predictions, use the Predict() function, which automatically
+  // sanitizes the input values.
+  typedef int32_t IntegerizedCategorical;
+
+  IntegerizedCategorical workclass;
+  IntegerizedCategorical education;
+  IntegerizedCategorical marital_status;
+  IntegerizedCategorical occupation;
+  IntegerizedCategorical relationship;
+  IntegerizedCategorical race;
+  IntegerizedCategorical sex;
+  IntegerizedCategorical native_country;
+  Numerical age;
+  Numerical fnlwgt;
+  Numerical education_num;
+  Numerical capital_gain;
+  Numerical capital_loss;
+  Numerical hours_per_week;
+};
+
+struct __attribute__((packed)) Node {
+  uint8_t pos = 0;
+  union {
+    struct __attribute__((packed)) {
+      uint8_t feat;
+      union {
+        int32_t thr;
+        uint16_t cat;
+      };
+    } cond;
+    struct __attribute__((packed)) {
+      float val;
+    } leaf;
+  };
+};
+static const Node nodes[] = {
+{.pos=25,.cond={.feat=4,.cat=15}},
+{.pos=15,.cond={.feat=11,.thr=7074}},
+{.pos=7,.cond={.feat=10,.thr=13}},
+{.pos=3,.cond={.feat=12,.thr=2219}},
+{.pos=1,.cond={.feat=13,.thr=41}},
+{.leaf={.val=-0.123347}},
+{.leaf={.val=-0.0927111}},
+{.pos=1,.cond={.feat=9,.thr=125451}},
+{.leaf={.val=0.292776}},
+{.leaf={.val=-0.0328167}},
+{.pos=3,.cond={.feat=8,.thr=32}},
+{.pos=1,.cond={.feat=12,.thr=1977}},
+{.leaf={.val=-0.106976}},
+{.leaf={.val=0.19949}},
+{.pos=1,.cond={.feat=10,.thr=15}},
+{.leaf={.val=-0.0295298}},
+{.leaf={.val=0.16421}},
+{.pos=1,.cond={.feat=8,.thr=22}},
+{.leaf={.val=0.0892425}},
+{.pos=3,.cond={.feat=11,.thr=7566}},
+{.pos=1,.cond={.feat=3,.cat=0}},
+{.leaf={.val=-0.0210046}},
+{.leaf={.val=0.419984}},
+{.pos=1,.cond={.feat=11,.thr=30962}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.392422}},
+{.pos=15,.cond={.feat=10,.thr=13}},
+{.pos=7,.cond={.feat=11,.thr=5096}},
+{.pos=3,.cond={.feat=3,.cat=39}},
+{.pos=1,.cond={.feat=1,.cat=22}},
+{.leaf={.val=-0.0807375}},
+{.leaf={.val=0.0169694}},
+{.pos=1,.cond={.feat=8,.thr=34}},
+{.leaf={.val=0.00303753}},
+{.leaf={.val=0.133204}},
+{.pos=3,.cond={.feat=8,.thr=61}},
+{.pos=1,.cond={.feat=9,.thr=36213}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.419984}},
+{.pos=1,.cond={.feat=3,.cat=54}},
+{.leaf={.val=0.19949}},
+{.leaf={.val=0.38061}},
+{.pos=7,.cond={.feat=11,.thr=5096}},
+{.pos=3,.cond={.feat=12,.thr=1783}},
+{.pos=1,.cond={.feat=13,.thr=31}},
+{.leaf={.val=0.084576}},
+{.leaf={.val=0.241071}},
+{.pos=1,.cond={.feat=12,.thr=1990}},
+{.leaf={.val=0.417359}},
+{.leaf={.val=0.349312}},
+{.pos=1,.cond={.feat=3,.cat=69}},
+{.leaf={.val=0.309737}},
+{.pos=1,.cond={.feat=8,.thr=80}},
+{.leaf={.val=0.418684}},
+{.leaf={.val=0.309737}},
+{.pos=25,.cond={.feat=4,.cat=135}},
+{.pos=15,.cond={.feat=11,.thr=7074}},
+{.pos=7,.cond={.feat=1,.cat=84}},
+{.pos=3,.cond={.feat=12,.thr=2219}},
+{.pos=1,.cond={.feat=13,.thr=41}},
+{.leaf={.val=-0.11917}},
+{.leaf={.val=-0.0879641}},
+{.pos=1,.cond={.feat=9,.thr=125451}},
+{.leaf={.val=0.227849}},
+{.leaf={.val=-0.0300817}},
+{.pos=3,.cond={.feat=8,.thr=32}},
+{.pos=1,.cond={.feat=13,.thr=45}},
+{.leaf={.val=-0.114477}},
+{.leaf={.val=-0.0633502}},
+{.pos=1,.cond={.feat=1,.cat=101}},
+{.leaf={.val=-0.0270186}},
+{.leaf={.val=0.13565}},
+{.pos=1,.cond={.feat=8,.thr=22}},
+{.leaf={.val=0.0765646}},
+{.pos=3,.cond={.feat=11,.thr=7566}},
+{.pos=1,.cond={.feat=1,.cat=118}},
+{.leaf={.val=-0.027731}},
+{.leaf={.val=0.330099}},
+{.pos=1,.cond={.feat=11,.thr=30962}},
+{.leaf={.val=0.310248}},
+{.leaf={.val=0.293003}},
+{.pos=15,.cond={.feat=1,.cat=172}},
+{.pos=7,.cond={.feat=11,.thr=5096}},
+{.pos=3,.cond={.feat=3,.cat=142}},
+{.pos=1,.cond={.feat=12,.thr=1794}},
+{.leaf={.val=-0.0104601}},
+{.leaf={.val=0.197498}},
+{.pos=1,.cond={.feat=8,.thr=34}},
+{.leaf={.val=0.00272918}},
+{.leaf={.val=0.111742}},
+{.pos=3,.cond={.feat=8,.thr=61}},
+{.pos=1,.cond={.feat=11,.thr=57512}},
+{.leaf={.val=0.310248}},
+{.leaf={.val=0.310248}},
+{.pos=1,.cond={.feat=3,.cat=157}},
+{.leaf={.val=0.178864}},
+{.leaf={.val=0.298499}},
+{.pos=7,.cond={.feat=11,.thr=5096}},
+{.pos=3,.cond={.feat=12,.thr=1783}},
+{.pos=1,.cond={.feat=3,.cat=189}},
+{.leaf={.val=0.0902713}},
+{.leaf={.val=0.1992}},
+{.pos=1,.cond={.feat=8,.thr=29}},
+{.leaf={.val=0.197697}},
+{.leaf={.val=0.305456}},
+{.pos=3,.cond={.feat=8,.thr=63}},
+{.pos=1,.cond={.feat=3,.cat=204}},
+{.leaf={.val=0.310521}},
+{.leaf={.val=0.317582}},
+{.pos=1,.cond={.feat=0,.cat=219}},
+{.leaf={.val=0.222857}},
+{.leaf={.val=0.300409}},
+{.pos=25,.cond={.feat=4,.cat=254}},
+{.pos=15,.cond={.feat=11,.thr=7074}},
+{.pos=7,.cond={.feat=1,.cat=228}},
+{.pos=3,.cond={.feat=12,.thr=2219}},
+{.pos=1,.cond={.feat=13,.thr=46}},
+{.leaf={.val=-0.114206}},
+{.leaf={.val=-0.0776276}},
+{.pos=1,.cond={.feat=9,.thr=175628}},
+{.leaf={.val=0.12781}},
+{.leaf={.val=-0.129346}},
+{.pos=3,.cond={.feat=13,.thr=45}},
+{.pos=1,.cond={.feat=8,.thr=34}},
+{.leaf={.val=-0.107713}},
+{.leaf={.val=-0.0409094}},
+{.pos=1,.cond={.feat=8,.thr=30}},
+{.leaf={.val=-0.074812}},
+{.leaf={.val=0.0478901}},
+{.pos=1,.cond={.feat=8,.thr=22}},
+{.leaf={.val=0.0663047}},
+{.pos=3,.cond={.feat=11,.thr=7566}},
+{.pos=1,.cond={.feat=10,.thr=11}},
+{.leaf={.val=-0.0253223}},
+{.leaf={.val=0.266158}},
+{.pos=1,.cond={.feat=0,.cat=245}},
+{.leaf={.val=0.238989}},
+{.leaf={.val=0.254692}},
+{.pos=15,.cond={.feat=10,.thr=13}},
+{.pos=7,.cond={.feat=11,.thr=5096}},
+{.pos=3,.cond={.feat=3,.cat=261}},
+{.pos=1,.cond={.feat=12,.thr=1794}},
+{.leaf={.val=-0.0511311}},
+{.leaf={.val=0.167491}},
+{.pos=1,.cond={.feat=12,.thr=1783}},
+{.leaf={.val=0.0400858}},
+{.leaf={.val=0.220157}},
+{.pos=3,.cond={.feat=8,.thr=61}},
+{.pos=1,.cond={.feat=11,.thr=6858}},
+{.leaf={.val=0.254167}},
+{.leaf={.val=0.254167}},
+{.pos=1,.cond={.feat=9,.thr=113108}},
+{.leaf={.val=0.109334}},
+{.leaf={.val=0.23652}},
+{.pos=7,.cond={.feat=11,.thr=5096}},
+{.pos=3,.cond={.feat=12,.thr=1783}},
+{.pos=1,.cond={.feat=3,.cat=276}},
+{.leaf={.val=0.0562773}},
+{.leaf={.val=0.162687}},
+{.pos=1,.cond={.feat=12,.thr=1990}},
+{.leaf={.val=0.253889}},
+{.leaf={.val=0.212015}},
+{.pos=1,.cond={.feat=3,.cat=291}},
+{.leaf={.val=0.188381}},
+{.pos=1,.cond={.feat=8,.thr=80}},
+{.leaf={.val=0.253687}},
+{.leaf={.val=0.189937}},
+};
+
+static const uint8_t condition_types[] = {1,1,1,1,1,1,1,1,0,0,0,0,0,0};
+
+
+static const uint8_t root_deltas[] = {55,57,55};
+
+
+static const std::bitset<306> categorical_bank {"111110111011010011110000010010111110000011011100001101011011001010110000000001010110100100000000100000011110000010000010101100000000001010000110100100111000000100101000011011101111111111111110110111111111101010110000000001111110111011010101010011010010011100000010010110111111000000011000011011010000000000"};
+
+// Predicts on an instance without any safety checks.
+//
+// The caller must ensure that the instance meets the following conditions:
+// - Numerical features must not be NaN.
+// - Integerized categorical features must be within the range [0, max_value],
+//   where max_value is the maximum value observed during training.
+//
+// Failure to meet these conditions may result in undefined behavior.
+//
+// It is recommended to use `Predict()` instead, unless the instance has
+// already been sanitized.
+//
+// This function is called by `Predict()`.
+inline float PredictUnsafe(const Instance& instance) {
+  float accumulator {-1.1631};
+
+  const Node* root = nodes;
+  const Node* node;
+  const char* raw_instance = (const char*)(&instance);
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+      if (condition_types[node->cond.feat] == 0) {
+        int32_t numerical_feature;
+        std::memcpy(&numerical_feature, raw_instance + node->cond.feat * sizeof(int32_t), sizeof(int32_t));
+        eval = numerical_feature >= node->cond.thr;
+      } else if (condition_types[node->cond.feat] == 1) {
+        uint32_t categorical_feature;
+        std::memcpy(&categorical_feature, raw_instance + node->cond.feat * sizeof(uint32_t), sizeof(uint32_t));
+        eval = categorical_bank[categorical_feature + node->cond.cat];
+      } else {
+        assert(false);
+      }
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator += node->leaf.val;
+    root += root_deltas[tree_idx];
+  }
+
+  // Sigmoid
+  return 1.f / (1.f + std::exp(-accumulator));
+
+}
+
+// Prediction function.
+//
+// Sanitizes the given instance, then calls `PredictUnsafe()`.
+inline float Predict(Instance instance) {
+  instance.workclass = instance.workclass == -1 ? 4 : instance.workclass;
+  instance.workclass = (instance.workclass < -1 || instance.workclass > 8) ? 0 : instance.workclass;
+  instance.education = instance.education == -1 ? 12 : instance.education;
+  instance.education = (instance.education < -1 || instance.education > 16) ? 0 : instance.education;
+  instance.marital_status = instance.marital_status == -1 ? 3 : instance.marital_status;
+  instance.marital_status = (instance.marital_status < -1 || instance.marital_status > 7) ? 0 : instance.marital_status;
+  instance.occupation = instance.occupation == -1 ? 10 : instance.occupation;
+  instance.occupation = (instance.occupation < -1 || instance.occupation > 14) ? 0 : instance.occupation;
+  instance.relationship = instance.relationship == -1 ? 1 : instance.relationship;
+  instance.relationship = (instance.relationship < -1 || instance.relationship > 6) ? 0 : instance.relationship;
+  instance.race = instance.race == -1 ? 5 : instance.race;
+  instance.race = (instance.race < -1 || instance.race > 5) ? 0 : instance.race;
+  instance.sex = instance.sex == -1 ? 2 : instance.sex;
+  instance.sex = (instance.sex < -1 || instance.sex > 2) ? 0 : instance.sex;
+  instance.native_country = instance.native_country == -1 ? 39 : instance.native_country;
+  instance.native_country = (instance.native_country < -1 || instance.native_country > 41) ? 0 : instance.native_country;
+
+  return PredictUnsafe(instance);
+}
+
+}  // namespace ydf_model
+#endif

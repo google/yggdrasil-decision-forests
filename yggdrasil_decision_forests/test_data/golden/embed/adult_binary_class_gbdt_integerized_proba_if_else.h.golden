@@ -1,0 +1,491 @@
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <stdint.h>
+#include <cstring>
+#include <array>
+#include <algorithm>
+#include <cmath>
+#include <bitset>
+#include <cassert>
+
+namespace ydf_model {
+
+enum class Label : uint32_t {
+  kLt50K = 0,
+  kGt50K = 1,
+};
+
+constexpr const int kNumFeatures = 14;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  typedef int32_t Numerical;
+  // Integerized categorical features require special care.
+  // The PredictUnsafe() function has undefined behavior if an integerized
+  // categorical feature value is outside the range [0, max_value], where
+  // max_value is the maximum value seen during training. To ensure
+  // safe predictions, use the Predict() function, which automatically
+  // sanitizes the input values.
+  typedef int32_t IntegerizedCategorical;
+
+  IntegerizedCategorical workclass;
+  IntegerizedCategorical education;
+  IntegerizedCategorical marital_status;
+  IntegerizedCategorical occupation;
+  IntegerizedCategorical relationship;
+  IntegerizedCategorical race;
+  IntegerizedCategorical sex;
+  IntegerizedCategorical native_country;
+  Numerical age;
+  Numerical fnlwgt;
+  Numerical education_num;
+  Numerical capital_gain;
+  Numerical capital_loss;
+  Numerical hours_per_week;
+};
+
+// Predicts on an instance without any safety checks.
+//
+// The caller must ensure that the instance meets the following conditions:
+// - Numerical features must not be NaN.
+// - Integerized categorical features must be within the range [0, max_value],
+//   where max_value is the maximum value observed during training.
+//
+// Failure to meet these conditions may result in undefined behavior.
+//
+// It is recommended to use `Predict()` instead, unless the instance has
+// already been sanitized.
+//
+// This function is called by `Predict()`.
+inline float PredictUnsafe(const Instance& instance) {
+  float accumulator {-1.1631};
+  // Tree #0
+  if (instance.relationship == 0 ||
+      instance.relationship == 1 ||
+      instance.relationship == 6) {
+    if (instance.education_num >= 12.5) {
+      if (instance.capital_gain >= 5095.5) {
+        if (std::array<Instance::IntegerizedCategorical,11> mask = {1, 3, 4, 6, 7, 8, 10, 11, 12, 13, 14};
+            std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
+          if (instance.age >= 79.5) {
+            accumulator += 0.309737;
+          } else {
+            accumulator += 0.418684;
+          }
+        } else {
+          accumulator += 0.309737;
+        }
+      } else {
+        if (instance.capital_loss >= 1782.5) {
+          if (instance.capital_loss >= 1989.5) {
+            accumulator += 0.349312;
+          } else {
+            accumulator += 0.417359;
+          }
+        } else {
+          if (instance.hours_per_week >= 31) {
+            accumulator += 0.241071;
+          } else {
+            accumulator += 0.084576;
+          }
+        }
+      }
+    } else {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 60.5) {
+          if (instance.occupation == 1 ||
+              instance.occupation == 4 ||
+              instance.occupation == 6 ||
+              instance.occupation == 7 ||
+              instance.occupation == 10 ||
+              instance.occupation == 12 ||
+              instance.occupation == 14) {
+            accumulator += 0.38061;
+          } else {
+            accumulator += 0.19949;
+          }
+        } else {
+          if (instance.fnlwgt >= 36212.5) {
+            accumulator += 0.419984;
+          } else {
+            accumulator += 0.419984;
+          }
+        }
+      } else {
+        if (instance.occupation == 1 ||
+            instance.occupation == 4 ||
+            instance.occupation == 11 ||
+            instance.occupation == 12 ||
+            instance.occupation == 13) {
+          if (instance.age >= 33.5) {
+            accumulator += 0.133204;
+          } else {
+            accumulator += 0.00303753;
+          }
+        } else {
+          if (std::array<Instance::IntegerizedCategorical,9> mask = {0, 8, 9, 10, 11, 12, 13, 15, 16};
+              std::binary_search(mask.begin(), mask.end(),  instance.education)) {
+            accumulator += 0.0169694;
+          } else {
+            accumulator += -0.0807375;
+          }
+        }
+      }
+    }
+  } else {
+    if (instance.capital_gain >= 7073.5) {
+      if (instance.age >= 21.5) {
+        if (instance.capital_gain >= 7565.5) {
+          if (instance.capital_gain >= 30961.5) {
+            accumulator += 0.392422;
+          } else {
+            accumulator += 0.419984;
+          }
+        } else {
+          if (instance.occupation == 10 ||
+              instance.occupation == 12 ||
+              instance.occupation == 13) {
+            accumulator += 0.419984;
+          } else {
+            accumulator += -0.0210046;
+          }
+        }
+      } else {
+        accumulator += 0.0892425;
+      }
+    } else {
+      if (instance.education_num >= 12.5) {
+        if (instance.age >= 31.5) {
+          if (instance.education_num >= 14.5) {
+            accumulator += 0.16421;
+          } else {
+            accumulator += -0.0295298;
+          }
+        } else {
+          if (instance.capital_loss >= 1977) {
+            accumulator += 0.19949;
+          } else {
+            accumulator += -0.106976;
+          }
+        }
+      } else {
+        if (instance.capital_loss >= 2218.5) {
+          if (instance.fnlwgt >= 125450) {
+            accumulator += -0.0328167;
+          } else {
+            accumulator += 0.292776;
+          }
+        } else {
+          if (instance.hours_per_week >= 40.5) {
+            accumulator += -0.0927111;
+          } else {
+            accumulator += -0.123347;
+          }
+        }
+      }
+    }
+  }
+
+  // Tree #1
+  if (instance.relationship == 0 ||
+      instance.relationship == 1 ||
+      instance.relationship == 6) {
+    if (instance.education == 10 ||
+        instance.education == 11 ||
+        instance.education == 13 ||
+        instance.education == 15) {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 62.5) {
+          if (instance.workclass == 2 ||
+              instance.workclass == 4 ||
+              instance.workclass == 5 ||
+              instance.workclass == 7) {
+            accumulator += 0.300409;
+          } else {
+            accumulator += 0.222857;
+          }
+        } else {
+          if (instance.occupation == 5 ||
+              instance.occupation == 14) {
+            accumulator += 0.317582;
+          } else {
+            accumulator += 0.310521;
+          }
+        }
+      } else {
+        if (instance.capital_loss >= 1782.5) {
+          if (instance.age >= 28.5) {
+            accumulator += 0.305456;
+          } else {
+            accumulator += 0.197697;
+          }
+        } else {
+          if (instance.occupation == 4 ||
+              instance.occupation == 10 ||
+              instance.occupation == 11 ||
+              instance.occupation == 12 ||
+              instance.occupation == 13) {
+            accumulator += 0.1992;
+          } else {
+            accumulator += 0.0902713;
+          }
+        }
+      }
+    } else {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 60.5) {
+          if (instance.occupation == 1 ||
+              instance.occupation == 4 ||
+              instance.occupation == 6 ||
+              instance.occupation == 7 ||
+              instance.occupation == 12 ||
+              instance.occupation == 14) {
+            accumulator += 0.298499;
+          } else {
+            accumulator += 0.178864;
+          }
+        } else {
+          if (instance.capital_gain >= 57511.5) {
+            accumulator += 0.310248;
+          } else {
+            accumulator += 0.310248;
+          }
+        }
+      } else {
+        if (instance.occupation == 1 ||
+            instance.occupation == 4 ||
+            instance.occupation == 11 ||
+            instance.occupation == 12 ||
+            instance.occupation == 13) {
+          if (instance.age >= 33.5) {
+            accumulator += 0.111742;
+          } else {
+            accumulator += 0.00272918;
+          }
+        } else {
+          if (instance.capital_loss >= 1794) {
+            accumulator += 0.197498;
+          } else {
+            accumulator += -0.0104601;
+          }
+        }
+      }
+    }
+  } else {
+    if (instance.capital_gain >= 7073.5) {
+      if (instance.age >= 21.5) {
+        if (instance.capital_gain >= 7565.5) {
+          if (instance.capital_gain >= 30961.5) {
+            accumulator += 0.293003;
+          } else {
+            accumulator += 0.310248;
+          }
+        } else {
+          if (std::array<Instance::IntegerizedCategorical,15> mask = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15};
+              std::binary_search(mask.begin(), mask.end(),  instance.education)) {
+            accumulator += 0.330099;
+          } else {
+            accumulator += -0.027731;
+          }
+        }
+      } else {
+        accumulator += 0.0765646;
+      }
+    } else {
+      if (instance.education == 0 ||
+          instance.education == 10 ||
+          instance.education == 11 ||
+          instance.education == 13 ||
+          instance.education == 15) {
+        if (instance.age >= 31.5) {
+          if (std::array<Instance::IntegerizedCategorical,15> mask = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16};
+              std::binary_search(mask.begin(), mask.end(),  instance.education)) {
+            accumulator += 0.13565;
+          } else {
+            accumulator += -0.0270186;
+          }
+        } else {
+          if (instance.hours_per_week >= 44.5) {
+            accumulator += -0.0633502;
+          } else {
+            accumulator += -0.114477;
+          }
+        }
+      } else {
+        if (instance.capital_loss >= 2218.5) {
+          if (instance.fnlwgt >= 125450) {
+            accumulator += -0.0300817;
+          } else {
+            accumulator += 0.227849;
+          }
+        } else {
+          if (instance.hours_per_week >= 40.5) {
+            accumulator += -0.0879641;
+          } else {
+            accumulator += -0.11917;
+          }
+        }
+      }
+    }
+  }
+
+  // Tree #2
+  if (instance.relationship == 0 ||
+      instance.relationship == 1 ||
+      instance.relationship == 6) {
+    if (instance.education_num >= 12.5) {
+      if (instance.capital_gain >= 5095.5) {
+        if (std::array<Instance::IntegerizedCategorical,11> mask = {1, 3, 4, 6, 7, 8, 10, 11, 12, 13, 14};
+            std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
+          if (instance.age >= 79.5) {
+            accumulator += 0.189937;
+          } else {
+            accumulator += 0.253687;
+          }
+        } else {
+          accumulator += 0.188381;
+        }
+      } else {
+        if (instance.capital_loss >= 1782.5) {
+          if (instance.capital_loss >= 1989.5) {
+            accumulator += 0.212015;
+          } else {
+            accumulator += 0.253889;
+          }
+        } else {
+          if (instance.occupation == 1 ||
+              instance.occupation == 4 ||
+              instance.occupation == 10 ||
+              instance.occupation == 11 ||
+              instance.occupation == 12 ||
+              instance.occupation == 13) {
+            accumulator += 0.162687;
+          } else {
+            accumulator += 0.0562773;
+          }
+        }
+      }
+    } else {
+      if (instance.capital_gain >= 5095.5) {
+        if (instance.age >= 60.5) {
+          if (instance.fnlwgt >= 113108) {
+            accumulator += 0.23652;
+          } else {
+            accumulator += 0.109334;
+          }
+        } else {
+          if (instance.capital_gain >= 6858) {
+            accumulator += 0.254167;
+          } else {
+            accumulator += 0.254167;
+          }
+        }
+      } else {
+        if (std::array<Instance::IntegerizedCategorical,9> mask = {0, 1, 3, 4, 10, 11, 12, 13, 14};
+            std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
+          if (instance.capital_loss >= 1782.5) {
+            accumulator += 0.220157;
+          } else {
+            accumulator += 0.0400858;
+          }
+        } else {
+          if (instance.capital_loss >= 1794) {
+            accumulator += 0.167491;
+          } else {
+            accumulator += -0.0511311;
+          }
+        }
+      }
+    }
+  } else {
+    if (instance.capital_gain >= 7073.5) {
+      if (instance.age >= 21.5) {
+        if (instance.capital_gain >= 7565.5) {
+          if (instance.workclass == 1 ||
+              instance.workclass == 2 ||
+              instance.workclass == 4 ||
+              instance.workclass == 5 ||
+              instance.workclass == 7) {
+            accumulator += 0.254692;
+          } else {
+            accumulator += 0.238989;
+          }
+        } else {
+          if (instance.education_num >= 10.5) {
+            accumulator += 0.266158;
+          } else {
+            accumulator += -0.0253223;
+          }
+        }
+      } else {
+        accumulator += 0.0663047;
+      }
+    } else {
+      if (instance.education == 0 ||
+          instance.education == 10 ||
+          instance.education == 11 ||
+          instance.education == 13 ||
+          instance.education == 15) {
+        if (instance.hours_per_week >= 44.5) {
+          if (instance.age >= 29.5) {
+            accumulator += 0.0478901;
+          } else {
+            accumulator += -0.074812;
+          }
+        } else {
+          if (instance.age >= 33.5) {
+            accumulator += -0.0409094;
+          } else {
+            accumulator += -0.107713;
+          }
+        }
+      } else {
+        if (instance.capital_loss >= 2218.5) {
+          if (instance.fnlwgt >= 175628) {
+            accumulator += -0.129346;
+          } else {
+            accumulator += 0.12781;
+          }
+        } else {
+          if (instance.hours_per_week >= 45.5) {
+            accumulator += -0.0776276;
+          } else {
+            accumulator += -0.114206;
+          }
+        }
+      }
+    }
+  }
+
+  // Sigmoid
+  return 1.f / (1.f + std::exp(-accumulator));
+
+}
+
+// Prediction function.
+//
+// Sanitizes the given instance, then calls `PredictUnsafe()`.
+inline float Predict(Instance instance) {
+  instance.workclass = instance.workclass == -1 ? 4 : instance.workclass;
+  instance.workclass = (instance.workclass < -1 || instance.workclass > 8) ? 0 : instance.workclass;
+  instance.education = instance.education == -1 ? 12 : instance.education;
+  instance.education = (instance.education < -1 || instance.education > 16) ? 0 : instance.education;
+  instance.marital_status = instance.marital_status == -1 ? 3 : instance.marital_status;
+  instance.marital_status = (instance.marital_status < -1 || instance.marital_status > 7) ? 0 : instance.marital_status;
+  instance.occupation = instance.occupation == -1 ? 10 : instance.occupation;
+  instance.occupation = (instance.occupation < -1 || instance.occupation > 14) ? 0 : instance.occupation;
+  instance.relationship = instance.relationship == -1 ? 1 : instance.relationship;
+  instance.relationship = (instance.relationship < -1 || instance.relationship > 6) ? 0 : instance.relationship;
+  instance.race = instance.race == -1 ? 5 : instance.race;
+  instance.race = (instance.race < -1 || instance.race > 5) ? 0 : instance.race;
+  instance.sex = instance.sex == -1 ? 2 : instance.sex;
+  instance.sex = (instance.sex < -1 || instance.sex > 2) ? 0 : instance.sex;
+  instance.native_country = instance.native_country == -1 ? 39 : instance.native_country;
+  instance.native_country = (instance.native_country < -1 || instance.native_country > 41) ? 0 : instance.native_country;
+
+  return PredictUnsafe(instance);
+}
+
+}  // namespace ydf_model
+#endif

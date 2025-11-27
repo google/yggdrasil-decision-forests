@@ -222,7 +222,7 @@ inline Label Predict(const Instance& instance) {
             }
           }
         } else {
-          if (std::array<FeatureOccupation,11> mask = { FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kFarmingFishing, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+          if (std::array<FeatureOccupation,11> mask = {FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kFarmingFishing, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
               std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
             accumulator += 0.333333;
           } else {
@@ -262,7 +262,7 @@ inline Label Predict(const Instance& instance) {
             instance.education == FeatureEducation::k12th ||
             instance.education == FeatureEducation::kDoctorate ||
             instance.education == FeatureEducation::k5th6th) {
-          if (std::array<FeatureNativeCountry,15> mask = { FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kMexico, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kVietnam, FeatureNativeCountry::kTaiwan, FeatureNativeCountry::kPoland, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kCambodia};
+          if (std::array<FeatureNativeCountry,15> mask = {FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kMexico, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kVietnam, FeatureNativeCountry::kTaiwan, FeatureNativeCountry::kPoland, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kCambodia};
               std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
             if (instance.capital_gain >= 5095.5) {
               if (instance.occupation == FeatureOccupation::kExecManagerial ||
@@ -534,7 +534,7 @@ inline Label Predict(const Instance& instance) {
                 } else {
                   if (instance.occupation == FeatureOccupation::kProfSpecialty ||
                       instance.occupation == FeatureOccupation::kExecManagerial) {
-                    if (std::array<FeatureNativeCountry,8> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kIndia, FeatureNativeCountry::kChina, FeatureNativeCountry::kJapan, FeatureNativeCountry::kIran, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kFrance, FeatureNativeCountry::kHong};
+                    if (std::array<FeatureNativeCountry,8> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kIndia, FeatureNativeCountry::kChina, FeatureNativeCountry::kJapan, FeatureNativeCountry::kIran, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kFrance, FeatureNativeCountry::kHong};
                         std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                       if (instance.hours_per_week >= 62.5) {
                       } else {
@@ -597,7 +597,7 @@ inline Label Predict(const Instance& instance) {
                     instance.workclass == FeatureWorkclass::kLocalGov ||
                     instance.workclass == FeatureWorkclass::kSelfEmpInc ||
                     instance.workclass == FeatureWorkclass::kFederalGov) {
-                  if (std::array<FeatureNativeCountry,12> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kIran, FeatureNativeCountry::kFrance, FeatureNativeCountry::kThailand};
+                  if (std::array<FeatureNativeCountry,12> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kIran, FeatureNativeCountry::kFrance, FeatureNativeCountry::kThailand};
                       std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                     if (instance.age >= 57.5) {
                       if (instance.age >= 74) {
@@ -932,11 +932,11 @@ inline Label Predict(const Instance& instance) {
               instance.occupation == FeatureOccupation::kAdmClerical ||
               instance.occupation == FeatureOccupation::kTransportMoving ||
               instance.occupation == FeatureOccupation::kProtectiveServ) {
-            if (std::array<FeatureNativeCountry,16> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kFrance, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kHungary};
+            if (std::array<FeatureNativeCountry,16> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kFrance, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kHungary};
                 std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
               if (instance.capital_loss >= 1532) {
               } else {
-                if (std::array<FeatureEducation,9> mask = { FeatureEducation::kHsGrad, FeatureEducation::kSomeCollege, FeatureEducation::kBachelors, FeatureEducation::kMasters, FeatureEducation::kAssocVoc, FeatureEducation::kAssocAcdm, FeatureEducation::kProfSchool, FeatureEducation::k12th, FeatureEducation::kDoctorate};
+                if (std::array<FeatureEducation,9> mask = {FeatureEducation::kHsGrad, FeatureEducation::kSomeCollege, FeatureEducation::kBachelors, FeatureEducation::kMasters, FeatureEducation::kAssocVoc, FeatureEducation::kAssocAcdm, FeatureEducation::kProfSchool, FeatureEducation::k12th, FeatureEducation::kDoctorate};
                     std::binary_search(mask.begin(), mask.end(),  instance.education)) {
                   if (instance.age >= 33.5) {
                     if (instance.hours_per_week >= 34) {
@@ -1006,7 +1006,7 @@ inline Label Predict(const Instance& instance) {
                               instance.workclass == FeatureWorkclass::kFederalGov) {
                             accumulator += 0.333333;
                           } else {
-                            if (std::array<FeatureNativeCountry,8> mask = { FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kEngland, FeatureNativeCountry::kPoland, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kHungary};
+                            if (std::array<FeatureNativeCountry,8> mask = {FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kEngland, FeatureNativeCountry::kPoland, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kHungary};
                                 std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                               accumulator += 0.333333;
                             } else {
@@ -1247,7 +1247,7 @@ inline Label Predict(const Instance& instance) {
               }
             }
           } else {
-            if (std::array<FeatureNativeCountry,13> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kVietnam, FeatureNativeCountry::kIran, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kLaos};
+            if (std::array<FeatureNativeCountry,13> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kVietnam, FeatureNativeCountry::kIran, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kLaos};
                 std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
               if (instance.education_num >= 11.5) {
                 if (instance.workclass == FeatureWorkclass::kSelfEmpInc) {
@@ -2038,7 +2038,7 @@ inline Label Predict(const Instance& instance) {
       } else {
         if (instance.age >= 26.5) {
           if (instance.hours_per_week >= 45.5) {
-            if (std::array<FeatureOccupation,9> mask = { FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kTransportMoving, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+            if (std::array<FeatureOccupation,9> mask = {FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kTransportMoving, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
                 std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
               if (instance.capital_gain >= 4668.5) {
                 if (instance.occupation == FeatureOccupation::kSales ||
@@ -2563,7 +2563,7 @@ inline Label Predict(const Instance& instance) {
 
   // Tree #1
   if (instance.capital_gain >= 7073.5) {
-    if (std::array<FeatureEducation,11> mask = { FeatureEducation::kSomeCollege, FeatureEducation::kBachelors, FeatureEducation::kMasters, FeatureEducation::kAssocVoc, FeatureEducation::k11th, FeatureEducation::kAssocAcdm, FeatureEducation::k7th8th, FeatureEducation::kProfSchool, FeatureEducation::k12th, FeatureEducation::kDoctorate, FeatureEducation::k5th6th};
+    if (std::array<FeatureEducation,11> mask = {FeatureEducation::kSomeCollege, FeatureEducation::kBachelors, FeatureEducation::kMasters, FeatureEducation::kAssocVoc, FeatureEducation::k11th, FeatureEducation::kAssocAcdm, FeatureEducation::k7th8th, FeatureEducation::kProfSchool, FeatureEducation::k12th, FeatureEducation::kDoctorate, FeatureEducation::k5th6th};
         std::binary_search(mask.begin(), mask.end(),  instance.education)) {
       if (instance.age >= 62.5) {
         if (instance.hours_per_week >= 49) {
@@ -2655,7 +2655,7 @@ inline Label Predict(const Instance& instance) {
                   instance.occupation == FeatureOccupation::kExecManagerial ||
                   instance.occupation == FeatureOccupation::kFarmingFishing ||
                   instance.occupation == FeatureOccupation::kTechSupport) {
-                if (std::array<FeatureNativeCountry,12> mask = { FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kChina, FeatureNativeCountry::kJapan, FeatureNativeCountry::kTaiwan, FeatureNativeCountry::kIran, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kThailand};
+                if (std::array<FeatureNativeCountry,12> mask = {FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kChina, FeatureNativeCountry::kJapan, FeatureNativeCountry::kTaiwan, FeatureNativeCountry::kIran, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kThailand};
                     std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                   if (instance.fnlwgt >= 130443) {
                     if (instance.hours_per_week >= 39) {
@@ -2887,7 +2887,7 @@ inline Label Predict(const Instance& instance) {
                   instance.occupation == FeatureOccupation::kSales ||
                   instance.occupation == FeatureOccupation::kTechSupport ||
                   instance.occupation == FeatureOccupation::kProtectiveServ) {
-                if (std::array<FeatureNativeCountry,14> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kMexico, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kIndia, FeatureNativeCountry::kCuba, FeatureNativeCountry::kChina, FeatureNativeCountry::kItaly, FeatureNativeCountry::kIran, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kGreece, FeatureNativeCountry::kFrance, FeatureNativeCountry::kIreland};
+                if (std::array<FeatureNativeCountry,14> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kMexico, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kIndia, FeatureNativeCountry::kCuba, FeatureNativeCountry::kChina, FeatureNativeCountry::kItaly, FeatureNativeCountry::kIran, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kGreece, FeatureNativeCountry::kFrance, FeatureNativeCountry::kIreland};
                     std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                   if (instance.age >= 28.5) {
                     if (instance.capital_loss >= 1532) {
@@ -3493,7 +3493,7 @@ inline Label Predict(const Instance& instance) {
                 } else {
                   if (instance.capital_loss >= 1532) {
                   } else {
-                    if (std::array<FeatureNativeCountry,15> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPoland, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kIreland, FeatureNativeCountry::kYugoslavia, FeatureNativeCountry::kHungary};
+                    if (std::array<FeatureNativeCountry,15> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPoland, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kIreland, FeatureNativeCountry::kYugoslavia, FeatureNativeCountry::kHungary};
                         std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                       if (instance.occupation == FeatureOccupation::kOutOfVocabulary ||
                           instance.occupation == FeatureOccupation::kCraftRepair ||
@@ -4980,7 +4980,7 @@ inline Label Predict(const Instance& instance) {
       instance.marital_status == FeatureMaritalStatus::kMarriedAfSpouse) {
     if (instance.education_num >= 12.5) {
       if (instance.capital_gain >= 7032.5) {
-        if (std::array<FeatureOccupation,10> mask = { FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+        if (std::array<FeatureOccupation,10> mask = {FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
             std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
           accumulator += 0.333333;
         } else {
@@ -5010,7 +5010,7 @@ inline Label Predict(const Instance& instance) {
                 instance.occupation == FeatureOccupation::kTechSupport ||
                 instance.occupation == FeatureOccupation::kProtectiveServ) {
               if (instance.age >= 25.5) {
-                if (std::array<FeatureNativeCountry,21> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kMexico, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kCanada, FeatureNativeCountry::kPuertoRico, FeatureNativeCountry::kIndia, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kChina, FeatureNativeCountry::kItaly, FeatureNativeCountry::kJapan, FeatureNativeCountry::kTaiwan, FeatureNativeCountry::kIran, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kIreland, FeatureNativeCountry::kScotland};
+                if (std::array<FeatureNativeCountry,21> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kMexico, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kCanada, FeatureNativeCountry::kPuertoRico, FeatureNativeCountry::kIndia, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kChina, FeatureNativeCountry::kItaly, FeatureNativeCountry::kJapan, FeatureNativeCountry::kTaiwan, FeatureNativeCountry::kIran, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kEcuador, FeatureNativeCountry::kIreland, FeatureNativeCountry::kScotland};
                     std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                   if (instance.age >= 68.5) {
                     if (instance.education == FeatureEducation::kBachelors ||
@@ -5108,7 +5108,7 @@ inline Label Predict(const Instance& instance) {
                     } else {
                       if (instance.relationship == FeatureRelationship::kHusband ||
                           instance.relationship == FeatureRelationship::kWife) {
-                        if (std::array<FeatureNativeCountry,10> mask = { FeatureNativeCountry::kMexico, FeatureNativeCountry::kCanada, FeatureNativeCountry::kPuertoRico, FeatureNativeCountry::kIndia, FeatureNativeCountry::kCuba, FeatureNativeCountry::kChina, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kIreland, FeatureNativeCountry::kScotland};
+                        if (std::array<FeatureNativeCountry,10> mask = {FeatureNativeCountry::kMexico, FeatureNativeCountry::kCanada, FeatureNativeCountry::kPuertoRico, FeatureNativeCountry::kIndia, FeatureNativeCountry::kCuba, FeatureNativeCountry::kChina, FeatureNativeCountry::kPoland, FeatureNativeCountry::kHaiti, FeatureNativeCountry::kIreland, FeatureNativeCountry::kScotland};
                             std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                           accumulator += 0.333333;
                         } else {
@@ -5189,7 +5189,7 @@ inline Label Predict(const Instance& instance) {
                   instance.workclass == FeatureWorkclass::kLocalGov ||
                   instance.workclass == FeatureWorkclass::kSelfEmpInc ||
                   instance.workclass == FeatureWorkclass::kFederalGov) {
-                if (std::array<FeatureNativeCountry,11> mask = { FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kIndia, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kIran, FeatureNativeCountry::kPoland, FeatureNativeCountry::kFrance, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kYugoslavia};
+                if (std::array<FeatureNativeCountry,11> mask = {FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kIndia, FeatureNativeCountry::kCuba, FeatureNativeCountry::kEngland, FeatureNativeCountry::kIran, FeatureNativeCountry::kPoland, FeatureNativeCountry::kFrance, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kYugoslavia};
                     std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                   if (instance.native_country == FeatureNativeCountry::kGermany ||
                       instance.native_country == FeatureNativeCountry::kIran ||
@@ -5349,7 +5349,7 @@ inline Label Predict(const Instance& instance) {
           } else {
           }
         } else {
-          if (std::array<FeatureOccupation,12> mask = { FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kFarmingFishing, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+          if (std::array<FeatureOccupation,12> mask = {FeatureOccupation::kOutOfVocabulary, FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kOtherService, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTransportMoving, FeatureOccupation::kHandlersCleaners, FeatureOccupation::kFarmingFishing, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
               std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
             accumulator += 0.333333;
           } else {
@@ -5366,16 +5366,16 @@ inline Label Predict(const Instance& instance) {
             if (instance.education == FeatureEducation::kSomeCollege ||
                 instance.education == FeatureEducation::kAssocVoc ||
                 instance.education == FeatureEducation::kAssocAcdm) {
-              if (std::array<FeatureOccupation,8> mask = { FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
+              if (std::array<FeatureOccupation,8> mask = {FeatureOccupation::kProfSpecialty, FeatureOccupation::kExecManagerial, FeatureOccupation::kCraftRepair, FeatureOccupation::kAdmClerical, FeatureOccupation::kSales, FeatureOccupation::kMachineOpInspct, FeatureOccupation::kTechSupport, FeatureOccupation::kProtectiveServ};
                   std::binary_search(mask.begin(), mask.end(),  instance.occupation)) {
                 if (instance.fnlwgt >= 152920) {
                   if (instance.capital_loss >= 1794) {
                     accumulator += 0.333333;
                   } else {
                     if (instance.hours_per_week >= 31) {
-                      if (std::array<FeatureNativeCountry,12> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPoland, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kFrance, FeatureNativeCountry::kThailand};
+                      if (std::array<FeatureNativeCountry,12> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kCuba, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPoland, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kFrance, FeatureNativeCountry::kThailand};
                           std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
-                        if (std::array<FeatureNativeCountry,9> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kFrance, FeatureNativeCountry::kThailand};
+                        if (std::array<FeatureNativeCountry,9> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCanada, FeatureNativeCountry::kElSalvador, FeatureNativeCountry::kJamaica, FeatureNativeCountry::kItaly, FeatureNativeCountry::kPortugal, FeatureNativeCountry::kFrance, FeatureNativeCountry::kThailand};
                             std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                           if (instance.fnlwgt >= 216722) {
                             accumulator += 0.333333;
@@ -5703,7 +5703,7 @@ inline Label Predict(const Instance& instance) {
                     if (instance.age >= 65.5) {
                       accumulator += 0.333333;
                     } else {
-                      if (std::array<FeatureNativeCountry,8> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCuba, FeatureNativeCountry::kItaly, FeatureNativeCountry::kIran, FeatureNativeCountry::kPortugal};
+                      if (std::array<FeatureNativeCountry,8> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kPhilippines, FeatureNativeCountry::kGermany, FeatureNativeCountry::kCuba, FeatureNativeCountry::kItaly, FeatureNativeCountry::kIran, FeatureNativeCountry::kPortugal};
                           std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                         if (instance.fnlwgt >= 362708) {
                           if (instance.fnlwgt >= 379206) {
@@ -5766,7 +5766,7 @@ inline Label Predict(const Instance& instance) {
                         }
                       }
                     } else {
-                      if (std::array<FeatureNativeCountry,8> mask = { FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kGermany, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kYugoslavia};
+                      if (std::array<FeatureNativeCountry,8> mask = {FeatureNativeCountry::kOutOfVocabulary, FeatureNativeCountry::kUnitedStates, FeatureNativeCountry::kGermany, FeatureNativeCountry::kEngland, FeatureNativeCountry::kSouth, FeatureNativeCountry::kItaly, FeatureNativeCountry::kCambodia, FeatureNativeCountry::kYugoslavia};
                           std::binary_search(mask.begin(), mask.end(),  instance.native_country)) {
                         if (instance.capital_gain >= 2994) {
                           accumulator += 0.333333;

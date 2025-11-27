@@ -40,6 +40,8 @@ print(model.predict(ds[:1]))
 #include "yggdrasil_decision_forests/serving/embed/test_model_abalone_regression_rf_small.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_abalone_regression_rf_small_routing.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_filegroup_filegroup.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_integerized_proba.h"
+#include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_integerized_proba_routing.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_oblique_proba.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_class.h"
 #include "yggdrasil_decision_forests/serving/embed/test_model_adult_binary_class_gbdt_v2_proba.h"
@@ -104,6 +106,42 @@ namespace {
       .capital_loss = 0,                                                 \
       .hours_per_week = 40,                                              \
       .native_country = FeatureNativeCountryFromString("United-States"), \
+  }
+
+#define ADULT_INTEGERIZED_EXAMPLE \
+  {                               \
+      .workclass = 7,             \
+      .education = 10,            \
+      .marital_status = 5,        \
+      .occupation = 1,            \
+      .relationship = 2,          \
+      .race = 5,                  \
+      .sex = 2,                   \
+      .native_country = 39,       \
+      .age = 39,                  \
+      .fnlwgt = 77516,            \
+      .education_num = 13,        \
+      .capital_gain = 2174,       \
+      .capital_loss = 0,          \
+      .hours_per_week = 40,       \
+  }
+
+#define ADULT_INTEGERIZED_EXAMPLE_WITH_NA \
+  {                                       \
+      .workclass = -1,                    \
+      .education = 10,                    \
+      .marital_status = 5,                \
+      .occupation = 1,                    \
+      .relationship = 2,                  \
+      .race = 5,                          \
+      .sex = 2,                           \
+      .native_country = 39,               \
+      .age = 39,                          \
+      .fnlwgt = 77516,                    \
+      .education_num = 13,                \
+      .capital_gain = 2174,               \
+      .capital_loss = 0,                  \
+      .hours_per_week = 40,               \
   }
 
 #define IRIS_EXAMPLE        \
@@ -183,6 +221,22 @@ TEST(Embed, test_model_adult_binary_class_gbdt_oblique_proba) {
   using namespace test_model_adult_binary_class_gbdt_oblique_proba;
   const float pred = Predict(ADULT_EXAMPLE);
   EXPECT_NEAR(pred, 0.03093987, eps);
+}
+
+TEST(Embed, test_model_adult_binary_class_gbdt_integerized_proba_routing) {
+  using namespace test_model_adult_binary_class_gbdt_integerized_proba_routing;
+  const float pred = Predict(ADULT_INTEGERIZED_EXAMPLE);
+  EXPECT_NEAR(pred, 0.07105424, eps);
+  const float pred_with_na = Predict(ADULT_INTEGERIZED_EXAMPLE_WITH_NA);
+  EXPECT_NEAR(pred_with_na, 0.08136991, eps);
+}
+
+TEST(Embed, test_model_adult_binary_class_gbdt_integerized_proba) {
+  using namespace test_model_adult_binary_class_gbdt_integerized_proba;
+  const float pred = Predict(ADULT_INTEGERIZED_EXAMPLE);
+  EXPECT_NEAR(pred, 0.07105424, eps);
+  const float pred_with_na = Predict(ADULT_INTEGERIZED_EXAMPLE_WITH_NA);
+  EXPECT_NEAR(pred_with_na, 0.08136991, eps);
 }
 
 // RF binary class

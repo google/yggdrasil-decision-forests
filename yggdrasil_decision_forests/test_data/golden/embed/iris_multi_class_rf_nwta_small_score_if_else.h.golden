@@ -28,14 +28,20 @@ struct Instance {
   Numerical petal_width;
 };
 
-// Predict on an instance with no NaN values. This function may give incorrect
-// predictions if `instance` contains missing values (e.g. NaN).
+// Predicts on an instance without any safety checks.
 //
-// Prefer using `Predict()` unless `instance` is guaranteed to not contain
-// missing values.
+// The caller must ensure that the instance meets the following conditions:
+// - Numerical features must not be NaN.
+// - Integerized categorical features must be within the range [0, max_value],
+//   where max_value is the maximum value observed during training.
+//
+// Failure to meet these conditions may result in undefined behavior.
+//
+// It is recommended to use `Predict()` instead, unless the instance has
+// already been sanitized.
 //
 // This function is called by `Predict()`.
-inline std::array<float, 3> PredictWithoutMissingValues(const Instance& instance) {
+inline std::array<float, 3> PredictUnsafe(const Instance& instance) {
   std::array<float, 3> accumulator {0};
   // Tree #0
   if (instance.petal_width >= 0.75) {
@@ -109,15 +115,14 @@ inline std::array<float, 3> PredictWithoutMissingValues(const Instance& instance
 
 // Prediction function.
 //
-// Replaces NaN numerical features by the global imputation of the model, and
-// then calls `PredictWithoutMissingValues()`.
+// Sanitizes the given instance, then calls `PredictUnsafe()`.
 inline std::array<float, 3> Predict(Instance instance) {
   instance.sepal_length = std::isnan(instance.sepal_length) ? 5.843333 : instance.sepal_length;
   instance.sepal_width = std::isnan(instance.sepal_width) ? 3.057333 : instance.sepal_width;
   instance.petal_length = std::isnan(instance.petal_length) ? 3.758000 : instance.petal_length;
   instance.petal_width = std::isnan(instance.petal_width) ? 1.199333 : instance.petal_width;
 
-  return PredictWithoutMissingValues(instance);
+  return PredictUnsafe(instance);
 }
 
 }  // namespace ydf_model

@@ -72,12 +72,25 @@ constexpr const int kNumTrees = $1;
 
 struct Instance {
   typedef $2 Numerical;
-
 )",
                             model.input_features().size(),  // $0
                             stats.num_trees,                // $1
                             numerical_type                  // $2
   );
+  if (internal_options.has_integerized_categorical) {
+    absl::SubstituteAndAppend(
+        &content, R"(  // Integerized categorical features require special care.
+  // The PredictUnsafe() function has undefined behavior if an integerized
+  // categorical feature value is outside the range [0, max_value], where
+  // max_value is the maximum value seen during training. To ensure
+  // safe predictions, use the Predict() function, which automatically
+  // sanitizes the input values.
+  typedef $0 IntegerizedCategorical;
+)",
+        SignedInteger((internal_options.feature_value_bytes))  // $0
+    );
+  }
+  absl::StrAppend(&content, "\n");
 
   for (int i = 0; i < model.input_features().size(); ++i) {
     const auto& feature_def = feature_defs[i];
@@ -299,24 +312,29 @@ namespace $0 {
 
   if (requires_nan_replacement) {
     absl::SubstituteAndAppend(&header, R"(
-// Predict on an instance with no NaN values. This function may give incorrect
-// predictions if `instance` contains missing values (e.g. NaN).
+// Predicts on an instance without any safety checks.
 //
-// Prefer using `Predict()` unless `instance` is guaranteed to not contain
-// missing values.
+// The caller must ensure that the instance meets the following conditions:
+// - Numerical features must not be NaN.
+// - Integerized categorical features must be within the range [0, max_value],
+//   where max_value is the maximum value observed during training.
+//
+// Failure to meet these conditions may result in undefined behavior.
+//
+// It is recommended to use `Predict()` instead, unless the instance has
+// already been sanitized.
 //
 // This function is called by `Predict()`.
-inline $0 PredictWithoutMissingValues(const Instance& instance) {
+inline $0 PredictUnsafe(const Instance& instance) {
 $1
 }
 
 // Prediction function.
 //
-// Replaces NaN numerical features by the global imputation of the model, and
-// then calls `PredictWithoutMissingValues()`.
+// Sanitizes the given instance, then calls `PredictUnsafe()`.
 inline $0 Predict(Instance instance) {
 $2
-  return PredictWithoutMissingValues(instance);
+  return PredictUnsafe(instance);
 }
 )",
                               predict_output_type,                   // $0
@@ -372,7 +390,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
           << "The model is not trained with global imputation. The generated "
              "code will crash if an instance with NaN values is provided. "
              "Ensure that input instances are NaN-free and call "
-             "PredictWithoutMissingValues or train the model with global "
+             "PredictUnsafe or train the model with global "
              "imputation.";
       *content_with_nan_replacement = R"(
     // If the model has not been trained with global imputation, export to C++
@@ -384,14 +402,29 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
     } else {
       for (const auto& feature_def : feature_defs) {
         if (feature_def.na_replacement.has_value()) {
-          // One could use instance.$0 != instance.$0 to avoid inclusion of
-          // cmath, but it hurts readability and is likely not worth it.
-          absl::SubstituteAndAppend(
-              content_with_nan_replacement,
-              "  instance.$0 = std::isnan(instance.$0) ? $1 : instance.$0;\n",
-              feature_def.variable_name,   // $0
-              *feature_def.na_replacement  // $1
-          );
+          if (feature_def.type == "Numerical") {
+            // One could use instance.$0 != instance.$0 to avoid inclusion of
+            // cmath, but it hurts readability and is likely not worth it.
+            absl::SubstituteAndAppend(
+                content_with_nan_replacement,
+                "  instance.$0 = std::isnan(instance.$0) ? $1 : instance.$0;\n",
+                feature_def.variable_name,   // $0
+                *feature_def.na_replacement  // $1
+            );
+          } else if (feature_def.type == "IntegerizedCategorical") {
+            // Integerized Categorical values are unsigned.
+            absl::SubstituteAndAppend(
+                content_with_nan_replacement,
+                "  instance.$0 = instance.$0 == -1 ? $1 : instance.$0;\n"
+                "  instance.$0 = (instance.$0 < -1 || instance.$0 > $2) ? 0 : "
+                "instance.$0;\n",
+                feature_def.variable_name,    // $0
+                *feature_def.na_replacement,  // $1
+                *feature_def.maximum_value    // $2
+            );
+          } else {
+            return absl::InternalError("Invalid na_replacement value");
+          }
         }
       }
     }
@@ -889,12 +922,24 @@ absl::StatusOr<FeatureDef> GenFeatureDef(
     } break;
     case dataset::proto::ColumnType::BOOLEAN:
     case dataset::proto::ColumnType::CATEGORICAL: {
-      return FeatureDef{
-          .variable_name = StringToVariableSymbol(col.name()),
-          .type = absl::StrCat("Feature", StringToStructSymbol(col.name())),
-          .underlying_type =
-              UnsignedInteger(internal_options.feature_value_bytes),
-          .default_value = {}};
+      if (col.categorical().is_already_integerized()) {
+        return FeatureDef{
+            .variable_name = StringToVariableSymbol(col.name()),
+            .type = "IntegerizedCategorical",
+            .underlying_type =
+                UnsignedInteger(internal_options.feature_value_bytes),
+            .na_replacement =
+                std::to_string(col.categorical().most_frequent_value()),
+            .maximum_value = std::to_string(
+                col.categorical().number_of_unique_values() - 1)};
+      } else {
+        return FeatureDef{
+            .variable_name = StringToVariableSymbol(col.name()),
+            .type = absl::StrCat("Feature", StringToStructSymbol(col.name())),
+            .underlying_type =
+                UnsignedInteger(internal_options.feature_value_bytes),
+            .default_value = {}};
+      }
     } break;
     default:
       return absl::InvalidArgumentError(
@@ -924,47 +969,66 @@ absl::Status GenerateTreeInferenceIfElseNode(
   const auto categorical_contains_condition =
       [&](const int attribute_idx, absl::string_view variable_name,
           absl::Span<const int32_t> elements) -> absl::Status {
-    const auto cat_dict_it =
-        internal_options.categorical_dicts.find(attribute_idx);
-    if (cat_dict_it == internal_options.categorical_dicts.end()) {
-      return absl::InternalError("cannot find dict");
-    }
-
-    // if the column has a dictionary. elements is large.
+    const bool is_integerized =
+        dataspec.columns(attribute_idx).categorical().is_already_integerized();
+    auto get_element_str = [&](int32_t element) -> absl::StatusOr<std::string> {
+      if (is_integerized) {
+        return std::to_string(element);
+      } else {
+        const auto cat_dict_it =
+            internal_options.categorical_dicts.find(attribute_idx);
+        if (cat_dict_it == internal_options.categorical_dicts.end()) {
+          return absl::InternalError("cannot find dict");
+        }
+        return absl::StrCat("Feature", cat_dict_it->second.sanitized_name,
+                            "::k",
+                            cat_dict_it->second.sanitized_items[element]);
+      }
+    };
     if (elements.size() < 8) {
-      // List the elements are a sequence of ==.
+      // List the elements as a sequence of ==.
       for (int element_idx = 0; element_idx < elements.size(); element_idx++) {
         if (element_idx > 0) {
           absl::StrAppend(&condition, " ||\n", prefix, "    ");
         }
-        const auto element_str = absl::StrCat(
-            "Feature", cat_dict_it->second.sanitized_name, "::k",
-            cat_dict_it->second.sanitized_items[elements[element_idx]]);
+        ASSIGN_OR_RETURN(const std::string element_str,
+                         get_element_str(elements[element_idx]));
         absl::SubstituteAndAppend(&condition, "instance.$0 == $1",
                                   variable_name, element_str);
       }
     } else {
       // Use binary search.
-      std::string mask;
-      for (const auto element_idx : elements) {
-        const auto element_str =
-            cat_dict_it->second.sanitized_items[element_idx];
-        if (!mask.empty()) {
-          absl::StrAppend(&mask, ",");
+      std::vector<std::string> str_elements;
+      str_elements.reserve(elements.size());
+      for (const auto element : elements) {
+        ASSIGN_OR_RETURN(const std::string element_str,
+                         get_element_str(element));
+        str_elements.push_back(element_str);
+      }
+      std::string mask = absl::StrJoin(str_elements, ", ");
+
+      std::string array_type;
+      if (is_integerized) {
+        array_type = "Instance::IntegerizedCategorical";
+      } else {
+        const auto cat_dict_it =
+            internal_options.categorical_dicts.find(attribute_idx);
+        if (cat_dict_it == internal_options.categorical_dicts.end()) {
+          return absl::InternalError("cannot find dict");
         }
-        absl::StrAppend(&mask, " Feature", cat_dict_it->second.sanitized_name,
-                        "::k", element_str);
+        array_type =
+            absl::StrCat("Feature", cat_dict_it->second.sanitized_name);
       }
 
       absl::SubstituteAndAppend(
           &condition,
-          "std::array<Feature$4,$0> mask = {$1};\n$3    "
-          "std::binary_search(mask.begin(), mask.end(),  instance.$2)",
-          elements.size(),                    //  $0
-          mask,                               // $1
-          variable_name,                      // $2
-          prefix,                             // $3
-          cat_dict_it->second.sanitized_name  // $4
+          "std::array<$1,$0> mask = {$2};\n$4    "
+          "std::binary_search(mask.begin(), mask.end(),  instance.$3)",
+          elements.size(),  //  $0
+          array_type,       // $1
+          mask,             // $2
+          variable_name,    // $3
+          prefix            // $4
       );
     }
     return absl::OkStatus();

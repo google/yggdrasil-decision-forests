@@ -224,6 +224,18 @@ SIMPLE_PARAMETERIZED_TEST(
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::PROBABILITY,
         },
+        {
+            "adult_binary_class_gbdt_integerized",
+            "adult_binary_class_gbdt_integerized_proba_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_gbdt_integerized",
+            "adult_binary_class_gbdt_integerized_proba_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+        },
     }) {
   const auto& test_case = GetParam();
 

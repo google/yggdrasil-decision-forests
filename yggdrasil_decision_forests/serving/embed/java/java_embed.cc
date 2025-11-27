@@ -293,9 +293,14 @@ absl::StatusOr<std::string> GenInstanceStruct(
         has_numerical = true;
         break;
       case dataset::proto::ColumnType::CATEGORICAL:
-      case dataset::proto::ColumnType::BOOLEAN:
+      case dataset::proto::ColumnType::BOOLEAN: {
         has_categorical_or_boolean = true;
-        break;
+        if (col.categorical().is_already_integerized()) {
+          return absl::InvalidArgumentError(
+              "Integerized categorical features are not yet supported for the "
+              "Java export.");
+        }
+      } break;
       default:
         break;
     }

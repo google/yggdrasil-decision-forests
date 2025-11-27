@@ -271,8 +271,13 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
     if (col_spec.type() != dataset::proto::ColumnType::CATEGORICAL) {
       continue;
     }
-    add_dict(StringToStructSymbol(col_spec.name()), input_feature,
-             col_spec.categorical(), false);
+    if (col_spec.categorical().has_is_already_integerized() &&
+        col_spec.categorical().is_already_integerized()) {
+      out->has_integerized_categorical = true;
+    } else {
+      add_dict(StringToStructSymbol(col_spec.name()), input_feature,
+               col_spec.categorical(), false);
+    }
   }
 
   return absl::OkStatus();
