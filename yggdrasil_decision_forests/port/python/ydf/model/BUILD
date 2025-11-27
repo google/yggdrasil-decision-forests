@@ -305,7 +305,8 @@ py_test(
 cc_test(
     name = "export_cc_run_test",
     srcs = [
-        "export_cc_generated_lib.h",
+        "export_cc_generated_lib_adult_binary_class_gbdt.h",
+        "export_cc_generated_lib_adult_binary_class_gbdt_integerized.h",
         "export_cc_run_test.cc",
     ],
     data = [
@@ -329,8 +330,18 @@ cc_test(
 genrule(
     name = "export_cc_generate_lib",
     srcs = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    outs = ["export_cc_generated_lib.h"],
-    cmd = "$(location export_cc_generator) --input_model=third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt --output_code=$@",
+    outs = [
+        "export_cc_generated_lib_adult_binary_class_gbdt.h",
+        "export_cc_generated_lib_adult_binary_class_gbdt_integerized.h",
+    ],
+    cmd = """
+      $(location :export_cc_generator) \
+          --input_model=third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt \
+          --output_code=$(location export_cc_generated_lib_adult_binary_class_gbdt.h);
+      $(location :export_cc_generator) \
+          --input_model=third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_integerized \
+          --output_code=$(location export_cc_generated_lib_adult_binary_class_gbdt_integerized.h);
+    """,
     tags = ["manual"],
     tools = [":export_cc_generator"],
 )

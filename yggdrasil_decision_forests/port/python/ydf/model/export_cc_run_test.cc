@@ -18,7 +18,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
-#include "ydf/model/export_cc_generated_lib.h"
+#include "ydf/model/export_cc_generated_lib_adult_binary_class_gbdt.h"
+#include "ydf/model/export_cc_generated_lib_adult_binary_class_gbdt_integerized.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -32,7 +33,7 @@ std::string TestDataDir() {
 }
 
 TEST(RunModel, Base) {
-  const auto model = exported_model_123::Load(
+  const auto model = exported_model_adult_binary_class_gbdt::Load(
       file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"));
   ASSERT_OK(model.status());
 
@@ -42,6 +43,18 @@ TEST(RunModel, Base) {
   for (const float p : predictions) {
     LOG(INFO) << p;
   }
+}
+
+TEST(RunModel, Integerized) {
+  const auto model =
+      exported_model_adult_binary_class_gbdt_integerized::Load(file::JoinPath(
+          TestDataDir(), "model", "adult_binary_class_gbdt_integerized"));
+  ASSERT_OK(model.status());
+
+  const auto predictions = model->Predict();
+
+  EXPECT_NEAR(predictions[0], 0.19673845, 0.00001);
+  EXPECT_NEAR(predictions[1], 0.25775748, 0.00001);
 }
 
 }  // namespace
