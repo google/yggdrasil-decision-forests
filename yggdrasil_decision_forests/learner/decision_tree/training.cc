@@ -605,11 +605,6 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegressionHessianGain(
     return absl::InternalError("Fake error");
   }
 
-  if (attribute_idx < 0 ||
-      attribute_idx >= train_dataset.data_spec().columns_size()) {
-    return absl::OutOfRangeError("The attribute index is out of bounds");
-  }
-
   const int min_num_obs =
       dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
 
@@ -1255,6 +1250,15 @@ absl::StatusOr<SplitterWorkResponse> FindBestConditionFromSplitterWorkRequest(
                           ? SplitSearchResult::kBetterSplitFound
                           : SplitSearchResult::kNoBetterSplitFound;
     return response;
+  }
+
+  if (request.attribute_idx < 0 ||
+      request.attribute_idx >=
+          request.common->train_dataset.data_spec().columns_size()) {
+    return absl::OutOfRangeError(absl::StrCat(
+        "The attribute index is out of bounds - attribute_idx: ",
+        request.attribute_idx, ", columns in the dataset: ",
+        request.common->train_dataset.data_spec().columns_size(), "."));
   }
 
   switch (config.task()) {
