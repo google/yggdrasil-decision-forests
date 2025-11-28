@@ -46,6 +46,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/learner/random_forest/random_forest.h" // add
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
@@ -136,7 +137,19 @@ void Predict() {
   predictions.resize(dataset.nrow());
 
   auto engine_or = model->BuildFastEngine();
-  if (engine_or.ok()) {
+  bool use_slow_engine_kernel = false; 
+
+  // Kernel method fallback: if enabled, always skip fast engine
+  if (model->task() == model::proto::Task::CLASSIFICATION) {
+    const auto* rf_model = dynamic_cast<const model::random_forest::RandomForestModel*>(model.get());
+    if (rf_model != nullptr && rf_model->kernel_method()) {
+      LOG(INFO) << "Skip fast engine because kernel_method = true";
+      use_slow_engine_kernel = true;
+    }
+  }
+
+  if (!use_slow_engine_kernel && !engine_or.ok()) {
+  //if (false) {
     LOG(INFO) << "Run predictions with semi-fast engine";
 
     // Convert dataset to efficient format.
