@@ -23,14 +23,12 @@
 // values, the mean value of numerical attributes, etc.
 //
 // While the dataspec can be defined by the user, it is better to use the
-// automatic dataspec builder. This program scans a dataset and generate the
+// automatic dataspec builder. This program scans a dataset and generates the
 // most likely dataspec. The user can give indications to the dataspec builder
 // using a DataSpecificationGuide proto.
 //
-// Currently supported formats to compute automatically dataspec are: Csv,
-// tensorflow.Example+recordIO and tensorflow.Example+sstable. In a future
-// version, dataspecs will support ColumnIO and Proto (using reflexion).
-// Computing the dataspec can be done locally or using flume.
+// Currently supported formats to compute dataspec automatically are: Csv,
+// tensorflow.Example+recordIO and tensorflow.Example+sstable.
 //
 // Naming convention (in the code and in the protos):
 //  "cat" : Categorical (for categorical attribute).
@@ -75,7 +73,7 @@ enum ColumnType {
   // A numerical vector sequence value is a sequence (e.g. a list) of numerical
   // vectors. A numerical vector is a sequence of floats. The number of vectors
   // in a sequence can vary from one example to another. Some examples can have
-  // empty sequences.The length of vectors is fixed for all the vectors in a
+  // empty sequences. The length of vectors is fixed for all the vectors in a
   // dataset (i.e., not just for the vectors in a sequence). Semantically, all
   // the i-th value of all vectors are expected to represent the same type
   // of data. An empty sequence is different than an unknown value sequence
@@ -92,7 +90,7 @@ message Column {
   optional ColumnType type = 1 [default = UNKNOWN];
   // Column unique name.
   optional string name = 2;
-  // If true, the type is set manually by the user (instead of been
+  // If true, the type is set manually by the user (instead of being
   // automatically detected). This field is purely used for debugging purpose
   // and has no impact on the computation. Note that if a column guide matches
   // this column, and if this column guide does not contain a type,
@@ -176,7 +174,7 @@ message CategoricalSpec {
   // dictionary. If "max_number_of_unique_values" == -1, the items are not
   // pruned.
   optional int32 max_number_of_unique_values = 4 [default = 2000];
-  // If true, values are interpreted directed as an integer. If false, values
+  // If true, values are interpreted directly as an integer. If false, values
   // are indexed in the "items" dictionary.
   optional bool is_already_integerized = 5;
   // Dictionary of values. Only available if is_already_integerized=false. In
@@ -240,7 +238,7 @@ message NumericalVectorSequenceSpec {
   // The length of the vectors.
   optional int32 vector_length = 1;
 
-  // Number of value (i.e., float) seen.
+  // Number of values (i.e., float) seen.
   optional int64 count_values = 2;
 
   // Minimum and maximum number of vectors seen.
@@ -261,10 +259,10 @@ message NumericalVectorSequenceSpec {
 // Because encoding a numerical value into a discretized numerical value is
 // lossy, the original numerical value cannot be recovered. In this case, the
 // following logic is applied:
-//   If i==-1, the numercal value is "std::nan" (corresponding to a missing
+//   If i==-1, the numerical value is "std::nan" (corresponding to a missing
 //   value). If i==0, the numerical value is "boundaries.front()-1". If
 //   i==boundaries.size(), the numerical value is "boundaries.back()+1". If i
-//   \in [1, boundaries.size()[, the numerical value is
+//   \in [1, boundaries.size()[ , the numerical value is
 //   "(boundaries[i-1]+boundaries[i])/2".
 message DiscretizedNumericalSpec {
   // Boundaries in between the bins.
@@ -340,7 +338,8 @@ message Unstacked {
 //   - The column called "feature_1" is a CATEGORICAL_SET and should be
 //     tokenized by commas.
 //   - The column called "feature_1" is a CATEGORICAL and the categorical
-//     values seen less than 50 times should be ignored (considered out-of-bag).
+//     values seen less than 50 times should be ignored (considered
+//     out-of-vocab).
 //   - The size of the CATEGORICAL and CATEGORICAL_SET column dictionaries
 //     should not have more than 1000 items.
 //   - Column that look BOOLEAN should be interpreted as NUMERICAL.
@@ -352,7 +351,7 @@ message DataSpecificationGuide {
   repeated ColumnGuide column_guides = 1;
   // Default guide for all columns.
   // Also apply to columns matched with "column_guides", but with a lower
-  // priority. For example, if an configuration option is set both in
+  // priority. For example, if a configuration option is set both in
   // "default_column_guide" and "column_guides", the value is "column_guides"
   // will be used.
   optional ColumnGuide default_column_guide = 2;
@@ -406,7 +405,7 @@ message ColumnGuide {
   // than one entry, an error will be raised.
   optional TokenizerGuide tokenizer = 5;
   // If true, a column can be matched against multiple different "ColumnGuide"
-  // with the last ColumnGuide having higher priority. For example, it the
+  // with the last ColumnGuide having higher priority. For example, if the
   // "type" is set in two matching column guides, the type defined in the last
   // column guide will be used. If false, an error will be raised if more than
   // one column guide is matching a column.
@@ -417,7 +416,7 @@ message ColumnGuide {
 }
 
 message CategoricalGuide {
-  // Minimum frequency of an categorical value not to be replaced by the <RARE>
+  // Minimum frequency of a categorical value not to be replaced by the <RARE>
   // special value.
   optional int32 min_vocab_frequency = 1 [default = 5];
   // Maximum number of unique categorical values. If more values are present,
@@ -484,7 +483,7 @@ message DataSpecificationAccumulator {
     optional double kahan_sum_of_square_error = 7;
 
     // Mapping between float values (represented as an uint32) and the number of
-    // times this value was saw.
+    // times this value was seen.
     //
     // Note: Map don't allow float indexed maps.
     map<fixed32, int32> discretized_numerical = 5;
