@@ -46,6 +46,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -107,20 +108,44 @@ int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
     // Note: if there is only one feature, all the projections are the same.
     return 1;
   }
-  const int max_num_projections =
-      dt_config.sparse_oblique_split().max_num_projections();
 
-  const int min_num_projections =
-      std::min(dt_config.sparse_oblique_split().min_num_projections(),
-               num_numerical_features);
+  switch (dt_config.split_axis_case()) {
+    case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit: {
+      const int max_num_projections =
+          dt_config.sparse_oblique_split().max_num_projections();
 
-  const int target_num_projections =
-      0.5 + std::ceil(std::pow(
-                num_numerical_features,
-                dt_config.sparse_oblique_split().num_projections_exponent()));
+      const int min_num_projections =
+          std::min(dt_config.sparse_oblique_split().min_num_projections(),
+                   num_numerical_features);
 
-  return std::max(std::min(target_num_projections, max_num_projections),
-                  min_num_projections);
+      const int target_num_projections =
+          0.5 +
+          std::ceil(std::pow(
+              num_numerical_features,
+              dt_config.sparse_oblique_split().num_projections_exponent()));
+
+      return std::max(std::min(target_num_projections, max_num_projections),
+                      min_num_projections);
+    } break;
+    case proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit: {
+      const int max_num_projections =
+          dt_config.guided_oblique_split().max_num_candidate();
+      const int min_num_projections =
+          std::min(dt_config.guided_oblique_split().min_num_candidate(),
+                   num_numerical_features);
+
+      const int target_num_projections =
+          0.5 + std::ceil(std::pow(
+                    num_numerical_features,
+                    dt_config.guided_oblique_split().num_candidate_exponent()));
+      return std::max(std::min(target_num_projections, max_num_projections),
+                      min_num_projections);
+    } break;
+    case proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET:
+    case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
+    case proto::DecisionTreeTrainingConfig::kAxisAlignedSplit:
+      return 1;
+  }
 }
 
 template <typename LabelStats>
@@ -154,7 +179,9 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   }
 
   const float projection_density =
-      dt_config.sparse_oblique_split().projection_density_factor() /
+      std::min<int>(
+          config_link.numerical_features_size(),
+          dt_config.sparse_oblique_split().projection_density_factor()) /
       config_link.numerical_features_size();
 
   // Best and current projections.
@@ -195,6 +222,132 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
             selected_labels, projection_values, internal_config,
             current_projection.front().attribute_idx, constraints,
             monotonic_direction, best_condition, cache));
+
+    if (result == SplitSearchResult::kBetterSplitFound) {
+      best_projection = current_projection;
+      best_threshold =
+          best_condition->condition().higher_condition().threshold();
+    }
+  }
+
+  // Update with the actual current_projection definition.
+  if (!best_projection.empty()) {
+    RETURN_IF_ERROR(SetCondition(best_projection, best_threshold,
+                                 train_dataset.data_spec(), best_condition));
+    return true;
+  }
+
+  return false;
+}
+
+template <typename LabelStats>
+absl::StatusOr<bool> FindBestConditionGuidedObliqueTemplate(
+    const dataset::VerticalDataset& train_dataset,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const std::vector<float>& weights,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const proto::Node& parent, const InternalTrainConfig& internal_config,
+    const LabelStats& label_stats,
+    const std::optional<int>& override_num_projections,
+    const NodeConstraints& constraints, proto::NodeCondition* best_condition,
+    utils::RandomEngine* random, SplitterPerThreadCache* cache) {
+  if (!weights.empty()) {
+    STATUS_CHECK_EQ(weights.size(), train_dataset.nrow());
+  }
+  if (config_link.numerical_features().empty()) {
+    return false;
+  }
+
+  // Get the number of projections to test.
+  int num_projections;
+  if (override_num_projections.has_value()) {
+    num_projections = override_num_projections.value();
+  } else {
+    num_projections =
+        GetNumProjections(dt_config, config_link.numerical_features_size());
+  }
+
+  // Keep track of the best projection so far.
+  Projection best_projection;
+  float best_threshold;
+
+  // Current projection.
+  Projection current_projection;
+  float current_threshold = 0;
+  auto& projection_values = cache->projection_values;
+
+  ProjectionEvaluator projection_evaluator(train_dataset,
+                                           config_link.numerical_features());
+
+  // TODO: Cache.
+  const auto selected_labels = ExtractLabels(label_stats, selected_examples);
+  std::vector<float> selected_weights;
+  if (!weights.empty()) {
+    selected_weights = Extract(weights, selected_examples);
+  }
+
+  std::vector<UnsignedExampleIdx> dense_example_idxs(selected_examples.size());
+  std::iota(dense_example_idxs.begin(), dense_example_idxs.end(), 0);
+
+  std::vector<bool> already_tested_solo_features(
+      config_link.numerical_features().size(), false);
+
+  // Generates and evaluates projections.
+  for (int projection_idx = 0; projection_idx < num_projections;
+       projection_idx++) {
+    SplitSearchResult result;
+    int8_t monotonic_direction = 0;
+    if (dt_config.guided_oblique_split().proba_exact_one_feature() > 0.f &&
+        utils::RandomUniformFloat(random) <
+            dt_config.guided_oblique_split().proba_exact_one_feature()) {
+      // Do an exact split on one feature instead of an oblique projection.
+      const int local_selected_feature = utils::RandomUniformInt(
+          config_link.numerical_features().size(), random);
+
+      // Avoid to randomly test twice the same feature.
+      if (already_tested_solo_features[local_selected_feature]) {
+        continue;
+      }
+      already_tested_solo_features[local_selected_feature] = true;
+
+      const auto selected_feature =
+          config_link.numerical_features()[local_selected_feature];
+      current_projection.clear();
+      current_projection.push_back({selected_feature, 1.f});
+
+      RETURN_IF_ERROR(projection_evaluator.Evaluate(
+          current_projection, selected_examples, &projection_values));
+
+      // TODO: Use pre-sorting.
+      ASSIGN_OR_RETURN(result,
+                       EvaluateProjection(
+                           dt_config, label_stats, dense_example_idxs,
+                           selected_weights, selected_labels, projection_values,
+                           internal_config, selected_feature, constraints,
+                           monotonic_direction, best_condition, cache));
+    } else {
+      SampleGuidedProjection(config_link.numerical_features(), dt_config,
+                             train_dataset.data_spec(), config_link,
+                             projection_evaluator.numerical_attributes(),
+                             selected_labels, selected_examples,
+                             &current_projection, &current_threshold,
+                             &monotonic_direction, random);
+      DCHECK(!current_projection.empty());
+
+      // Pre-compute the result of the current_projection.
+      RETURN_IF_ERROR(projection_evaluator.Evaluate(
+          current_projection, selected_examples, &projection_values));
+
+      ASSIGN_OR_RETURN(
+          result,
+          EvaluateProjectionWithGivenThreshold(
+              dt_config, label_stats, dense_example_idxs, selected_weights,
+              selected_labels, projection_values, current_threshold,
+              internal_config, current_projection.front().attribute_idx,
+              constraints, monotonic_direction, best_condition, cache));
+    }
 
     if (result == SplitSearchResult::kBetterSplitFound) {
       best_projection = current_projection;
@@ -367,6 +520,66 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
   }
 
   return result;
+}
+
+template <typename LabelStats, typename Labels>
+absl::StatusOr<SplitSearchResult> EvaluateProjectionWithGivenThreshold(
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const LabelStats& label_stats,
+    const absl::Span<const UnsignedExampleIdx> dense_example_idxs,
+    const std::vector<float>& selected_weights, const Labels& selected_labels,
+    const absl::Span<const float> projection_values, const float threshold,
+    const InternalTrainConfig& internal_config, const int first_attribute_idx,
+    const NodeConstraints& constraints, int8_t monotonic_direction,
+    proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
+  InternalTrainConfig effective_internal_config = internal_config;
+  effective_internal_config.override_sorting_strategy =
+      proto::DecisionTreeTrainingConfig::Internal::SortingStrategy::
+          DecisionTreeTrainingConfig_Internal_SortingStrategy_IN_NODE;
+
+  const UnsignedExampleIdx min_num_obs =
+      dt_config.in_split_min_examples_check() ? dt_config.min_examples() : 1;
+
+#ifndef NDEBUG
+  for (const float v : projection_values) {
+    DCHECK(!std::isnan(v));
+  }
+#endif
+
+  // Find a good split in the current_projection.
+  SplitStats split_stats;
+  if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
+    ASSIGN_OR_RETURN(
+        split_stats,
+        EvaluateGreatherThanSplitOnLabelRegression(
+            dense_example_idxs.size(), projection_values, selected_labels,
+            selected_weights, label_stats.label_distribution, min_num_obs,
+            threshold, cache));
+  } else {
+    return absl::InvalidArgumentError("Not implemented");
+  }
+
+  if (split_stats.valid) {
+    // Split is valid.
+    if (split_stats.score > condition->split_score()) {
+      condition->set_split_score(split_stats.score);
+      condition->mutable_condition()->mutable_higher_condition()->set_threshold(
+          threshold);
+      condition->set_num_pos_training_examples_with_weight(
+          split_stats.weighted_num_pos_examples);
+      condition->set_num_pos_training_examples_without_weight(
+          split_stats.nonweighted_num_pos_examples);
+      condition->set_num_training_examples_with_weight(
+          split_stats.weighted_num_examples);
+      condition->set_num_training_examples_without_weight(
+          split_stats.nonweighted_num_examples);
+      return SplitSearchResult::kBetterSplitFound;
+    } else {
+      return SplitSearchResult::kNoBetterSplitFound;
+    }
+  } else {
+    return SplitSearchResult::kInvalidAttribute;
+  }
 }
 
 template absl::StatusOr<SplitSearchResult>
@@ -653,6 +866,9 @@ absl::StatusOr<bool> FindBestConditionOblique(
     case proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET:
     case proto::DecisionTreeTrainingConfig::kAxisAlignedSplit:
       return absl::InvalidArgumentError("Oblique split expected");
+    case proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit:
+      return absl::InvalidArgumentError(
+          "Guided oblique splits are not implemented for classification trees");
   }
 }
 
@@ -683,6 +899,9 @@ absl::StatusOr<bool> FindBestConditionOblique(
     case proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET:
     case proto::DecisionTreeTrainingConfig::kAxisAlignedSplit:
       return absl::InvalidArgumentError("Oblique split expected");
+    case proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit:
+      return absl::InvalidArgumentError(
+          "Guided oblique splits are not implemented for hessian regressions.");
   }
 }
 
@@ -712,10 +931,155 @@ absl::StatusOr<bool> FindBestConditionOblique(
     case proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET:
     case proto::DecisionTreeTrainingConfig::kAxisAlignedSplit:
       return absl::InvalidArgumentError("Oblique split expected");
+    case proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit:
+      return FindBestConditionGuidedObliqueTemplate<RegressionLabelStats>(
+          train_dataset, selected_examples, weights, config, config_link,
+          dt_config, parent, internal_config, label_stats,
+          override_num_projections, {}, best_condition, random, cache);
   }
 }
 
 namespace internal {
+
+// Generates a new guided projection.
+void SampleGuidedProjection(
+    const absl::Span<const int>& features,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const dataset::proto::DataSpecification& data_spec,
+    const model::proto::TrainingConfigLinking& config_link,
+    const absl::Span<const std::vector<float>* const> numerical_attributes,
+    const absl::Span<const float> labels,
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    internal::Projection* projection, float* threshold,
+    int8_t* monotonic_direction, utils::RandomEngine* random,
+    const bool debug) {
+  *monotonic_direction = 0;
+  projection->clear();
+  std::uniform_real_distribution<float> unif01;
+  std::uniform_real_distribution<float> unif1m1(-1.f, 1.f);
+
+#ifndef NDEBUG
+  // All the features are numerical.
+  for (const auto feature : features) {
+    DCHECK_EQ(data_spec.columns(feature).type(), dataset::proto::NUMERICAL);
+  }
+#endif
+
+  // Number of dimensions of the projections i.e. number of selected features.
+  const float binom_p =
+      std::min<int>(features.size(),
+                    dt_config.guided_oblique_split().avg_num_dim()) /
+      features.size();
+  // Expectation[Binomial(p,projection_density)] = num_selected_features
+  std::binomial_distribution<size_t> binom(features.size(), binom_p);
+  size_t num_selected_features = binom(*random);
+
+  int max_num_dim = dt_config.guided_oblique_split().max_num_dim();
+  if (max_num_dim > 0 && num_selected_features > max_num_dim) {
+    num_selected_features = max_num_dim;
+  }
+
+  if (num_selected_features == 0) {
+    num_selected_features = 1;
+  }
+  DCHECK_GT(num_selected_features, 0);
+
+  // Sampling without replacement of the features.
+  absl::btree_set<size_t> picked_idx;
+  // Floyd's sampler to select k indices uniformly
+  for (size_t j = features.size() - num_selected_features; j < features.size();
+       j++) {
+    size_t t = absl::Uniform<size_t>(*random, 0, j + 1);
+    if (!picked_idx.insert(t).second) {
+      picked_idx.insert(j);
+    }
+  }
+  DCHECK_EQ(picked_idx.size(), num_selected_features);
+
+  const auto num_projections = picked_idx.size();
+  projection->reserve(num_projections);
+  // O(k) minimal pass to fill in those indices
+  for (const auto attribute_idx : picked_idx) {
+    projection->push_back({features[attribute_idx], 0.});
+  }
+
+  std::vector<double> sum_feature_times_label;      // A
+  double sum_abs_labels = 0;                        // B
+  std::vector<double> sum_feature_times_abs_label;  // C
+  double sum_labels = 0;                            // D
+  sum_feature_times_label.resize(num_projections, 0);
+  sum_feature_times_abs_label.resize(num_projections, 0);
+
+  // Computes the mean of the feature values, weighted (signed) by the label.
+  // This only makes sense if the label values are gaussian centered; like for
+  // the pseudo label of a GBT.
+  const size_t sample_size = std::min<size_t>(
+      labels.size(), dt_config.guided_oblique_split().num_sampled_examples());
+  for (size_t sample_idx = 0; sample_idx < sample_size; sample_idx++) {
+    size_t local_selected_example;
+    if (!debug) {
+      local_selected_example =
+          absl::Uniform<size_t>(*random, 0, selected_examples.size() - 1);
+    } else {
+      local_selected_example = sample_idx;
+    }
+
+    const auto selected_example = selected_examples[local_selected_example];
+
+    const float label = labels[local_selected_example];
+    const float abs_label = std::abs(label);
+
+    sum_labels += label;
+    sum_abs_labels += abs_label;
+
+    for (int proj_idx = 0; proj_idx < num_projections; proj_idx++) {
+      auto& proj = (*projection)[proj_idx];
+      const auto& attribute_values = *numerical_attributes[proj.attribute_idx];
+      const float attribute_value = attribute_values[selected_example];
+      // feature_sum[proj_idx] += attribute_value;
+
+      sum_feature_times_label[proj_idx] += attribute_value * label;
+      sum_feature_times_abs_label[proj_idx] += attribute_value * abs_label;
+    }
+  }
+
+  if (sum_abs_labels == 0) {
+    sum_abs_labels = 1;
+  }
+
+  // Normalize and get the threshold value.
+  *threshold = 0;
+  for (int proj_idx = 0; proj_idx < num_projections; proj_idx++) {
+    auto& proj = (*projection)[proj_idx];
+    // weight = A/B - D*C/B².
+    proj.weight = sum_feature_times_label[proj_idx] / sum_abs_labels -
+                  sum_labels * sum_feature_times_abs_label[proj_idx] /
+                      (sum_abs_labels * sum_abs_labels);
+    switch (dt_config.guided_oblique_split().threshold_selection()) {
+      case proto::DecisionTreeTrainingConfig::GuidedObliqueSplit::MEAN:
+        // *threshold += proj.weight * feature_sum[proj_idx] / sample_size;
+        *threshold += proj.weight * sum_feature_times_abs_label[proj_idx] /
+                      sum_abs_labels;
+        break;
+      case proto::DecisionTreeTrainingConfig::GuidedObliqueSplit::ZERO:
+        break;
+    }
+  }
+
+  // // Normalize and get the threshold value.
+  // *threshold = 0;
+  // for (int proj_idx = 0; proj_idx < num_projections; proj_idx++) {
+  //   auto& proj = (*projection)[proj_idx];
+  //   proj.weight /= sum_abs_labels;
+  //   switch (dt_config.guided_oblique_split().threshold_selection()) {
+  //     case proto::DecisionTreeTrainingConfig::GuidedObliqueSplit::MEAN:
+  //       // *threshold += proj.weight * feature_sum[proj_idx] / sample_size;
+  //       break;
+  //     case proto::DecisionTreeTrainingConfig::GuidedObliqueSplit::ZERO:
+  //       break;
+  //   }
+  // }
+}
 
 void SampleProjection(const absl::Span<const int>& features,
                       const proto::DecisionTreeTrainingConfig& dt_config,

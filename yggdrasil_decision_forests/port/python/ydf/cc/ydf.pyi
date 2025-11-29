@@ -150,6 +150,7 @@ class GBTCCTrainingLogEntry:
   iteration: int
   validation_evaluation: metric_pb2.EvaluationResults
   training_evaluation: metric_pb2.EvaluationResults
+  time: Optional[float]
 
 class GenericCCModel:
   def Predict(

@@ -248,6 +248,7 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
             iteration=entry.iteration,
             evaluation=metric.Evaluation(entry.validation_evaluation),
             training_evaluation=metric.Evaluation(entry.training_evaluation),
+            time=entry.time,
         )
         for entry in raw_training_logs
     ]

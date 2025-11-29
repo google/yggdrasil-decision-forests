@@ -177,11 +177,13 @@ class TrainingLogEntry:
     training_evaluation: Optional evaluation metrics computed on the training
       dataset at the given iteration. This is generally less insightful than the
       main `evaluation` but can be useful for debugging.
+    time: Duration, in seconds, since the start of the training.
   """
 
   iteration: int
   evaluation: metric.Evaluation
   training_evaluation: Optional[metric.Evaluation]
+  time: Optional[float] = 0.0
 
 
 class GenericModel(abc.ABC):
