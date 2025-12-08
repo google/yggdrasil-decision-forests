@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -27,11 +28,8 @@
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
-#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
@@ -49,10 +47,11 @@ class MultinomialLogLikelihoodLoss : public AbstractLoss {
   using AbstractLoss::Loss;
   using AbstractLoss::UpdateGradients;
 
-  MultinomialLogLikelihoodLoss(const ConstructorArgs& args)
-      : AbstractLoss(args) {
-    dimension_ = label_column_.categorical().number_of_unique_values() - 1;
-  }
+  explicit MultinomialLogLikelihoodLoss(const ConstructorArgs& args)
+      : AbstractLoss(args),
+        initialize_with_class_priors_(args.gbt_config.multinomial_loss_options()
+                                          .initialize_with_class_priors()),
+        dimension_(label_column_.categorical().number_of_unique_values() - 1) {}
 
   static absl::StatusOr<std::unique_ptr<AbstractLoss>> RegistrationCreate(
       const ConstructorArgs& args);
@@ -127,6 +126,7 @@ class MultinomialLogLikelihoodLoss : public AbstractLoss {
       utils::concurrency::ThreadPool* thread_pool) const override;
 
  private:
+  bool initialize_with_class_priors_;
   int dimension_;
 };
 

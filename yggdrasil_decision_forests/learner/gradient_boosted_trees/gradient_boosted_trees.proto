@@ -25,7 +25,7 @@ option java_outer_classname = "GradientBoostedTreesLearner";
 
 // Training configuration for the Gradient Boosted Trees algorithm.
 message GradientBoostedTreesTrainingConfig {
-  // Next ID: 39
+  // Next ID: 42
 
   // Basic parameters.
 
@@ -185,6 +185,7 @@ message GradientBoostedTreesTrainingConfig {
     LossConfiguration.LambdaMartNdcg lambda_mart_ndcg = 12;
     LossConfiguration.XeNdcg xe_ndcg = 26;
     LossConfiguration.BinaryFocalLossOptions binary_focal_loss_options = 36;
+    LossConfiguration.MultinomialLoss multinomial_loss_options = 41;
   }
 
   // L2 regularization on the tree predictions i.e. on the value of the leaf.

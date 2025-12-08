@@ -324,9 +324,11 @@ void GradientBoostedTreesModel::Predict(
     } break;
 
     case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
+      DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
       absl::FixedArray<float> accumulator(num_trees_per_iter_);
-      // Zero initial prediction for the MULTINOMIAL_LOG_LIKELIHOOD.
-      std::fill(accumulator.begin(), accumulator.end(), 0);
+      // Initialize accumulator with initial_predictions_.
+      std::copy(initial_predictions_.begin(), initial_predictions_.end(),
+                accumulator.begin());
 
       {
         int accumulator_cell_idx = 0;
