@@ -154,8 +154,9 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   }
 
   const float projection_density =
-      dt_config.sparse_oblique_split().projection_density_factor() /
-      config_link.numerical_features_size();
+      std::clamp(dt_config.sparse_oblique_split().projection_density_factor() /
+                     config_link.numerical_features_size(),
+                 0.f, 1.f);
 
   // Best and current projections.
   Projection best_projection;
@@ -792,6 +793,10 @@ void SampleProjection(const absl::Span<const int>& features,
     DCHECK_EQ(data_spec.columns(feature).type(), dataset::proto::NUMERICAL);
   }
 #endif
+
+  // Make sure the preconditions for std::binomial_distribution are met.
+  DCHECK_GE(projection_density, 0.f);
+  DCHECK_LE(projection_density, 1.f);
 
   std::binomial_distribution<size_t> binom(features.size(), projection_density);
 
