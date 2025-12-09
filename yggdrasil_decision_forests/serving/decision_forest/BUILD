@@ -84,7 +84,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_highway//:hwy",
     ],
     alwayslink = 1,
 )
@@ -146,18 +145,13 @@ cc_library_ydf(
     name = "quick_scorer_extended",
     srcs = [
         "quick_scorer_extended.cc",
-        "quick_scorer_extended_hwy.cc",
-        "quick_scorer_extended_internal.h",
     ],
     hdrs = [
         "quick_scorer_extended.h",
     ],
     deps = [
         ":utils",
-        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
-        "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/model/decision_tree",
-        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
         "//yggdrasil_decision_forests/serving:example_set",
@@ -165,13 +159,11 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:usage",
         "@com_google_absl//absl/base:config",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/numeric:bits",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
-        "@com_google_highway//:hwy",
     ],
 )
 
@@ -191,7 +183,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/utils:logging",
-        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",

@@ -69,6 +69,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/base/nullability.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -86,6 +87,8 @@ namespace yggdrasil_decision_forests {
 namespace serving {
 
 class AbstractExampleSet;
+
+using dataset::proto::DataSpecification;
 
 // Input feature value that can either be a numerical of a categorical value.
 struct NumericalOrCategoricalValue {
@@ -424,9 +427,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   }
 
   // Specification of the features.
-  const dataset::proto::DataSpecification& data_spec() const {
-    return data_spec_;
-  }
+  const DataSpecification& data_spec() const { return data_spec_; }
 
   // Specification of the features.
   const std::vector<int>& column_input_features() const {
@@ -441,20 +442,18 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
 
   // Initialize the object.
   absl::Status Initialize(const std::vector<int>& input_features,
-                          const dataset::proto::DataSpecification& dataspec,
+                          const DataSpecification& dataspec,
                           bool missing_numerical_is_na = false);
 
  private:
   // Specialization of "Initialize" for "normal" features.
-  absl::Status InitializeNormalFeatures(
-      const std::vector<int>& input_features,
-      const dataset::proto::DataSpecification& dataspec,
-      bool missing_numerical_is_na);
+  absl::Status InitializeNormalFeatures(const std::vector<int>& input_features,
+                                        const DataSpecification& dataspec,
+                                        bool missing_numerical_is_na);
 
   // Specialization of "Initialize" for "unstacked" features.
   absl::Status InitializeUnstackedFeatures(
-      const std::vector<int>& input_features,
-      const dataset::proto::DataSpecification& dataspec,
+      const std::vector<int>& input_features, const DataSpecification& dataspec,
       bool missing_numerical_is_na);
 
   // The name and order of the fixed length input features expected by the
@@ -476,7 +475,7 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
       numerical_vector_sequence_features_;
 
   // Data specification.
-  dataset::proto::DataSpecification data_spec_;
+  DataSpecification data_spec_;
 
   // Index to the "fixed_length_features_", "categorical_set_features_" and
   // "numerical_vector_sequence_features_" by "name".
@@ -1298,7 +1297,7 @@ struct EmptyModel {
                                            ExampleFormat::FORMAT_FEATURE_MAJOR>;
 
   absl::Status Initialize(const std::vector<int>& input_features,
-                          const dataset::proto::DataSpecification& dataspec) {
+                          const DataSpecification& dataspec) {
     return mutable_features()->Initialize(input_features, dataspec);
   }
 

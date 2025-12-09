@@ -29,7 +29,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "hwy/highway.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -337,23 +336,8 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
   }
 
   std::vector<std::string> IsBetterThan() const override {
-    // Users with dynamic dispatch always get the highway engine, since it
-    // is probably faster than the legacy engine. Users with AVX2 or better also
-    // get the highway engine, since it is faster than legacy for high lane
-    // counts. Users with low lane counts (e.g. ARM) or  builds not specifying
-    // the haswell architecture get the legacy engine, which is fastest for
-    // these cases.
-#ifdef YDF_USE_DYNAMIC_DISPATCH
     return {serving::gradient_boosted_trees::kGeneric,
             serving::gradient_boosted_trees::kOptPred};
-#elif HWY_TARGET <= HWY_AVX2
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred};
-#else
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred,
-            serving::gradient_boosted_trees::kQuickScorerExtendedHighway};
-#endif
   }
 
   absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
@@ -420,146 +404,6 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
 REGISTER_FastEngineFactory(
     GradientBoostedTreesQuickScorerFastEngineFactory,
     serving::gradient_boosted_trees::kQuickScorerExtended);
-
-class GradientBoostedTreesQuickScorerFastEngineFactoryHighway
-    : public FastEngineFactory {
- public:
-  using SourceModel = gradient_boosted_trees::GradientBoostedTreesModel;
-
-  std::string name() const override {
-    return serving::gradient_boosted_trees::kQuickScorerExtendedHighway;
-  }
-
-  bool IsCompatible(const AbstractModel* const model) const override {
-    auto* gbt_model = dynamic_cast<const SourceModel*>(model);
-    if (gbt_model == nullptr) {
-      return false;
-    }
-
-    // TODO: Add support for cases where global imputation is not active. The
-    // QuickScorer code should already be prepared for this, though testing is
-    // still missing.
-    if (!gbt_model->CheckStructure({/*.global_imputation_is_higher =*/false})) {
-      return false;
-    }
-
-    if (gbt_model->NumTrees() > serving::decision_forest::internal::
-                                    QuickScorerExtendedModel::kMaxTrees) {
-      return false;
-    }
-
-    for (const auto& src_tree : gbt_model->decision_trees()) {
-      if (src_tree->NumLeafs() > serving::decision_forest::internal::
-                                     QuickScorerExtendedModel::kMaxLeafs) {
-        return false;
-      }
-    }
-
-    if (!AllConditionsCompatibleQuickScorerExtendedModels(
-            gbt_model->decision_trees())) {
-      return false;
-    }
-
-    switch (gbt_model->task()) {
-      case proto::CLASSIFICATION:
-        return gbt_model->label_col_spec()
-                   .categorical()
-                   .number_of_unique_values() == 3;
-      case proto::REGRESSION:
-      case proto::RANKING:
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  std::vector<std::string> IsBetterThan() const override {
-    // Users with dynamic dispatch always get the highway engine, since it
-    // is probably faster than the legacy engine. Users with AVX2 or better also
-    // get the highway engine, since it is faster than legacy for high lane
-    // counts. Users with low lane counts (e.g. ARM) or poorly configured builds
-    // (not specifying the haswell architecture) get the legacy engine, which is
-    // fastest for these cases.
-#ifdef YDF_USE_DYNAMIC_DISPATCH
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred,
-            serving::gradient_boosted_trees::kQuickScorerExtended};
-#else
-#if HWY_TARGET <= HWY_AVX2
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred,
-            serving::gradient_boosted_trees::kQuickScorerExtended};
-#else
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred};
-#endif
-#endif
-  }
-
-  absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
-      const AbstractModel* const model) const override {
-    auto* gbt_model = dynamic_cast<const SourceModel*>(model);
-    if (!gbt_model) {
-      return absl::InvalidArgumentError("The model is not a GBDT.");
-    }
-
-    if (!gbt_model->CheckStructure({/*.global_imputation_is_higher =*/false})) {
-      return NoGlobalImputationError(
-          "GradientBoostedTreesQuickScorerFastEngineFactoryHighway");
-    }
-
-    switch (gbt_model->task()) {
-      case proto::CLASSIFICATION:
-        if (gbt_model->label_col_spec()
-                .categorical()
-                .number_of_unique_values() == 3) {
-          // Binary classification.
-          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
-              serving::decision_forest::
-                  GradientBoostedTreesBinaryClassificationQuickScorerExtendedHighway,
-              serving::decision_forest::Predict>>();
-          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
-          return engine;
-        } else {
-          return absl::InvalidArgumentError("Non supported GBDT model");
-        }
-
-      case proto::REGRESSION: {
-        if (gbt_model->loss() == gradient_boosted_trees::proto::POISSON) {
-          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
-              serving::decision_forest::
-                  GradientBoostedTreesPoissonRegressionQuickScorerExtendedHighway,
-              serving::decision_forest::Predict>>();
-          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
-          return engine;
-        } else {
-          auto engine = std::make_unique<serving::ExampleSetModelWrapper<
-              serving::decision_forest::
-                  GradientBoostedTreesRegressionQuickScorerExtendedHighway,
-              serving::decision_forest::Predict>>();
-          RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
-          return engine;
-        }
-      }
-
-      case proto::RANKING: {
-        auto engine = std::make_unique<serving::ExampleSetModelWrapper<
-            serving::decision_forest::
-                GradientBoostedTreesRankingQuickScorerExtendedHighway,
-            serving::decision_forest::Predict>>();
-        RETURN_IF_ERROR(engine->LoadModel<SourceModel>(*gbt_model));
-        return engine;
-      }
-
-      default:
-        return absl::InvalidArgumentError("Non supported GBDT model");
-    }
-  }
-};
-
-REGISTER_FastEngineFactory(
-    GradientBoostedTreesQuickScorerFastEngineFactoryHighway,
-    serving::gradient_boosted_trees::kQuickScorerExtendedHighway);
 
 class GradientBoostedTreesOptPredFastEngineFactory : public FastEngineFactory {
  public:

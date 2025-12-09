@@ -20,15 +20,16 @@
 #include <limits>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <vector>
 
+#include "absl/base/nullability.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -134,8 +135,7 @@ bool FeaturesDefinitionNumericalOrCategoricalFlat::HasInputFeature(
 }
 
 absl::Status FeaturesDefinitionNumericalOrCategoricalFlat::Initialize(
-    const std::vector<int>& input_features,
-    const dataset::proto::DataSpecification& dataspec,
+    const std::vector<int>& input_features, const DataSpecification& dataspec,
     const bool missing_numerical_is_na) {
   column_input_features_ = input_features;
   RETURN_IF_ERROR(InitializeNormalFeatures(input_features, dataspec,
@@ -162,8 +162,7 @@ absl::Status FeaturesDefinitionNumericalOrCategoricalFlat::Initialize(
 
 absl::Status
 FeaturesDefinitionNumericalOrCategoricalFlat::InitializeNormalFeatures(
-    const std::vector<int>& input_features,
-    const dataset::proto::DataSpecification& dataspec,
+    const std::vector<int>& input_features, const DataSpecification& dataspec,
     const bool missing_numerical_is_na) {
   data_spec_ = dataspec;
 
@@ -220,8 +219,7 @@ FeaturesDefinitionNumericalOrCategoricalFlat::InitializeNormalFeatures(
 
 absl::Status
 FeaturesDefinitionNumericalOrCategoricalFlat::InitializeUnstackedFeatures(
-    const std::vector<int>& input_features,
-    const dataset::proto::DataSpecification& dataspec,
+    const std::vector<int>& input_features, const DataSpecification& dataspec,
     const bool missing_numerical_is_na) {
   // List the sub-set of input features which are unstacked.
   std::vector<int> unstacked_input_features;

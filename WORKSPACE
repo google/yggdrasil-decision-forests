@@ -37,13 +37,3 @@ load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 emsdk_deps()
 load("@emsdk//:emscripten_deps.bzl", emsdk_emscripten_deps = "emscripten_deps")
 emsdk_emscripten_deps()
-
-
-# Required for Highway (and possibly additional dependencies in the future).
-http_archive(
-    name = "rules_license",
-    sha256 = "4531deccb913639c30e5c7512a054d5d875698daeb75d8cf90f284375fe7c360",
-    urls = [
-        "https://github.com/bazelbuild/rules_license/releases/download/0.0.7/rules_license-0.0.7.tar.gz",
-    ],
-)

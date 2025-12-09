@@ -155,18 +155,6 @@ class LogBook:
         return True
     return False
 
-  def count_key(self, key: ExperimentKey) -> int:
-    """Counts the number of occurrences of a given key."""
-    key = self._augment_key(key)
-    query = "SELECT key FROM experiments"
-    self._cursor.execute(query)
-    count = 0
-    for (row_serialized_key,) in self._cursor.fetchall():
-      row_key = self._augment_key(json.loads(row_serialized_key))
-      if row_key == key:
-        count += 1
-    return count
-
   def add(self, key: ExperimentKey, result: ExperimentResult) -> None:
     """Creates a new experiment.
 

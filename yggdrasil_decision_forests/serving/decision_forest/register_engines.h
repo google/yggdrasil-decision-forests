@@ -26,8 +26,6 @@ namespace gradient_boosted_trees {
 constexpr char kGeneric[] = "GradientBoostedTreesGeneric";
 constexpr char kQuickScorerExtended[] =
     "GradientBoostedTreesQuickScorerExtended";
-constexpr char kQuickScorerExtendedHighway[] =
-    "GradientBoostedTreesQuickScorerExtendedHighway";
 constexpr char kOptPred[] = "GradientBoostedTreesOptPred";
 }  // namespace gradient_boosted_trees
 
