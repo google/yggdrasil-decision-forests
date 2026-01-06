@@ -107,60 +107,6 @@ class VerticalDataset:
     normalized_values = [normalize_categorical_string_value(v) for v in values]
     return np.array(normalized_values, dtype=np.bytes_)
 
-  def _sanitize_forced_vocabulary(
-      self,
-      inferred_vocabulary: Optional[Sequence[bytes]],
-      forced_vocabulary: Optional[Sequence[str]],
-  ) -> Optional[Sequence[Any]]:
-    """Validate and sanitize the user-provided vocabulary."""
-    if inferred_vocabulary is None or forced_vocabulary is None:
-      return inferred_vocabulary
-
-    # Check for duplicates
-    if len(set(forced_vocabulary)) != len(forced_vocabulary):
-      counts = collections.Counter(forced_vocabulary)
-      duplicates = [item for item, count in counts.items() if count > 1]
-      raise ValueError(
-          "The forced vocabulary argument contains duplicate values:"
-          f" {duplicates!r}"
-      )
-
-    # The first class must be the OOD class.
-    user_classes_bytes = [dataspec_lib.YDF_OOD_BYTES]
-    for c in forced_vocabulary:
-      if not isinstance(c, str):
-        raise ValueError(
-            "User-provided label classes must be of type string, got"
-            f" {type(c)} instead."
-        )
-      if c == dataspec_lib.YDF_OOD:
-        raise ValueError(
-            "The OOD class must not be in the user-provided vocabulary."
-        )
-      user_classes_bytes.append(c.encode("utf-8"))
-
-    inferred_vocabulary_set_bytes = set()
-    for voc_item in inferred_vocabulary:
-      if isinstance(voc_item, bytes):
-        inferred_vocabulary_set_bytes.add(voc_item)
-      else:
-        inferred_vocabulary_set_bytes.add(str(voc_item).encode("utf-8"))
-
-    # Check coverage
-    missing = inferred_vocabulary_set_bytes - set(user_classes_bytes)
-    if missing:
-      missing_str = [
-          x.decode("utf-8") if isinstance(x, bytes) else str(x) for x in missing
-      ]
-      raise ValueError(
-          "The provided `label_classes` argument does not contain all the"
-          " unique values present in the label column. The following values"
-          " are missing:"
-          f" {missing_str!r}"
-      )
-
-    return user_classes_bytes
-
   def _add_column(
       self,
       column: dataspec_lib.Column,
@@ -393,11 +339,6 @@ class VerticalDataset:
       message += f"\nGot type {original_type}."
       raise ValueError(message)
     assert column_data.ndim == 1, "Categorical columns must be 1-dimensional"
-
-    if column.vocabulary is not None:
-      force_dictionary = self._sanitize_forced_vocabulary(
-          force_dictionary, column.vocabulary
-      )
 
     if column_data.dtype.type == np.bytes_:
       if inference_args is not None:
@@ -692,7 +633,6 @@ def create_vertical_dataset(
     num_discretized_numerical_bins: int = 255,
     max_num_scanned_rows_to_infer_semantic: int = 100_000,
     max_num_scanned_rows_to_compute_statistics: int = 100_000,
-    label_classes: Optional[list[str]] = None,
     data_spec: Optional[data_spec_pb2.DataSpecification] = None,
     required_columns: Optional[Sequence[str]] = None,
     dont_unroll_columns: Optional[Sequence[str]] = None,
@@ -775,11 +715,6 @@ def create_vertical_dataset(
       reading, but skew statistics in the dataspec, which can hurt model quality
       (e.g. if an important category of a categorical feature is considered
       OOV). Set to -1 to scan the entire dataset.
-    label_classes: An ordered list of possible values for the label. This
-      argument is optional and typically not required. If not provided, the
-      label classes are determined automatically from the dataset. If provided,
-      it forces a specific order for the label classes. All label values present
-      in the dataset must be included in this list.
     data_spec: Dataspec to be used for this dataset. If a data spec is given,
       all other arguments except `data` and `required_columns` should not be
       provided.
@@ -822,7 +757,6 @@ def create_vertical_dataset(
         num_discretized_numerical_bins=num_discretized_numerical_bins,
         max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
-        label_classes=label_classes,
     )
     return create_vertical_dataset_with_spec_or_args(
         data,
@@ -910,9 +844,7 @@ def create_vertical_dataset_from_path(
     )
   if inference_args is not None:
     dataset._dataset.CreateFromPathWithDataSpecGuide(  # pylint: disable=protected-access
-        path,
-        inference_args.to_proto_guide(),
-        required_columns,
+        path, inference_args.to_proto_guide(), required_columns
     )
   return dataset
 

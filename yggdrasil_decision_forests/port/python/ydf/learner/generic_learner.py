@@ -396,9 +396,6 @@ Hyper-parameters: ydf.{self._hyperparameters}
             semantic=dataspec.Semantic.CATEGORICAL,
             max_vocab_count=-1,
             min_vocab_frequency=1,
-            vocabulary=self._data_spec_args.label_classes,
-            vocabulary_must_be_complete=self._data_spec_args.label_classes
-            is not None,
         )
       elif task in [
           Task.REGRESSION,

@@ -587,9 +587,7 @@ absl::Status AbstractLearner::CheckConfiguration(
             "The categorical training label column \"", config.label(),
             "\" contains out-of-dictionary values. This is not allowed. Make "
             "sure the Dataspec guide of the label column is configured with "
-            "`min_vocab_frequency=0` and `max_vocab_count=-1`. If you "
-            "explicitly provided label classes, make sure the list "
-            "contains all the unique values present in the label column"));
+            "`min_vocab_frequency=0` and `max_vocab_count=-1`."));
       }
     } break;
     case model::proto::Task::REGRESSION:
