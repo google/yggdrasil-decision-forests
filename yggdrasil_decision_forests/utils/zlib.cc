@@ -19,12 +19,12 @@
 #include "yggdrasil_decision_forests/utils/zlib.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstring>
 #include <memory>
 #include <string>
 
-#include "absl/base/nullability.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -278,6 +278,10 @@ absl::Status Inflate(absl::string_view input, std::string* output,
   inflateEnd(&stream);
 
   return absl::OkStatus();
+}
+
+bool IsGZipMagicNumber(std::array<char, 2> magic_number) {
+  return magic_number[0] == '\x1f' && magic_number[1] == '\x8b';
 }
 
 }  // namespace yggdrasil_decision_forests::utils

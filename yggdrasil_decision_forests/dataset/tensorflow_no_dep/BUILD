@@ -14,6 +14,7 @@ cc_library_ydf(
     srcs = ["tf_record.cc"],
     hdrs = ["tf_record.h"],
     deps = [
+        "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/utils:bytestream",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",

@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 
+#include <array>
 #include <memory>
 #include <utility>
 
@@ -25,11 +26,12 @@
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "yggdrasil_decision_forests/dataset/formats.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
-#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/zlib.h"
 
@@ -85,6 +87,18 @@ absl::StatusOr<std::unique_ptr<TFRecordReader>> TFRecordReader::Create(
 
   ASSIGN_OR_RETURN(reader->raw_stream_, file::OpenInputFile(path));
   if (compressed) {
+    // Don't touch the original stream but check if the beginning of the file is
+    // ok.
+    ASSIGN_OR_RETURN(auto header_only_stream, file::OpenInputFile(path));
+    std::array<char, 2> header;
+    ASSIGN_OR_RETURN(int bytes_read,
+                     header_only_stream->ReadUpTo(header.data(), 2));
+    if (bytes_read != 2 || !utils::IsGZipMagicNumber(header)) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("The file is not a gzip compressed file. To read "
+                       "uncompressed TFRecord files, use prefix ",
+                       FORMAT_TFE_TFRECORDV2));
+    }
     ASSIGN_OR_RETURN(reader->zlib_stream_, utils::GZipInputByteStream::Create(
                                                reader->raw_stream_.get()));
   }

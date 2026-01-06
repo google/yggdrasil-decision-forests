@@ -40,18 +40,15 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:formats",
         "//yggdrasil_decision_forests/dataset:formats_cc_proto",
         "//yggdrasil_decision_forests/dataset/tensorflow_no_dep:tf_example",
-        "//yggdrasil_decision_forests/utils:compatibility",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:registration",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:node_hash_map",
-        "@com_google_absl//absl/functional:any_invocable",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
     ],
 )
 

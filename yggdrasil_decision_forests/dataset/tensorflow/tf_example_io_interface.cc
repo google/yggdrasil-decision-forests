@@ -304,7 +304,11 @@ absl::Status TFExampleReaderToDataSpecCreator::InferColumnsAndTypes(
   // Number of rows scanned so far.
   uint64_t nrow = 0;
   tensorflow::Example example;
-  while (reader->Next(&example).value()) {
+  while (true) {
+    ASSIGN_OR_RETURN(const bool has_more, reader->Next(&example));
+    if (!has_more) {
+      break;
+    }
     LOG_EVERY_N_SEC(INFO, 30) << nrow << " row(s) processed";
 
     if ((nrow % 100) == 0 && should_stop()) {
