@@ -325,6 +325,25 @@ class EvaluationTest(absltest.TestCase):
 
     _ = evaluation.html()
 
+  def test_regression_computed_loss(self):
+    proto_eval = metric_pb2.EvaluationResults(
+        count_predictions=2,
+        regression=metric_pb2.EvaluationResults.Regression(
+            sum_square_error=8,
+        ),
+    )
+    evaluation = metric.Evaluation(proto_eval)
+    self.assertEqual(evaluation.loss, 4.0)
+
+  def test_ranking_computed_loss(self):
+    proto_eval = metric_pb2.EvaluationResults(
+        ranking=metric_pb2.EvaluationResults.Ranking(
+            ndcg=metric_pb2.MetricEstimate(value=5),
+        ),
+    )
+    evaluation = metric.Evaluation(proto_eval)
+    self.assertEqual(evaluation.loss, 5.0)
+
 
 class MaxYAtMinXTest(absltest.TestCase):
 
