@@ -474,7 +474,7 @@ RandomForestLearner::TrainWithStatusImpl(
   if ((training_config().task() == model::proto::Task::NUMERICAL_UPLIFT ||
        training_config().task() == model::proto::Task::CATEGORICAL_UPLIFT) &&
       rf_config.decision_tree().has_honest()) {
-    // TODO: b/2439527146 - Re-enable honest trees with uplift.
+    // TODO: Re-enable honest trees with uplift.
     return absl::InvalidArgumentError(
         "Honest trees are not compatible with Uplift tasks.");
   }

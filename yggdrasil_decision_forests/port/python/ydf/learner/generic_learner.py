@@ -396,6 +396,9 @@ Hyper-parameters: ydf.{self._hyperparameters}
             semantic=dataspec.Semantic.CATEGORICAL,
             max_vocab_count=-1,
             min_vocab_frequency=1,
+            vocabulary=self._data_spec_args.label_classes,
+            vocabulary_must_be_complete=self._data_spec_args.label_classes
+            is not None,
         )
       elif task in [
           Task.REGRESSION,
@@ -648,7 +651,7 @@ class GenericCCLearner(GenericLearner):
       ]
       py_custom_loss.check_is_compatible_task(training_config.task)
       cc_custom_loss = py_custom_loss._to_cc()  # pylint: disable=protected-access
-      # TODO: b/322763329 - Fail if the user set apply_link_function.
+      # TODO: Fail if the user set apply_link_function.
       if py_custom_loss.activation.name == "IDENTITY":
         self._hyperparameters["apply_link_function"] = False
       else:

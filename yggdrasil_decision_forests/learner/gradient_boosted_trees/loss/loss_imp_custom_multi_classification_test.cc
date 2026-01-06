@@ -46,7 +46,7 @@ using ::testing::SizeIs;
 
 absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   dataset::VerticalDataset dataset;
-  // TODO Replace by a modern function when possible.
+  // TODO(b/241112691) Replace by a modern function when possible.
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
     columns {
       type: CATEGORICAL

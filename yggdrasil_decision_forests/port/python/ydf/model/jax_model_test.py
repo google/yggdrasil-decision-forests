@@ -962,7 +962,7 @@ class ToJaxTest(parameterized.TestCase):
               "split_axis": "SPARSE_OBLIQUE",
               "sparse_oblique_normalization": "STANDARD_DEVIATION",
           },
-          # TODO: b/364685350 - Re-enable when compiler fix oss sync
+          # TODO: Re-enable when compiler fix oss sync
           # is released.
           False
       ),

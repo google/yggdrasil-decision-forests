@@ -296,7 +296,7 @@ class TfModelTest(parameterized.TestCase):
     )
 
   def test_to_tensorflow_saved_model_serialized_input(self):
-    # TODO: b/321204507 - Integrate logic in YDF.
+    # TODO: Integrate logic in YDF.
 
     train_ds_path = os.path.join(
         test_utils.ydf_test_data_path(), "dataset", "adult_train.recordio"

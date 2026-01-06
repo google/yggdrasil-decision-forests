@@ -1171,7 +1171,7 @@ TEST_F(RandomForestOnSimPTE, Base) {
             train_dataset_.nrow() + 1 /*the header*/);
 }
 
-// TODO: b/2439527146 - Re-enable honest trees with uplift.
+// TODO: Re-enable honest trees with uplift.
 TEST_F(RandomForestOnSimPTE, DISABLED_Honest) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);

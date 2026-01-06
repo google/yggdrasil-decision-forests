@@ -23,7 +23,7 @@ import numpy as np
 from yggdrasil_decision_forests.model.decision_tree import decision_tree_pb2
 
 
-# TODO: 310218604 - Use kw_only with default value num_examples = 1.
+# TODO: Use kw_only with default value num_examples = 1.
 @dataclasses.dataclass
 class AbstractValue(metaclass=abc.ABCMeta):
   """A generic value/prediction/output.

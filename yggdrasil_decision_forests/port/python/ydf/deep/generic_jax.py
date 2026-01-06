@@ -1363,7 +1363,7 @@ class MetricComputer:
       The list of metrics (corresponding to "metric_names") and the valid loss.
     """
 
-    # TODO Use a subset of the training dataset for evaluation.
+    # TODO(b/381397901) Use a subset of the training dataset for evaluation.
 
     def compute_metric_on_generator(
         metric_fn: Callable[..., jax.Array],

@@ -62,7 +62,7 @@ constexpr float kTestPrecision = 0.000001f;
 // Returns a simple datasets with gradients in the second column.
 absl::StatusOr<dataset::VerticalDataset> CreateToyGradientDataset() {
   dataset::VerticalDataset dataset;
-  // TODO Replace PARSE_TEST_PROTO by a modern function when
+  // TODO(b/241112691) Replace PARSE_TEST_PROTO by a modern function when
   // possible.
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "a" }
