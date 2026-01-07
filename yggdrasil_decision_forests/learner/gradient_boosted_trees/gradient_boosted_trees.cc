@@ -1642,6 +1642,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
       const auto now = absl::Now();
       const auto since_start =
           utils::FormatDurationForLogs(now - begin_tree_grow);
+      log_entry->set_time(absl::ToDoubleSeconds(now - begin_tree_grow));
       const auto time_per_tree =
           utils::FormatDurationForLogs(now - begin_iter_training);
       absl::StrAppendFormat(&snippet, " [total:%s iter:%s]", since_start,

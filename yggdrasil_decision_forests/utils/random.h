@@ -30,6 +30,11 @@ T RandomUniformInt(const T& n, RandomEngine* random) {
   return std::uniform_int_distribution<T>(0, n - 1)(*random);
 }
 
+// Returns a random float in the range [0.0, 1.0).
+inline float RandomUniformFloat(RandomEngine* random) {
+  return std::uniform_real_distribution<float>()(*random);
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 

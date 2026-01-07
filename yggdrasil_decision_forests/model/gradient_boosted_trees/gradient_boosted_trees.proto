@@ -120,6 +120,8 @@ message TrainingLogs {
     // Confusion between the label and the predictions.
     optional utils.proto.IntegersConfusionMatrixDouble
         validation_confusion_matrix = 8;
+    // Duration in seconds since the start of the training.
+    optional float time = 9;
   }
 }
 
