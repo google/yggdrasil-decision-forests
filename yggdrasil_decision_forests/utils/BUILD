@@ -224,9 +224,9 @@ cc_library_ydf(
             "@release_or_nightly//:tensorflow_tf_header_lib",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:framework",
-            "@org_tensorflow//tensorflow/core:lib",
-            "@org_tensorflow//tensorflow/core/platform:path",
+            "@tensorflow//tensorflow/core:framework",
+            "@tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core/platform:path",
         ],
     }),
     alwayslink = 1,
@@ -291,7 +291,7 @@ cc_library_ydf(
             "@release_or_nightly//:tensorflow_tf_header_lib",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core:lib",
         ],
     }),
 )
@@ -830,7 +830,7 @@ cc_library_ydf(
         "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/strings",
     ] + [
-        "@farmhash_archive//:farmhash",
+        "@farmhash",
     ],
 )
 
