@@ -292,7 +292,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
 
     self._check_adult_model(learner=learner, minimum_accuracy=0.860)
 
-  # TODO: Fix this test in OSS.
+  # TODO: b/310580458 - Fix this test in OSS.
   @absltest.skip("Test sometimes times out")
   def test_interrupt_training(self):
     learner = specialized_learners.RandomForestLearner(

@@ -1286,7 +1286,7 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   // To avoid potential (performance) issues with std::vector<bool> bit packing,
   // use the (possibly faster but more wasteful) std::vector<char>.
   //
-  // TODO: Benchmark std:vector<char> vs. std::vector<bool>
+  // TODO: b/314117797 - Benchmark std:vector<char> vs. std::vector<bool>
   std::vector<char> na_bitmap_;
 };  // namespace serving
 

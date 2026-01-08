@@ -782,7 +782,7 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
   };
   // Remove not yet implemented hyperparameters
-  // TODO: Implement more hyperparameters for isolation forests.
+  // TODO: b/345425508 - Implement more hyperparameters for isolation forests.
   absl::flat_hash_set<std::string> invalid_decision_tree_hyperparameters = {
       kHParamMaximumModelSizeInMemoryInBytes,
       kHParamMaximumTrainingDurationSeconds,

@@ -22,7 +22,7 @@ from ydf.learner import feature_selector as feature_selector_lib
 from ydf.learner import specialized_learners
 from ydf.utils import test_utils
 
-# TODO: Do not use randomness in dataset creation.
+# TODO: b/412885347 - Do not use randomness in dataset creation.
 
 _NUM_TREES = 10  #  Used for experimentation
 _MIN_ACCURACY_ADULT = 0.85

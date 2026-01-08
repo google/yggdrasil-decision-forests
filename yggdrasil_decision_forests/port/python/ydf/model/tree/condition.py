@@ -25,7 +25,7 @@ from ydf.dataset import dataspec as dataspec_lib
 ColumnType = data_spec_pb2.ColumnType
 
 
-# TODO: Use kw_only with default value score = 0.
+# TODO: b/310218604 - Use kw_only with default value score = 0.
 @dataclasses.dataclass
 class AbstractCondition(metaclass=abc.ABCMeta):
   """Generic condition.

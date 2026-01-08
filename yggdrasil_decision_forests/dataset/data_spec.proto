@@ -416,7 +416,7 @@ message ColumnGuide {
 }
 
 message CategoricalGuide {
-  // Minimum frequency of a categorical value not to be replaced by the <RARE>
+  // Minimum frequency of a categorical value not to be replaced by the <OOD>
   // special value.
   optional int32 min_vocab_frequency = 1 [default = 5];
   // Maximum number of unique categorical values. If more values are present,
@@ -455,6 +455,17 @@ message CategoricalGuide {
     // Overriding is only possible for non-integerized columns.
     optional string str_value = 5;
   }
+
+  // If set, defines the vocabulary of the column. The values are assigned
+  // indices starting from 1 in the order they appear in this list. Values not
+  // in this list are considered out-of-vocabulary (index 0).
+  //
+  // If set, "min_vocab_frequency" and "max_vocab_count" are ignored.
+  // Incompatible with "is_already_integerized=true".
+  repeated string vocabulary = 6;
+
+  // If true, the vocabulary must contain all the values present in the data.
+  optional bool vocabulary_must_be_complete = 7 [default = false];
 }
 
 message NumericalGuide {}

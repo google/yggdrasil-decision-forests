@@ -307,6 +307,18 @@ class Column(object):
         discriminative.
       - **Warning**: Tensorflow Decision Forests uses a different semantic for
         integerized categorical features.
+    vocabulary: **(CATEGORICAL columns only, advanced)**
+      If set, defines the vocabulary of the column. The values are assigned
+      indices starting from 1 in the order they appear in this list. Values not
+      in this list are considered out-of-vocabulary (index 0).
+      If set, `min_vocab_frequency` and `max_vocab_count` are ignored.
+      Incompatible with `is_already_integerized=True`.
+      For the label column, use the `label_classes` argument of the learner
+      instead.
+      Note: This parameter is not supported for CATEGORICAL_SET columns.
+    vocabulary_must_be_complete: If true, the vocabulary must contain all the
+      values present in the data. If a value is missing, the dataspec generation
+      will fail.
   """
 # pyformat: enable
 
@@ -317,6 +329,8 @@ class Column(object):
   num_discretized_numerical_bins: Optional[int] = None
   monotonic: MonotonicConstraint = None
   is_already_integerized: Optional[bool] = None
+  vocabulary: Optional[list[str]] = None
+  vocabulary_must_be_complete: bool = False
 
   def __post_init__(self):
     if self.name is None:
@@ -355,10 +369,28 @@ class Column(object):
           f" semantic={self.semantic!r} instead."
       )
 
+    if self.vocabulary is not None:
+      if self.is_already_integerized:
+        raise ValueError(
+            "Arguments vocabulary and is_already_integerized cannot be used"
+            " together."
+        )
+      self.vocabulary = [str(x) for x in self.vocabulary]
+
+    if self.vocabulary_must_be_complete and self.vocabulary is None:
+      raise ValueError(
+          "Argument vocabulary_must_be_complete requires vocabulary to be set."
+      )
+
     if self.semantic is not Semantic.CATEGORICAL:
       if self.is_already_integerized is not None:
         raise ValueError(
             "Argument is_already_integerized requires semantic=CATEGORICAL. Got"
+            f" semantic={self.semantic!r} instead."
+        )
+      if self.vocabulary is not None:
+        raise ValueError(
+            "Argument vocabulary requires semantic=CATEGORICAL. Got"
             f" semantic={self.semantic!r} instead."
         )
 
@@ -370,20 +402,23 @@ class Column(object):
 
   def to_proto_column_guide(self) -> ds_pb.ColumnGuide:
     """Creates a proto ColumnGuide from the given specification."""
+    categorical_guide = ds_pb.CategoricalGuide(
+        max_vocab_count=self.max_vocab_count,
+        min_vocab_frequency=self.min_vocab_frequency,
+        vocabulary=self.vocabulary,
+        vocabulary_must_be_complete=self.vocabulary_must_be_complete,
+    )
+
     guide = ds_pb.ColumnGuide(
         # Only match the exact name
         column_name_pattern=f"^{self.name}$",
-        categorial=ds_pb.CategoricalGuide(
-            max_vocab_count=self.max_vocab_count,
-            min_vocab_frequency=self.min_vocab_frequency,
-        ),
+        categorial=categorical_guide,
         discretized_numerical=ds_pb.DiscretizedNumericalGuide(
             maximum_num_bins=self.num_discretized_numerical_bins
         ),
     )
-    column_semantic = self.semantic
-    if column_semantic is not None:
-      guide.type = column_semantic.to_proto_type()
+    if self.semantic is not None:
+      guide.type = self.semantic.to_proto_type()
     return guide
 
   @classmethod
@@ -470,6 +505,7 @@ class DataSpecInferenceArgs:
   max_num_scanned_rows_to_infer_semantic: int
   max_num_scanned_rows_to_compute_statistics: int
   zscore_numerical_columns: bool = False
+  label_classes: Optional[list[str]] = dataclasses.field(default_factory=list)
 
   def to_proto_guide(self) -> ds_pb.DataSpecificationGuide:
     """Creates a proto DataSpecGuide for these arguments.

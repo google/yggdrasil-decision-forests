@@ -35,7 +35,7 @@ def indent(text: str, num_spaces: int = 4) -> str:
     Intended string.
   """
 
-  # TODO: Replace with "textwrap.indent".
+  # TODO: @gbm - Replace with "textwrap.indent".
   block = " " * num_spaces
   return block + block.join(text.splitlines(keepends=True))
 

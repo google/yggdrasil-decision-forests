@@ -50,7 +50,7 @@ constexpr float kTestPrecision = 0.000001f;
 absl::StatusOr<dataset::VerticalDataset> CreateToyDataset(
     const bool even_num_examples = true) {
   dataset::VerticalDataset dataset;
-  // TODO(b/241112691) Replace by a modern function when possible.
+  // TODO Replace by a modern function when possible.
   *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
     columns { type: NUMERICAL name: "a" }
     columns {
