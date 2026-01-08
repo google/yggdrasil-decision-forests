@@ -41,14 +41,12 @@
 // Note: Adding 'copts = ["-mavx2"],' to your binary configuration wont work as
 // it will only be used to compile your main target.
 //
-// The current implementation support:
-//   - Regressive GBDTs.
-//
-// With the following constraints:
+// The current implementation supports Gradient Boosted Trees with the following
+// constraints:
 //   - Maximum of 65k trees.
 //   - Maximum of 128 nodes per trees (e.g. max depth = 6).
 //   - Maximum of 65k unique input features.
-//   - Support categorical and numerical features.
+//   - No oblique splits.
 //
 // Unlike the other YDF optimized inference engines, categorical features are
 // not restricted to have a maximum of 32 unique values.
@@ -62,44 +60,49 @@
 // Categorical-Set Extension:
 //   https://arxiv.org/abs/2009.09991
 //
-// The code can be benchmarked using the following command:
-//
-//   bazel run -c opt --copt=-mavx2 :benchmark_nogpu -- \
-//    --alsologtostderr \
-//    --mtc=GRADIENT_BOOSTED_TREES_REGRESSION_NUMERICAL_AND_CATEGORICAL_32_ATTRIBUTES
-//
-// On 9.10.2019, this command returned the following results:
-//
-//   ...
-//   Average serving time per example:
-//   gbdt_regression_num_and_cat32_attributes_single_thread_cpu_quick_scorer :
-//   647.5ns gbdt_regression_num_and_cat32_attributes_single_thread_cpu_opt_v1
-//   : 1.3857us gbdt_regression_num_and_cat32_attributes_single_thread_cpu
-//   : 1.4537us
-//   ...
 //
 // In the code "feature_idx" refers to features indexed according to the
 // "dataspec" (i.e. the training dataset). "internal_feature_idx" refers to a
 // internal feature indices from the point of view of the model (i.e. where the
 // features used by the model are densely packaged).
 //
-// See the "Intrinsics Guide" for a definition of the used SIMD instructions
-// (https://software.intel.com/sites/landingpage/IntrinsicsGuide/).
+// QuickScorer has two implementations:
+// 1. Legacy: Hand-written AVX2 intrinsics.
+// 2. Highway: Uses the Highway library (https://github.com/google/highway).
+//
+// The Highway implementation is benchmarked to be at least as fast as the
+// legacy AVX2 implementation and is recommended. The AVX2 implementation will
+// be removed in the future.
+//
+// By default, the Highway implementation uses static dispatch, meaning the
+// SIMD intrinsics are selected at compile time. To enable dynamic dispatch
+// (i.e., selecting the best intrinsics available on the current CPU at
+// runtime), define the preprocessor flag YDF_USE_DYNAMIC_DISPATCH.
 
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_QUICK_SCORER_EXTENDED_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_QUICK_SCORER_EXTENDED_H_
 
 #include <stdlib.h>
 
+#include <cstdint>
+#include <limits>
+#include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
+#include "absl/log/check.h"
 #include "absl/status/status.h"
-#include "yggdrasil_decision_forests/serving/decision_forest/utils.h"
+#include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
+#include "yggdrasil_decision_forests/utils/bitmap.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
-namespace yggdrasil_decision_forests {
-namespace serving {
-namespace decision_forest {
+namespace yggdrasil_decision_forests::serving::decision_forest {
 
 namespace internal {
 
@@ -291,30 +294,385 @@ void FinalizeConditionItems(
 void FinalizeIsHigherConditionItems(
     std::vector<QuickScorerExtendedModel::IsHigherConditionItem>* items);
 
+// Maximum stack size used by the model during inference
+constexpr size_t kMaxStackUsageInBytes = 16 * 1024;
+
+// Returns the number of trailing 0-bits in x, starting at the least significant
+// bit position. If x is 0, the result is undefined.
+int FindLSBSetNonZero64(uint64_t n);
+
+// Initialize the accumulator used to construct the quick scorer model
+// representation.
+//
+// Note: This accumulator is discarded at the end of the model generation.
+template <typename AbstractModel>
+absl::Status InitializeAccumulator(
+    const AbstractModel& src, const internal::QuickScorerExtendedModel& dst,
+    internal::QuickScorerExtendedModel::BuildingAccumulator* accumulator) {
+  for (const auto& feature : dst.features().fixed_length_features()) {
+    const auto& feature_spec = src.data_spec().columns(feature.spec_idx);
+
+    switch (feature.type) {
+      case dataset::proto::ColumnType::CATEGORICAL: {
+        // Note: Initially, the bitmap is initially filled with 1s i.e. no leaf
+        // is filtered.
+        auto& feature_acc =
+            accumulator->categorical_contains_conditions[feature.spec_idx];
+        feature_acc.internal_feature_idx = feature.internal_idx;
+        feature_acc.items.assign(
+            src.NumTrees() *
+                feature_spec.categorical().number_of_unique_values(),
+            ~internal::QuickScorerExtendedModel::kZeroLeafMask);
+      } break;
+
+      case dataset::proto::ColumnType::NUMERICAL:
+      case dataset::proto::ColumnType::DISCRETIZED_NUMERICAL:
+      case dataset::proto::ColumnType::BOOLEAN: {
+        // Note: Initially, the bitmap is initially filled with 1s i.e. no leaf
+        // is filtered.
+        auto& feature_acc = accumulator->is_higher_conditions[feature.spec_idx];
+        feature_acc.internal_feature_idx = feature.internal_idx;
+      } break;
+
+      default:
+        return absl::InternalError("Unexpected feature type");
+    }
+  }
+
+  for (const auto& feature : dst.features().categorical_set_features()) {
+    const auto& feature_spec = src.data_spec().columns(feature.spec_idx);
+    if (feature.type == dataset::proto::ColumnType::CATEGORICAL_SET) {
+      auto& feature_acc =
+          accumulator->categoricalset_contains_conditions[feature.spec_idx];
+      feature_acc.internal_feature_idx = feature.internal_idx;
+      feature_acc.masks.resize(
+          feature_spec.categorical().number_of_unique_values() + 1);
+    } else {
+      return absl::InternalError("Unexpected feature type");
+    }
+  }
+
+  return absl::OkStatus();
+}
+
+// Finalize the model. To be run once all the trees have been integrated to the
+// quick scorer representation with the "FillQuickScorer" method.
+absl::Status FinalizeModel(
+    const internal::QuickScorerExtendedModel::BuildingAccumulator& accumulator,
+    internal::QuickScorerExtendedModel* dst);
+
+// Adds the content of a node (and its children i.e. recursive visit) to the
+// quick scorer tree structure.
+template <typename AbstractModel>
+absl::Status FillQuickScorerNode(
+    const AbstractModel& src,
+    const internal::QuickScorerExtendedModel::TreeIdx tree_idx,
+    const model::decision_tree::NodeWithChildren& src_node,
+    internal::QuickScorerExtendedModel* dst, int* leaf_idx, int* non_leaf_idx,
+    internal::QuickScorerExtendedModel::BuildingAccumulator* accumulator) {
+  if (src_node.IsLeaf()) {
+    // Store the lead value.
+    if (*leaf_idx >= internal::QuickScorerExtendedModel::kMaxLeafs) {
+      return absl::InternalError("Leaf idx too large");
+    }
+    if (*leaf_idx >= dst->max_num_leafs_per_tree) {
+      return absl::InternalError("Leaf idx too large");
+    }
+    const auto leaf_value_idx =
+        *leaf_idx + tree_idx * dst->max_num_leafs_per_tree;
+    if (leaf_value_idx >= dst->leaf_values.size()) {
+      return absl::InternalError("Leaf value idx too large");
+    }
+    dst->leaf_values[leaf_value_idx] = src_node.node().regressor().top_value();
+    (*leaf_idx)++;
+  } else {
+    // Index of the first leaf in the negative branch.
+    const auto begin_neg_leaf_idx = *leaf_idx;
+
+    // Parse the negative branch.
+    RETURN_IF_ERROR(FillQuickScorerNode(src, tree_idx, *src_node.neg_child(),
+                                        dst, leaf_idx, non_leaf_idx,
+                                        accumulator));
+
+    // Index of the feature used by the node.
+    const int spec_feature_idx = src_node.node().condition().attribute();
+
+    // Compute the bitmap mask i.e. the bitmap that hide the leafs of the
+    // negative branch.
+    //
+    // Example:
+    // If begin_neg_leaf_idx=2 and end_neg_leaf_idx = 5, the mask will be:
+    //   "1100011111" + 54 * "1" (lower bit on the left).
+    const auto end_neg_leaf_idx = *leaf_idx;
+    const auto start_leaf_mask =
+        (internal::QuickScorerExtendedModel::kOneLeafMask
+         << begin_neg_leaf_idx) -
+        1;
+    const auto after_neg_mask =
+        (internal::QuickScorerExtendedModel::kOneLeafMask << end_neg_leaf_idx) -
+        1;
+    internal::QuickScorerExtendedModel::LeafMask mask =
+        ~(after_neg_mask ^ start_leaf_mask);
+
+    const auto& condition = src_node.node().condition().condition();
+    // Branch to take is case of missing value. Can be ignored in the case of
+    // numerical and categorical features as the use "feature_missing_values"
+    // produce an equivalent (but more efficient) behavior.
+    const bool na_value = src_node.node().condition().na_value();
+    const auto& attribute_spec =
+        src.data_spec().columns(src_node.node().condition().attribute());
+
+    auto set_numerical_higher = [&]() {
+      const auto threshold = condition.higher_condition().threshold();
+      accumulator->is_higher_conditions[spec_feature_idx].items.push_back(
+          {/*.threshold =*/threshold, /*.tree_idx =*/tree_idx,
+           /*.leaf_mask =*/mask});
+
+      if (src_node.node().condition().na_value()) {
+        // The condition evaluates to true when the attribute is missing.
+        accumulator->is_higher_conditions[spec_feature_idx]
+            .missing_value_items.push_back({/*.tree_idx =*/tree_idx,
+                                            /*.leaf_mask =*/mask});
+      }
+    };
+
+    auto set_boolean_is_true = [&]() {
+      accumulator->is_higher_conditions[spec_feature_idx].items.push_back(
+          {/*.threshold =*/0.5f, /*.tree_idx =*/tree_idx,
+           /*.leaf_mask =*/mask});
+    };
+
+    auto set_discretized_numerical_higher = [&]() {
+      const auto discretized_threshold =
+          condition.discretized_higher_condition().threshold();
+      const float threshold = attribute_spec.discretized_numerical().boundaries(
+          discretized_threshold - 1);
+      accumulator->is_higher_conditions[spec_feature_idx].items.push_back(
+          {/*.threshold = */ threshold, /*.tree_idx =*/tree_idx,
+           /*.leaf_mask =*/mask});
+    };
+
+    auto set_categorical_contains = [&]() {
+      const auto elements = condition.contains_condition().elements();
+      for (const auto feature_value : elements) {
+        accumulator->categorical_contains_conditions[spec_feature_idx]
+            .items[tree_idx + feature_value * dst->num_trees] &= mask;
+      }
+    };
+
+    auto set_categorical_bitmap_contains = [&]() {
+      const auto bitmap =
+          condition.contains_bitmap_condition().elements_bitmap();
+      const int num_unique_values =
+          attribute_spec.categorical().number_of_unique_values();
+      for (int feature_value = 0; feature_value < num_unique_values;
+           ++feature_value) {
+        if (utils::bitmap::GetValueBit(bitmap, feature_value)) {
+          accumulator->categorical_contains_conditions[spec_feature_idx]
+              .items[tree_idx + feature_value * dst->num_trees] &= mask;
+        }
+      }
+    };
+
+    auto set_categoricalset_contains = [&]() {
+      const auto elements = condition.contains_condition().elements();
+      if (na_value) {
+        internal::AndMaskMap(
+            tree_idx, mask,
+            &accumulator->categoricalset_contains_conditions[spec_feature_idx]
+                 .masks[0]);
+      }
+      for (const auto feature_value : elements) {
+        internal::AndMaskMap(
+            tree_idx, mask,
+            &accumulator->categoricalset_contains_conditions[spec_feature_idx]
+                 .masks[feature_value + 1]);
+      }
+    };
+
+    auto set_categoricalset_bitmap_contains = [&]() {
+      if (na_value) {
+        internal::AndMaskMap(
+            tree_idx, mask,
+            &accumulator->categoricalset_contains_conditions[spec_feature_idx]
+                 .masks[0]);
+      }
+      const auto bitmap =
+          condition.contains_bitmap_condition().elements_bitmap();
+      const int num_unique_values =
+          attribute_spec.categorical().number_of_unique_values();
+      for (int feature_value = 0; feature_value < num_unique_values;
+           ++feature_value) {
+        if (utils::bitmap::GetValueBit(bitmap, feature_value)) {
+          internal::AndMaskMap(
+              tree_idx, mask,
+              &accumulator->categoricalset_contains_conditions[spec_feature_idx]
+                   .masks[feature_value + 1]);
+        }
+      }
+    };
+
+    // Process the node's condition.
+    switch (condition.type_case()) {
+      case model::decision_tree::proto::Condition::TypeCase::kHigherCondition:
+        DCHECK_EQ(attribute_spec.type(), dataset::proto::ColumnType::NUMERICAL);
+        set_numerical_higher();
+        break;
+
+      case model::decision_tree::proto::Condition::TypeCase::
+          kDiscretizedHigherCondition:
+        DCHECK_EQ(attribute_spec.type(),
+                  dataset::proto::ColumnType::DISCRETIZED_NUMERICAL);
+        set_discretized_numerical_higher();
+        break;
+
+      case model::decision_tree::proto::Condition::TypeCase::
+          kTrueValueCondition:
+        DCHECK_EQ(attribute_spec.type(), dataset::proto::ColumnType::BOOLEAN);
+        set_boolean_is_true();
+        break;
+
+      case model::decision_tree::proto::Condition::TypeCase::kContainsCondition:
+        if (attribute_spec.type() == dataset::proto::ColumnType::CATEGORICAL) {
+          set_categorical_contains();
+        } else if (attribute_spec.type() ==
+                   dataset::proto::ColumnType::CATEGORICAL_SET) {
+          set_categoricalset_contains();
+        } else {
+          return absl::InternalError("Unexpected type");
+        }
+        break;
+
+      case model::decision_tree::proto::Condition::TypeCase::
+          kContainsBitmapCondition:
+        if (attribute_spec.type() == dataset::proto::ColumnType::CATEGORICAL) {
+          set_categorical_bitmap_contains();
+        } else if (attribute_spec.type() ==
+                   dataset::proto::ColumnType::CATEGORICAL_SET) {
+          set_categoricalset_bitmap_contains();
+        } else {
+          return absl::InternalError("Unexpected type");
+        }
+        break;
+
+      default:
+        return absl::InvalidArgumentError("Unsupported condition type.");
+    }
+
+    ++(*non_leaf_idx);
+
+    RETURN_IF_ERROR(FillQuickScorerNode(src, tree_idx, *src_node.pos_child(),
+                                        dst, leaf_idx, non_leaf_idx,
+                                        accumulator));
+  }
+  return absl::OkStatus();
+}
+
+// Adds the content of the tree structures to the quick scorer structure.
+template <typename AbstractModel>
+absl::Status FillQuickScorer(
+    const AbstractModel& src, internal::QuickScorerExtendedModel* dst,
+    internal::QuickScorerExtendedModel::BuildingAccumulator* accumulator) {
+  RETURN_IF_ERROR(internal::InitializeAccumulator(src, *dst, accumulator));
+
+  dst->initial_prediction = src.initial_predictions()[0];
+  dst->output_logits = src.output_logits();
+  dst->num_trees = src.NumTrees();
+  if (dst->num_trees > internal::QuickScorerExtendedModel::kMaxTrees) {
+    return absl::InvalidArgumentError(
+        absl::Substitute("The model contains more than $0 trees",
+                         internal::QuickScorerExtendedModel::kMaxTrees));
+  }
+
+  // Get the maximum number of leafs per trees.
+  dst->max_num_leafs_per_tree = 0;
+  int num_leafs = 0;
+  for (const auto& src_tree : src.decision_trees()) {
+    const auto num_leafs_in_tree = src_tree->NumLeafs();
+    num_leafs += num_leafs_in_tree;
+    if (num_leafs_in_tree > dst->max_num_leafs_per_tree) {
+      dst->max_num_leafs_per_tree = num_leafs_in_tree;
+    }
+  }
+
+  if (dst->max_num_leafs_per_tree >
+      internal::QuickScorerExtendedModel::kMaxLeafs) {
+    return absl::InvalidArgumentError(
+        absl::Substitute("The model contains trees with more than $0 leafs",
+                         internal::QuickScorerExtendedModel::kMaxLeafs));
+  }
+
+  dst->leaf_values.assign(dst->max_num_leafs_per_tree * dst->num_trees, 0.f);
+
+  for (internal::QuickScorerExtendedModel::TreeIdx tree_idx = 0;
+       tree_idx < src.decision_trees().size(); ++tree_idx) {
+    const auto& src_tree = src.decision_trees()[tree_idx];
+    int leaf_idx = 0;
+    int non_leaf_idx = 0;
+    RETURN_IF_ERROR(
+        internal::FillQuickScorerNode(src, tree_idx, src_tree->root(), dst,
+                                      &leaf_idx, &non_leaf_idx, accumulator));
+  }
+
+  RETURN_IF_ERROR(internal::FinalizeModel(*accumulator, dst));
+  return absl::OkStatus();
+}
+
 }  // namespace internal
+
+// Legacy implementation of the QuickScorer algorithm.
+struct QuickScorerExtendedModelLegacy : internal::QuickScorerExtendedModel {};
+
+// Highway implementation of the QuickScorer algorithm.
+struct QuickScorerExtendedModelHighway : internal::QuickScorerExtendedModel {};
 
 // Specialization of quick scorer for GBDT regression model with MSE loss.
 struct GradientBoostedTreesRegressionQuickScorerExtended
-    : internal::QuickScorerExtendedModel {
+    : QuickScorerExtendedModelLegacy {
   static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
 };
 
 // Specialization of quick scorer for GBDT regression model with poisson loss.
 struct GradientBoostedTreesPoissonRegressionQuickScorerExtended
-    : internal::QuickScorerExtendedModel {
+    : QuickScorerExtendedModelLegacy {
   static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
 };
 
 // Specialization of quick scorer for GBDT binary classification model.
 struct GradientBoostedTreesBinaryClassificationQuickScorerExtended
-    : internal::QuickScorerExtendedModel {
+    : QuickScorerExtendedModelLegacy {
   static constexpr model::proto::Task kTask =
       model::proto::Task::CLASSIFICATION;
 };
 
 // Specialization of quick scorer for GBDT ranking model.
 struct GradientBoostedTreesRankingQuickScorerExtended
-    : internal::QuickScorerExtendedModel {
+    : QuickScorerExtendedModelLegacy {
+  static constexpr model::proto::Task kTask = model::proto::Task::RANKING;
+};
+
+// Specialization of quick scorer for GBDT regression model with MSE loss.
+struct GradientBoostedTreesRegressionQuickScorerExtendedHighway
+    : QuickScorerExtendedModelHighway {
+  static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
+};
+
+// Specialization of quick scorer for GBDT regression model with poisson loss.
+struct GradientBoostedTreesPoissonRegressionQuickScorerExtendedHighway
+    : QuickScorerExtendedModelHighway {
+  static constexpr model::proto::Task kTask = model::proto::Task::REGRESSION;
+};
+
+// Specialization of quick scorer for GBDT binary classification model.
+struct GradientBoostedTreesBinaryClassificationQuickScorerExtendedHighway
+    : QuickScorerExtendedModelHighway {
+  static constexpr model::proto::Task kTask =
+      model::proto::Task::CLASSIFICATION;
+};
+
+// Specialization of quick scorer for GBDT ranking model.
+struct GradientBoostedTreesRankingQuickScorerExtendedHighway
+    : QuickScorerExtendedModelHighway {
   static constexpr model::proto::Task kTask = model::proto::Task::RANKING;
 };
 
@@ -367,7 +725,7 @@ absl::Status GenericToSpecializedModel(const AbstractModel& src,
 // of ExampleSets.
 template <typename CompiledModel>
 absl::Status CreateEmptyModel(const std::vector<int>& input_features,
-                              const DataSpecification& dataspec,
+                              const dataset::proto::DataSpecification& dataspec,
                               CompiledModel* dst);
 
 // Generates a human readable text describing the internal of the quick scorer
@@ -379,8 +737,6 @@ absl::Status CreateEmptyModel(const std::vector<int>& input_features,
 template <typename Model>
 std::string DescribeQuickScorer(const Model& model, bool detailed = true);
 
-}  // namespace decision_forest
-}  // namespace serving
-}  // namespace yggdrasil_decision_forests
+}  // namespace yggdrasil_decision_forests::serving::decision_forest
 
 #endif  // YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_QUICK_SCORER_EXTENDED_H_
