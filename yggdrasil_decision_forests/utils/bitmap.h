@@ -46,6 +46,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_TOOL_BITMAP_H_
 #define YGGDRASIL_DECISION_FORESTS_TOOL_BITMAP_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
