@@ -59,6 +59,8 @@ class RandomForestLearner : public AbstractLearner {
   // Generic hyper parameter names.
   static constexpr char kHParamNumTrees[] = "num_trees";
   static constexpr char kHParamWinnerTakeAll[] = "winner_take_all";
+  static constexpr char kHParamKernelMethod[] = "kernel_method";
+
   static constexpr char
       kHParamAdaptBootstrapSizeRatioForMaximumTrainingDuration[] =
           "adapt_bootstrap_size_ratio_for_maximum_training_duration";
@@ -160,6 +162,7 @@ absl::Status UpdateOOBPredictionsWithNewTree(
     const model::proto::TrainingConfig& config,
     std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
+    const bool kernel_method,
     const decision_tree::DecisionTree& new_decision_tree,
     const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
     std::vector<PredictionAccumulator>* oob_predictions);
@@ -167,6 +170,7 @@ absl::Status UpdateOOBPredictionsWithNewTree(
 // Evaluates the OOB predictions. Examples without any tree predictions are
 // skipped.
 absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
+    const model::proto::TrainingConfig& training_config,
     const dataset::VerticalDataset& train_dataset,
     const model::proto::Task task, const int label_col_idx,
     int uplift_treatment_col_idx,
@@ -176,6 +180,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
 
 // Update the variable importance of the model with set of oob predictions.
 absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
+    const model::proto::TrainingConfig& training_config,
     const std::vector<internal::PredictionAccumulator>& oob_predictions,
     const std::vector<std::vector<internal::PredictionAccumulator>>&
         oob_predictions_per_input_features,
