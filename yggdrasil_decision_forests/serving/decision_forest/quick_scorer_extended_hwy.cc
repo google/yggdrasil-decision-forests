@@ -100,13 +100,19 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE void PredictQuickScorerHighwayImpl(
   int example_idx = 0;
 
   {
-    auto* sample_reader = fixed_length_features.data();
+    // `fixed_length_features` can be empty, in which case the data pointer is
+    // nullptr. Performing arithmetic on the address avoids UB and branches.
+    auto sample_reader_addr =
+        reinterpret_cast<uintptr_t>(fixed_length_features.data());
     auto* prediction_reader = predictions->data();
 
     // First run on sub-batches of kNumParallelExamples at a time. The
     // remaining will be done sequentially below.
     int num_remaining_iters = num_examples / kNumParallelExamples;
     while (num_remaining_iters--) {
+      auto* sample_reader =
+          reinterpret_cast<const NumericalOrCategoricalValue*>(
+              sample_reader_addr);
       // Reset active node buffer.
       std::memset(active_leaf_buffer, 0xFF, bytes_needed);
 
@@ -259,7 +265,8 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE void PredictQuickScorerHighwayImpl(
             Activation(prediction_reader[sub_example_idx]);
       }
 
-      sample_reader += kNumParallelExamples;
+      sample_reader_addr +=
+          kNumParallelExamples * sizeof(NumericalOrCategoricalValue);
       prediction_reader += kNumParallelExamples;
       example_idx += kNumParallelExamples;
     }
