@@ -1,6 +1,6 @@
 # Changelog
 
-## HEAD
+## 0.14.0 - 2026-01-08
 
 ### API Changes
 
@@ -8,16 +8,39 @@
     hyperparameter. Support for honest uplift trees is not yet implemented.
     Training an uplift model with `honest=True` will now raise an error. Please
     reach out to the YDF team if you have a use case for this functionality.
-
+-   Removed support for Python 3.8
+-   Moved Python package and Docker to manylinux_2_28.
 
 ### Feature
 
 -   Added new versions of the hyperparameter templates for Random Forests with
-    `winner_take_all=False`.
--   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random 
+    `winner_take_all=False`. The new version generally has better quality
+-   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random
     Forest Learner to retrieve the indices of the in-bag samples used for
     training each tree.
 -   Add export to standalone Java.
+-   The output_logits option is now explicitly exposed in the Python API for GBT
+    models.
+-   Added SHAP value computation support for weighted models.
+-   Added support for integerized numerical features in the Python port.
+-   Added a new inference engine for QuickScorer based on the Highway SIMD
+    library. This engine provides up to a 70% speedup on AVX3 machines and
+    maintains high performance on modern ARM and AVX2 architectures.
+
+### Fixes
+
+-   Removed Pandas as a hard dependency (it is now optional for dataset
+    ingestion).
+-   Model descriptions now group multi-dimensional features together for better
+    readability.
+-   Support for missing features for standalone models.
+-   Fixed a rare undefined behavior bug in oblique splits caused by incorrect
+    initialization of the binomial distribution.
+
+### Release music
+
+Sortie en mi bémol majeur, L’Organiste Moderne, vol. 11. Louis James Alfred Lefébure-Wély
+
 
 ## 0.13.0 - 2025-07-15
 

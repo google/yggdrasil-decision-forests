@@ -22,7 +22,7 @@ import setuptools
 from setuptools.command.install import install
 from setuptools.dist import Distribution
 
-_VERSION = "0.13.0"
+_VERSION = "0.14.0"
 
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
@@ -112,7 +112,6 @@ setuptools.setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
@@ -128,12 +127,12 @@ setuptools.setup(
     ],
     distclass=BinaryDistribution,
     packages=setuptools.find_packages(),
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     license="Apache 2.0",
     keywords=(
         "machine learning decision forests random forest gradient boosted"
         " decision trees CART isolation forests classification regression "
-        " ranking uplift"
+        " ranking uplift boosing"
     ),
     install_requires=REQUIRED_PACKAGES,
     extras_require=OPTIONAL_PACKAGES,

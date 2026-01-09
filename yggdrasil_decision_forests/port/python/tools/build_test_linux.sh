@@ -35,7 +35,7 @@ build_and_maybe_test () {
     bazel version
     local ARCHITECTURE=$(uname -m)
 
-    local flags="--config=linux_cpp17 --features=-fully_static_link"
+    local flags="--config=linux_cpp17 --features=-fully_static_link --copt=-DYDF_USE_DYNAMIC_DISPATCH"
     if [ "$ARCHITECTURE" == "x86_64" ]; then
         flags="$flags --config=linux_avx2"
     fi
