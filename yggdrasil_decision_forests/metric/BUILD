@@ -36,6 +36,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@boost.math//:boost.math",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/log",
@@ -43,7 +44,6 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-        "@org_boost_math//:boost_math",
     ] + select({
         "//conditions:default": [
         ],
@@ -94,10 +94,10 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model:prediction_cc_proto",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
+        "@boost.math//:boost.math",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@org_boost_math//:boost_math",
     ],
 )
 
@@ -182,9 +182,9 @@ cc_test(
         ":metric",
         ":metric_cc_proto",
         "//yggdrasil_decision_forests/utils:random",
+        "@boost.math//:boost.math",
         "@com_google_absl//absl/log:check",
         "@com_google_googletest//:gtest_main",
-        "@org_boost_math//:boost_math",
     ],
 )
 
