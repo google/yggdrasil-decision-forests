@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <string>
@@ -53,8 +54,8 @@ uint8_t& SafeGetRef(std::string& bitmap, T index) {
 }
 
 template <typename BufferType, typename T>
-BufferType& SafeGetRefBufferType(std::string& bitmap, T index) {
-  return *reinterpret_cast<BufferType*>(&bitmap[index]);
+void WriteToBitmap(std::string& bitmap, T index, BufferType value) {
+  memcpy(&bitmap[index], &value, sizeof(BufferType));
 }
 
 template <typename T>
@@ -209,7 +210,7 @@ void BitWriter::Write(bool value) {
   buffer_ |= static_cast<uint64_t>(value) << sub_cur_;
   if ((sub_cur_++) == sizeof(BufferType) * 8 - 1) {
     DCHECK_LT(cur_, bitmap_.size());
-    SafeGetRefBufferType<BufferType>(bitmap_, cur_) = buffer_;
+    WriteToBitmap<BufferType>(bitmap_, cur_, buffer_);
     sub_cur_ = 0;
     cur_ += sizeof(BufferType);
     buffer_ = 0;
@@ -278,8 +279,8 @@ void MultibitWriter::Write(const uint64_t value) {
   buffer_ |= value << sub_cur_;
   sub_cur_ += bits_by_elements_;
   while (sub_cur_ >= sizeof(buffertype) * 8) {
-    SafeGetRefBufferType<buffertype>(bitmap_, cur_) =
-        (buffer_ & std::numeric_limits<buffertype>::max());
+    WriteToBitmap<buffertype>(bitmap_, cur_,
+                              buffer_ & std::numeric_limits<buffertype>::max());
     cur_ += sizeof(buffertype);
     sub_cur_ -= sizeof(buffertype) * 8;
     buffer_ >>= sizeof(buffertype) * 8;
