@@ -12,4 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version = "0.15.0"
+"""Smoke test for the ydf_tf package. Requires ydf >= 0.15.0."""
+
+import tempfile
+import numpy as np
+import ydf
+
+dataset = {
+    "f1": np.array([1, 2, 3, 4] * 100),
+    "f2": np.array(["red", "blue", "blue", "red"] * 100),
+    "label": np.array(["X", "Y", "X", "X"] * 100),
+}
+
+model = ydf.GradientBoostedTreesLearner(label="label").train(dataset)
+model.to_tensorflow_saved_model(tempfile.gettempdir(), mode="tf")

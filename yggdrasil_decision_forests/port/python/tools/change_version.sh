@@ -53,6 +53,7 @@ echo
 echo "Check that the following files have been updated correctly:"
 echo ${SRC}/config/setup.py
 echo ${SRC}/ydf/version.py
-echo "Update the changelog:"
+echo "Update the changelog and dependencies:"
 echo ${SRC}/CHANGELOG.md
 echo ${SRC}/tools/release_windows.bat
+echo ${SRC}/MODULE.bazel
