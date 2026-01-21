@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.15.0 - 2026-01-28
+
+### API Changes
+
+-   Export to Tensorflow now uses the ydf-tf package instead of TF-DF.
+    Tensorflow Decision Forests is no longer required for exporting to
+    TensorFlow SavedModel.
+-   `model.to_tensorflow_saved_model(mode="keras")` is now strongly discouraged
+    and will be removed in a future version. This mode still requires
+    Tensorflow Decision Forests (TF-DF) to be installed.
+
+### Fix
+
+-   Fixed compatibility with Pandas 3.0
+
+### Release music
+
+Allegretto, op. 1. Louis Vierne
+
 ## 0.14.0 - 2026-01-08
 
 ### API Changes
