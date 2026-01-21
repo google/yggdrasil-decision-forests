@@ -181,6 +181,8 @@ absl::StatusOr<std::string> ExportToHtml(const Plot& plot,
   switch (options.target_library) {
     case TargetLibrary::kPlotly:
       return internal::plotly::ExportToHtml(plot, options);
+    default:
+      return absl::InvalidArgumentError("Unsupported target_library");	
   }
 }
 

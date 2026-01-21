@@ -266,6 +266,12 @@ class IntegerDistribution {
   template <typename P>
   void AddNormalizedProto(const P& v);
 
+
+  // Add the content of an accumulated IntegerCounter
+  // Similar to "Add", when the input is a IntegerDistrubution* proto.
+  template <typename P>
+  void AddProto(const P& v);
+
   // Subtract the content of an IntegerCounter with a total weight of 1.
   // Similar to "SubNormalized", when the input is a IntegerDistribution* proto.
   template <typename P>
@@ -756,15 +762,33 @@ void IntegerDistribution<T>::Load(const P& proto) {
     counts_.push_back(proto.counts(i));
 }
 
+// template <typename T>
+// void IntegerDistribution<T>::Normalize() {
+//   if (sum_ == 0) return;
+//   DCHECK_GE(sum_, 0);
+  
+//   for (auto& w : counts_) {
+//     DCHECK_GE(w, 0);
+//     w /= sum_;
+//   }
+//   sum_ = 1;
+
+// }
+
 template <typename T>
 void IntegerDistribution<T>::Normalize() {
-  if (sum_ == 0) return;
-  DCHECK_GE(sum_, 0);
-  for (auto& w : counts_) {
+  T sum = 0;
+  for (const auto& w : counts_) {
     DCHECK_GE(w, 0);
-    w /= sum_;
+    sum += w;
   }
-  sum_ = 1;
+  if (sum == 0) return;
+
+  for (auto& w : counts_) {
+    w /= sum;
+  }
+
+  sum_ = 1;  
 }
 
 template <typename T>
@@ -866,6 +890,17 @@ void IntegerDistribution<T>::AddNormalizedProto(const P& v) {
   sum_++;
   for (int i = 0; i < counts_.size(); i++) {
     counts_[i] += v.counts(i) / v.sum();
+  }
+}
+
+template <typename T>
+template <typename P>
+void IntegerDistribution<T>::AddProto(const P& v) {
+  DCHECK_EQ(NumClasses(), v.counts_size());
+  if (v.sum() == 0) return;
+  sum_++;  
+  for (int i = 0; i < counts_.size(); i++) {
+    counts_[i] += v.counts(i);  
   }
 }
 

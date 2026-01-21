@@ -210,6 +210,27 @@ class RandomForestOnAdult : public utils::TrainAndTestTester {
   }
 };
 
+// kernel method
+TEST_F(RandomForestOnAdult, KernelMethodSlowEngineOnly) {
+  auto* rf_config = train_config_.MutableExtension(
+      model::random_forest::proto::random_forest_config);
+  rf_config->set_kernel_method(true);
+  rf_config->set_winner_take_all_inference(false);
+
+  PrepareDataset();
+  TrainModel();
+  CHECK_OK(PostTrainingChecks()); // no fast engine
+  
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.850, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.350, 0.05);
+
+}
+
+
+
+
+
+
 // Train and test a model on the adult dataset.
 TEST_F(RandomForestOnAdult, Base) {
   auto* rf_config = train_config_.MutableExtension(
@@ -324,6 +345,7 @@ TEST_F(RandomForestOnAdult, EqualWidthHistogramNoWinnerTakeAll) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->mutable_decision_tree()->mutable_numerical_split()->set_type(
       decision_tree::proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
   TrainAndEvaluateModel();
@@ -334,6 +356,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllWithWeights) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   TrainAndEvaluateModel(/*numerical_weight_attribute=*/"age",
                         /*emulate_weight_with_duplication=*/true);
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8415, 0.012);
@@ -343,6 +366,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAll) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.862, 0.015);
   // Disabling winner take all reduce the logloss (as expected).
@@ -353,6 +377,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllDiscretizedNumerical) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   guide_.set_detect_numerical_as_discretized_numerical(true);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.862, 0.015);
@@ -377,6 +402,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllOneHotCategorical) {
   train_config_.add_features("native_country");
 
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->mutable_decision_tree()->set_max_depth(64);
   rf_config->mutable_decision_tree()->mutable_categorical()->mutable_one_hot();
   TrainAndEvaluateModel();
@@ -405,6 +431,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllRandomCategorical) {
   train_config_.add_features("native_country");
 
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->mutable_decision_tree()->mutable_categorical()->mutable_random();
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.82618, 0.005);
@@ -416,6 +443,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllExampleSampling) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->set_bootstrap_size_ratio(0.2f);
   TrainAndEvaluateModel();
   // Similar (should be slightly better) to the dataset sampling.
@@ -474,6 +502,7 @@ TEST_F(RandomForestOnAdult, MaximumDuration) {
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(100000);  // Would take a very long time.
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   train_config_.set_maximum_training_duration_seconds(8);
 
   TrainAndEvaluateModel();
@@ -490,7 +519,7 @@ TEST_F(RandomForestOnAdult, MaximumSize) {
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(100000);  // Would be a very big model.
   rf_config->set_winner_take_all_inference(false);
-
+  rf_config->set_kernel_method(false);
   const int max_size = 2 * 1024 * 1024;  // 2MB
   // Note: Each tree takes ~200k of RAM; the majority caused by proto overhead
   // and pointers. The serialized model will be ~5x smaller.
@@ -518,6 +547,7 @@ TEST_F(RandomForestOnAdult, MaximumDurationInTree) {
       ->mutable_sparse_oblique_split()
       ->set_num_projections_exponent(10);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   train_config_.set_maximum_training_duration_seconds(8);
 
   SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
@@ -537,7 +567,7 @@ TEST_F(RandomForestOnAdult, InterruptTraining) {
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(100000);  // Would take a very long time.
   rf_config->set_winner_take_all_inference(false);
-
+  rf_config->set_kernel_method(false);
   // Train for 5 seconds.
   interrupt_training_after = absl::Seconds(5);
   TrainAndEvaluateModel();
@@ -590,6 +620,7 @@ TEST_F(RandomForestOnAdult, SparseOblique) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
@@ -601,6 +632,7 @@ TEST_F(RandomForestOnAdult, MHLDTOblique) {
       random_forest::proto::random_forest_config);
   deployment_config_.set_num_threads(0);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   // Prevent timeouts with a smaller model.
   rf_config->set_num_trees(150);
   rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
@@ -733,7 +765,7 @@ TEST(RandomForest, OOBPredictions) {
 
   std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices = {1};
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
-      dataset, config, sorted_non_oob_example_indices, true,
+      dataset, config, sorted_non_oob_example_indices, true,false,
       *model.decision_trees()[0].get(), {}, &rnd, &predictions));
   EXPECT_EQ(predictions[0].num_trees, 1);
   EXPECT_EQ(predictions[0].classification.NumObservations(), 1);
@@ -746,14 +778,14 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
   const auto evaluation_1 =
-      internal::EvaluateOOBPredictions(dataset, config.task(),
+      internal::EvaluateOOBPredictions(config, dataset, config.task(),
                                        config_link.label(), -1, {}, predictions)
           .value();
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_1),
             "accuracy:0.5 logloss:18.0218");
 
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
-      dataset, config, sorted_non_oob_example_indices, true,
+      dataset, config, sorted_non_oob_example_indices, true, false,
       *model.decision_trees()[1].get(), {}, &rnd, &predictions));
   EXPECT_EQ(predictions[0].num_trees, 2);
   EXPECT_EQ(predictions[0].classification.NumObservations(), 2);
@@ -766,7 +798,7 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
   const auto evaluation_2 =
-      internal::EvaluateOOBPredictions(dataset, config.task(),
+      internal::EvaluateOOBPredictions(config,dataset, config.task(),
                                        config_link.label(), -1, {}, predictions)
           .value();
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_2),
@@ -803,26 +835,26 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
 
   // Baseline
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
-      dataset, config, sorted_non_oob_example_indices, true,
+      dataset, config, sorted_non_oob_example_indices, true, false,
       *model.decision_trees()[0].get(), {}, &rnd, &oob_predictions));
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
-      dataset, config, sorted_non_oob_example_indices, true,
+      dataset, config, sorted_non_oob_example_indices, true, false,
       *model.decision_trees()[1].get(), {}, &rnd, &oob_predictions));
 
   // Shuffled
   for (int repetition = 0; repetition < 100; repetition++) {
     EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
-        dataset, config, sorted_non_oob_example_indices, true,
+        dataset, config, sorted_non_oob_example_indices, true, false,
         *model.decision_trees()[0].get(), 0, &rnd,
         &oob_predictions_per_input_features[0]));
     EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
-        dataset, config, sorted_non_oob_example_indices, true,
+        dataset, config, sorted_non_oob_example_indices, true, false,
         *model.decision_trees()[1].get(), 0, &rnd,
         &oob_predictions_per_input_features[0]));
   }
 
   // Compute importance.
-  CHECK_OK(internal::ComputeVariableImportancesFromAccumulatedPredictions(
+  CHECK_OK(internal::ComputeVariableImportancesFromAccumulatedPredictions(config,
       oob_predictions, oob_predictions_per_input_features, dataset,
       /*num_threads=*/6, &model));
 
@@ -1080,6 +1112,7 @@ TEST_F(RandomForestOnSyntheticClassification, Base) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->mutable_decision_tree()->mutable_categorical()->mutable_random();
   TrainAndEvaluateModel();
   // This test has a lot of variance because of the small number of examples
@@ -1092,6 +1125,7 @@ TEST_F(RandomForestOnSyntheticClassification, SparseOblique) {
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(70);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   rf_config->mutable_decision_tree()
       ->set_internal_error_on_wrong_splitter_statistics(true);
@@ -1105,6 +1139,7 @@ TEST_F(RandomForestOnSyntheticClassification, MHLDTOblique) {
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(70);
   rf_config->set_winner_take_all_inference(false);
+  rf_config->set_kernel_method(false);
   rf_config->mutable_decision_tree()->mutable_mhld_oblique_split();
   rf_config->mutable_decision_tree()
       ->set_internal_error_on_wrong_splitter_statistics(true);
@@ -1343,6 +1378,7 @@ class RandomForestOnSyntheticVectorSequence : public utils::TrainAndTestTester {
     rf_config->set_num_trees(5);
     rf_config->mutable_decision_tree()->set_max_depth(2);
     rf_config->set_winner_take_all_inference(false);
+    rf_config->set_kernel_method(false);
     SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
   }
 };
@@ -1395,6 +1431,7 @@ TEST_F(RandomForestOnSyntheticVectorSequence, WithSampling) {
   TrainModel();
   CHECK_OK(PostTrainingChecks());
 }
+
 
 TEST(RandomForestBootstrappingIndices, Base) {
   model::proto::TrainingConfig training_config;
