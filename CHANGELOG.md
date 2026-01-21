@@ -21,6 +21,10 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
 -   Fix honest trees implementation.
 
+### Infra
+
+-   YDF and Yggdrasil Decision Forests now use Bazel 7 and Bzlmod.
+
 ## 1.11.0 - 2025-03-12
 
 ### Features
