@@ -133,7 +133,6 @@ Task: REGRESSION
 Loss (SQUARED_ERROR): 0.393557
 
 RMSE: 0.627341
-Default RMSE: : 0
 </pre><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_123self_eval_item0" style="display: inline-block;" ></div><script>
 (function() {
     function user_code(Plotly) {
