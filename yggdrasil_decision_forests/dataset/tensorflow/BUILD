@@ -12,12 +12,11 @@ cc_library_ydf(
     tags = ["tf_dep"],
     deps = select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:lib",
-            "@org_tensorflow//tensorflow/core:protos_all_cc",
+            "@tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core:protos_all_cc",
         ],
     }),
 )

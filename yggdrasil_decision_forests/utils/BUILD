@@ -220,13 +220,12 @@ cc_library_ydf(
         "@com_google_protobuf//:protobuf",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:framework",
-            "@org_tensorflow//tensorflow/core:lib",
-            "@org_tensorflow//tensorflow/core/platform:path",
+            "@tensorflow//tensorflow/core:framework",
+            "@tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core/platform:path",
         ],
     }),
     alwayslink = 1,
@@ -287,11 +286,10 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core:lib",
         ],
     }),
 )
@@ -830,7 +828,7 @@ cc_library_ydf(
         "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/strings",
     ] + [
-        "@farmhash_archive//:farmhash",
+        "@farmhash",
     ],
 )
 
