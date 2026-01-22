@@ -60,7 +60,7 @@ def to_dict(
       raise ValueError("The pandas DataFrame must have string column names.")
 
   def clean(values):
-    if values.dtype == "object":
+    if values.dtype in ["object", "string"]:
       return values.to_numpy(copy=False, na_value="")
     else:
       return values.to_numpy(copy=False)
