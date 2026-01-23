@@ -374,11 +374,11 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:zlib",
+        "@com_github_nlohmann_json//:json",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@nlohmann_json//:json",
     ],
 )
 

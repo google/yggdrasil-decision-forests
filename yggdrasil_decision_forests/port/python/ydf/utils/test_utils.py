@@ -63,20 +63,18 @@ class TrainAndTestDataset:
   train: dataset.VerticalDataset
   test: dataset.VerticalDataset
 
-
 def ydf_test_data_path() -> str:
   return os.path.join(
       data_root_path(),
-      "external/ydf_cc/yggdrasil_decision_forests/test_data",
+      "external/yggdrasil_decision_forests~/yggdrasil_decision_forests/test_data",
   )
 
 
 def ydf_test_data_pathlib() -> pathlib.Path:
   return (
       pathlib.Path(data_root_path())
-      / "external/ydf_cc/yggdrasil_decision_forests/test_data"
+      / "external/yggdrasil_decision_forests~/yggdrasil_decision_forests/test_data"
   )
-
 
 def load_datasets(
     name: str, column_args: Optional[Sequence[dataspec.Column]] = None
