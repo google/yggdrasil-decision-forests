@@ -20,7 +20,6 @@ import time
 from typing import List, NamedTuple, Optional, Tuple, Union
 
 import pandas as pd
-import tensorflow_decision_forests as tfdf
 import ydf
 
 
@@ -156,28 +155,6 @@ def bench_train_ydf(
   train_func(label=label, task=task, **hyperparameters).train(df)
 
 
-def bench_train_tfdf(
-    df: pd.DataFrame,
-    label: str,
-    task: ydf.Task,
-    hyperparameters: dict,
-    algo: str,
-):
-  """Trains a model with TF-DF."""
-  algo_to_function = {
-      "rf": tfdf.keras.RandomForestModel,
-      "gbt": functools.partial(
-          tfdf.keras.GradientBoostedTreesModel, early_stopping="NONE"
-      ),
-      "cart": tfdf.keras.CartModel,
-  }
-  tfdf_task = tfdf.keras.Task.Value(task.value)
-  ds = tfdf.keras.pd_dataframe_to_tf_dataset(df, label=label, task=tfdf_task)
-  train_func = algo_to_function[algo]
-  model = train_func(**hyperparameters, task=tfdf_task, verbose=0)
-  model.fit(ds)
-
-
 def bench_train(
     ds: str,
     configuration: str,
@@ -194,8 +171,6 @@ def bench_train(
   hyperparameters = build_learning_params(configuration, num_threads)
   hyperparameters["ranking_group"] = ranking_group
   bench = None
-  if application == "tfdf":
-    bench = functools.partial(bench_train_tfdf, df, label, task, hyperparameters, algo)
   if application == "ydf":
     bench = functools.partial(bench_train_ydf, df, label, task, hyperparameters, algo)
   runner.benchmark(

@@ -949,17 +949,17 @@ Use `model.describe()` for more details.
   ) -> None:
     """Exports the model as a TensorFlow SavedModel.
 
-    This function requires TensorFlow and TensorFlow Decision Forests to be
+    This function requires TensorFlow and the ydf-tf package to be
     installed. Install them by running the command `pip install
-    tensorflow_decision_forests`. The generated SavedModel relies on the
-    TensorFlow Decision Forests Custom Inference Op. This op is available by
+    ydf-tf`. The generated SavedModel relies on the
+    YDF Custom Inference Op. This op is available by
     default in various platforms such as Servomatic, TensorFlow Serving, Vertex
     AI, and TensorFlow.js.
 
     Usage example:
 
     ```python
-    !pip install tensorflow_decision_forests
+    !pip install ydf-tf
 
     import ydf
     import numpy as np
@@ -1159,6 +1159,7 @@ Use `model.describe()` for more details.
       force: Tries to export even in currently unsupported environments.
         WARNING: Setting this to true may crash the Python runtime.
     """
+
     raise NotImplementedError
 
   @abc.abstractmethod
@@ -1172,8 +1173,7 @@ Use `model.describe()` for more details.
     """Converts the model into a callable TensorFlow Module (`@tf.function`).
 
     This allows the YDF model to be integrated into larger TensorFlow graphs.
-    Requires `tensorflow_decision_forests` (`pip install
-    tensorflow_decision_forests`).
+    Requires `ydf-tf` (`pip install ydf-tf`).
 
     Note: Export to TensorFlow is not yet available for Anomaly Detection
     models.
@@ -2429,16 +2429,9 @@ def _get_export_jax():
 
 
 def _get_export_tf():
-  try:
-    from ydf.model import export_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+  from ydf.model import export_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
 
-    return export_tf
-  except ImportError as exc:
-    raise ValueError(
-        '"tensorflow_decision_forests" is needed by this function. Make sure'
-        " it is installed and try again. If using pip, run `pip install"
-        " tensorflow_decision_forests`."
-    ) from exc
+  return export_tf
 
 
 def _get_export_sklearn():
