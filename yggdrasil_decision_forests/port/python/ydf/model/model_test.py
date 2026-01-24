@@ -1406,6 +1406,20 @@ Use `model.describe()` for more details.
         header = abstract_model_pb2.AbstractModel.FromString(f.read())
         self.assertFalse(header.is_pure_model)
 
+  def test_regression_evaluation_loss(self):
+    model_evaluation = self.abalone_regression_gbdt.evaluate(
+        self.abalone_regression_gbdt_test_ds
+    )
+    self.assertIsNotNone(model_evaluation.loss)
+    self.assertAlmostEqual(model_evaluation.loss, model_evaluation.rmse**2)
+
+  def test_ranking_evaluation_loss(self):
+    model_evaluation = self.synthetic_ranking_gbdt.evaluate(
+        self.synthetic_ranking_gbdt_test_ds
+    )
+    self.assertIsNotNone(model_evaluation.loss)
+    self.assertAlmostEqual(model_evaluation.loss, model_evaluation.ndcg)
+
 
 if __name__ == "__main__":
   absltest.main()
