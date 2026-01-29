@@ -54,7 +54,7 @@ jobs:
         run: |
           CACHE_PREFIX="${{ runner.os }}-bazel-py-${{ inputs.python_version }}"
           CACHE_RESTORE_KEY_2="$CACHE_PREFIX"
-          CACHE_RESTORE_KEY_1="$CACHE_RESTORE_KEY_2-${{ hashFiles('**/WORKSPACE', '.bazelrc') }}"
+          CACHE_RESTORE_KEY_1="$CACHE_RESTORE_KEY_2-${{ hashFiles('**/MODULE.bazel', '.bazelrc') }}"
           CACHE_RESTORE_KEY_0="$CACHE_RESTORE_KEY_1-${{ hashFiles('**/BUILD*') }}"
           CACHE_KEY="$CACHE_RESTORE_KEY_0-${{ github.sha }}"
           echo "CACHE_RESTORE_KEY_2=$CACHE_RESTORE_KEY_2" >> "$GITHUB_OUTPUT"

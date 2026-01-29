@@ -16,8 +16,8 @@ cc_library_ydf(
             "@release_or_nightly//:tensorflow_tf_header_lib",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:lib",
-            "@org_tensorflow//tensorflow/core:protos_all_cc",
+            "@tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core:protos_all_cc",
         ],
     }),
 )

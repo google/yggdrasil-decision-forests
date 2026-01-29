@@ -24,7 +24,7 @@ pybind_extension(
         "//ydf/metric:metric_cc",
         "//ydf/model:model_cc",
         "//ydf/utils:log_cc",
-        "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
+        "@pybind11_protobuf//pybind11_protobuf:native_proto_caster",
     ],
 )
 
@@ -34,12 +34,4 @@ pybind_library(
         # GCS support is enabled by default in the external build.
         "@ydf_cc//yggdrasil_decision_forests/utils:filesystem_default_gcs",
     ],
-)
-
-# Libraries
-# =========
-
-py_library(
-    name = "ydf",
-    data = ["ydf.so"],
 )

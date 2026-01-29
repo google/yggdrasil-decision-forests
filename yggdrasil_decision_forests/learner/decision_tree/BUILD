@@ -66,7 +66,7 @@ cc_library_ydf(
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
-        "@eigen_archive//:eigen3_internal",
+        "@eigen",
     ] + select({
         "//conditions:default": [
         ],
@@ -150,7 +150,7 @@ cc_library_ydf(
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
-        "@eigen_archive//:eigen3_internal",
+        "@eigen",
     ] + select({
         "//conditions:default": [
         ],

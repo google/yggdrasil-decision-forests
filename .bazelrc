@@ -32,7 +32,6 @@
 #
 
 # Common flags.
-common --noenable_bzlmod
 common --experimental_repo_remote_exec
 common --enable_platform_specific_config
 

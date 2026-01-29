@@ -18,7 +18,7 @@
 set -x
 set -e
 
-ROOT_DIR="$TEST_SRCDIR/yggdrasil_decision_forests/yggdrasil_decision_forests"
+ROOT_DIR="$TEST_SRCDIR/_main/yggdrasil_decision_forests/"
 
 # Paths
 TRAIN_DS="csv:$ROOT_DIR/test_data/dataset/adult_train.csv"
