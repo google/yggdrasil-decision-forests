@@ -1,8 +1,10 @@
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 
 # Model bindings for PYDF
-# pytype binary, test, library
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(

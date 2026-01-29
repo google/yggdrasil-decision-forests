@@ -1,4 +1,6 @@
 # Bazel configuration for Yggdrasil Decision Forests
+common --noenable_bzlmod
+common --incompatible_default_to_explicit_init_py
 
 # On Windows, uncomment the next line to solve long path issues:
 # startup --output_user_root=C:/tmpbld

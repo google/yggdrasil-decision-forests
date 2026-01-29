@@ -1,6 +1,8 @@
-# Dataset bindings for PYDF
-# pytype test and library
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
+load("@rules_python//python:py_library.bzl", "py_library")
+
+# Dataset bindings for PYDF
+load("@rules_python//python:py_test.bzl", "py_test")
 
 package(
     default_visibility = ["//visibility:public"],
