@@ -70,8 +70,8 @@ selects.config_setting_group(
 # TFRecord is selected as the format container). If
 # tensorflow_with_header_lib=1, TensorFlow is linked with "head only"
 # dependencies. This option makes sense when injecting Yggdrasil as a dynamic
-# library in TensorFlow. It requires the "release_or_nightly" setting from
-# Tensorflow Decision Forests, see this repository for details.
+# library in TensorFlow. It requires setting YDF_TF_VERSION and YDF_PY_VERSION
+# to ensure the automatic download of the correct TensorFlow version.
 config_setting(
     name = "tensorflow_with_header_lib",
     values = {"define": "tensorflow_with_header_lib=1"},

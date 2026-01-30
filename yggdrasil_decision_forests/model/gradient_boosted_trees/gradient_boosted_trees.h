@@ -292,8 +292,8 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
     const proto::TrainingLogs::Entry& log_entry,
     const proto::TrainingLogs& training_logs, const model::proto::Task& task,
     const dataset::proto::Column& label_col_spec,
-    const proto::LossConfiguration& loss_config,
-    const absl::string_view loss_name, TrainingLogEvaluationSet eval_set);
+    const proto::LossConfiguration& loss_config, const std::string& loss_name,
+    TrainingLogEvaluationSet eval_set);
 
 }  // namespace internal
 

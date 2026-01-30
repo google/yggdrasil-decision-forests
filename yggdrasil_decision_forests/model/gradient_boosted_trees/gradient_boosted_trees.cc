@@ -978,7 +978,7 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
     const proto::TrainingLogs& training_logs, const model::proto::Task& task,
     const dataset::proto::Column& label_col_spec,
     const proto::LossConfiguration& loss_config,
-    const absl::string_view loss_name,
+    const std::string& loss_name,
     const TrainingLogEvaluationSet eval_set) {
   metric::proto::EvaluationResults evaluation;
   evaluation.set_task(task);

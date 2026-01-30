@@ -51,6 +51,10 @@ http_archive(
     urls = ["https://github.com/googleapis/google-cloud-cpp/archive/refs/tags/v2.39.0.tar.gz"],
 )
 
+# If Tensorflow headers are required, download them from pip.
+tf_ext = use_extension("//third_party:tf_downloader.bzl", "tf_downloaded_header_extension")
+use_repo(tf_ext, "local_config_tf")
+
 # Use system Python until the migration to hermetic Python is completed.
 local_runtime_repo = use_repo_rule(
     "@rules_python//python/local_toolchains:repos.bzl",

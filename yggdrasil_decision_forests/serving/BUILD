@@ -30,7 +30,6 @@ cc_library_ydf(
     ],
 )
 
-# TODO: Remove dependency to TF in this rule.
 cc_library_ydf(
     name = "example_set",
     srcs = ["example_set.cc"],
@@ -67,8 +66,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings:str_format",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [],
     }),

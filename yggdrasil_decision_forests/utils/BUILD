@@ -220,8 +220,7 @@ cc_library_ydf(
         "@com_google_protobuf//:protobuf",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [
             "@tensorflow//tensorflow/core:framework",
@@ -287,8 +286,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [
             "@tensorflow//tensorflow/core:lib",
