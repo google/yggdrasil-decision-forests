@@ -174,7 +174,7 @@ absl::Status ComputePermutationFeatureImportance(
           return absl::OkStatus();
         }
 
-        utils::concurrency::MutexLock lock(&data_mutex);
+        utils::concurrency::MutexLock lock(data_mutex);
         for (int metric_idx = 0; metric_idx < metrics.size(); metric_idx++) {
           const auto metric = metrics[metric_idx];
           ASSIGN_OR_RETURN(
@@ -193,7 +193,7 @@ absl::Status ComputePermutationFeatureImportance(
 
   const auto process = [&](const int feature_idx) {
     {
-      utils::concurrency::MutexLock lock(&status_mutex);
+      utils::concurrency::MutexLock lock(status_mutex);
       if (!status.ok()) {
         // One of the previous job has already fail. Skip all the remaining
         // jobs.
@@ -202,7 +202,7 @@ absl::Status ComputePermutationFeatureImportance(
     }
     auto sub_status = process_return_status(feature_idx);
     if (!sub_status.ok()) {
-      utils::concurrency::MutexLock lock(&status_mutex);
+      utils::concurrency::MutexLock lock(status_mutex);
       status.Update(sub_status);
     }
   };
@@ -287,7 +287,7 @@ absl::Status ComputePermutationFeatureImportance(
     }
     utils::RandomEngine sub_rng;
     {
-      utils::concurrency::MutexLock lock(&rng_mutex);
+      utils::concurrency::MutexLock lock(rng_mutex);
       sub_rng.seed(rng());
     }
     const auto perturbed_dataset =

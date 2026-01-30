@@ -38,7 +38,7 @@ AdaptativeWork::AdaptativeWork(const int num_tasks, const double total_budget,
 
 void AdaptativeWork::ReportTaskDone(const double approximation_factor,
                                     const double consumed_budget) {
-  utils::concurrency::MutexLock lock(&mu_);
+  utils::concurrency::MutexLock lock(mu_);
   DCHECK_GT(approximation_factor, 0.0);
   DCHECK_LE(approximation_factor, 1.0);
   consumed_budget_ += consumed_budget;
@@ -48,7 +48,7 @@ void AdaptativeWork::ReportTaskDone(const double approximation_factor,
 }
 
 double AdaptativeWork::OptimalApproximationFactor() const {
-  utils::concurrency::MutexLock lock(&mu_);
+  utils::concurrency::MutexLock lock(mu_);
   if (consumed_budget_ < warming_up_budget_ || num_ran_tasks_ == 0) {
     return 1.;
   }

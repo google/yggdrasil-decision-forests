@@ -1131,7 +1131,7 @@ TemplatedFindBestSplitsWithDiscretizedNumericalFeatureMultiThreading(
             /*num_feature_values=*/num_discretized_values, begin_idx, end_idx,
             &example_bucket_set_per_node[thread_idx]);
 
-        utils::concurrency::MutexLock l(&mutex_status);
+        utils::concurrency::MutexLock l(mutex_status);
         status.Update(local_status);
       });
 

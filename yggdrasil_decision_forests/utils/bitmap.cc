@@ -427,7 +427,7 @@ absl::Status ShardedMultiBitmap::SaveToFile(const std::string& base_path,
                          shard_idx),
             shards_[shard_idx]);
         if (!local_status.ok()) {
-          utils::concurrency::MutexLock lock(&status_mutex);
+          utils::concurrency::MutexLock lock(status_mutex);
           status.Update(local_status);
         }
       });

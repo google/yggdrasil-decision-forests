@@ -205,7 +205,7 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
     return absl::InternalError(
         "Non-blocking feature loading already in progress.");
   }
-  utils::concurrency::MutexLock lock(&non_blocking_.status_mutex);
+  utils::concurrency::MutexLock lock(non_blocking_.status_mutex);
   non_blocking_.is_running = true;
   non_blocking_.status = {};  // Clear status
   non_blocking_.load_features = load_features;
@@ -222,7 +222,7 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
           for (const int column_idx : non_blocking_.load_features) {
             pool.Schedule([&, column_idx]() {
               {
-                utils::concurrency::MutexLock l(&non_blocking_.status_mutex);
+                utils::concurrency::MutexLock l(non_blocking_.status_mutex);
                 if (!non_blocking_.status.ok()) {
                   return;
                 }
@@ -230,7 +230,7 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
               size_t column_memory_usage;
               const auto status =
                   LoadInMemoryCacheColumn(column_idx, &column_memory_usage);
-              utils::concurrency::MutexLock l(&non_blocking_.status_mutex);
+              utils::concurrency::MutexLock l(non_blocking_.status_mutex);
               non_blocking_.status.Update(status);
             });
           }
@@ -260,7 +260,7 @@ DatasetCacheReader::NonBlockingLoadingInProgressUnloadedFeatures() const {
 }
 
 absl::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
-  utils::concurrency::MutexLock lock(&non_blocking_.status_mutex);
+  utils::concurrency::MutexLock lock(non_blocking_.status_mutex);
   if (non_blocking_.is_running) {
     // Still running.
     return true;
@@ -321,7 +321,7 @@ absl::Status DatasetCacheReader::LoadingAndUnloadingFeatures(
         for (const int column_idx : load_features) {
           pool.Schedule([&, column_idx]() {
             {
-              utils::concurrency::MutexLock l(&mutex_worker_status);
+              utils::concurrency::MutexLock l(mutex_worker_status);
               if (!worker_status.ok()) {
                 return;
               }
@@ -329,7 +329,7 @@ absl::Status DatasetCacheReader::LoadingAndUnloadingFeatures(
             size_t column_memory_usage;
             const auto status =
                 LoadInMemoryCacheColumn(column_idx, &column_memory_usage);
-            utils::concurrency::MutexLock l(&mutex_worker_status);
+            utils::concurrency::MutexLock l(mutex_worker_status);
             worker_status.Update(status);
           });
         }
@@ -610,7 +610,7 @@ absl::Status DatasetCacheReader::InitializeAndLoadInMemoryCache() {
     for (const int column_idx : features_) {
       pool.Schedule([&, column_idx]() {
         {
-          utils::concurrency::MutexLock l(&mutex_worker_status);
+          utils::concurrency::MutexLock l(mutex_worker_status);
           if (!worker_status.ok()) {
             return;
           }
@@ -619,7 +619,7 @@ absl::Status DatasetCacheReader::InitializeAndLoadInMemoryCache() {
         const auto status =
             LoadInMemoryCacheColumn(column_idx, &column_memory_usage);
         memory_usage += column_memory_usage;
-        utils::concurrency::MutexLock l(&mutex_worker_status);
+        utils::concurrency::MutexLock l(mutex_worker_status);
         worker_status.Update(status);
       });
     }
@@ -1077,7 +1077,7 @@ absl::Status PartialDatasetCacheDataSpecCreator::ComputeColumnStatistics(
           const auto status_get_binary = file::GetBinaryProto(
               shard_meta_data_path, &shard_meta_data, file::Defaults());
 
-          utils::concurrency::MutexLock l(&mutex_data);
+          utils::concurrency::MutexLock l(mutex_data);
           thread_status.Update(status_get_binary);
           if (!thread_status.ok()) {
             return;

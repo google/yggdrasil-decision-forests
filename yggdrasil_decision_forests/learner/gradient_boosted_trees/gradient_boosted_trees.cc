@@ -791,7 +791,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     auto time_begin_load = absl::Now();
     std::vector<std::string> selected_shards;
     {
-      utils::concurrency::MutexLock lock(&shard_random_mutex);
+      utils::concurrency::MutexLock lock(shard_random_mutex);
       selected_shards = SampleTrainingShards(
           training_shards, num_sample_train_shards, &shard_random);
     }
