@@ -70,6 +70,7 @@ class WarningMessage(enum.Enum):
   TRAIN_TRANSFORMER_ON_CPU = 14
   AD_PERMUTATION_VARIABLE_IMPORTANCE_NOT_ENABLED = 15
   CAST_INTEGERIZED_CATEGORICAL_TO_INT32 = 16
+  USING_TFDF_FOR_EXPORT = 17
 
 
 # List of already showed warning message that should not be displayed again.

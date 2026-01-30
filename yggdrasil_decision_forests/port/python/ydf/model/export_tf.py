@@ -34,11 +34,8 @@ from ydf.utils import log
 # pylint: disable=g-import-not-at-top
 try:
   import tensorflow as tf
-  import tensorflow_decision_forests as tfdf
-except ImportError as exc:
-  raise ImportError(
-      "Cannot import tensorflow or tensorflow_decision_forests."
-  ) from exc
+except ImportError as tf_exc:
+  raise ImportError("Export to TensorFlow requires TensorFlow.") from tf_exc
 # pylint: enable=g-import-not-at-top
 # pytype: enable=import-error
 
@@ -176,6 +173,14 @@ def ydf_model_to_tensorflow_saved_model_keras_mode(
     input_model_signature_fn: Any,
     temp_dir: Optional[str],
 ):  # pylint: disable=g-doc-args
+
+  try:
+    import tensorflow_decision_forests as tfdf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype:disable=import-error
+  except ImportError as exc:
+    raise ImportError(
+        "Export to Keras is deprecated, will be removed soon and requires"
+        " tensorflow-decision-forests. Users should use the mode='tf' instead."
+    ) from exc
 
   # Do not pass input_model_signature_fn if it is None.
   not_none_params = {}
@@ -384,7 +389,25 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
   See GenericModel.to_tensorflow_function for the documentation.
   """
 
-  tf_op = tfdf.keras.core.tf_op
+  try:
+    import ydf_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype:disable=import-error
+
+    tf_op = ydf_tf.tf_op
+  except ImportError as exc:
+    # Try to import tensorflow decision forests (legacy).
+    try:
+      import tensorflow_decision_forests as tfdf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype:disable=import-error
+
+      tf_op = tfdf.keras.core.tf_op
+      log.warning(
+          "Using TF-DF for the TensorFlow export. Prefer ydf-tf instead.",
+          message_id=log.WarningMessage.USING_TFDF_FOR_EXPORT,
+      )
+    except ImportError:
+      raise ImportError(
+          "Use the `ydf_tf` library to export models to TensorFlow. You can"
+          " install it with `pip install ydf_tf`."
+      ) from exc
 
   # Using prefixes ensure multiple models can be combined in a single
   # SavedModel.

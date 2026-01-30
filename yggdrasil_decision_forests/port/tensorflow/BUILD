@@ -1,4 +1,4 @@
 package(
-    default_visibility = ["@ydf_cc//yggdrasil_decision_forests/port/tensorflow:internal"],
+    default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
