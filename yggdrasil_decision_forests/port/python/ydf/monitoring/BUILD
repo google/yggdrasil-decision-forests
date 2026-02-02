@@ -54,6 +54,7 @@ py_library(
         # absl:app dep,
         # absl/flags dep,
         # pandas dep,
+        # tensorflow_decision_forests dep,
         # ydf dep,
     ],
 )
