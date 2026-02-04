@@ -1,0 +1,217 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Registration of abstract classes by a string name.
+// All the user operations (i.e. outside of "internal::") are thread safe.
+//
+// Usage example:
+//
+// interface.h
+//   #include "registration.h"
+//   class BaseClass {};
+//   REGISTRATION_CREATE_POOL(BaseClass, absl::string_view);
+//
+// implementation1.cc
+//   #include "interface.h"
+//   class Implementation1 : public BaseClass {
+//     Implementation1(absl::string_view name) {...}
+//   REGISTRATION_REGISTER_CLASS(Implementation1, "Implementation1", BaseClass);
+//
+// consumer.cc
+//   #include "interface.h"
+//   BaseClassRegisterer::Create("C1", "Toto").value() ...
+//
+// If the interface class defines the symbol "REQUIRED_REGISTRATION_CREATE",
+// implementation class should defines a static "RegistrationCreate" method,with
+// the following signature. This method will be called instead of the
+// constructor. This mechanism allows to handle failure in the implementation
+// class constructor.
+//   static absl::StatusOr<std::unique_ptr<BaseClass>> RegistrationCreate();
+//
+#ifndef YGGDRASIL_DECISION_FORESTS_UTILS_REGISTRATION_H_
+#define YGGDRASIL_DECISION_FORESTS_UTILS_REGISTRATION_H_
+
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <vector>
+#include <new>
+#include <utility>
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
+
+// Build the registration pool name from the interface class name.
+#define INTERNAL_REGISTERER_CLASSNAME(INTERFACE) INTERFACE##Registerer
+
+// Register a new pool of classes.
+//
+// Args:
+//   cls: Interface class.
+//   ...: Argument of the implementation class constructors.
+//
+#define REGISTRATION_CREATE_POOL(INTERFACE, ...)                             \
+  class INTERNAL_REGISTERER_CLASSNAME(INTERFACE)                             \
+      : public ::yggdrasil_decision_forests::registration::internal::        \
+            ClassPool<INTERFACE, ##__VA_ARGS__> {                            \
+   public:                                                                   \
+    template <typename IMPLEMENTATION>                                       \
+    static ::yggdrasil_decision_forests::registration::internal::Empty       \
+    Register(const absl::string_view key) {                                  \
+      if (IsName(key)) return {};                                            \
+      utils::concurrency::MutexLock l(                                       \
+          &::yggdrasil_decision_forests::registration::internal::            \
+              registration_mutex);                                           \
+      InternalGetItems()->push_back(                                         \
+          std::make_unique<                                                  \
+              ::yggdrasil_decision_forests::registration::internal::Creator< \
+                  INTERFACE, IMPLEMENTATION, ##__VA_ARGS__>>(key));          \
+      return {};                                                             \
+    }                                                                        \
+  };
+
+// Adds an implementation class to an existing pool.
+#define REGISTRATION_REGISTER_CLASS(IMPLEMENTATION, name, INTERFACE)      \
+  static const auto register_##IMPLEMENTATION##_in_##INTERFACE =          \
+      INTERNAL_REGISTERER_CLASSNAME(INTERFACE)::Register<IMPLEMENTATION>( \
+          name);
+
+namespace yggdrasil_decision_forests {
+namespace registration {
+namespace internal {
+
+// utils::concurrency::Mutex for all user registration operations.
+extern utils::concurrency::Mutex registration_mutex;
+
+struct Empty {};template <typename T>
+class NoDestructor {
+ public:
+  template <typename... Args>
+  explicit NoDestructor(Args&&... args) {
+    new (&space_) T(std::forward<Args>(args)...);
+  }
+
+  // Disallow copy and move.
+  NoDestructor(const NoDestructor&) = delete;
+  NoDestructor& operator=(const NoDestructor&) = delete;
+
+  T* get() { return reinterpret_cast<T*>(&space_); }
+  T* operator->() { return get(); }
+  T& operator*() { return *get(); }
+
+ private:
+  alignas(T) unsigned char space_[sizeof(T)];
+};
+
+template <class Interface, class... Args>
+class AbstractCreator {
+ public:
+  virtual ~AbstractCreator() = default;
+  AbstractCreator(absl::string_view name) : name_(name) {}
+  const std::string& name() const { return name_; }
+  virtual absl::StatusOr<std::unique_ptr<Interface>> Create(Args... args) = 0;
+
+ private:
+  std::string name_;
+};
+
+// Check if the interface class defines a "REQUIRED_REGISTRATION_CREATE" global
+// variable.
+template <typename T, typename = void>
+struct use_registration_create_value : std::false_type {};
+
+template <typename T>
+struct use_registration_create_value<
+    T, std::void_t<typename T::REQUIRED_REGISTRATION_CREATE>> : std::true_type {
+};
+
+template <class Interface, class Implementation, class... Args>
+class Creator final : public AbstractCreator<Interface, Args...> {
+ public:
+  Creator(absl::string_view name) : AbstractCreator<Interface, Args...>(name) {}
+  absl::StatusOr<std::unique_ptr<Interface>> Create(Args... args) override {
+    if constexpr (use_registration_create_value<Interface>::value) {
+      return Implementation::RegistrationCreate(args...);
+    } else {
+      return std::make_unique<Implementation>(args...);
+    }
+  };
+};
+
+template <class Interface, class... Args>
+class ClassPool {
+ public:
+  static std::vector<std::unique_ptr<AbstractCreator<Interface, Args...>>>*
+  InternalGetItems() {
+    static NoDestructor<
+        std::vector<std::unique_ptr<AbstractCreator<Interface, Args...>>>>
+        items;
+    return items.get();
+  }
+
+  static std::vector<std::string> GetNames() {
+    utils::concurrency::MutexLock l(&registration_mutex);
+    return InternalGetNames();
+  }
+
+  static bool IsName(absl::string_view name) {
+    utils::concurrency::MutexLock l(&registration_mutex);
+    auto* items = InternalGetItems();
+    for (const auto& item : *items) {
+      if (name == item->name()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static absl::StatusOr<std::unique_ptr<Interface>> Create(
+      absl::string_view name, Args... args) {
+    utils::concurrency::MutexLock l(&registration_mutex);
+    auto* items = InternalGetItems();
+    for (const auto& item : *items) {
+      if (name != item->name()) {
+        continue;
+      }
+      return item->Create(args...);
+    }
+    return absl::InvalidArgumentError(absl::Substitute(
+        "No class registered with key \"$0\" in the class pool \"$1\". "
+        "Registered classes are \"$2\". Add as a dependency the cc_library "
+        "rule that defines this class in your BUILD file.",
+        name, typeid(Interface).name(),
+        absl::StrJoin(InternalGetNames(), ",")));
+  }
+
+ private:
+  static std::vector<std::string> InternalGetNames() {
+    std::vector<std::string> names;
+    auto* items = InternalGetItems();
+    for (const auto& item : *items) {
+      names.push_back(item->name());
+    }
+    return names;
+  }
+};
+
+}  // namespace internal
+}  // namespace registration
+}  // namespace yggdrasil_decision_forests
+
+#endif  // YGGDRASIL_DECISION_FORESTS_UTILS_REGISTRATION_H_

@@ -35,12 +35,33 @@ Key milestones in YDF's development:
 *   2021: Open-sourced and presented at Google I/O.
 *   2023: Presented at KDD23 (paper).
 *   2023: Launch of the standalone YDF Python API.
+*   2026: Launch of the Tensorflow Export library YDF-TF.
 
 ## YDF and TF-DF
 
+### What is YDF-TF
+
+[YDF-TF](http://pypi.org/project/ydf-tf) is a Python library packaging the
+TensorFlow inference ops of YDF. These custom ops are necessary to
+
+-   Export YDF models to TensorFlow SavedModel format, and
+-   Load exported YDF models with TensorFlow.
+
+YDF-TF can be installed with
+
+```bash
+pip install ydf-tf
+```
+
+The package can also be included in the YDF installation by installing
+
+```bash
+pip install ydf[tensorflow]
+```
+
 ### Should I use YDF or TensorFlow Decision Forests (TF-DF)?
 
-For new projects, you should prefer YDF over TF-DF in nearly all cases.
+For new projects, you should prefer YDF over TF-DF in all cases.
 
 YDF's Python API and TF-DF share the same core C++ engine, so many features and
 the models they produce are similar. However, TF-DF is constrained by its
@@ -48,12 +69,18 @@ integration with the Keras 2 API and TensorFlow. As a result, TF-DF is generally
 slower, has a larger memory footprint, and is less flexible than the standalone
 YDF Python API.
 
+If you need to export to TensorFlow, install the ydf-tf package from pip.
+
 ### What is the status of TF-DF? Can I still use it?
 
+for new use cases, we believe that YDF is a better choice than TF-DF. If export
+to Tensorflow SavedModel is necessary, use the ydf-tf library to add support.
 TF-DF is a production-grade library that is supported and deployed in many
-products. You can still use it, and it is actively maintained by the YDF team.
-However, for most new use cases, we believe the YDF Python API is a better
-choice.
+products. It is still maintained, but might not receive quick compatibility
+updates for new versions of TensorFlow.
+
+Please contact the YDF team with any blockers preventing the migration from
+TF-DF to YDF.
 
 ### What is the status of the Python API?
 

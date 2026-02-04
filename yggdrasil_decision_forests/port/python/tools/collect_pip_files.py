@@ -60,7 +60,7 @@ for f in [
     "config/MANIFEST.in",
     "README.md",
     "CHANGELOG.md",
-    "bazel-python/external/ydf_cc/LICENSE",
+    "bazel-python/external/yggdrasil_decision_forests~/LICENSE",
 ]:
   s.copy(f, DST_PK)
 
@@ -74,7 +74,7 @@ s.copy(f"{SRC_BIN}/learner/specialized_learners.py", f"{DST_PK}/ydf/learner")
 
 # Copy the YDF c++ protos
 rec_glob_copy(
-    "bazel-bin/external/ydf_cc/yggdrasil_decision_forests",
+    "bazel-bin/external/yggdrasil_decision_forests~/yggdrasil_decision_forests",
     f"{DST_PK}/yggdrasil_decision_forests",
     "**/*.py",
 )

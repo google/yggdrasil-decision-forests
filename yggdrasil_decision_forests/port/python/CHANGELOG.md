@@ -1,15 +1,23 @@
 # Changelog
 
-## HEAD
+## 0.15.0 - 2026-02-04
 
 ### API Changes
 
--   This change removes any dependency of YDF to Tensorflow Decision Forests
-    (TF-DF). Export to Tensorflow is still available via the new `ydf-tf`
-    package.
-    `model.to_tensorflow_saved_model(mode="keras")` is now strongly discouraged
+-   Export to Tensorflow now uses the ydf-tf package instead of TF-DF.
+    Tensorflow Decision Forests is no longer required for exporting to
+    TensorFlow SavedModel.
+-   `model.to_tensorflow_saved_model(mode="keras")` is now strongly discouraged
     and will be removed in a future version. This mode still requires
     Tensorflow Decision Forests (TF-DF) to be installed.
+
+### Fix
+
+-   Fixed compatibility with Pandas 3.0
+
+### Release music
+
+Allegretto, op. 1. Louis Vierne
 
 ## 0.14.0 - 2026-01-08
 

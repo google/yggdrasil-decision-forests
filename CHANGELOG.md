@@ -3,7 +3,7 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
-## HEAD
+## 1.12.0 - 2026-02-04
 
 ### API Changes
 
@@ -16,10 +16,16 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
 -   Allow custom fields in model metadata.
 -   Add export to standalone Java.
+-   Added the Highway Quickscorer inference engines for faster inference on
+    supported machines.
+-   Various performance improvements.
 
 ### Fix
 
 -   Fix honest trees implementation.
+-   Various bugfixes
+-   Random Forests training no longer trains recursively, which fixes a number
+    of crashes in debug mode.
 
 ### Infra
 

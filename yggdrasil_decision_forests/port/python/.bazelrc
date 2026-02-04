@@ -4,6 +4,8 @@ common --incompatible_default_to_explicit_init_py
 # On Windows, uncomment the next line to solve long path issues:
 # startup --output_user_root=C:/tmpbld
 
+common --enable_platform_specific_config
+
 build -c opt
 build --announce_rc
 
@@ -40,6 +42,13 @@ build:linux_cpp17 --config=linux
 
 build:macos --cxxopt=-std=c++17
 build:macos --host_cxxopt=-std=c++17
+
+# Bazel 7.0.0 no longer supports dynamic symbol lookup on macOS. To resolve
+# undefined symbol errors in macOS arm64 builds, explicitly add the necessary
+# linker flags until dependencies are well defined. See
+# https://github.com/bazelbuild/bazel/issues/19730.
+common:macos --linkopt=-Wl,-undefined,dynamic_lookup
+common:macos --host_linkopt=-Wl,-undefined,dynamic_lookup
 
 build:windows_cpp20 --cxxopt=/std:c++20
 build:windows_cpp20 --host_cxxopt=/std:c++20

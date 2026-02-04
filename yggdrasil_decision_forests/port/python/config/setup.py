@@ -22,7 +22,7 @@ import setuptools
 from setuptools.command.install import install
 from setuptools.dist import Distribution
 
-_VERSION = "0.14.0"
+_VERSION = "0.15.0"
 
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
@@ -33,9 +33,7 @@ REQUIRED_PACKAGES = [
     "protobuf>=5.29.1,<7.0.0",
 ]
 
-OPTIONAL_PACKAGES = {"pandas": ["pandas"]}
-
-MAC_CROSS_COMPILED = False  # Change if cross-compiled
+OPTIONAL_PACKAGES = {"pandas": ["pandas"], "tensorflow": ["ydf-tf"]}
 
 
 class InstallPlatlib(install):
@@ -58,24 +56,15 @@ class BinaryDistribution(Distribution):
 if "bdist_wheel" in sys.argv:
   if "--plat-name" not in sys.argv:
     if platform.system() == "Darwin":
-      if MAC_CROSS_COMPILED:
-        idx = sys.argv.index("bdist_wheel") + 1
-        sys.argv.insert(idx, "--plat-name")
-        if platform.processor() == "arm":
-          sys.argv.insert(idx + 1, "macosx_10_15_x86_64")
-        elif platform.processor() == "i386":
-          sys.argv.insert(idx + 1, "macosx_12_0_arm64")
-        else:
-          raise ValueError(f"Unknown processor {platform.processor()}")
+      idx = sys.argv.index("bdist_wheel") + 1
+      sys.argv.insert(idx, "--plat-name")
+      machine = platform.machine()
+      if machine == "arm64":
+        sys.argv.insert(idx + 1, "macosx_12_0_arm64")
+      elif machine == "x86_64":
+        sys.argv.insert(idx + 1, "macosx_10_15_x86_64")
       else:
-        idx = sys.argv.index("bdist_wheel") + 1
-        sys.argv.insert(idx, "--plat-name")
-        if platform.processor() == "arm":
-          sys.argv.insert(idx + 1, "macosx_12_0_arm64")
-        elif platform.processor() == "i386":
-          sys.argv.insert(idx + 1, "macosx_10_15_x86_64")
-        else:
-          raise ValueError(f"Unknown processor {platform.processor()}")
+        raise ValueError(f"Unknown machine {machine}")
     else:
       print("Not on MacOS")
   else:
@@ -132,7 +121,7 @@ setuptools.setup(
     keywords=(
         "machine learning decision forests random forest gradient boosted"
         " decision trees CART isolation forests classification regression "
-        " ranking uplift boosing"
+        " ranking uplift boosting"
     ),
     install_requires=REQUIRED_PACKAGES,
     extras_require=OPTIONAL_PACKAGES,

@@ -1,5 +1,6 @@
 module(
     name = "yggdrasil_decision_forests",
+    version = "1.12.0"
 )
 
 # BCR Dependencies
