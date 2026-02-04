@@ -4812,10 +4812,10 @@ absl::Status DecisionTreeCoreTrain(
   switch (dt_config.growing_strategy_case()) {
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyLocal: {
       const auto constraints = NodeConstraints::CreateNodeConstraints();
-      return NodeTrain(train_dataset, config, config_link, dt_config,
-                       deployment, weights, 1, internal_config, constraints,
-                       false, dt->mutable_root(), random, &cache,
-                       selected_examples_rb, leaf_examples_rb);
+      return GrowTreeLocal(train_dataset, config, config_link, dt_config,
+                           deployment, weights, 1, internal_config, constraints,
+                           false, dt->mutable_root(), random, &cache,
+                           selected_examples_rb, leaf_examples_rb);
     } break;
     case proto::DecisionTreeTrainingConfig::kGrowingStrategyBestFirstGlobal:
       return GrowTreeBestFirstGlobal(
@@ -4827,18 +4827,24 @@ absl::Status DecisionTreeCoreTrain(
       return absl::InvalidArgumentError("Grow strategy not set");
   }
 }
-absl::Status NodeTrain(
+
+ABSL_ATTRIBUTE_ALWAYS_INLINE static absl::Status NodeTrain(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const model::proto::DeploymentConfig& deployment,
-    const std::vector<float>& weights, const int32_t depth,
-    const InternalTrainConfig& internal_config,
-    const NodeConstraints& constraints, bool set_leaf_already_set,
-    NodeWithChildren* node, utils::RandomEngine* random, PerThreadCache* cache,
-    SelectedExamplesRollingBuffer selected_examples,
-    std::optional<SelectedExamplesRollingBuffer> leaf_examples) {
+    const std::vector<float>& weights,
+    const InternalTrainConfig& internal_config, utils::RandomEngine* random,
+    PerThreadCache* cache, internal::NodeAndExamples node_and_examples,
+    std::vector<internal::NodeAndExamples>& node_stack) {
+  auto& selected_examples = node_and_examples.selected_examples;
+  auto& leaf_examples = node_and_examples.leaf_examples;
+  const auto depth = node_and_examples.depth;
+  const auto& constraints = node_and_examples.constraints;
+  const auto set_leaf_already_set = node_and_examples.set_leaf_already_set;
+  auto node = node_and_examples.node;
+
   if (selected_examples.empty()) {
     return absl::InternalError("No examples fed to the node trainer");
   }
@@ -4988,25 +4994,56 @@ absl::Status NodeTrain(
         &neg_constraints));
   }
 
-  // Positive child.
-  RETURN_IF_ERROR(NodeTrain(
-      train_dataset, config, config_link, dt_config, deployment, weights,
-      depth + 1, internal_config, pos_constraints, true,
-      node->mutable_pos_child(), random, cache, example_split.positive_examples,
-      node_only_example_split.has_value()
-          ? std::optional<SelectedExamplesRollingBuffer>(
-                node_only_example_split->positive_examples)
-          : std::nullopt));
-
   // Negative child.
-  RETURN_IF_ERROR(NodeTrain(
-      train_dataset, config, config_link, dt_config, deployment, weights,
-      depth + 1, internal_config, neg_constraints, true,
-      node->mutable_neg_child(), random, cache, example_split.negative_examples,
-      node_only_example_split.has_value()
-          ? std::optional<SelectedExamplesRollingBuffer>(
-                node_only_example_split->negative_examples)
-          : std::nullopt));
+  node_stack.push_back(
+      {node->mutable_neg_child(), std::move(example_split.negative_examples),
+       node_only_example_split.has_value()
+           ? std::optional<SelectedExamplesRollingBuffer>(
+                 std::move(node_only_example_split->negative_examples))
+           : std::nullopt,
+       depth + 1, neg_constraints, true});
+  // Positive child.
+  node_stack.push_back(
+      {node->mutable_pos_child(), std::move(example_split.positive_examples),
+       node_only_example_split.has_value()
+           ? std::optional<SelectedExamplesRollingBuffer>(
+                 std::move(node_only_example_split->positive_examples))
+           : std::nullopt,
+       depth + 1, pos_constraints, true});
+
+  return absl::OkStatus();
+}
+
+absl::Status GrowTreeLocal(
+    const dataset::VerticalDataset& train_dataset,
+    const model::proto::TrainingConfig& config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const model::proto::DeploymentConfig& deployment,
+    const std::vector<float>& weights, const int32_t depth,
+    const InternalTrainConfig& internal_config,
+    const NodeConstraints& constraints, bool set_leaf_already_set,
+    NodeWithChildren* root, utils::RandomEngine* random, PerThreadCache* cache,
+    SelectedExamplesRollingBuffer selected_examples,
+    std::optional<SelectedExamplesRollingBuffer> leaf_examples) {
+  std::vector<internal::NodeAndExamples> node_stack;
+  const int expected_stack_size =
+      dt_config.max_depth() > 0 ? dt_config.max_depth()
+                                : 2 * std::log2(selected_examples.size() + 1);
+  node_stack.reserve(expected_stack_size);
+  node_stack.push_back({root, std::move(selected_examples),
+                        std::move(leaf_examples), depth, constraints,
+                        set_leaf_already_set});
+
+  while (!node_stack.empty()) {
+    auto current_node = std::move(node_stack.back());
+    node_stack.pop_back();
+
+    RETURN_IF_ERROR(NodeTrain(train_dataset, config, config_link, dt_config,
+                              deployment, weights, internal_config, random,
+                              cache, std::move(current_node), node_stack));
+  }
+
   return absl::OkStatus();
 }
 
