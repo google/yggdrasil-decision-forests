@@ -1,0 +1,26 @@
+module(
+    name = "ydf_tf",
+)
+
+bazel_dep(name = "rules_cc", version = "0.1.4")
+bazel_dep(name = "yggdrasil_decision_forests", version = "1.12.0", repo_name = "ydf_cc")
+local_path_override(
+    module_name = "yggdrasil_decision_forests",
+    path = "../../../",
+)
+
+# Must match the Abseil and Protobuf version used by the Tensorflow version you're compiling for.
+bazel_dep(name = "abseil-cpp", version = "20250127.1", repo_name = "com_google_absl")
+bazel_dep(name = "protobuf", version = "28.3", repo_name = "com_google_protobuf")
+single_version_override(
+    module_name = "protobuf",
+    version = "28.3",
+)
+
+single_version_override(
+    module_name = "abseil-cpp",
+    version = "20250127.1",
+)
+
+tf_ext = use_extension("@ydf_cc//third_party:tf_downloader.bzl", "tf_downloaded_header_extension")
+use_repo(tf_ext, "local_config_tf")
