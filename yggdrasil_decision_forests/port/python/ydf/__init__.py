@@ -76,6 +76,7 @@ from ydf.dataset.dataspec import Column as Feature
 from ydf.dataset.dataspec import Column
 from ydf.model.generic_model import Task
 from ydf.dataset.dataspec import Semantic
+from ydf.dataset.dataspec import Monotonic
 from ydf.learner.worker import start_worker
 from ydf.utils.log import strict
 
