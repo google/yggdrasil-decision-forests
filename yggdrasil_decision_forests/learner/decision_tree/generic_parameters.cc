@@ -484,7 +484,7 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
     param->mutable_documentation()->set_description(
         R"(How to learn splits on categorical attributes.
 - `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.
-- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.
+- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purposes for classification problems and generally performs worse than other alternatives.
 - `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.)");
   }
 
