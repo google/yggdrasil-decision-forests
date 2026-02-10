@@ -137,6 +137,8 @@ def template(
   str_feature_sets_1 = "\n".join(feature_sets_1)
   str_feature_sets_2 = "\n".join(feature_sets_2)
 
+  additional_instructions = ""
+
   return f"""\
 // Automatically generated code running an Yggdrasil Decision Forests model in
 // C++. This code was generated with "model.to_cpp()".
@@ -145,6 +147,8 @@ def template(
 // YDF Version: {version.version}
 //
 // How to use this code:
+//
+// {additional_instructions}
 //
 // 1. Copy this code in a new .h file.
 // 2. If you use Bazel/Blaze, use the following dependencies:
@@ -240,6 +244,18 @@ inline absl::StatusOr<ServingModel> Load(absl::string_view path) {{
 
   // Index the input features.
 {str_feature_index}
+
+// Print all the features of the model in debug mode.
+// This is for debugging only, remove before deployment.
+#ifndef NDEBUG
+  // Note that feature "constant" is NOT in the list.
+  for (const auto& feature_def : m.features->input_features()) {{
+    LOG(INFO) << "Feature " << feature_def.name
+              << ": internal index: " << feature_def.internal_idx
+              << "; index in data spec: " << feature_def.spec_idx << "; type: "
+              << dataset::proto::ColumnType_Name(feature_def.type);
+  }}
+#endif  // NDEBUG
 
   return m;
 }}
