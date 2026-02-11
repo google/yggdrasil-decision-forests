@@ -195,7 +195,7 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
             dt_config, label_stats, dense_example_idxs, selected_weights,
             selected_labels, projection_values, internal_config,
             current_projection.front().attribute_idx, constraints,
-            monotonic_direction, best_condition, cache));
+            monotonic_direction, random, best_condition, cache));
 
     if (result == SplitSearchResult::kBetterSplitFound) {
       best_projection = current_projection;
@@ -292,6 +292,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
+    utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache) {
   InternalTrainConfig effective_internal_config = internal_config;
   effective_internal_config.override_sorting_strategy =
@@ -312,13 +313,25 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
   // Find a good split in the current_projection.
   SplitSearchResult result;
   if constexpr (is_same<LabelStats, ClassificationLabelStats>::value) {
+    if (dt_config.numerical_split().type() == proto::NumericalSplit::EXACT) {
     ASSIGN_OR_RETURN(
         result,
         FindSplitLabelClassificationFeatureNumericalCart(
-            dense_example_idxs, selected_weights, projection_values,
+            dense_example_idxs, selected_weights,
+            projection_values,
             selected_labels, label_stats.num_label_classes, na_replacement,
             min_num_obs, dt_config, label_stats.label_distribution,
             first_attribute_idx, effective_internal_config, condition, cache));
+    }
+    else {
+      ASSIGN_OR_RETURN(
+          result,
+          FindSplitLabelClassificationFeatureNumericalHistogram(
+              dense_example_idxs, selected_weights, projection_values,
+              selected_labels, label_stats.num_label_classes, na_replacement,
+              min_num_obs, dt_config, label_stats.label_distribution,
+              first_attribute_idx, random, condition));
+    }
   } else if constexpr (is_same<LabelStats,
                                RegressionHessianLabelStats>::value) {
     if (!selected_weights.empty()) {
@@ -380,6 +393,7 @@ EvaluateProjection<ClassificationLabelStats, std::vector<int32_t>>(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
+    utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 template absl::StatusOr<SplitSearchResult>
@@ -392,6 +406,7 @@ EvaluateProjection<RegressionLabelStats, std::vector<float>>(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
+    utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 template absl::StatusOr<SplitSearchResult>
@@ -404,6 +419,7 @@ EvaluateProjection<RegressionHessianLabelStats, GradientAndHessian>(
     const absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, const int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
+    utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 template <typename LabelStats, typename Labels>
@@ -415,14 +431,16 @@ absl::Status EvaluateProjectionAndSetCondition(
     const std::vector<float>& selected_weights, const Labels& selected_labels,
     const absl::Span<const float> projection_values,
     const Projection& projection, const InternalTrainConfig& internal_config,
-    const int first_attribute_idx, proto::NodeCondition* condition,
+    const int first_attribute_idx, 
+    utils::RandomEngine* random,
+    proto::NodeCondition* condition,
     SplitterPerThreadCache* cache) {
   ASSIGN_OR_RETURN(
       const auto result,
       EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                          selected_weights, selected_labels, projection_values,
-                         internal_config, first_attribute_idx,
-                         /*constraints=*/{}, /*monotonic_direction=*/0,
+                         internal_config, first_attribute_idx, 
+                         /*constraints=*/{}, /*monotonic_direction=*/0, random,
                          condition, cache));
 
   if (result == SplitSearchResult::kBetterSplitFound) {
@@ -467,7 +485,7 @@ absl::Status EvaluateMHLDCandidates(
       RETURN_IF_ERROR(EvaluateProjectionAndSetCondition(
           dataspec, dt_config, label_stats, dense_example_idxs,
           selected_weights, selected_labels, projection_values,
-          {{attribute_idx, 1.f}}, internal_config, attribute_idx, &condition,
+          {{attribute_idx, 1.f}}, internal_config, attribute_idx, random, &condition,
           cache));
     } else {
       // Find best projection
@@ -494,7 +512,7 @@ absl::Status EvaluateMHLDCandidates(
       RETURN_IF_ERROR(EvaluateProjectionAndSetCondition(
           dataspec, dt_config, label_stats, dense_example_idxs,
           selected_weights, selected_labels, projection_values, projection,
-          internal_config, candidate.front(), &condition, cache));
+          internal_config, candidate.front(), random, &condition, cache));
     }
   }
 
