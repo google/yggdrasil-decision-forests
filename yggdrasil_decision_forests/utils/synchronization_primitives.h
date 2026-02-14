@@ -45,12 +45,7 @@ namespace concurrency {
 
 #ifdef YGG_STD_MUTEX
 
-#if _LIBCPP_STD_VER >= 17
-// shared_mutex was introduced in c++17.
 using std_shared_mutex = std::shared_mutex;
-#else
-using std_shared_mutex = std::shared_timed_mutex;
-#endif
 
 class Mutex {
  public:
@@ -111,7 +106,10 @@ class CondVar {
 #else
 
 using Mutex = absl::Mutex;
-using MutexLock = absl::MutexLock;
+class MutexLock : public absl::MutexLock {
+ public:
+  explicit MutexLock(Mutex* mu) : absl::MutexLock(*mu) {}
+};
 using WriterMutexLock = absl::WriterMutexLock;
 using ReaderMutexLock = absl::ReaderMutexLock;
 using SharedMutex = Mutex;
