@@ -142,7 +142,7 @@ absl::Status GRPCManager::InitializeWorkers(
   // Override the worker address with global changes.
   if (imp_config.has_key()) {
     auto& all_events = GetGlobalChanges();
-    utils::concurrency::MutexLock l(&all_events.mutex);
+    utils::concurrency::MutexLock l(all_events.mutex);
     auto& per_key = all_events.per_key[imp_config.key()];
     for (const auto& change : per_key.past_changes) {
       worker_addresses[change.first] = change.second;
@@ -164,7 +164,7 @@ absl::Status GRPCManager::InitializeWorkers(
     auto worker = std::make_unique<Worker>();
     worker->worker_idx = worker_idx;
     {
-      utils::concurrency::MutexLock l(&worker->mutex_address);
+      utils::concurrency::MutexLock l(worker->mutex_address);
       worker->expected_address = worker_addresses[worker_idx];
       worker->StartThreads(parallel_execution_per_worker, this);
       workers_.push_back(std::move(worker));
@@ -237,7 +237,7 @@ absl::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
 
 absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
     Worker* worker) {
-  utils::concurrency::MutexLock l(&worker->mutex_address);
+  utils::concurrency::MutexLock l(worker->mutex_address);
   if (worker->expected_address != worker->connected_address) {
     // The worker has moved.
 
@@ -317,7 +317,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
         // configuration field. The request should be re-sent with the worker
         // configuration.
         LOG(WARNING) << "Send configuration to worker #" << worker->worker_idx;
-        utils::concurrency::MutexLock l(&mutex_worker_config_);
+        utils::concurrency::MutexLock l(mutex_worker_config_);
         *query.mutable_worker_config() = worker_config_;
         continue;
       }
@@ -386,7 +386,7 @@ void GRPCManager::ProcessGlobalQueries(Worker* worker) {
 absl::Status GRPCManager::InitializeConfigFile(
     const proto::Config& config, const absl::string_view worker_name,
     const int parallel_execution_per_worker, Blob welcome_blob) {
-  utils::concurrency::MutexLock l(&mutex_worker_config_);
+  utils::concurrency::MutexLock l(mutex_worker_config_);
   worker_config_.set_worker_name(std::string(worker_name));
   worker_config_.set_welcome_blob(welcome_blob);
   worker_config_.set_manager_uid(manager_uid_);
@@ -394,7 +394,7 @@ absl::Status GRPCManager::InitializeConfigFile(
       parallel_execution_per_worker);
 
   for (const auto& worker : workers_) {
-    utils::concurrency::MutexLock l(&worker->mutex_address);
+    utils::concurrency::MutexLock l(worker->mutex_address);
     worker_config_.add_worker_addresses(worker->expected_address);
   }
   return absl::OkStatus();
@@ -509,7 +509,7 @@ absl::Status GRPCManager::DebugShutdownWorker(int worker_idx) {
   ConfigureClientContext(&context);
   proto::Empty ignored;
   auto& worker = workers_[worker_idx];
-  utils::concurrency::MutexLock l(&worker->mutex_address);
+  utils::concurrency::MutexLock l(worker->mutex_address);
   auto worker_shutdown = worker->stub->Shutdown(&context, query, &ignored);
   return GrpcStatusToAbslStatus(worker_shutdown);
 }
@@ -558,11 +558,11 @@ absl::Status GRPCManager::UpdateWorkerAddress(
   DCHECK_LT(worker_idx, workers_.size());
   auto& worker = workers_[worker_idx];
   {
-    utils::concurrency::MutexLock l(&worker->mutex_address);
+    utils::concurrency::MutexLock l(worker->mutex_address);
     worker->expected_address = std::string(new_address);
   }
   {
-    utils::concurrency::MutexLock l(&mutex_worker_config_);
+    utils::concurrency::MutexLock l(mutex_worker_config_);
     *worker_config_.mutable_worker_addresses(worker_idx) =
         std::string(new_address);
   }
@@ -588,7 +588,7 @@ void GRPCManager::ProcessPeerWorkerAddressUpdate(Worker* worker) {
     // Get the new address of those workers.
     {
       auto& target_worker = workers_[query.worker_idx()];
-      utils::concurrency::MutexLock l(&target_worker->mutex_address);
+      utils::concurrency::MutexLock l(target_worker->mutex_address);
       query.set_new_address(target_worker->expected_address);
     }
 
@@ -618,7 +618,7 @@ void UpdateWorkerAddress(int key, int worker_idx,
   LOG(INFO) << "Receive update of worker #" << worker_idx << " address to "
             << new_address;
   auto& all_changes = GetGlobalChanges();
-  utils::concurrency::MutexLock l(&all_changes.mutex);
+  utils::concurrency::MutexLock l(all_changes.mutex);
   auto& per_key = all_changes.per_key[key];
 
   per_key.pending_changes.push_back(
@@ -646,7 +646,7 @@ void GRPCManager::MainEventCheckingThread() {
   while (!done_was_called_) {
     std::vector<UpdateAddress> pending_changes;
     {
-      utils::concurrency::MutexLock lock(&all_changes.mutex);
+      utils::concurrency::MutexLock lock(all_changes.mutex);
 
       // Wait for changes.
       absl::flat_hash_map<int, KeyChanges>::iterator it_per_key;

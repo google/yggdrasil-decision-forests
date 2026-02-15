@@ -173,7 +173,7 @@ class GenericCCModel {
 
   void ForceEngine(std::optional<std::string> engine_name) {
     // TODO: Let the user configure inference without an engine.
-    utils::concurrency::MutexLock lock(&engine_mutex_);
+    utils::concurrency::MutexLock lock(engine_mutex_);
     force_engine_name_ = engine_name;
     invalidate_engine();
   }
