@@ -17,6 +17,7 @@
 
 #include <pybind11/numpy.h>
 
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <utility>
@@ -94,18 +95,21 @@ std::vector<GBTCCTrainingLogEntry> GradientBoostedTreesCCModel::training_logs()
   const auto& label_col_spec = gbt_model_->label_col_spec();
   logs.reserve(training_logs.entries_size());
   for (const auto& entry : training_logs.entries()) {
-    const auto& validation_evaluation =
-        model::gradient_boosted_trees::internal::TrainingLogToEvaluationResults(
-            entry, training_logs, gbt_model_->task(), label_col_spec,
-            gbt_model_->loss_config(), gbt_model_->GetLossName(),
-            model::gradient_boosted_trees::internal::TrainingLogEvaluationSet::
-                kValidation);
-    const auto& training_evaluation =
+    const auto training_evaluation =
         model::gradient_boosted_trees::internal::TrainingLogToEvaluationResults(
             entry, training_logs, gbt_model_->task(), label_col_spec,
             gbt_model_->loss_config(), gbt_model_->GetLossName(),
             model::gradient_boosted_trees::internal::TrainingLogEvaluationSet::
                 kTraining);
+    metric::proto::EvaluationResults validation_evaluation;
+    if (!std::isnan(gbt_model_->validation_loss())) {
+      validation_evaluation = model::gradient_boosted_trees::internal::
+          TrainingLogToEvaluationResults(
+              entry, training_logs, gbt_model_->task(), label_col_spec,
+              gbt_model_->loss_config(), gbt_model_->GetLossName(),
+              model::gradient_boosted_trees::internal::
+                  TrainingLogEvaluationSet::kValidation);
+    }
     logs.push_back({.iteration = entry.number_of_trees(),
                     .validation_evaluation = validation_evaluation,
                     .training_evaluation = training_evaluation});

@@ -92,6 +92,30 @@ class GradientBoostedTreesTest(parameterized.TestCase):
         self.assertAlmostEqual(training_evaluation.loss, 0.5057407)
         self.assertAlmostEqual(training_evaluation.accuracy, 0.89436144)
 
+  def test_training_logs_with_newly_trained_model(self):
+    dataset = {
+        "x": np.array([0, 0, 1, 1] * 20),
+        "y": np.array([0, 0, 1, 1] * 20),
+    }
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=5,
+        validation_ratio=0.5,
+    ).train(dataset)
+
+    training_logs = model.training_logs()
+    self.assertLen(training_logs, 5)
+
+    for log in training_logs:
+      # Check validation evaluation
+      self.assertIsNotNone(log.evaluation)
+      self.assertTrue(hasattr(log.evaluation, "loss"))
+      self.assertIsInstance(log.evaluation.loss, float)
+
+      # Check training evaluation
+      self.assertIsNotNone(log.training_evaluation)
+      self.assertTrue(hasattr(log.training_evaluation, "loss"))
+
   def test_empty_training_logs(self):
     # This model has no training logs.
     training_logs = self.adult_binary_class_gbdt.training_logs()

@@ -986,9 +986,14 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
   evaluation.set_loss_value(eval_set == TrainingLogEvaluationSet::kValidation
                                 ? log_entry.validation_loss()
                                 : log_entry.training_loss());
+  int secondary_metric_size =
+      eval_set == TrainingLogEvaluationSet::kValidation
+          ? log_entry.validation_secondary_metrics_size()
+          : log_entry.training_secondary_metrics_size();
+  secondary_metric_size = std::min(secondary_metric_size,
+                                   training_logs.secondary_metric_names_size());
 
-  for (int metrix_idx = 0;
-       metrix_idx < training_logs.secondary_metric_names_size(); metrix_idx++) {
+  for (int metrix_idx = 0; metrix_idx < secondary_metric_size; metrix_idx++) {
     const auto& metric_name = training_logs.secondary_metric_names(metrix_idx);
     const auto metric_value =
         eval_set == TrainingLogEvaluationSet::kValidation
