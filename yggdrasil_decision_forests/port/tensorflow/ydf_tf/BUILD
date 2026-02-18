@@ -75,7 +75,6 @@ cc_library(
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/utility:if_constexpr",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
     ],
     alwayslink = 1,
