@@ -241,7 +241,7 @@ MultitaskerLearner::TrainWithStatusImpl(
     ASSIGN_OR_RETURN(
         submodel, sublearner->TrainWithStatus(local_train_ds, local_valid_ds));
 
-    utils::concurrency::MutexLock lock(&mutex);
+    utils::concurrency::MutexLock lock(mutex);
     STATUS_CHECK_LT(subtask_idx, model->models_.size());
     model->models_[subtask_idx] = std::move(submodel);
     return absl::OkStatus();
@@ -250,13 +250,13 @@ MultitaskerLearner::TrainWithStatusImpl(
   const auto train_subtask_nostatus = [&](const int subtask_idx,
                                           const bool primary) {
     {
-      utils::concurrency::MutexLock lock(&mutex);
+      utils::concurrency::MutexLock lock(mutex);
       if (!status.ok()) {
         return;
       }
     }
     const auto substatus = train_subtask(subtask_idx, primary);
-    utils::concurrency::MutexLock lock(&mutex);
+    utils::concurrency::MutexLock lock(mutex);
     if (!substatus.ok()) {
       status.Update(substatus);
     }

@@ -94,7 +94,7 @@ grpc::Status WorkerService::Run(grpc::ServerContext* context,
                                 const proto::Query* request,
                                 proto::Answer* reply) {
   {
-    utils::concurrency::MutexLock l(&mutex_);
+    utils::concurrency::MutexLock l(mutex_);
     RETURN_IF_ERROR(AbslStatusToGrpcStatus(EnsureReadyWorker(
         request->manager_uid(), *request, request->worker_idx(), &l)));
     num_active_requests_++;
@@ -103,7 +103,7 @@ grpc::Status WorkerService::Run(grpc::ServerContext* context,
   auto result_or = worker_->RunRequest(request->blob());
 
   {
-    utils::concurrency::MutexLock l(&mutex_);
+    utils::concurrency::MutexLock l(mutex_);
     num_active_requests_--;
     if (stopping_worker_) {
       LOG(INFO) << "Still " << num_active_requests_ << " active requests";
@@ -152,7 +152,7 @@ grpc::Status WorkerService::UpdateWorkerAddress(
     return grpc::Status::OK;
   }
   auto& worker = *intra_worker_communication_->workers[request->worker_idx()];
-  utils::concurrency::MutexLock l(&worker.mutex_address);
+  utils::concurrency::MutexLock l(worker.mutex_address);
   worker.expected_address = request->new_address();
   return grpc::Status::OK;
 }
@@ -161,7 +161,7 @@ grpc::Status WorkerService::Shutdown(grpc::ServerContext* context,
                                      const proto::ShutdownQuery* request,
                                      proto::Empty* reply) {
   LOG(INFO) << "Shutdown worker";
-  utils::concurrency::MutexLock l(&mutex_);
+  utils::concurrency::MutexLock l(mutex_);
   if (worker_) {
     RETURN_IF_ERROR(AbslStatusToGrpcStatus(BlockingDoneOnWorker(&l)));
     stopping_worker_ = false;
@@ -324,7 +324,7 @@ void WorkerService::InitializerInterWorkerCommunication(
   for (int worker_idx = 0; worker_idx < worker_config.worker_addresses_size();
        worker_idx++) {
     auto worker = std::make_unique<InterWorkerCommunication::Worker>();
-    utils::concurrency::MutexLock l(&worker->mutex_address);
+    utils::concurrency::MutexLock l(worker->mutex_address);
     worker->expected_address = worker_config.worker_addresses(worker_idx);
     intra_worker_communication_->workers.push_back(std::move(worker));
   }
@@ -336,7 +336,7 @@ WorkerService::EnsureIntraWorkerStubIsReady(const int worker_idx) {
   CHECK_LT(worker_idx, intra_worker_communication_->workers.size());
   auto& worker = *intra_worker_communication_->workers[worker_idx];
 
-  utils::concurrency::MutexLock l(&worker.mutex_address);
+  utils::concurrency::MutexLock l(worker.mutex_address);
 
   if (worker.stub && worker.expected_address == worker.connected_address) {
     return worker.stub.get();

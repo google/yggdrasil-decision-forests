@@ -295,7 +295,7 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
     for (const auto column_idx : request.columns()) {
       thread_pool.Schedule([&, column_idx]() {
         {
-          utils::concurrency::MutexLock l(&mutex_worker_status);
+          utils::concurrency::MutexLock l(mutex_worker_status);
           if (!worker_status.ok()) {
             return;
           }
@@ -308,7 +308,7 @@ absl::Status CreateDatasetCacheWorker::SeparateDatasetColumns(
             dataset, column_idx, request.shard_idx(), request.num_shards(),
             temp_directory, request.output_directory());
         {
-          utils::concurrency::MutexLock l(&mutex_worker_status);
+          utils::concurrency::MutexLock l(mutex_worker_status);
           worker_status.Update(local_status);
           exported_columns++;
         }

@@ -89,7 +89,7 @@ absl::Status AppendEvaluation(const AbstractModel& model,
           dataset, option, weight_links, *engine, &sub_rnd, nullptr,
           &sub_evaluation));
 
-      utils::concurrency::MutexLock lock(&mutex);
+      utils::concurrency::MutexLock lock(mutex);
       RETURN_IF_ERROR(metric::MergeEvaluation(option, sub_evaluation, eval));
       num_evaluated_shards++;
       LOG_EVERY_N_SEC(INFO, 30) << num_evaluated_shards << "/" << shards.size()
@@ -105,14 +105,14 @@ absl::Status AppendEvaluation(const AbstractModel& model,
         thread_pool.Schedule([&shard, &mutex, &process_shard, &worker_status,
                               sub_rnd_seed = (*rnd)()]() -> void {
           {
-            utils::concurrency::MutexLock lock(&mutex);
+            utils::concurrency::MutexLock lock(mutex);
             if (!worker_status.ok()) {
               return;
             }
           }
           auto sub_status = process_shard(shard, sub_rnd_seed);
           {
-            utils::concurrency::MutexLock lock(&mutex);
+            utils::concurrency::MutexLock lock(mutex);
             worker_status.Update(sub_status);
           }
         });

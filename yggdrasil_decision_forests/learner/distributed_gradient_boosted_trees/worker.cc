@@ -204,7 +204,7 @@ absl::StatusOr<distribute::Blob>
 DistributedGradientBoostedTreesWorker::RunRequest(
     distribute::Blob serialized_request) {
   {
-    utils::concurrency::MutexLock l(&mutex_num_running_requests_);
+    utils::concurrency::MutexLock l(mutex_num_running_requests_);
     num_running_requests_++;
   }
 
@@ -215,7 +215,7 @@ DistributedGradientBoostedTreesWorker::RunRequest(
   }
 
   {
-    utils::concurrency::MutexLock l(&mutex_num_running_requests_);
+    utils::concurrency::MutexLock l(mutex_num_running_requests_);
     num_running_requests_--;
     if (stop_) {
       if (num_running_requests_ == 0) {
@@ -715,7 +715,7 @@ absl::Status DistributedGradientBoostedTreesWorker::FindSplits(
   }
 
   done_find_splits.Wait();
-  utils::concurrency::MutexLock l(&mutex_splits_per_weak_models);
+  utils::concurrency::MutexLock l(mutex_splits_per_weak_models);
   RETURN_IF_ERROR(worker_status);
 
   // Save the best splits into the reply.

@@ -75,7 +75,7 @@
     Register(const absl::string_view key) {                                  \
       if (IsName(key)) return {};                                            \
       utils::concurrency::MutexLock l(                                       \
-          &::yggdrasil_decision_forests::registration::internal::            \
+          ::yggdrasil_decision_forests::registration::internal::             \
               registration_mutex);                                           \
       InternalGetItems()->push_back(                                         \
           std::make_unique<                                                  \
@@ -147,12 +147,12 @@ class ClassPool {
   }
 
   static std::vector<std::string> GetNames() {
-    utils::concurrency::MutexLock l(&registration_mutex);
+    utils::concurrency::MutexLock l(registration_mutex);
     return InternalGetNames();
   }
 
   static bool IsName(absl::string_view name) {
-    utils::concurrency::MutexLock l(&registration_mutex);
+    utils::concurrency::MutexLock l(registration_mutex);
     auto* items = InternalGetItems();
     for (const auto& item : *items) {
       if (name == item->name()) {
@@ -164,7 +164,7 @@ class ClassPool {
 
   static absl::StatusOr<std::unique_ptr<Interface>> Create(
       absl::string_view name, Args... args) {
-    utils::concurrency::MutexLock l(&registration_mutex);
+    utils::concurrency::MutexLock l(registration_mutex);
     auto* items = InternalGetItems();
     for (const auto& item : *items) {
       if (name != item->name()) {

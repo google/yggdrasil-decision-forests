@@ -264,7 +264,7 @@ absl::Status VectorSequenceComputer::ComputeMaxDotProductGPU(
     const int32_t attribute_idx,
     const absl::Span<const UnsignedExampleIdx> selected_examples,
     absl::Span<const float> anchors, int num_anchors, absl::Span<float> dst) {
-  utils::concurrency::MutexLock l(&gpu_mutex_);
+  utils::concurrency::MutexLock l(gpu_mutex_);
 
   const auto &per_attribute = per_attributes_[attribute_idx];
   DCHECK(per_attribute.attribute);
@@ -305,7 +305,7 @@ absl::Status VectorSequenceComputer::ComputeNegMinSquareDistanceGPU(
     const int32_t attribute_idx,
     const absl::Span<const UnsignedExampleIdx> selected_examples,
     absl::Span<const float> anchors, int num_anchors, absl::Span<float> dst) {
-  utils::concurrency::MutexLock l(&gpu_mutex_);
+  utils::concurrency::MutexLock l(gpu_mutex_);
 
   const auto &per_attribute = per_attributes_[attribute_idx];
   DCHECK(per_attribute.attribute);
