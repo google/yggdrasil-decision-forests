@@ -150,10 +150,27 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
     }
   }
   {
-    const auto hparam = generic_hyper_params->Get(kHParamWinnerTakeAll);
+    const auto hparam_deprecated =
+        generic_hyper_params->Get(kHParamWinnerTakeAll);
+    const auto hparam = generic_hyper_params->Get(kHParamWinnerTakesAll);
     if (hparam.has_value()) {
+      if (hparam_deprecated.has_value() &&
+          hparam.value().value().categorical() !=
+              hparam_deprecated.value().value().categorical()) {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Cannot set both ", kHParamWinnerTakesAll, " and ",
+            kHParamWinnerTakeAll, " to different values. Received '",
+            hparam.value().value().categorical(), "' for ",
+            kHParamWinnerTakesAll, " and '",
+            hparam_deprecated.value().value().categorical(), "' for ",
+            kHParamWinnerTakeAll, "."));
+      }
       rf_config->set_winner_take_all_inference(
           hparam.value().value().categorical() == "true");
+    }
+    if (hparam_deprecated.has_value()) {
+      rf_config->set_winner_take_all_inference(
+          hparam_deprecated.value().value().categorical() == "true");
     }
   }
   {
@@ -233,7 +250,7 @@ RandomForestLearner::PredefinedHyperParameterSpace() const {
 
   {
     auto* field = space.add_fields();
-    field->set_name(kHParamWinnerTakeAll);
+    field->set_name(kHParamWinnerTakesAll);
     auto* cands = field->mutable_discrete_candidates();
     cands->add_possible_values()->set_categorical("true");
   }
@@ -271,7 +288,7 @@ RandomForestLearner::GetGenericHyperParameterSpecification() const {
   const auto proto_path = "learner/random_forest/random_forest.proto";
 
   hparam_def.mutable_documentation()->set_description(
-      R"(A [Random Forest](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) is a collection of deep CART decision trees trained independently and without pruning. Each tree is trained on a random subset of the original training  dataset (sampled with replacement).
+      R"(A [Random Forest](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) is a collection of deep CART decision trees trained independently and without pruning. Each tree is trained on a random subset of the original training dataset (sampled with replacement).
 
 The algorithm is unique in that it is robust to overfitting, even in extreme cases e.g. when there are more features than training examples.
 
@@ -297,6 +314,27 @@ It is probably the most well-known of the Decision Forest training algorithms.)"
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_proto_field("winner_take_all_inference");
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamWinnerTakesAll);
+    param.mutable_mutual_exclusive()->set_is_default(false);
+    // Note that setting the field to deprecated would block the export to
+    // Python. This is not yet what we want.
+
+    param.mutable_documentation()->set_description(
+        R"(DEPRECATED, use winner_takes_all instead. Control how classification trees vote. If true, each tree votes for one class. If false, each tree vote for a distribution of classes. winner_take_all_inference=false is often preferable.)");
+  }
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamWinnerTakesAll);
+    param.mutable_categorical()->set_default_value(
+        rf_config.winner_take_all_inference() ? "true" : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_proto_field("winner_take_all_inference");
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamWinnerTakeAll);
+    param.mutable_mutual_exclusive()->set_is_default(true);
 
     param.mutable_documentation()->set_description(
         R"(Control how classification trees vote. If true, each tree votes for one class. If false, each tree vote for a distribution of classes. winner_take_all_inference=false is often preferable.)");
@@ -401,7 +439,7 @@ absl::Status RandomForestLearner::CheckConfiguration(
     if (!rf_config.decision_tree().store_detailed_label_distribution())
       return absl::InvalidArgumentError(
           "store_detailed_label_label_distribution should be true if "
-          "winner_take_all is false. The decision trees need to contain the "
+          "winner_takes_all is false. The decision trees need to contain the "
           "detailed label distributions.");
   }
   return absl::OkStatus();
