@@ -1202,7 +1202,7 @@ double CateCalibration(const proto::EvaluationResults& eval) {
 }
 
 float DefaultRMSE(const proto::EvaluationResults& eval) {
-  if (eval.count_predictions() == 0) {
+  if (eval.count_predictions() == 0 || !eval.regression().has_sum_label()) {
     return std::numeric_limits<float>::quiet_NaN();
   }
   const double mean_label =
