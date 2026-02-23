@@ -148,6 +148,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
     absl::Span<const float> projection_values,
     const InternalTrainConfig& internal_config, int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
+    utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache);
 
 namespace internal {
