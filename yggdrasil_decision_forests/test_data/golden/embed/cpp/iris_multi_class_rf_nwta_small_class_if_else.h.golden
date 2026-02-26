@@ -1,13 +1,13 @@
 #ifndef YDF_MODEL_YDF_MODEL_H_
 #define YDF_MODEL_YDF_MODEL_H_
 
-#include <stdint.h>
-#include <cstring>
-#include <array>
 #include <algorithm>
-#include <cmath>
-#include <bitset>
+#include <array>
 #include <cassert>
+#include <cmath>
+#include <cstring>
+#include <iterator>
+#include <stdint.h>
 
 namespace ydf_model {
 
@@ -18,7 +18,7 @@ enum class Label : uint32_t {
 };
 
 constexpr const int kNumFeatures = 4;
-constexpr const int kNumTrees = 3;
+constexpr const uint8_t kNumTrees = 3;
 
 struct Instance {
   typedef float Numerical;
@@ -43,7 +43,8 @@ struct Instance {
 //
 // This function is called by `Predict()`.
 inline Label PredictUnsafe(const Instance& instance) {
-  std::array<float, 3> accumulator {0};
+  std::array<float, 3> accumulator {0, 0, 0};
+
   // Tree #0
   if (instance.petal_width >= 0.75) {
     if (instance.petal_width >= 1.65) {
@@ -118,10 +119,10 @@ inline Label PredictUnsafe(const Instance& instance) {
 //
 // Sanitizes the given instance, then calls `PredictUnsafe()`.
 inline Label Predict(Instance instance) {
-  instance.sepal_length = std::isnan(instance.sepal_length) ? 5.843333 : instance.sepal_length;
-  instance.sepal_width = std::isnan(instance.sepal_width) ? 3.057333 : instance.sepal_width;
-  instance.petal_length = std::isnan(instance.petal_length) ? 3.758000 : instance.petal_length;
-  instance.petal_width = std::isnan(instance.petal_width) ? 1.199333 : instance.petal_width;
+  instance.sepal_length = std::isnan(instance.sepal_length) ? 5.84333 : instance.sepal_length;
+  instance.sepal_width = std::isnan(instance.sepal_width) ? 3.05733 : instance.sepal_width;
+  instance.petal_length = std::isnan(instance.petal_length) ? 3.758 : instance.petal_length;
+  instance.petal_width = std::isnan(instance.petal_width) ? 1.19933 : instance.petal_width;
 
   return PredictUnsafe(instance);
 }

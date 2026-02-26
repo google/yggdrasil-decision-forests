@@ -1,13 +1,11 @@
 #ifndef YDF_MODEL_YDF_MODEL_H_
 #define YDF_MODEL_YDF_MODEL_H_
 
-#include <stdint.h>
-#include <cstring>
-#include <array>
 #include <algorithm>
-#include <cmath>
-#include <bitset>
+#include <array>
 #include <cassert>
+#include <cstring>
+#include <stdint.h>
 
 namespace ydf_model {
 
@@ -145,7 +143,7 @@ enum class FeatureNativeCountry : uint32_t {
 };
 
 constexpr const int kNumFeatures = 14;
-constexpr const int kNumTrees = 3;
+constexpr const uint8_t kNumTrees = 3;
 
 struct Instance {
   typedef int32_t Numerical;
@@ -168,6 +166,7 @@ struct Instance {
 
 inline float Predict(const Instance& instance) {
   uint8_t accumulator {0};
+
   // Tree #0
   if (instance.marital_status == FeatureMaritalStatus::kMarriedCivSpouse ||
       instance.marital_status == FeatureMaritalStatus::kMarriedAfSpouse) {
@@ -6902,8 +6901,7 @@ inline float Predict(const Instance& instance) {
     }
   }
 
-return static_cast<float>(accumulator) / 3;
-
+  return static_cast<float>(accumulator) / 3;
 }
 
 }  // namespace ydf_model

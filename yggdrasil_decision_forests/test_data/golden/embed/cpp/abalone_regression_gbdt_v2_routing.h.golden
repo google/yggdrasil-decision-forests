@@ -1,13 +1,11 @@
 #ifndef YDF_MODEL_YDF_MODEL_H_
 #define YDF_MODEL_YDF_MODEL_H_
 
-#include <stdint.h>
-#include <cstring>
-#include <array>
-#include <algorithm>
-#include <cmath>
 #include <bitset>
 #include <cassert>
+#include <cmath>
+#include <cstring>
+#include <stdint.h>
 
 namespace ydf_model {
 
@@ -19,7 +17,7 @@ enum class FeatureType : uint32_t {
 };
 
 constexpr const int kNumFeatures = 8;
-constexpr const int kNumTrees = 3;
+constexpr const uint8_t kNumTrees = 3;
 
 struct Instance {
   typedef float Numerical;

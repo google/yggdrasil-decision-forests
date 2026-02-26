@@ -1,14 +1,13 @@
 #ifndef YDF_MODEL_YDF_MODEL_H_
 #define YDF_MODEL_YDF_MODEL_H_
 
-#include <stdint.h>
-#include <cstring>
-#include <array>
-#include <algorithm>
-#include <cmath>
-#include <unordered_map>
 #include <bitset>
 #include <cassert>
+#include <cmath>
+#include <cstring>
+#include <stdint.h>
+#include <string_view>
+#include <unordered_map>
 
 namespace ydf_model {
 
@@ -28,6 +27,7 @@ enum class FeatureWorkclass : uint32_t {
   kWithoutPay = 7,
 };
 
+
 FeatureWorkclass FeatureWorkclassFromString(const std::string_view name) {
   using F = FeatureWorkclass;
   static const std::unordered_map<std::string_view, FeatureWorkclass>
@@ -46,7 +46,6 @@ FeatureWorkclass FeatureWorkclassFromString(const std::string_view name) {
   }
   return it->second;
 }
-
 enum class FeatureEducation : uint32_t {
   kOutOfVocabulary = 0,
   kHsGrad = 1,
@@ -66,6 +65,7 @@ enum class FeatureEducation : uint32_t {
   k1st4th = 15,
   kPreschool = 16,
 };
+
 
 FeatureEducation FeatureEducationFromString(const std::string_view name) {
   using F = FeatureEducation;
@@ -94,7 +94,6 @@ FeatureEducation FeatureEducationFromString(const std::string_view name) {
   }
   return it->second;
 }
-
 enum class FeatureMaritalStatus : uint32_t {
   kOutOfVocabulary = 0,
   kMarriedCivSpouse = 1,
@@ -105,6 +104,7 @@ enum class FeatureMaritalStatus : uint32_t {
   kMarriedSpouseAbsent = 6,
   kMarriedAfSpouse = 7,
 };
+
 
 FeatureMaritalStatus FeatureMaritalStatusFromString(const std::string_view name) {
   using F = FeatureMaritalStatus;
@@ -124,7 +124,6 @@ FeatureMaritalStatus FeatureMaritalStatusFromString(const std::string_view name)
   }
   return it->second;
 }
-
 enum class FeatureOccupation : uint32_t {
   kOutOfVocabulary = 0,
   kProfSpecialty = 1,
@@ -141,6 +140,7 @@ enum class FeatureOccupation : uint32_t {
   kProtectiveServ = 12,
   kPrivHouseServ = 13,
 };
+
 
 FeatureOccupation FeatureOccupationFromString(const std::string_view name) {
   using F = FeatureOccupation;
@@ -166,7 +166,6 @@ FeatureOccupation FeatureOccupationFromString(const std::string_view name) {
   }
   return it->second;
 }
-
 enum class FeatureRelationship : uint32_t {
   kOutOfVocabulary = 0,
   kHusband = 1,
@@ -176,6 +175,7 @@ enum class FeatureRelationship : uint32_t {
   kWife = 5,
   kOtherRelative = 6,
 };
+
 
 FeatureRelationship FeatureRelationshipFromString(const std::string_view name) {
   using F = FeatureRelationship;
@@ -194,7 +194,6 @@ FeatureRelationship FeatureRelationshipFromString(const std::string_view name) {
   }
   return it->second;
 }
-
 enum class FeatureRace : uint32_t {
   kOutOfVocabulary = 0,
   kWhite = 1,
@@ -203,6 +202,7 @@ enum class FeatureRace : uint32_t {
   kAmerIndianEskimo = 4,
   kOther = 5,
 };
+
 
 FeatureRace FeatureRaceFromString(const std::string_view name) {
   using F = FeatureRace;
@@ -220,12 +220,12 @@ FeatureRace FeatureRaceFromString(const std::string_view name) {
   }
   return it->second;
 }
-
 enum class FeatureSex : uint32_t {
   kOutOfVocabulary = 0,
   kMale = 1,
   kFemale = 2,
 };
+
 
 FeatureSex FeatureSexFromString(const std::string_view name) {
   using F = FeatureSex;
@@ -240,7 +240,6 @@ FeatureSex FeatureSexFromString(const std::string_view name) {
   }
   return it->second;
 }
-
 enum class FeatureNativeCountry : uint32_t {
   kOutOfVocabulary = 0,
   kUnitedStates = 1,
@@ -284,6 +283,7 @@ enum class FeatureNativeCountry : uint32_t {
   kScotland = 39,
   kOutlyingUsGuamUsviEtc = 40,
 };
+
 
 FeatureNativeCountry FeatureNativeCountryFromString(const std::string_view name) {
   using F = FeatureNativeCountry;
@@ -336,9 +336,8 @@ FeatureNativeCountry FeatureNativeCountryFromString(const std::string_view name)
   }
   return it->second;
 }
-
 constexpr const int kNumFeatures = 14;
-constexpr const int kNumTrees = 3;
+constexpr const uint8_t kNumTrees = 3;
 
 struct Instance {
   typedef int32_t Numerical;

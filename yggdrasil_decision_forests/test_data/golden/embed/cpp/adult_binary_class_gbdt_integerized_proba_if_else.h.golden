@@ -1,13 +1,12 @@
 #ifndef YDF_MODEL_YDF_MODEL_H_
 #define YDF_MODEL_YDF_MODEL_H_
 
-#include <stdint.h>
-#include <cstring>
-#include <array>
 #include <algorithm>
-#include <cmath>
-#include <bitset>
+#include <array>
 #include <cassert>
+#include <cmath>
+#include <cstring>
+#include <stdint.h>
 
 namespace ydf_model {
 
@@ -17,7 +16,7 @@ enum class Label : uint32_t {
 };
 
 constexpr const int kNumFeatures = 14;
-constexpr const int kNumTrees = 3;
+constexpr const uint8_t kNumTrees = 3;
 
 struct Instance {
   typedef int32_t Numerical;
@@ -60,6 +59,7 @@ struct Instance {
 // This function is called by `Predict()`.
 inline float PredictUnsafe(const Instance& instance) {
   float accumulator {-1.1631};
+
   // Tree #0
   if (instance.relationship == 0 ||
       instance.relationship == 1 ||

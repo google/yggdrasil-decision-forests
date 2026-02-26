@@ -8,21 +8,51 @@ package(
 )
 
 cc_library_ydf(
+    name = "cpp_target_lowering",
+    srcs = ["cpp_target_lowering.cc"],
+    hdrs = ["cpp_target_lowering.h"],
+    deps = [
+        ":cpp_ir",
+        "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
+        "//yggdrasil_decision_forests/serving/embed:utils",
+        "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library_ydf(
+    name = "cpp_ir",
+    hdrs = ["cpp_ir.h"],
+    deps = [
+        "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
+        "@com_google_absl//absl/container:flat_hash_set",
+    ],
+)
+
+cc_library_ydf(
     name = "cpp_embed",
     srcs = ["cpp_embed.cc"],
     hdrs = ["cpp_embed.h"],
     deps = [
+        ":cpp_emitter",
+        ":cpp_ir",
+        ":cpp_target_lowering",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
-        "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
-        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving/embed:common",
         "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "//yggdrasil_decision_forests/serving/embed:utils",
-        "//yggdrasil_decision_forests/utils:bitmap",
+        "//yggdrasil_decision_forests/serving/embed/ir:builder",
+        "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/log",
@@ -31,12 +61,39 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library_ydf(
+    name = "cpp_emitter",
+    srcs = ["cpp_emitter.cc"],
+    hdrs = ["cpp_emitter.h"],
+    deps = [
+        ":cpp_ir",
+        "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
+        "//yggdrasil_decision_forests/serving/embed:utils",
+        "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
 )
 
 # Tests
 # =====
+
+cc_test(
+    name = "cpp_target_lowering_test",
+    srcs = ["cpp_target_lowering_test.cc"],
+    deps = [
+        ":cpp_target_lowering",
+        "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
+        "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
 
 cc_test(
     name = "cpp_embed_test",
@@ -46,7 +103,6 @@ cc_test(
         "//yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_filegroup",
     ],
     deps = [
-        ":cpp_embed",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
@@ -55,18 +111,18 @@ cc_test(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:builder",
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
-        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/serving/embed",
-        "//yggdrasil_decision_forests/serving/embed:common",
         "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:testing_macros",
-        "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+# Tests
+# =====
 
 cc_test(
     name = "cpp_embed_pred_test",

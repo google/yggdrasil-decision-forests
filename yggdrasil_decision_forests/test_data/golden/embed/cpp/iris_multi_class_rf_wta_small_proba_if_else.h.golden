@@ -1,13 +1,11 @@
 #ifndef YDF_MODEL_YDF_MODEL_H_
 #define YDF_MODEL_YDF_MODEL_H_
 
-#include <stdint.h>
-#include <cstring>
 #include <array>
-#include <algorithm>
-#include <cmath>
-#include <bitset>
 #include <cassert>
+#include <cmath>
+#include <cstring>
+#include <stdint.h>
 
 namespace ydf_model {
 
@@ -18,7 +16,7 @@ enum class Label : uint32_t {
 };
 
 constexpr const int kNumFeatures = 4;
-constexpr const int kNumTrees = 3;
+constexpr const uint8_t kNumTrees = 3;
 
 struct Instance {
   typedef float Numerical;
@@ -43,7 +41,8 @@ struct Instance {
 //
 // This function is called by `Predict()`.
 inline std::array<float, 3> PredictUnsafe(const Instance& instance) {
-  std::array<uint8_t, 3> accumulator {0};
+  std::array<uint8_t, 3> accumulator {0, 0, 0};
+
   // Tree #0
   if (instance.petal_width >= 0.75) {
     if (instance.petal_width >= 1.65) {
@@ -105,21 +104,21 @@ inline std::array<float, 3> PredictUnsafe(const Instance& instance) {
     accumulator[0]++;
   }
 
-
-          std::array<float,3> probas;
-          for(int i=0;i<3;i++){ probas[i] = static_cast<float>(accumulator[i]) / 3; }
-          return probas;
-        
+    std::array<float, 3> probas;
+  for (int i = 0; i < 3; ++i) { 
+    probas[i] = static_cast<float>(accumulator[i]) / 3.0f; 
+  }
+  return probas;
 }
 
 // Prediction function.
 //
 // Sanitizes the given instance, then calls `PredictUnsafe()`.
 inline std::array<float, 3> Predict(Instance instance) {
-  instance.sepal_length = std::isnan(instance.sepal_length) ? 5.843333 : instance.sepal_length;
-  instance.sepal_width = std::isnan(instance.sepal_width) ? 3.057333 : instance.sepal_width;
-  instance.petal_length = std::isnan(instance.petal_length) ? 3.758000 : instance.petal_length;
-  instance.petal_width = std::isnan(instance.petal_width) ? 1.199333 : instance.petal_width;
+  instance.sepal_length = std::isnan(instance.sepal_length) ? 5.84333 : instance.sepal_length;
+  instance.sepal_width = std::isnan(instance.sepal_width) ? 3.05733 : instance.sepal_width;
+  instance.petal_length = std::isnan(instance.petal_length) ? 3.758 : instance.petal_length;
+  instance.petal_width = std::isnan(instance.petal_width) ? 1.19933 : instance.petal_width;
 
   return PredictUnsafe(instance);
 }
