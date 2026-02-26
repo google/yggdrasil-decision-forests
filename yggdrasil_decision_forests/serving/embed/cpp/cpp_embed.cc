@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
+#include "yggdrasil_decision_forests/serving/embed/cpp/cpp_embed.h"
 
 #include <cmath>
 #include <cstddef>
@@ -52,7 +52,7 @@ namespace {
 // label).
 absl::StatusOr<std::string> GenInstanceStruct(
     const model::AbstractModel& model, const proto::Options& options,
-    const CCInternalOptions& internal_options,
+    const CppInternalOptions& internal_options,
     const internal::ModelStatistics& stats,
     const std::vector<FeatureDef>& feature_defs) {
   std::string content;
@@ -115,7 +115,7 @@ struct Instance {
 // the label.
 absl::StatusOr<std::string> GenCategoricalStringDictionaries(
     const model::AbstractModel& model, const proto::Options& options,
-    const CCInternalOptions& internal_options) {
+    const CppInternalOptions& internal_options) {
   std::string content;
 
   for (const auto& dict : internal_options.categorical_dicts) {
@@ -173,7 +173,7 @@ Feature$0 Feature$0FromString(const std::string_view name) {
 
 }  // namespace
 
-absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
+absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCpp(
     const model::AbstractModel& model, const proto::Options& options) {
   // Make sure the model is a decision forest.
   const auto* df_interface =
@@ -194,7 +194,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
                    internal::ComputeStatistics(model, *df_interface));
 
   ASSIGN_OR_RETURN(
-      const CCInternalOptions internal_options,
+      const CppInternalOptions internal_options,
       internal::ComputeInternalOptions(model, *df_interface, stats, options));
 
   // Implementation specific specialization.
@@ -207,11 +207,11 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
         dynamic_cast<const model::random_forest::RandomForestModel*>(&model);
     if (model_gbt) {
       ASSIGN_OR_RETURN(specialized_conversion,
-                       internal::SpecializedConversionGradientBoostedTreesCC(
+                       internal::SpecializedConversionGradientBoostedTreesCpp(
                            *model_gbt, stats, internal_options, options));
     } else if (model_rf) {
       ASSIGN_OR_RETURN(specialized_conversion,
-                       internal::SpecializedConversionRandomForestCC(
+                       internal::SpecializedConversionRandomForestCpp(
                            *model_rf, stats, internal_options, options));
     } else {
       return absl::InvalidArgumentError("The model type is not supported.");
@@ -367,7 +367,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
                          const model::DecisionForestInterface& df_interface,
                          const SpecializedConversion& specialized_conversion,
                          const ModelStatistics& stats,
-                         const CCInternalOptions& internal_options,
+                         const CppInternalOptions& internal_options,
                          const proto::Options& options,
                          const std::vector<FeatureDef>& feature_defs,
                          const ValueBank& routing_bank,
@@ -460,10 +460,10 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
   return absl::OkStatus();
 }
 
-absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestCC(
+absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestCpp(
     const model::random_forest::RandomForestModel& model,
     const internal::ModelStatistics& stats,
-    const CCInternalOptions& internal_options, const proto::Options& options) {
+    const CppInternalOptions& internal_options, const proto::Options& options) {
   SpecializedConversion spec;
 
   switch (stats.task) {
@@ -683,10 +683,10 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestCC(
 }
 
 absl::StatusOr<internal::SpecializedConversion>
-SpecializedConversionGradientBoostedTreesCC(
+SpecializedConversionGradientBoostedTreesCpp(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
     const internal::ModelStatistics& stats,
-    const CCInternalOptions& internal_options, const proto::Options& options) {
+    const CppInternalOptions& internal_options, const proto::Options& options) {
   SpecializedConversion spec;
   switch (stats.task) {
     case model::proto::Task::CLASSIFICATION: {
@@ -812,11 +812,11 @@ SpecializedConversionGradientBoostedTreesCC(
   return spec;
 }
 
-absl::StatusOr<CCInternalOptions> ComputeInternalOptions(
+absl::StatusOr<CppInternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats, const proto::Options& options) {
-  CCInternalOptions internal_options;
+  CppInternalOptions internal_options;
   RETURN_IF_ERROR(
       ComputeInternalOptionsFeature(stats, model, options, &internal_options));
   RETURN_IF_ERROR(
@@ -829,7 +829,7 @@ absl::StatusOr<CCInternalOptions> ComputeInternalOptions(
 absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
                                            const model::AbstractModel& model,
                                            const proto::Options& options,
-                                           CCInternalOptions* out) {
+                                           CppInternalOptions* out) {
   RETURN_IF_ERROR(
       ComputeBaseInternalOptionsFeature(stats, model, options, out));
 
@@ -842,7 +842,7 @@ absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
 
 absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
                                           const proto::Options& options,
-                                          CCInternalOptions* out) {
+                                          CppInternalOptions* out) {
   if (stats.has_conditions
           [model::decision_tree::proto::Condition::kContainsBitmapCondition] ||
       stats.has_conditions
@@ -898,7 +898,7 @@ absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
 
 absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
-    const CCInternalOptions& internal_options) {
+    const CppInternalOptions& internal_options) {
   // TODO: Add support for default values.
   // TODO: For integer numericals, use the min/max to possibly reduce the
   // required precision.
@@ -952,7 +952,7 @@ absl::Status GenerateTreeInferenceIfElseNode(
     const dataset::proto::DataSpecification& dataspec,
     const model::decision_tree::NodeWithChildren& node, const int depth,
     const IfElseSetNodeFn& set_node_ifelse_fn, const int tree_idx,
-    const CCInternalOptions& internal_options, std::string* content) {
+    const CppInternalOptions& internal_options, std::string* content) {
   std::string prefix(depth * 2 + 2, ' ');
 
   if (node.IsLeaf()) {
@@ -1110,7 +1110,7 @@ absl::Status GenerateTreeInferenceIfElseNode(
 absl::Status GenerateTreeInferenceIfElse(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const CCInternalOptions& internal_options,
+    const proto::Options& options, const CppInternalOptions& internal_options,
     const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content) {
   for (int tree_idx = 0; tree_idx < df_interface.num_trees(); tree_idx++) {
     absl::StrAppend(content, "  // Tree #", tree_idx, "\n");
@@ -1194,7 +1194,7 @@ absl::Status AddRoutingConditions(std::vector<RoutingConditionCode> conditions,
 absl::Status GenerateTreeInferenceRouting(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const CCInternalOptions& internal_options,
+    const proto::Options& options, const CppInternalOptions& internal_options,
     const SpecializedConversion& specialized_conversion,
     const ModelStatistics& stats, const ValueBank& routing_bank,
     std::string* content) {
@@ -1291,7 +1291,7 @@ absl::Status GenRoutingModelDataNode(
     const dataset::proto::DataSpecification& dataspec,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
-    const proto::Options& options, const CCInternalOptions& internal_options,
+    const proto::Options& options, const CppInternalOptions& internal_options,
     const model::decision_tree::NodeWithChildren& node, const int depth,
     std::string* serialized_nodes, int* node_idx, ValueBank* bank) {
   if (node.IsLeaf()) {
@@ -1491,7 +1491,7 @@ absl::Status GenRoutingModelDataNode(
 
 // Outputs the code to encode the bank data and other arrays of the routing
 // algorithm.
-absl::Status GenRoutingModelDataBank(const CCInternalOptions& internal_options,
+absl::Status GenRoutingModelDataBank(const CppInternalOptions& internal_options,
                                      const ValueBank& bank,
                                      std::string* content) {
   const std::string root_delta_type =
@@ -1549,7 +1549,7 @@ static const $0 oblique_features[] = {$1};
 // Outputs the struct code to encode the nodes in the routing
 // algorithm.
 absl::Status GenRoutingModelDataStruct(
-    const CCInternalOptions& internal_options, const ModelStatistics& stats,
+    const CppInternalOptions& internal_options, const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion, const ValueBank& bank,
     std::string* content) {
   // TODO: Add boolean condition support.
@@ -1575,7 +1575,7 @@ absl::Status GenRoutingModelDataStruct(
   if (specialized_conversion.leaf_value_spec.dims == 1) {
     // The leaf value is stored in the node struct.
     node_value_type =
-        DTypeToCCType(specialized_conversion.leaf_value_spec.dtype);
+        DTypeToCppType(specialized_conversion.leaf_value_spec.dtype);
   } else {
     // The leaf values are stored in a separate buffer. The node struct contains
     // an index to this buffer.
@@ -1633,7 +1633,7 @@ absl::Status GenRoutingModelData(
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
-    const proto::Options& options, const CCInternalOptions& internal_options,
+    const proto::Options& options, const CppInternalOptions& internal_options,
     std::string* content, ValueBank* bank) {
   // Compute the node data and populate the banks.
   std::string serialized_nodes;

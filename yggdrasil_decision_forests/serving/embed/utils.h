@@ -83,7 +83,7 @@ uint32_t NumBytesToMaxUnsignedValue(int bytes);
 int MaxSignedValueToNumBytes(int32_t value);
 
 // Convert a proto dtype to the corresponding C++ class.
-std::string DTypeToCCType(proto::DType::Enum value);
+std::string DTypeToCppType(proto::DType::Enum value);
 
 // Convert a proto dtype to the corresponding Java primitive type.
 std::string DTypeToJavaType(proto::DType::Enum value);

@@ -301,7 +301,7 @@ std::string JavaInteger(int bytes) {
   }
 }
 
-std::string DTypeToCCType(const proto::DType::Enum value) {
+std::string DTypeToCppType(const proto::DType::Enum value) {
   switch (value) {
     case proto::DType::UNDEFINED:
       DCHECK(false);

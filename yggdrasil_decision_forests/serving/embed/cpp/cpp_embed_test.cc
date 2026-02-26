@@ -15,7 +15,7 @@
 
 // Test the code to embed models.
 
-#include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
+#include "yggdrasil_decision_forests/serving/embed/cpp/cpp_embed.h"
 
 #include <memory>
 #include <optional>
@@ -101,7 +101,7 @@ TestData BuildToyTestData() {
   return TestData{.model = std::move(model)};
 };
 
-struct GoldenGeneratedCCCase {
+struct GoldenGeneratedCppCase {
   std::string model_filename;
   std::string golden_filename;
   proto::Algorithm::Enum algorithm;
@@ -112,7 +112,7 @@ struct GoldenGeneratedCCCase {
 
 // Compare the generated .h files against golden files.
 SIMPLE_PARAMETERIZED_TEST(
-    GoldenGeneratedCC, GoldenGeneratedCCCase,
+    GoldenGeneratedCpp, GoldenGeneratedCppCase,
     {
         // GBT
         {
@@ -261,7 +261,7 @@ SIMPLE_PARAMETERIZED_TEST(
   test::ExpectEqualGolden(
       embed.at("ydf_model.h"),
       file::JoinPath("yggdrasil_decision_forests/test_data/"
-                     "golden/embed",
+                     "golden/embed/cpp",
                      test_case.golden_filename));
 }
 
@@ -428,7 +428,7 @@ SIMPLE_PARAMETERIZED_TEST(
          "int16_t"},
     }) {
   const auto& test_case = GetParam();
-  internal::CCInternalOptions internal_options;
+  internal::CppInternalOptions internal_options;
   ASSERT_OK(internal::ComputeInternalOptionsOutput(
       test_case.stats, test_case.options, &internal_options));
   EXPECT_EQ(internal_options.output_type, test_case.expected_output_type);
@@ -486,7 +486,7 @@ SIMPLE_PARAMETERIZED_TEST(
     }) {
   const auto& test_case = GetParam();
 
-  internal::CCInternalOptions options;
+  internal::CppInternalOptions options;
   static_cast<internal::BaseInternalOptions&>(options) =
       test_case.base_internal_options;
   ASSERT_OK_AND_ASSIGN(const auto value,

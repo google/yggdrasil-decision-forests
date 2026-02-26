@@ -125,13 +125,13 @@ SIMPLE_PARAMETERIZED_TEST(
   test::ExpectEqualGolden(
       embed.at("YdfModel.java"),
       file::JoinPath("yggdrasil_decision_forests/test_data/"
-                     "golden/embed",
+                     "golden/embed/java",
                      test_case.golden_filename));
 
   test::ExpectEqualGolden(
       embed.at("YdfModelData.bin"),
       file::JoinPath("yggdrasil_decision_forests/test_data/"
-                     "golden/embed",
+                     "golden/embed/java",
                      test_case.golden_resource_filename));
 }
 

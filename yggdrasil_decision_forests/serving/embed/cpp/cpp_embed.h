@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
-#ifndef YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_CC_EMBED_H_
-#define YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_CC_EMBED_H_
+#ifndef YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_CPP_CPP_EMBED_H_
+#define YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_CPP_CPP_EMBED_H_
 
 #include <string>
 #include <vector>
@@ -46,31 +46,31 @@ struct Includes {
 // model compilation e.g. how many bits to use to encode numerical features. The
 // internal options are computed using the user provided options (simply called
 // "options" in the code) and the model.
-struct CCInternalOptions : BaseInternalOptions {
+struct CppInternalOptions : BaseInternalOptions {
   // C++ includes.
   Includes includes;
 };
 
-absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
+absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCpp(
     const model::AbstractModel& model, const proto::Options& options);
 // Type used to encode an oblique index.
 // This cannot be computed with the other internal options as it depends on the
 // forest node tracing.
 std::string ObliqueFeatureType(const ValueBank& bank);
 
-absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestCC(
+absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestCpp(
     const model::random_forest::RandomForestModel& model,
     const internal::ModelStatistics& stats,
-    const CCInternalOptions& internal_options, const proto::Options& options);
+    const CppInternalOptions& internal_options, const proto::Options& options);
 
 absl::StatusOr<SpecializedConversion>
-SpecializedConversionGradientBoostedTreesCC(
+SpecializedConversionGradientBoostedTreesCpp(
     const model::gradient_boosted_trees::GradientBoostedTreesModel& model,
     const internal::ModelStatistics& stats,
-    const CCInternalOptions& internal_options, const proto::Options& options);
+    const CppInternalOptions& internal_options, const proto::Options& options);
 
 // Computes the internal options of the model.
-absl::StatusOr<CCInternalOptions> ComputeInternalOptions(
+absl::StatusOr<CppInternalOptions> ComputeInternalOptions(
     const model::AbstractModel& model,
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats, const proto::Options& options);
@@ -79,12 +79,12 @@ absl::StatusOr<CCInternalOptions> ComputeInternalOptions(
 absl::Status ComputeInternalOptionsFeature(const ModelStatistics& stats,
                                            const model::AbstractModel& model,
                                            const proto::Options& options,
-                                           CCInternalOptions* out);
+                                           CppInternalOptions* out);
 
 // Populates the output parts of the internal option.
 absl::Status ComputeInternalOptionsOutput(const ModelStatistics& stats,
                                           const proto::Options& options,
-                                          CCInternalOptions* out);
+                                          CppInternalOptions* out);
 
 struct FeatureDef {
   std::string variable_name;  // Name used for the feature in the export.
@@ -101,7 +101,7 @@ struct FeatureDef {
 // Generates the definition of a feature in an instance struct.
 absl::StatusOr<FeatureDef> GenFeatureDef(
     const dataset::proto::Column& col,
-    const CCInternalOptions& internal_options);
+    const CppInternalOptions& internal_options);
 
 // Adds the code of a condition for the routing algorithm.
 // If the model supports multiple types of condition, wrapps the code with the
@@ -113,7 +113,7 @@ absl::Status CorePredict(const dataset::proto::DataSpecification& dataspec,
                          const model::DecisionForestInterface& df_interface,
                          const SpecializedConversion& specialized_conversion,
                          const ModelStatistics& stats,
-                         const CCInternalOptions& internal_options,
+                         const CppInternalOptions& internal_options,
                          const proto::Options& options,
                          const std::vector<FeatureDef>& feature_defs,
                          const ValueBank& routing_bank,
@@ -132,13 +132,13 @@ AccumulatorDef GenAccumulatorDef(const proto::Options& options,
 absl::Status GenerateTreeInferenceIfElse(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const CCInternalOptions& internal_options,
+    const proto::Options& options, const CppInternalOptions& internal_options,
     const IfElseSetNodeFn& set_node_ifelse_fn, std::string* content);
 
 absl::Status GenerateTreeInferenceRouting(
     const dataset::proto::DataSpecification& dataspec,
     const model::DecisionForestInterface& df_interface,
-    const proto::Options& options, const CCInternalOptions& internal_options,
+    const proto::Options& options, const CppInternalOptions& internal_options,
     const SpecializedConversion& specialized_conversion,
     const ModelStatistics& stats, const ValueBank& routing_bank,
     std::string* content);
@@ -149,9 +149,9 @@ absl::Status GenRoutingModelData(
     const model::DecisionForestInterface& df_interface,
     const ModelStatistics& stats,
     const SpecializedConversion& specialized_conversion,
-    const proto::Options& options, const CCInternalOptions& internal_options,
+    const proto::Options& options, const CppInternalOptions& internal_options,
     std::string* content, ValueBank* bank);
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal
 
-#endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_CC_EMBED_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_CPP_CPP_EMBED_H_

@@ -22,8 +22,9 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
-#include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
+#include "yggdrasil_decision_forests/serving/embed/c/c_embed.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
+#include "yggdrasil_decision_forests/serving/embed/cpp/cpp_embed.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/java/java_embed.h"
 
@@ -35,9 +36,9 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModel(
     case proto::Options::kJava:
       return internal::EmbedModelJava(model, options);
     case proto::Options::kCpp:
-      return internal::EmbedModelCC(model, options);
+      return internal::EmbedModelCpp(model, options);
     case proto::Options::kC:
-      return absl::UnimplementedError("C export has not yet been implemented");
+      return internal::EmbedModelC(model, options);
     case proto::Options::kCc:
       return absl::InvalidArgumentError(
           "Language identifier CC is deprecated, use Cpp instead.");

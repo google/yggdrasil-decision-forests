@@ -75,6 +75,8 @@ absl::Status WriteEmbeddedModel() {
   if (options.language_case() == proto::Options::LANGUAGE_NOT_SET) {
     if (language_str == "Cpp") {
       options.mutable_cpp();
+    } else if (language_str == "C") {
+      options.mutable_c();
     } else if (language_str == "Java") {
       options.mutable_java();
     } else if (language_str == "CC") {
