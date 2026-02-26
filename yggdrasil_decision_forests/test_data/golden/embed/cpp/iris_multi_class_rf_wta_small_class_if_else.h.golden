@@ -1,0 +1,124 @@
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <stdint.h>
+#include <cstring>
+#include <array>
+#include <algorithm>
+#include <cmath>
+#include <bitset>
+#include <cassert>
+
+namespace ydf_model {
+
+enum class Label : uint32_t {
+  kSetosa = 0,
+  kVersicolor = 1,
+  kVirginica = 2,
+};
+
+constexpr const int kNumFeatures = 4;
+constexpr const int kNumTrees = 3;
+
+struct Instance {
+  typedef float Numerical;
+
+  Numerical sepal_length;
+  Numerical sepal_width;
+  Numerical petal_length;
+  Numerical petal_width;
+};
+
+// Predicts on an instance without any safety checks.
+//
+// The caller must ensure that the instance meets the following conditions:
+// - Numerical features must not be NaN.
+// - Integerized categorical features must be within the range [0, max_value],
+//   where max_value is the maximum value observed during training.
+//
+// Failure to meet these conditions may result in undefined behavior.
+//
+// It is recommended to use `Predict()` instead, unless the instance has
+// already been sanitized.
+//
+// This function is called by `Predict()`.
+inline Label PredictUnsafe(const Instance& instance) {
+  std::array<uint8_t, 3> accumulator {0};
+  // Tree #0
+  if (instance.petal_width >= 0.75) {
+    if (instance.petal_width >= 1.65) {
+      if (instance.petal_length >= 4.85) {
+        accumulator[2]++;
+      } else {
+        accumulator[1]++;
+      }
+    } else {
+      if (instance.petal_width >= 1.35) {
+        if (instance.sepal_width >= 2.65) {
+          if (instance.sepal_length >= 6.65) {
+            accumulator[1]++;
+          } else {
+            accumulator[1]++;
+          }
+        } else {
+          accumulator[1]++;
+        }
+      } else {
+        accumulator[1]++;
+      }
+    }
+  } else {
+    accumulator[0]++;
+  }
+
+  // Tree #1
+  if (instance.petal_width >= 0.8) {
+    if (instance.petal_length >= 4.95) {
+      if (instance.petal_width >= 1.75) {
+        accumulator[2]++;
+      } else {
+        accumulator[2]++;
+      }
+    } else {
+      if (instance.petal_width >= 1.65) {
+        accumulator[2]++;
+      } else {
+        accumulator[1]++;
+      }
+    }
+  } else {
+    accumulator[0]++;
+  }
+
+  // Tree #2
+  if (instance.petal_length >= 2.6) {
+    if (instance.petal_width >= 1.75) {
+      accumulator[2]++;
+    } else {
+      if (instance.petal_width >= 1.55) {
+        accumulator[1]++;
+      } else {
+        accumulator[1]++;
+      }
+    }
+  } else {
+    accumulator[0]++;
+  }
+
+  return static_cast<Label>(std::distance(accumulator.begin(), std::max_element(accumulator.begin(), accumulator.end())));
+}
+
+// Prediction function.
+//
+// Sanitizes the given instance, then calls `PredictUnsafe()`.
+inline Label Predict(Instance instance) {
+  instance.sepal_length = std::isnan(instance.sepal_length) ? 5.843333 : instance.sepal_length;
+  instance.sepal_width = std::isnan(instance.sepal_width) ? 3.057333 : instance.sepal_width;
+  instance.petal_length = std::isnan(instance.petal_length) ? 3.758000 : instance.petal_length;
+  instance.petal_width = std::isnan(instance.petal_width) ? 1.199333 : instance.petal_width;
+
+  return PredictUnsafe(instance);
+}
+
+}  // namespace ydf_model
+#endif

@@ -134,6 +134,18 @@ SIMPLE_PARAMETERIZED_TEST(
         },
         {
             "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_class_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_score_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
             "adult_binary_class_gbdt_v2_probability_routing.h.golden",
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::PROBABILITY,
@@ -186,6 +198,40 @@ SIMPLE_PARAMETERIZED_TEST(
             proto::ClassificationOutput::PROBABILITY,
         },
         {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_class_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_proba_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_score_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_class_routing.h.golden",
+            proto::Algorithm::ROUTING,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_proba_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_score_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
             "abalone_regression_rf_small",
             "abalone_regression_rf_small_if_else.h.golden",
             proto::Algorithm::IF_ELSE,
@@ -199,6 +245,42 @@ SIMPLE_PARAMETERIZED_TEST(
             "iris_multi_class_rf_nwta_small",
             "iris_multi_class_rf_nwta_small_class_if_else.h.golden",
             proto::Algorithm::IF_ELSE,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_class_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_score_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_proba_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_class_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_score_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_proba_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
         },
         {
             "iris_multi_class_rf_nwta_small",
