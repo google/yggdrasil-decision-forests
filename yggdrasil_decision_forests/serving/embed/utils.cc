@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
 
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -398,6 +399,21 @@ std::string IndentString(absl::string_view input, int num_spaces) {
     }
   }
   return absl::StrJoin(lines, "\n");
+}
+
+std::vector<uint8_t> PackBoolVector(const std::vector<bool>& input) {
+  std::vector<uint8_t> output;
+  output.reserve((input.size() + 7) / 8);
+  for (size_t i = 0; i < input.size(); i += 8) {
+    uint8_t byte = 0;
+    for (size_t j = 0; j < 8 && i + j < input.size(); ++j) {
+      if (input[i + j]) {
+        byte |= (static_cast<uint8_t>(1) << j);
+      }
+    }
+    output.push_back(byte);
+  }
+  return output;
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed

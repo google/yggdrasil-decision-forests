@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
@@ -103,6 +104,10 @@ int NumLeavesToNumNodes(int num_leaves);
 
 // Indents every line of the string by the given number of spaces.
 std::string IndentString(absl::string_view input, int num_spaces);
+
+// Packs a vector of booleans into a vector of bytes (8 booleans per byte).
+// The first boolean is the least significant bit of the first byte.
+std::vector<uint8_t> PackBoolVector(const std::vector<bool>& input);
 
 }  // namespace yggdrasil_decision_forests::serving::embed
 

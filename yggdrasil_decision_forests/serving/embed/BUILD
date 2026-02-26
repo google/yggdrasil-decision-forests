@@ -98,6 +98,8 @@ cc_binary_ydf(
 bzl_library(
     name = "embed_bzl",
     srcs = ["embed.bzl"],
+    deps = [
+    ],
 )
 
 # Proto

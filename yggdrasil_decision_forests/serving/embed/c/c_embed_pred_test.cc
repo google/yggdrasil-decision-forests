@@ -31,8 +31,6 @@ print(model.predict(ds[:1]))
 */
 
 #include "gtest/gtest.h"
-// #include
-// "yggdrasil_decision_forests/serving/embed/cpp/test_model_abalone_regression_gbdt_v2_routing.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
 namespace {
