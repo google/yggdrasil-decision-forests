@@ -103,10 +103,9 @@ absl::Status ComputeBaseInternalOptionsFeature(
   out->feature_value_bytes = 1;
   out->numerical_feature_is_float = false;
 
-  const bool is_java = options.language_case() == proto::Options::kJava;
-  const auto max_value_to_num_bytes = [is_java](const int64_t value) {
-    return is_java ? MaxSignedValueToNumBytes(value)
-                   : MaxUnsignedValueToNumBytes(value);
+  const auto max_value_to_num_bytes = [&options](const int64_t value) {
+    return IsJava(options) ? MaxSignedValueToNumBytes(value)
+                           : MaxUnsignedValueToNumBytes(value);
   };
 
   out->feature_index_bytes =
@@ -216,26 +215,30 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
       std::string item_symbol;
       if (!is_label && index == dataset::kOutOfDictionaryItemIndex) {
         switch (options.language_case()) {
-          case proto::Options::kCc:
+          case proto::Options::kC:
+          case proto::Options::kCpp:
             item_symbol =
                 "OutOfVocabulary";  // Better than the default <OOV> symbol.
             break;
           case proto::Options::kJava:
             item_symbol = "OUT_OF_VOCABULARY";
             break;
+          case proto::Options::kCc:
           case proto::Options::LANGUAGE_NOT_SET:
             NOTREACHED();
             break;
         }
       } else {
         switch (options.language_case()) {
-          case proto::Options::kCc:
+          case proto::Options::kC:
+          case proto::Options::kCpp:
             item_symbol = StringToStructSymbol(item.first,
                                                /*.ensure_letter_first=*/false);
             break;
           case proto::Options::kJava:
             item_symbol = StringToJavaEnumConstant(item.first);
             break;
+          case proto::Options::kCc:
           case proto::Options::LANGUAGE_NOT_SET:
             NOTREACHED();
             break;
@@ -336,8 +339,7 @@ absl::StatusOr<std::vector<uint8_t>> GenRoutingModelDataConditionType(
 
 int ObliqueFeatureIndex(const proto::Options& options,
                         const BaseInternalOptions& internal_options) {
-  const bool is_java = options.language_case() == proto::Options::kJava;
-  return is_java
+  return IsJava(options)
              ? NumBytesToMaxSignedValue(internal_options.feature_index_bytes)
              : NumBytesToMaxUnsignedValue(internal_options.feature_index_bytes);
 }

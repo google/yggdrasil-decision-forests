@@ -2015,7 +2015,7 @@ class GenericCCModel(GenericModel):
         ),
         algorithm=embed_pb2.Algorithm.Enum.Value(algorithm),
         categorical_from_string=categorical_from_string,
-        cc=embed_pb2.CC(),
+        cpp=embed_pb2.Cpp(),
     )
     results = self._model.EmbedModel(options)
     if len(results) == 1:

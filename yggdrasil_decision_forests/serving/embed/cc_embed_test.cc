@@ -248,7 +248,7 @@ SIMPLE_PARAMETERIZED_TEST(
   }
 
   proto::Options options;
-  options.mutable_cc();
+  options.mutable_cpp();
   options.set_algorithm(test_case.algorithm);
   options.set_categorical_from_string(test_case.categorical_from_string);
   if (test_case.output.has_value()) {
@@ -294,7 +294,7 @@ TEST(Process, ManualBinaryGBT) {
           [model::decision_tree::proto::Condition::kTrueValueCondition]);
 
   proto::Options options;
-  options.mutable_cc();
+  options.mutable_cpp();
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
       internal::ComputeInternalOptions(*test_data.model, *df, stats, options));
@@ -338,7 +338,7 @@ TEST(Process, RealBinaryGBT) {
   EXPECT_EQ(stats.num_classification_classes, 2);
 
   proto::Options options;
-  options.mutable_cc();
+  options.mutable_cpp();
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
       internal::ComputeInternalOptions(*model, *df, stats, options));
@@ -370,7 +370,7 @@ TEST(Process, RealMultiClassGBT) {
   EXPECT_EQ(stats.num_classification_classes, 3);
 
   proto::Options options;
-  options.mutable_cc();
+  options.mutable_cpp();
   ASSERT_OK_AND_ASSIGN(
       const auto internal_options,
       internal::ComputeInternalOptions(*model, *df, stats, options));

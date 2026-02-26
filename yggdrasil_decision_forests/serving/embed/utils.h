@@ -25,6 +25,12 @@
 
 namespace yggdrasil_decision_forests::serving::embed {
 
+bool IsJava(const proto::Options& options);
+
+bool IsCpp(const proto::Options& options);
+
+bool IsC(const proto::Options& options);
+
 // Checks that a model name is valid. A model name can only contain certain
 // letters depending on the language.
 absl::Status CheckModelName(absl::string_view value,

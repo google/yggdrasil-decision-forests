@@ -16,7 +16,6 @@
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
 
 #include <cctype>
-#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -45,10 +44,23 @@ const absl::flat_hash_map<char, std::string> kReplacements = {
 
 }  // namespace
 
+bool IsJava(const proto::Options& options) {
+  return options.language_case() == proto::Options::kJava;
+}
+
+bool IsCpp(const proto::Options& options) {
+  return options.language_case() == proto::Options::kCpp;
+}
+
+bool IsC(const proto::Options& options) {
+  return options.language_case() == proto::Options::kC;
+}
+
 absl::Status CheckModelName(absl::string_view value,
                             proto::Options::LanguageCase language) {
   switch (language) {
-    case proto::Options::kCc:
+    case proto::Options::kCpp:
+    case proto::Options::kC:
       for (const char c : value) {
         if (!std::islower(c) && !std::isdigit(c) && c != '_') {
           return absl::InvalidArgumentError(absl::StrCat(
@@ -67,8 +79,9 @@ absl::Status CheckModelName(absl::string_view value,
         }
       }
       break;
+    case proto::Options::kCc:
     case proto::Options::LANGUAGE_NOT_SET:
-      return absl::InternalError("Language not set for CheckModelName");
+      return absl::InternalError("Unsupported language or language not set");
   }
   return absl::OkStatus();
 }

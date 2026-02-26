@@ -184,7 +184,7 @@ absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelCC(
   }
 
   // Check names.
-  RETURN_IF_ERROR(CheckModelName(options.name(), proto::Options::kCc));
+  RETURN_IF_ERROR(CheckModelName(options.name(), proto::Options::kCpp));
   for (const auto& column_idx : model.input_features()) {
     RETURN_IF_ERROR(
         CheckFeatureName(model.data_spec().columns(column_idx).name()));

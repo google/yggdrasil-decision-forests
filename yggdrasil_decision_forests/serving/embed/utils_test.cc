@@ -27,12 +27,12 @@ namespace yggdrasil_decision_forests::serving::embed {
 namespace {
 
 TEST(Embed, CheckModelNameCC) {
-  EXPECT_OK(CheckModelName("my_model_123", proto::Options::kCc));
-  EXPECT_THAT(CheckModelName("my-model", proto::Options::kCc),
+  EXPECT_OK(CheckModelName("my_model_123", proto::Options::kCpp));
+  EXPECT_THAT(CheckModelName("my-model", proto::Options::kCpp),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(CheckModelName("MyModel", proto::Options::kCc),
+  EXPECT_THAT(CheckModelName("MyModel", proto::Options::kCpp),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(CheckModelName("my model", proto::Options::kCc),
+  EXPECT_THAT(CheckModelName("my model", proto::Options::kCpp),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
