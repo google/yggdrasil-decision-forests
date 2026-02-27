@@ -71,7 +71,11 @@ YdfModel_LabelEnum YdfModel_PredictUnsafe(const YdfModel_Instance* instance);
 #include <stdint.h>
 
 // Portable packing macros.
-#if defined(_MSC_VER)
+#if defined(__KERNEL__) || defined(MODULE)
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR __packed
+#elif defined(_MSC_VER)
     #define YDF_MODEL_PACK_PUSH __pragma(pack(push, 1))
     #define YDF_MODEL_PACK_POP __pragma(pack(pop))
     #define YDF_MODEL_PACKED_ATTR

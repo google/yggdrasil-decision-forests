@@ -131,6 +131,15 @@ std::string IndentString(absl::string_view input, int num_spaces);
 // The first boolean is the least significant bit of the first byte.
 std::vector<uint8_t> PackBoolVector(const std::vector<bool>& input);
 
+absl::StatusOr<std::string> KernelStorageToPrimitiveType(int bytes,
+                                                         bool is_float,
+                                                         bool is_signed);
+std::string KernelUnsignedInteger(int bytes);
+
+std::string KernelSignedInteger(int bytes);
+
+std::string KernelDTypeToCppType(proto::DType::Enum value);
+
 }  // namespace yggdrasil_decision_forests::serving::embed
 
 #endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_UTILS_H_

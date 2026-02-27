@@ -450,9 +450,9 @@ absl::StatusOr<RoutingDataAssets> PrepareRoutingDataAssets(const ModelIR& ir) {
   return assets;
 }
 
-absl::StatusOr<BaseTypes> BuildTypes(const proto::Options& options,
-                                     const ModelIR& model_ir,
-                                     const std::string pseudo_namespace) {
+absl::StatusOr<BaseTypes> BuildTypesStandard(
+    const proto::Options& options, const ModelIR& model_ir,
+    const std::string pseudo_namespace) {
   BaseTypes types;
 
   // Global
@@ -552,6 +552,130 @@ absl::StatusOr<BaseTypes> BuildTypes(const proto::Options& options,
   types.leaf_value_bank = "float";
 
   return types;
+}
+
+absl::StatusOr<BaseTypes> BuildTypesKernel(const proto::Options& options,
+                                           const ModelIR& model_ir,
+                                           const std::string pseudo_namespace) {
+  BaseTypes types;
+
+  // Global
+  ASSIGN_OR_RETURN(
+      types.num_trees,
+      KernelStorageToPrimitiveType(
+          MaxUnsignedValueToNumBytes(model_ir.num_trees), false, false));
+
+  types.accumulator = !model_ir.winner_takes_all
+                          ? "s32"
+                          : KernelUnsignedInteger(
+                                MaxUnsignedValueToNumBytes(model_ir.num_trees));
+
+  types.eval = KernelUnsignedInteger(model_ir.node_offset_bytes);
+  types.boolean = "bool";
+
+  if (model_ir.task == ModelIR::Task::kRegression) {
+    types.output = "s32";
+  } else {
+    switch (options.classification_output()) {
+      case proto::ClassificationOutput::CLASS:
+        types.output = absl::Substitute("$0LabelEnum", pseudo_namespace);
+        break;
+      case proto::ClassificationOutput::SCORE:
+        types.output = types.accumulator;
+        break;
+      case proto::ClassificationOutput::PROBABILITY:
+        types.output = "s32";
+        break;
+      default:
+        return absl::InvalidArgumentError(
+            "Unknown classification output type.");
+    }
+  }
+
+  // Instance
+  types.numerical_feature = "";
+  for (const auto& feature : model_ir.features) {
+    if (feature.is_label) continue;
+    if (feature.type == FeatureInfo::Type::kNumerical) {
+      if (feature.is_float) {
+        types.numerical_feature = "s32";
+        break;
+      } else if (types.numerical_feature.empty()) {
+        types.numerical_feature =
+            KernelSignedInteger(model_ir.feature_value_bytes);
+      }
+    }
+  }
+  types.categorical_feature =
+      KernelUnsignedInteger(model_ir.feature_value_bytes);
+  types.integerized_categorical_feature =
+      KernelSignedInteger(model_ir.feature_value_bytes);
+
+  // Node data structure
+  ASSIGN_OR_RETURN(
+      types.pos,
+      KernelStorageToPrimitiveType(
+          MaxUnsignedValueToNumBytes(model_ir.nodes.size()), false, false));
+  ASSIGN_OR_RETURN(
+      types.feature_idx,
+      KernelStorageToPrimitiveType(
+          MaxUnsignedValueToNumBytes(model_ir.features.size()), false, false));
+
+  types.threshold = types.numerical_feature;
+
+  if (!model_ir.bitset_bank.empty()) {
+    ASSIGN_OR_RETURN(
+        types.cat_bank_idx,
+        KernelStorageToPrimitiveType(
+            MaxUnsignedValueToNumBytes(model_ir.bitset_bank.size()), false,
+            false));
+  }
+  ASSIGN_OR_RETURN(
+      types.obl_bank_idx,
+      KernelStorageToPrimitiveType(
+          MaxUnsignedValueToNumBytes(model_ir.oblique_weights.size()), false,
+          false));
+  if (model_ir.leaf_value_dims == 1) {
+    types.leaf_value = KernelDTypeToCppType(model_ir.leaf_value_dtype);
+  } else {
+    types.leaf_value = KernelUnsignedInteger(MaxUnsignedValueToNumBytes(
+        model_ir.num_leaves / model_ir.leaf_value_dims));
+  }
+
+  // Banks
+  types.categorical_bank = "u8";
+  types.condition_types = "u8";
+
+  const NodeIdx max_root_delta = model_ir.tree_start_offsets.empty()
+                                     ? 0
+                                     : model_ir.tree_start_offsets.back();
+  ASSIGN_OR_RETURN(
+      types.root_deltas,
+      KernelStorageToPrimitiveType(MaxUnsignedValueToNumBytes(max_root_delta),
+                                   false, false));
+
+  types.oblique_weights = "s32";
+
+  ASSIGN_OR_RETURN(types.oblique_features,
+                   KernelStorageToPrimitiveType(
+                       MaxUnsignedValueToNumBytes(GetMaxObliqueFeatureValue(
+                           model_ir.oblique_features)),
+                       false, false));
+
+  types.feature_offsets = "size_t";
+  types.leaf_value_bank = "s32";
+
+  return types;
+}
+
+absl::StatusOr<BaseTypes> BuildTypes(const proto::Options& options,
+                                     const ModelIR& model_ir,
+                                     const std::string pseudo_namespace) {
+  if (options.c().linux_kernel_compatible()) {
+    return BuildTypesKernel(options, model_ir, pseudo_namespace);
+  }
+
+  return BuildTypesStandard(options, model_ir, pseudo_namespace);
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

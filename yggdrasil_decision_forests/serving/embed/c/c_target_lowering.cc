@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/serving/embed/c/c_target_lowering.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -40,7 +41,28 @@
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
-namespace {}  // namespace
+namespace {
+// Helper to transparently handle floating point vs fixed-point generation
+absl::StatusOr<std::string> FormatValue(DoubleOrInt64 val, bool is_float,
+                                        const proto::Options& options) {
+  if (options.c().linux_kernel_compatible() && is_float) {
+    double double_val = AsDouble(val);
+
+    int64_t fp_val = std::round(
+        double_val * (1ULL << options.c().fixed_point_fractional_bits()));
+    // Catch the overflow before writing bad C code
+    if (fp_val > std::numeric_limits<int32_t>::max() ||
+        fp_val < std::numeric_limits<int32_t>::min()) {
+      return absl::OutOfRangeError(absl::Substitute(
+          "Fixed point value $0 (from float $1) exceeds s32 limits. "
+          "Decrease 'fixed_point_fractional_bits' in your export options.",
+          fp_val, double_val));
+    }
+    return absl::StrCat(fp_val);
+  }
+  return FormatExampleLiteral(val, is_float);
+}
+}  // namespace
 
 absl::StatusOr<CIR> CTargetLowering::Lower(const ModelIR& model_ir,
                                            const proto::Options& options) {
@@ -58,6 +80,29 @@ absl::StatusOr<CIR> CTargetLowering::Run() {
     return absl::InvalidArgumentError(
         "Generating categorical features from string is not supported for C "
         "export");
+  }
+
+  if (options_.c().has_fixed_point_fractional_bits()) {
+    if (!options_.c().linux_kernel_compatible()) {
+      return absl::InvalidArgumentError(
+          "Fixed-point export is currently only supported for "
+          "kernel-compatible "
+          "export");
+    }
+    if (options_.c().fixed_point_fractional_bits() < 0 ||
+        options_.c().fixed_point_fractional_bits() > 31) {
+      return absl::InvalidArgumentError(
+          "fixed_point_fractional_bits must be between 0 and 31");
+    }
+  }
+
+  if (options_.c().linux_kernel_compatible()) {
+    if (std::find(model_ir_.active_condition_types.begin(),
+                  model_ir_.active_condition_types.end(),
+                  ConditionType::OBLIQUE_CONDITION) !=
+        model_ir_.active_condition_types.end())
+      LOG(WARNING) << "Kernel-mode export with oblique conditions is fragile, "
+                      "consider training without oblique conditions";
   }
 
   RETURN_IF_ERROR(LowerGlobalFormatting());
@@ -86,11 +131,18 @@ absl::Status CTargetLowering::LowerGlobalFormatting() {
   c_ir_.impl_guard = absl::Substitute("YDF_MODEL_$0_IMPL_",
                                       StringToConstantSymbol(options_.name()));
   c_ir_.num_trees = model_ir_.num_trees;
-  // For integer types.
-  c_ir_.header_includes.insert("<stdint.h>");
-  c_ir_.impl_includes.insert("<stdint.h>");
-  c_ir_.impl_includes.insert("<assert.h>");
-  c_ir_.impl_includes.insert("<stddef.h>");
+  if (!options_.c().linux_kernel_compatible()) {
+    c_ir_.header_includes.insert("<stdint.h>");
+    c_ir_.impl_includes.insert("<stdint.h>");
+    c_ir_.impl_includes.insert("<assert.h>");
+    c_ir_.impl_includes.insert("<stddef.h>");
+  } else {
+    // Defines offsetof and BUG()
+    c_ir_.header_includes.insert("<linux/types.h>");
+    c_ir_.impl_includes.insert("<linux/stddef.h>");
+    c_ir_.impl_includes.insert("<linux/types.h>");
+    c_ir_.impl_includes.insert("<linux/bug.h>");
+  }
 
   ASSIGN_OR_RETURN(c_ir_.types, BuildTypes(options_, model_ir_,
                                            c_ir_.pseudo_namespace_name));
@@ -157,20 +209,21 @@ absl::Status CTargetLowering::LowerFeature(
       c_feature.c_type = AddPseudoNamespace("Numerical");
       c_ir_.has_numercial_feature = true;
       if (feature.is_float) {
-        // If we have a float feature, we need at least 4 bytes.
-        STATUS_CHECK_EQ(model_ir_.feature_value_bytes, 4);
-        if (!feature.na_replacement.has_value()) {
-          return absl::InvalidArgumentError(absl::Substitute(
-              "Missing NA replacement value for feature $0", var_name));
+        if (!options_.c().linux_kernel_compatible()) {
+          STATUS_CHECK_EQ(model_ir_.feature_value_bytes, 4);
+          if (!feature.na_replacement.has_value()) {
+            return absl::InvalidArgumentError(absl::Substitute(
+                "Missing NA replacement value for feature $0", var_name));
+          }
+          ASSIGN_OR_RETURN(const std::string un,
+                           FormatExampleLiteral(*feature.na_replacement, true));
+          c_ir_.impl_includes.insert("<math.h>");
+          c_feature.na_sanitization = {
+              absl::Substitute("sanitized_instance.$0 = isnan(instance->$0) ? "
+                               "$1 : instance->$0;",
+                               var_name, un)};
+          c_ir_.needs_predict_unsafe = true;
         }
-        ASSIGN_OR_RETURN(const std::string un,
-                         FormatExampleLiteral(*feature.na_replacement,
-                                              /*is_float=*/true));
-        c_ir_.impl_includes.insert("<math.h>");
-        c_feature.na_sanitization = {absl::Substitute(
-            "sanitized_instance.$0 = isnan(instance->$0) ? $1 : instance->$0;",
-            var_name, un)};
-        c_ir_.needs_predict_unsafe = true;
       }
       condition_types_bank.push_back(
           static_cast<int>(ConditionType::HIGHER_CONDITION));
@@ -187,7 +240,9 @@ absl::Status CTargetLowering::LowerFeature(
       c_feature.c_type = categorical_type;
       condition_types_bank.push_back(
           static_cast<int>(ConditionType::CONTAINS_CONDITION_BUFFER_BITMAP));
-      c_ir_.impl_includes.insert("<stdbool.h>");
+      if (!options_.c().linux_kernel_compatible()) {
+        c_ir_.impl_includes.insert("<stdbool.h>");
+      }
     } break;
     case FeatureInfo::Type::kIntegerizedCategorical: {
       return absl::InvalidArgumentError(
@@ -195,8 +250,10 @@ absl::Status CTargetLowering::LowerFeature(
           "export.");
     } break;
     case FeatureInfo::Type::kBoolean: {
-      c_ir_.header_includes.insert("<stdbool.h>");
-      c_ir_.impl_includes.insert("<stdbool.h>");
+      if (!options_.c().linux_kernel_compatible()) {
+        c_ir_.header_includes.insert("<stdbool.h>");
+        c_ir_.impl_includes.insert("<stdbool.h>");
+      }
       c_feature.c_type = c_ir_.types.boolean;
       condition_types_bank.push_back(
           static_cast<int>(ConditionType::TRUE_CONDITION));
@@ -298,8 +355,8 @@ absl::Status CTargetLowering::LowerAccumulator() {
   // Case 1: Single output (Regression or Binary Classification)
   if (model_ir_.num_output_classes == 1) {
     ASSIGN_OR_RETURN(const std::string init_val,
-                     FormatExampleLiteral(
-                         model_ir_.accumulator_initialization[0], is_float));
+                     FormatValue(model_ir_.accumulator_initialization[0],
+                                 is_float, options_));
     c_ir_.accumulator_init_statement = absl::Substitute(
         "$0 accumulator = $1;", c_ir_.types.accumulator, init_val);
     c_ir_.accumulator_sum_statement = "accumulator += node->leaf.val;";
@@ -317,7 +374,7 @@ absl::Status CTargetLowering::LowerAccumulator() {
 
   std::vector<std::string> init_vals;
   for (const auto& val : model_ir_.accumulator_initialization) {
-    ASSIGN_OR_RETURN(std::string s, FormatExampleLiteral(val, is_float));
+    ASSIGN_OR_RETURN(std::string s, FormatValue(val, is_float, options_));
     init_vals.push_back(std::move(s));
   }
 
@@ -373,10 +430,10 @@ absl::Status CTargetLowering::LowerActivation() {
         } else {
           std::string threshold;
           if (model_ir_.model_type == ModelIR::ModelType::kRandomForest) {
-            threshold = "1";
+            ASSIGN_OR_RETURN(threshold, FormatValue(1.f, true, options_));
           } else if (model_ir_.model_type ==
                      ModelIR::ModelType::kGradientBoostedTrees) {
-            threshold = "0.0f";
+            ASSIGN_OR_RETURN(threshold, FormatValue(0.0f, true, options_));
           } else {
             return absl::InvalidArgumentError("Invalid model type");
           }
@@ -411,6 +468,11 @@ absl::Status CTargetLowering::LowerActivation() {
       break;
 
     case proto::ClassificationOutput::PROBABILITY:
+      if (options_.c().linux_kernel_compatible()) {
+        return absl::InvalidArgumentError(
+            "Probability activations (Sigmoid/Softmax) are not supported in "
+            "Kernel mode. Use ClassificationOutput::SCORE");
+      }
       if (model_ir_.num_output_classes == 1) {
         if (model_ir_.winner_takes_all) {
           c_ir_.activation_statement =
@@ -462,7 +524,6 @@ absl::Status CTargetLowering::LowerNodes() {
   // This value is used as a marker in the feature index field to indicate an
   // oblique split. It is chosen to be the largest representable value for the
   // feature index type.
-  // feature index type.
   const auto oblique_feature_idx =
       GetObliqueFeatureSentinel(model_ir_.num_features);
   c_ir_.oblique_feature_idx = oblique_feature_idx;
@@ -489,16 +550,14 @@ absl::StatusOr<std::string> CTargetLowering::LowerLeafNode(
     // Scalar Leaf
     // Note: Using threshold_or_offset because builder.cc populated it here
     // instead of leaf_value
-    ASSIGN_OR_RETURN(
-        const std::string val_str,
-        FormatExampleLiteral(ir_node.threshold_or_offset,
-                             /*is_float=*/!model_ir_.winner_takes_all));
+    ASSIGN_OR_RETURN(const std::string val_str,
+                     FormatValue(ir_node.threshold_or_offset,
+                                 !model_ir_.winner_takes_all, options_));
     return absl::Substitute("{.leaf={.val=$0}}", val_str);
   } else {
     // Vector Leaf (Multi-class Classification)
     const int offset = AsInt(ir_node.threshold_or_offset);
     // Routing optimizes binary size by dividing the offset by the
-    // dimension.
     // dimension.
     const int encoded_leaf_value =
         GetEncodedLeafValue(offset, model_ir_.num_output_classes);
@@ -535,7 +594,7 @@ absl::StatusOr<std::string> CTargetLowering::LowerConditionNode(
         val = static_cast<int64_t>(std::ceil(AsDouble(val)));
       }
       ASSIGN_OR_RETURN(const std::string routing_thresh_str,
-                       FormatExampleLiteral(val, is_float));
+                       FormatValue(val, is_float, options_));
 
       return absl::Substitute("{.pos=$0,.cond={.feat=$1,.thr=$2}}",
                               jump_offset_false, ir_node.feature_idx,
@@ -561,11 +620,11 @@ absl::StatusOr<std::string> CTargetLowering::LowerConditionNode(
     }
 
     case ConditionType::TRUE_CONDITION: {
-      // In CC_embed routing, true conditions are generally treated as
-      // numerical thresholds >= 0.5f if they must be mapped to the routing
-      // engine constraints.
-      return absl::Substitute("{.pos=$0,.cond={.feat=$1,.thr=0.5f}}",
-                              jump_offset_false, ir_node.feature_idx);
+      ASSIGN_OR_RETURN(const std::string routing_thresh_str,
+                       FormatValue(0.5f, true, options_));
+      return absl::Substitute("{.pos=$0,.cond={.feat=$1,.thr=$2}}",
+                              jump_offset_false, ir_node.feature_idx,
+                              routing_thresh_str);
     }
 
     default:
@@ -589,9 +648,20 @@ absl::Status CTargetLowering::LowerRoutingData() {
     }
     c_ir_.categorical_bank_content = absl::StrJoin(hex_bytes, ",");
   }
-
   if (!model_ir_.oblique_weights.empty()) {
-    c_ir_.oblique_weights_content = std::move(assets.oblique_weights_content);
+    if (options_.c().linux_kernel_compatible()) {
+      // Re-format the oblique weights as fixed-point integers
+      std::vector<std::string> weights_str;
+      weights_str.reserve(model_ir_.oblique_weights.size());
+      for (float w : model_ir_.oblique_weights) {
+        ASSIGN_OR_RETURN(std::string w_str,
+                         FormatValue(w, /*is_float=*/true, options_));
+        weights_str.push_back(w_str);
+      }
+      c_ir_.oblique_weights_content = absl::StrJoin(weights_str, ",");
+    } else {
+      c_ir_.oblique_weights_content = std::move(assets.oblique_weights_content);
+    }
     c_ir_.oblique_features_content = std::move(assets.oblique_features_content);
   }
 
@@ -604,13 +674,41 @@ absl::Status CTargetLowering::LowerRoutingData() {
         eval = numerical_feature >= node->cond.thr;)",
               c_ir_.types.numerical_feature)));
     } else if (cond_type == ConditionType::OBLIQUE_CONDITION) {
-      c_ir_.impl_includes.insert("<string.h>");
-      c_ir_.routing_condition_eval_blocks.insert(
-          c_ir_.routing_condition_eval_blocks.begin(),
-          std::make_pair(
-              cond_type,
-              absl::Substitute(
-                  R"(        const $0 num_projs = $2oblique_features[node->cond.obl];
+      if (options_.c().linux_kernel_compatible()) {
+        c_ir_.impl_includes.insert(
+            "<linux/string.h>");  // Required for kernel memcpy
+
+        c_ir_.routing_condition_eval_blocks.insert(
+            c_ir_.routing_condition_eval_blocks.begin(),
+            std::make_pair(
+                cond_type,
+                absl::Substitute(
+                    R"(        const $0 num_projs = $2oblique_features[node->cond.obl];
+        // Shift the bias to match the doubled scale of the dot product multiplication.
+        s64 obl_acc = -((s64)$2oblique_weights[node->cond.obl] << $5);
+        for ($0 proj_idx=0; proj_idx<num_projs; proj_idx++){
+          const $4 proj_off = node->cond.obl + proj_idx + 1;
+          $1 numerical_feature;
+          const $0 feat_idx = $2oblique_features[proj_off];
+          const $4 safe_off = $2FeatureOffsets[feat_idx];
+          memcpy(&numerical_feature, raw_instance + safe_off, sizeof($1));
+
+          // Cast to 64-bit to prevent overflow during fixed-point multiplication
+          obl_acc += (s64)numerical_feature * (s64)$2oblique_weights[proj_off];
+        }
+        eval = obl_acc >= 0;)",
+                    c_ir_.types.oblique_features, c_ir_.types.numerical_feature,
+                    c_ir_.pseudo_namespace_name, c_ir_.types.oblique_weights,
+                    c_ir_.types.feature_offsets,
+                    options_.c().fixed_point_fractional_bits())));
+      } else {
+        c_ir_.impl_includes.insert("<string.h>");
+        c_ir_.routing_condition_eval_blocks.insert(
+            c_ir_.routing_condition_eval_blocks.begin(),
+            std::make_pair(
+                cond_type,
+                absl::Substitute(
+                    R"(        const $0 num_projs = $2oblique_features[node->cond.obl];
         $3 obl_acc = -$2oblique_weights[node->cond.obl];
         for ($0 proj_idx=0; proj_idx<num_projs; proj_idx++){
           const $4 proj_off = node->cond.obl + proj_idx + 1;
@@ -621,9 +719,10 @@ absl::Status CTargetLowering::LowerRoutingData() {
           obl_acc += numerical_feature * $2oblique_weights[proj_off];
         }
         eval = obl_acc >= 0;)",
-                  c_ir_.types.oblique_features, c_ir_.types.numerical_feature,
-                  c_ir_.pseudo_namespace_name, c_ir_.types.oblique_weights,
-                  c_ir_.types.feature_offsets)));
+                    c_ir_.types.oblique_features, c_ir_.types.numerical_feature,
+                    c_ir_.pseudo_namespace_name, c_ir_.types.oblique_weights,
+                    c_ir_.types.feature_offsets)));
+      }
     } else if (cond_type == ConditionType::CONTAINS_CONDITION_BUFFER_BITMAP) {
       c_ir_.routing_condition_eval_blocks.push_back(std::make_pair(
           cond_type,

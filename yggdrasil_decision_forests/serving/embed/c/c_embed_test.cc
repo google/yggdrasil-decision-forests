@@ -42,6 +42,8 @@ struct GoldenGeneratedCCase {
   std::string golden_implementation_filename;
   proto::Algorithm::Enum algorithm;
   std::optional<proto::ClassificationOutput::Enum> output;
+  bool kernel_mode = false;
+  std::optional<int> fixed_point_fractional_bits = std::nullopt;
   int crop_num_trees = 3;
 };
 
@@ -195,6 +197,30 @@ SIMPLE_PARAMETERIZED_TEST(
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::SCORE,
         },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_score_routing_kernel.h.golden",
+            "adult_binary_class_gbdt_v2_score_routing_kernel.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+            true,
+        },
+        {
+            "abalone_regression_gbdt_v2",
+            "abalone_regression_gbdt_v2_routing_kernel.h.golden",
+            "abalone_regression_gbdt_v2_routing_kernel.c.golden",
+            proto::Algorithm::ROUTING,
+            std::nullopt,
+            true,
+        },
+        {
+            "iris_multi_class_gbdt_v2",
+            "iris_multi_class_gbdt_v2_score_routing_kernel.h.golden",
+            "iris_multi_class_gbdt_v2_score_routing_kernel.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+            true,
+        },
     }) {
   const auto& test_case = GetParam();
 
@@ -211,6 +237,9 @@ SIMPLE_PARAMETERIZED_TEST(
   options.set_algorithm(test_case.algorithm);
   if (test_case.output.has_value()) {
     options.set_classification_output(*test_case.output);
+  }
+  if (test_case.kernel_mode) {
+    options.mutable_c()->set_linux_kernel_compatible(true);
   }
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModel(*model, options));
   EXPECT_EQ(embed.size(), 2);

@@ -1,0 +1,345 @@
+/*
+   ydf_model.h - Single-Header C Library for YDF Model Prediction
+   
+   USAGE:
+   
+   1. In EXACTLY ONE .c file, define the implementation before including:
+      #define YDF_MODEL_YDF_MODEL_IMPL_
+      #include "ydf_model.h"
+
+   2. In all other .c files, just include it normally:
+      #include "ydf_model.h"
+*/
+
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <linux/types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+typedef enum {
+  YdfModel_FeatureTypeEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureTypeEnum_M = 1,
+  YdfModel_FeatureTypeEnum_I = 2,
+  YdfModel_FeatureTypeEnum_F = 3,
+} YdfModel_FeatureTypeEnum;
+typedef u32 YdfModel_FeatureType;
+
+typedef s32 YdfModel_Numerical;
+
+typedef struct {
+  YdfModel_FeatureType type;
+  YdfModel_Numerical longestshell;
+  YdfModel_Numerical diameter;
+  YdfModel_Numerical height;
+  YdfModel_Numerical wholeweight;
+  YdfModel_Numerical shuckedweight;
+  YdfModel_Numerical visceraweight;
+  YdfModel_Numerical shellweight;
+} YdfModel_Instance;
+
+// Prediction function.
+s32 YdfModel_Predict(const YdfModel_Instance* instance);
+
+#ifdef __cplusplus
+}
+#endif  // __cplusplus
+
+#endif  // YDF_MODEL_YDF_MODEL_H_
+
+// This code is compiled ONLY when YDF_MODEL_YDF_MODEL_IMPL_ is defined.
+#ifdef YDF_MODEL_YDF_MODEL_IMPL_
+
+#include <linux/bug.h>
+#include <linux/stddef.h>
+#include <linux/types.h>
+
+// Portable packing macros.
+#if defined(__KERNEL__) || defined(MODULE)
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR __packed
+#elif defined(_MSC_VER)
+    #define YDF_MODEL_PACK_PUSH __pragma(pack(push, 1))
+    #define YDF_MODEL_PACK_POP __pragma(pack(pop))
+    #define YDF_MODEL_PACKED_ATTR
+#elif defined(__GNUC__) || defined(__clang__)
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR __attribute__((packed))
+#else
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR
+#endif
+
+// Helper to test a bit in a byte array (for categorical byte arrays)
+static inline bool YdfModel_BitTest(const u8* array, const u32 bit_index) {
+  return array[bit_index / 8] & (1 << (bit_index % 8));
+}
+
+static const u8 YdfModel_NumTrees = 3;
+
+YDF_MODEL_PACK_PUSH
+typedef struct YDF_MODEL_PACKED_ATTR {
+  u8 pos;
+  union {
+    struct YDF_MODEL_PACKED_ATTR {
+      u8 feat;
+      union {
+        s32 thr;
+        u8 cat;
+      };
+    } cond;
+    struct YDF_MODEL_PACKED_ATTR {
+      s32 val;
+    } leaf;
+  };
+} YdfModel_Node;
+YDF_MODEL_PACK_POP
+
+static const YdfModel_Node YdfModel_nodes[] = {
+{.pos=31,.cond={.feat=7,.thr=10994}},
+{.pos=15,.cond={.feat=7,.thr=3850}},
+{.pos=7,.cond={.feat=7,.thr=1737}},
+{.pos=3,.cond={.feat=6,.thr=672}},
+{.pos=1,.cond={.feat=5,.thr=475}},
+{.leaf={.val=-44490}},
+{.leaf={.val=-37725}},
+{.pos=1,.cond={.feat=7,.thr=1147}},
+{.leaf={.val=-35475}},
+{.leaf={.val=-31752}},
+{.pos=3,.cond={.feat=2,.thr=14582}},
+{.pos=1,.cond={.feat=3,.thr=4096}},
+{.leaf={.val=-30879}},
+{.leaf={.val=-26546}},
+{.pos=1,.cond={.feat=0,.cat=0}},
+{.leaf={.val=-23029}},
+{.leaf={.val=-12385}},
+{.pos=7,.cond={.feat=0,.cat=4}},
+{.pos=3,.cond={.feat=7,.thr=7340}},
+{.pos=1,.cond={.feat=5,.thr=6275}},
+{.leaf={.val=-16007}},
+{.leaf={.val=-19361}},
+{.pos=1,.cond={.feat=5,.thr=14221}},
+{.leaf={.val=-7716}},
+{.leaf={.val=-14158}},
+{.pos=3,.cond={.feat=5,.thr=15057}},
+{.pos=1,.cond={.feat=3,.thr=8028}},
+{.leaf={.val=-5902}},
+{.leaf={.val=2471}},
+{.pos=1,.cond={.feat=6,.thr=11043}},
+{.leaf={.val=-13837}},
+{.leaf={.val=-1807}},
+{.pos=15,.cond={.feat=7,.thr=23577}},
+{.pos=7,.cond={.feat=7,.thr=16335}},
+{.pos=3,.cond={.feat=5,.thr=19677}},
+{.pos=1,.cond={.feat=0,.cat=8}},
+{.leaf={.val=-1790}},
+{.leaf={.val=11398}},
+{.pos=1,.cond={.feat=5,.thr=24887}},
+{.leaf={.val=-2927}},
+{.leaf={.val=-7318}},
+{.pos=3,.cond={.feat=5,.thr=26198}},
+{.pos=1,.cond={.feat=5,.thr=22594}},
+{.leaf={.val=21900}},
+{.leaf={.val=12092}},
+{.pos=1,.cond={.feat=7,.thr=19251}},
+{.leaf={.val=-1393}},
+{.leaf={.val=4712}},
+{.pos=7,.cond={.feat=5,.thr=36176}},
+{.pos=3,.cond={.feat=7,.thr=33260}},
+{.pos=1,.cond={.feat=5,.thr=27181}},
+{.leaf={.val=38025}},
+{.leaf={.val=21194}},
+{.pos=1,.cond={.feat=2,.thr=32440}},
+{.leaf={.val=68722}},
+{.leaf={.val=44614}},
+{.pos=3,.cond={.feat=7,.thr=37274}},
+{.pos=1,.cond={.feat=7,.thr=29131}},
+{.leaf={.val=7083}},
+{.leaf={.val=14907}},
+{.pos=1,.cond={.feat=5,.thr=50463}},
+{.leaf={.val=46252}},
+{.leaf={.val=20475}},
+{.pos=31,.cond={.feat=7,.thr=10994}},
+{.pos=15,.cond={.feat=7,.thr=3850}},
+{.pos=7,.cond={.feat=7,.thr=1737}},
+{.pos=3,.cond={.feat=6,.thr=672}},
+{.pos=1,.cond={.feat=2,.thr=6717}},
+{.leaf={.val=-43671}},
+{.leaf={.val=-34552}},
+{.pos=1,.cond={.feat=5,.thr=1524}},
+{.leaf={.val=-27069}},
+{.leaf={.val=-30591}},
+{.pos=3,.cond={.feat=2,.thr=14582}},
+{.pos=1,.cond={.feat=5,.thr=3801}},
+{.leaf={.val=-23890}},
+{.leaf={.val=-28505}},
+{.pos=1,.cond={.feat=0,.cat=12}},
+{.leaf={.val=-20726}},
+{.leaf={.val=-11147}},
+{.pos=7,.cond={.feat=0,.cat=16}},
+{.pos=3,.cond={.feat=7,.thr=7340}},
+{.pos=1,.cond={.feat=7,.thr=4506}},
+{.leaf={.val=-19661}},
+{.leaf={.val=-16098}},
+{.pos=1,.cond={.feat=5,.thr=14221}},
+{.leaf={.val=-6944}},
+{.leaf={.val=-12742}},
+{.pos=3,.cond={.feat=5,.thr=15270}},
+{.pos=1,.cond={.feat=7,.thr=7750}},
+{.leaf={.val=-6799}},
+{.leaf={.val=-253}},
+{.pos=1,.cond={.feat=6,.thr=11043}},
+{.leaf={.val=-12675}},
+{.leaf={.val=-1627}},
+{.pos=15,.cond={.feat=7,.thr=24560}},
+{.pos=7,.cond={.feat=7,.thr=16335}},
+{.pos=3,.cond={.feat=5,.thr=15942}},
+{.pos=1,.cond={.feat=4,.thr=40419}},
+{.leaf={.val=6140}},
+{.leaf={.val=31584}},
+{.pos=1,.cond={.feat=5,.thr=19677}},
+{.leaf={.val=2247}},
+{.leaf={.val=-4317}},
+{.pos=3,.cond={.feat=5,.thr=29082}},
+{.pos=1,.cond={.feat=7,.thr=18989}},
+{.leaf={.val=9642}},
+{.leaf={.val=19671}},
+{.pos=1,.cond={.feat=7,.thr=19038}},
+{.leaf={.val=-3015}},
+{.leaf={.val=2888}},
+{.pos=7,.cond={.feat=5,.thr=36176}},
+{.pos=3,.cond={.feat=4,.thr=91832}},
+{.pos=1,.cond={.feat=5,.thr=27197}},
+{.leaf={.val=41029}},
+{.leaf={.val=19349}},
+{.pos=1,.cond={.feat=3,.thr=11633}},
+{.leaf={.val=29086}},
+{.leaf={.val=50965}},
+{.pos=3,.cond={.feat=7,.thr=45400}},
+{.pos=1,.cond={.feat=7,.thr=29131}},
+{.leaf={.val=6881}},
+{.leaf={.val=15440}},
+{.pos=1,.cond={.feat=2,.thr=35553}},
+{.leaf={.val=70463}},
+{.leaf={.val=39639}},
+{.pos=31,.cond={.feat=7,.thr=10076}},
+{.pos=15,.cond={.feat=7,.thr=3113}},
+{.pos=7,.cond={.feat=7,.thr=1425}},
+{.pos=3,.cond={.feat=4,.thr=1524}},
+{.pos=1,.cond={.feat=2,.thr=6717}},
+{.leaf={.val=-39303}},
+{.leaf={.val=-33821}},
+{.pos=1,.cond={.feat=7,.thr=999}},
+{.leaf={.val=-29983}},
+{.leaf={.val=-27255}},
+{.pos=3,.cond={.feat=7,.thr=2589}},
+{.pos=1,.cond={.feat=6,.thr=901}},
+{.leaf={.val=-16623}},
+{.leaf={.val=-22995}},
+{.pos=1,.cond={.feat=5,.thr=3015}},
+{.leaf={.val=-10018}},
+{.leaf={.val=-19928}},
+{.pos=7,.cond={.feat=0,.cat=20}},
+{.pos=3,.cond={.feat=7,.thr=7340}},
+{.pos=1,.cond={.feat=7,.thr=4506}},
+{.leaf={.val=-17617}},
+{.leaf={.val=-14488}},
+{.pos=1,.cond={.feat=5,.thr=14172}},
+{.leaf={.val=-8063}},
+{.leaf={.val=-13103}},
+{.pos=3,.cond={.feat=5,.thr=15270}},
+{.pos=1,.cond={.feat=2,.thr=20152}},
+{.leaf={.val=-7883}},
+{.leaf={.val=-1459}},
+{.pos=1,.cond={.feat=6,.thr=9912}},
+{.leaf={.val=-12928}},
+{.leaf={.val=-5498}},
+{.pos=15,.cond={.feat=7,.thr=23233}},
+{.pos=7,.cond={.feat=7,.thr=15696}},
+{.pos=3,.cond={.feat=5,.thr=15254}},
+{.pos=1,.cond={.feat=4,.thr=37536}},
+{.leaf={.val=3400}},
+{.leaf={.val=19494}},
+{.pos=1,.cond={.feat=3,.thr=9994}},
+{.leaf={.val=-3824}},
+{.leaf={.val=4628}},
+{.pos=3,.cond={.feat=5,.thr=22594}},
+{.pos=1,.cond={.feat=2,.thr=28017}},
+{.leaf={.val=20832}},
+{.leaf={.val=11750}},
+{.pos=1,.cond={.feat=5,.thr=29082}},
+{.leaf={.val=6889}},
+{.leaf={.val=483}},
+{.pos=7,.cond={.feat=5,.thr=36176}},
+{.pos=3,.cond={.feat=7,.thr=27132}},
+{.pos=1,.cond={.feat=5,.thr=27869}},
+{.leaf={.val=29287}},
+{.leaf={.val=9608}},
+{.pos=1,.cond={.feat=4,.thr=91832}},
+{.leaf={.val=27413}},
+{.leaf={.val=41502}},
+{.pos=3,.cond={.feat=7,.thr=37274}},
+{.pos=1,.cond={.feat=7,.thr=29131}},
+{.leaf={.val=5447}},
+{.leaf={.val=11873}},
+{.pos=1,.cond={.feat=5,.thr=50463}},
+{.leaf={.val=38755}},
+{.leaf={.val=16561}},
+};
+
+static const u8 YdfModel_condition_types[] = {1,0,0,0,0,0,0,0};
+
+
+static const u8 YdfModel_root_deltas[] = {63,63,63};
+
+
+static const u8 YdfModel_categorical_bank[] = {0xb3,0x3b,0xbb};
+
+static const size_t YdfModel_FeatureOffsets[] = {
+    offsetof(YdfModel_Instance, type),
+    offsetof(YdfModel_Instance, longestshell),
+    offsetof(YdfModel_Instance, diameter),
+    offsetof(YdfModel_Instance, height),
+    offsetof(YdfModel_Instance, wholeweight),
+    offsetof(YdfModel_Instance, shuckedweight),
+    offsetof(YdfModel_Instance, visceraweight),
+    offsetof(YdfModel_Instance, shellweight),
+};
+
+s32 YdfModel_Predict(const YdfModel_Instance* instance) {
+  s32 accumulator = 651589;
+
+  const YdfModel_Node* root = YdfModel_nodes;
+  const YdfModel_Node* node;
+  const char* raw_instance = (const char*)(instance);
+  u8 eval;
+  for (u8 tree_idx = 0; tree_idx != YdfModel_NumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+      if (YdfModel_condition_types[node->cond.feat] == 0) {
+        const size_t off = YdfModel_FeatureOffsets[node->cond.feat];
+        s32 numerical_feature = *(s32*)(raw_instance + off);
+        eval = numerical_feature >= node->cond.thr;
+      } else if (YdfModel_condition_types[node->cond.feat] == 1) {
+        const size_t off = YdfModel_FeatureOffsets[node->cond.feat];
+        u32 categorical_feature = *(u32*)(raw_instance + off);
+        eval = YdfModel_BitTest(YdfModel_categorical_bank, categorical_feature + node->cond.cat);
+      } else {
+        BUG();
+      }
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator += node->leaf.val;
+    root += YdfModel_root_deltas[tree_idx];
+  }
+
+  return accumulator;
+}
+
+#endif  // YDF_MODEL_YDF_MODEL_IMPL_

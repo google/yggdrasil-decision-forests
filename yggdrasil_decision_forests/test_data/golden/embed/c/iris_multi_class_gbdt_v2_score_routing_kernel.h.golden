@@ -1,0 +1,164 @@
+/*
+   ydf_model.h - Single-Header C Library for YDF Model Prediction
+   
+   USAGE:
+   
+   1. In EXACTLY ONE .c file, define the implementation before including:
+      #define YDF_MODEL_YDF_MODEL_IMPL_
+      #include "ydf_model.h"
+
+   2. In all other .c files, just include it normally:
+      #include "ydf_model.h"
+*/
+
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <linux/types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+typedef enum {
+  YdfModel_LabelEnum_Setosa = 0,
+  YdfModel_LabelEnum_Versicolor = 1,
+  YdfModel_LabelEnum_Virginica = 2,
+} YdfModel_LabelEnum;
+typedef u32 YdfModel_Label;
+
+typedef s32 YdfModel_Numerical;
+
+typedef struct {
+  YdfModel_Numerical sepal_length;
+  YdfModel_Numerical sepal_width;
+  YdfModel_Numerical petal_length;
+  YdfModel_Numerical petal_width;
+} YdfModel_Instance;
+
+// Prediction function.
+// The results are written into the provided `out` array.
+void YdfModel_Predict(const YdfModel_Instance* instance, s32 out[3]);
+
+#ifdef __cplusplus
+}
+#endif  // __cplusplus
+
+#endif  // YDF_MODEL_YDF_MODEL_H_
+
+// This code is compiled ONLY when YDF_MODEL_YDF_MODEL_IMPL_ is defined.
+#ifdef YDF_MODEL_YDF_MODEL_IMPL_
+
+#include <linux/bug.h>
+#include <linux/stddef.h>
+#include <linux/types.h>
+
+// Portable packing macros.
+#if defined(__KERNEL__) || defined(MODULE)
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR __packed
+#elif defined(_MSC_VER)
+    #define YDF_MODEL_PACK_PUSH __pragma(pack(push, 1))
+    #define YDF_MODEL_PACK_POP __pragma(pack(pop))
+    #define YDF_MODEL_PACKED_ATTR
+#elif defined(__GNUC__) || defined(__clang__)
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR __attribute__((packed))
+#else
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR
+#endif
+
+static const u8 YdfModel_NumTrees = 3;
+
+YDF_MODEL_PACK_PUSH
+typedef struct YDF_MODEL_PACKED_ATTR {
+  u8 pos;
+  union {
+    struct YDF_MODEL_PACKED_ATTR {
+      u8 feat;
+      union {
+        s32 thr;
+      };
+    } cond;
+    struct YDF_MODEL_PACKED_ATTR {
+      s32 val;
+    } leaf;
+  };
+} YdfModel_Node;
+YDF_MODEL_PACK_POP
+
+static const YdfModel_Node YdfModel_nodes[] = {
+{.pos=1,.cond={.feat=3,.thr=52429}},
+{.leaf={.val=19661}},
+{.pos=1,.cond={.feat=2,.thr=239206}},
+{.leaf={.val=-9830}},
+{.leaf={.val=-9830}},
+{.pos=3,.cond={.feat=3,.thr=52429}},
+{.pos=1,.cond={.feat=2,.thr=95027}},
+{.leaf={.val=-9830}},
+{.leaf={.val=-9830}},
+{.pos=5,.cond={.feat=3,.thr=114688}},
+{.pos=3,.cond={.feat=2,.thr=324403}},
+{.pos=1,.cond={.feat=0,.thr=347341}},
+{.leaf={.val=13763}},
+{.leaf={.val=19661}},
+{.leaf={.val=1966}},
+{.pos=1,.cond={.feat=2,.thr=324403}},
+{.leaf={.val=-3932}},
+{.pos=1,.cond={.feat=0,.thr=475136}},
+{.leaf={.val=-9830}},
+{.leaf={.val=-9830}},
+{.pos=7,.cond={.feat=3,.thr=108134}},
+{.pos=5,.cond={.feat=2,.thr=317850}},
+{.pos=3,.cond={.feat=3,.thr=22938}},
+{.pos=1,.cond={.feat=1,.thr=226099}},
+{.leaf={.val=-9830}},
+{.leaf={.val=-9830}},
+{.leaf={.val=-9830}},
+{.leaf={.val=4915}},
+{.pos=1,.cond={.feat=2,.thr=330957}},
+{.leaf={.val=13107}},
+{.leaf={.val=19661}},
+};
+
+
+static const u8 YdfModel_root_deltas[] = {5,15,11};
+
+static const size_t YdfModel_FeatureOffsets[] = {
+    offsetof(YdfModel_Instance, sepal_length),
+    offsetof(YdfModel_Instance, sepal_width),
+    offsetof(YdfModel_Instance, petal_length),
+    offsetof(YdfModel_Instance, petal_width),
+};
+
+void YdfModel_Predict(const YdfModel_Instance* instance, s32 out[3]) {
+    out[0] = 0;
+  out[1] = 0;
+  out[2] = 0;
+
+
+  const YdfModel_Node* root = YdfModel_nodes;
+  const YdfModel_Node* node;
+  const char* raw_instance = (const char*)(instance);
+  u8 eval;
+  for (u8 tree_idx = 0; tree_idx != YdfModel_NumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+      const size_t off = YdfModel_FeatureOffsets[node->cond.feat];
+        s32 numerical_feature = *(s32*)(raw_instance + off);
+        eval = numerical_feature >= node->cond.thr;
+
+      node += (node->pos & -eval) + 1;
+    }
+    out[tree_idx % 3] += node->leaf.val;
+    root += YdfModel_root_deltas[tree_idx];
+  }
+
+  
+}
+
+#endif  // YDF_MODEL_YDF_MODEL_IMPL_

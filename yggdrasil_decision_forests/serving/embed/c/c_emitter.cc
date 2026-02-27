@@ -161,7 +161,11 @@ absl::Status CEmitter::EmitImplementation(std::string* out) const {
 
   absl::StrAppend(out, R"(
 // Portable packing macros.
-#if defined(_MSC_VER)
+#if defined(__KERNEL__) || defined(MODULE)
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR __packed
+#elif defined(_MSC_VER)
     #define YDF_MODEL_PACK_PUSH __pragma(pack(push, 1))
     #define YDF_MODEL_PACK_POP __pragma(pack(pop))
     #define YDF_MODEL_PACKED_ATTR
@@ -362,7 +366,11 @@ absl::Status CEmitter::EmitPredictUnsafeRouting(std::string* out) const {
 
   if (ir_.routing_condition_eval_blocks.empty()) {
     // The model does not contain any condition.
-    absl::StrAppend(out, "      assert(false);\n");
+    if (options_.c().linux_kernel_compatible()) {
+      absl::StrAppend(out, "      BUG();\n");
+    } else {
+      absl::StrAppend(out, "      assert(false);\n");
+    }
   }
   if (ir_.routing_condition_eval_blocks.size() == 1) {
     if (ir_.routing_condition_eval_blocks[0].first !=
@@ -394,7 +402,11 @@ absl::Status CEmitter::EmitPredictUnsafeRouting(std::string* out) const {
       absl::StrAppend(out, eval_block, "\n");
     }
     absl::StrAppend(out, "      } else {\n");
-    absl::StrAppend(out, "        assert(false);\n");
+    if (options_.c().linux_kernel_compatible()) {
+      absl::StrAppend(out, "        BUG();\n");
+    } else {
+      absl::StrAppend(out, "        assert(false);\n");
+    }
     absl::StrAppend(out, "      }\n");
   }
 

@@ -329,6 +329,34 @@ std::string DTypeToCppType(const proto::DType::Enum value) {
   }
 }
 
+std::string KernelDTypeToCppType(const proto::DType::Enum value) {
+  switch (value) {
+    case proto::DType::UNDEFINED:
+      return "UNDEFINED";
+
+    case proto::DType::INT8:
+      return "s8";
+    case proto::DType::INT16:
+      return "s16";
+    case proto::DType::INT32:
+      return "s32";
+
+    case proto::DType::UINT8:
+      return "u8";
+    case proto::DType::UINT16:
+      return "u16";
+    case proto::DType::UINT32:
+      return "u32";
+
+    case proto::DType::FLOAT32:
+      return "s32";
+
+    case proto::DType::BOOL:
+      // The Linux kernel supports 'bool' via <linux/types.h>
+      return "bool";
+  }
+}
+
 std::string DTypeToJavaType(const proto::DType::Enum value) {
   switch (value) {
     case proto::DType::UNDEFINED:
@@ -459,6 +487,38 @@ std::vector<uint8_t> PackBoolVector(const std::vector<bool>& input) {
     output.push_back(byte);
   }
   return output;
+}
+
+absl::StatusOr<std::string> KernelStorageToPrimitiveType(const int bytes,
+                                                         const bool is_float,
+                                                         const bool is_signed) {
+  if (is_float) {
+    if (bytes == 4) return "s32";
+    if (bytes == 8) return "s64";
+  } else {
+    if (is_signed) {
+      if (bytes == 1) return "s8";
+      if (bytes == 2) return "s16";
+      if (bytes == 4) return "s32";
+      if (bytes == 8) return "s64";
+    } else {
+      if (bytes == 1) return "u8";
+      if (bytes == 2) return "u16";
+      if (bytes == 4) return "u32";
+      if (bytes == 8) return "u64";
+    }
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unsupported kernel storage type: bytes=", bytes,
+                   " float=", is_float, " signed=", is_signed));
+}
+
+std::string KernelUnsignedInteger(const int bytes) {
+  return absl::StrCat("u", bytes * 8);
+}
+
+std::string KernelSignedInteger(const int bytes) {
+  return absl::StrCat("s", bytes * 8);
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed

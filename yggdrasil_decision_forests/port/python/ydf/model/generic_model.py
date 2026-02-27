@@ -863,8 +863,11 @@ Use `model.describe()` for more details.
   @abc.abstractmethod
   def to_standalone_c(
       self,
+      *,
       name: str = "ydf_model",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      linux_kernel_compatible: bool = False,
+      fixed_point_fractional_bits: Optional[int] = None,
   ) -> Union[str, Dict[str, bytes]]:
     """Generates standalone, dependency-free C code for model inference.
 
@@ -950,6 +953,12 @@ Use `model.describe()` for more details.
         "CLASS" (default): The predicted class index (fast). - "SCORE": The raw
         scores (e.g., logits) for all classes. - "PROBABILITY": The
         probabilities for all classes (slower, as it requires a softmax).
+      linux_kernel_compatible: If True, create C code that is compatible with
+        deployment in the Linux kernel, i.e. no floating point usage and linux
+        kernel types.
+      fixed_point_fractional_bits: If None, use floating-point arithmetic. If
+        set, use fixed-point arithmetic with this parameter determining the size
+        of the fractional part.
 
     Returns:
       A dictionary containing header and implementation of the C code.
@@ -2121,9 +2130,17 @@ class GenericCCModel(GenericModel):
 
   def to_standalone_c(
       self,
+      *,
       name: str = "ydf_model",
       classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+      linux_kernel_compatible: bool = False,
+      fixed_point_fractional_bits: Optional[int] = None,
   ) -> Union[str, Dict[str, bytes]]:
+    c_options = embed_pb2.C(
+        linux_kernel_compatible=linux_kernel_compatible,
+    )
+    if fixed_point_fractional_bits is not None:
+      c_options.fixed_point_fractional_bits = fixed_point_fractional_bits
     options = embed_pb2.Options(
         name=name,
         classification_output=embed_pb2.ClassificationOutput.Enum.Value(
@@ -2131,7 +2148,7 @@ class GenericCCModel(GenericModel):
         ),
         algorithm=embed_pb2.Algorithm.Enum.Value("ROUTING"),
         categorical_from_string=False,
-        c=embed_pb2.C(),
+        c=c_options,
     )
     results = self._model.EmbedModel(options)
     if len(results) == 1:
