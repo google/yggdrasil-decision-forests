@@ -126,8 +126,6 @@ TEST(CppTargetLoweringTest, Regression) {
   proto::Options options;
   ASSERT_OK_AND_ASSIGN(const auto cpp_ir,
                        CppTargetLowering::Lower(model_ir, options));
-
-  EXPECT_EQ(cpp_ir.output_type, "float");
 }
 
 TEST(CppTargetLoweringTest, Multiclass) {
@@ -142,8 +140,6 @@ TEST(CppTargetLoweringTest, Multiclass) {
   options.set_classification_output(proto::ClassificationOutput::PROBABILITY);
   ASSERT_OK_AND_ASSIGN(const auto cpp_ir,
                        CppTargetLowering::Lower(model_ir, options));
-
-  EXPECT_EQ(cpp_ir.output_type, "std::array<float, 3>");
 }
 
 }  // namespace

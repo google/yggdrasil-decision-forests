@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -27,7 +28,9 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -35,6 +38,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
+#include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -342,6 +346,212 @@ int ObliqueFeatureIndex(const proto::Options& options,
   return IsJava(options)
              ? NumBytesToMaxSignedValue(internal_options.feature_index_bytes)
              : NumBytesToMaxUnsignedValue(internal_options.feature_index_bytes);
+}
+
+std::string ResolveNameCollision(
+    const std::string& name,
+    const absl::flat_hash_set<std::string>& existing_names) {
+  if (!existing_names.contains(name)) {
+    return name;
+  }
+  int local_index = 1;
+  std::string extended_item_symbol;
+  do {
+    extended_item_symbol = absl::StrCat(name, "_", local_index++);
+  } while (existing_names.contains(extended_item_symbol));
+  return extended_item_symbol;
+}
+
+uint32_t GetObliqueFeatureSentinel(int64_t num_features) {
+  return NumBytesToMaxUnsignedValue(
+      MaxUnsignedValueToNumBytes(num_features + kReservedFeatureIndexes));
+}
+
+int GetEncodedLeafValue(int64_t offset, int num_output_classes) {
+  return offset / num_output_classes;
+}
+
+absl::StatusOr<std::string> StorageToType(int bytes, bool is_float,
+                                          bool is_signed) {
+  if (is_float) {
+    if (bytes == 4) return "float";
+    if (bytes == 8) return "double";
+  } else {
+    if (is_signed) {
+      if (bytes == 1) return "int8_t";
+      if (bytes == 2) return "int16_t";
+      if (bytes == 4) return "int32_t";
+      if (bytes == 8) return "int64_t";
+    } else {
+      if (bytes == 1) return "uint8_t";
+      if (bytes == 2) return "uint16_t";
+      if (bytes == 4) return "uint32_t";
+      if (bytes == 8) return "uint64_t";
+    }
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unsupported storage type: bytes=", bytes,
+                   " float=", is_float, " signed=", is_signed));
+}
+
+std::string GetBitsetBankString(const std::vector<bool>& bitset_bank) {
+  std::string bitset_str;
+  bitset_str.reserve(bitset_bank.size());
+  for (auto it = bitset_bank.rbegin(); it != bitset_bank.rend(); ++it) {
+    bitset_str.push_back(*it ? '1' : '0');
+  }
+  return bitset_str;
+}
+
+int GetMaxObliqueFeatureValue(const std::vector<int>& oblique_features) {
+  int max_val = 0;
+  for (int f : oblique_features) {
+    if (f > max_val) max_val = f;
+  }
+  return max_val;
+}
+
+absl::Status CheckFeatureNameCollision(
+    const std::string& var_name,
+    absl::flat_hash_set<std::string>& sanitized_feature_names,
+    const std::vector<FeatureInfo>& features) {
+  if (!sanitized_feature_names.insert(var_name).second) {
+    return absl::InvalidArgumentError(
+        absl::Substitute("Feature name clash on feature $0, consider "
+                         "renaming your features!",
+                         var_name));
+  }
+  return absl::OkStatus();
+}
+
+absl::StatusOr<RoutingDataAssets> PrepareRoutingDataAssets(const ModelIR& ir) {
+  RoutingDataAssets assets;
+  assets.root_deltas_content = absl::StrJoin(ir.tree_start_offsets, ",");
+
+  if (!ir.bitset_bank.empty()) {
+    assets.categorical_bank_size = ir.bitset_bank.size();
+  }
+
+  if (!ir.oblique_weights.empty()) {
+    assets.oblique_weights_content = absl::StrJoin(ir.oblique_weights, ",");
+
+    assets.oblique_features_content = absl::StrJoin(ir.oblique_features, ",");
+
+    if (ir.oblique_weights.size() > std::numeric_limits<uint32_t>::max()) {
+      return absl::InternalError(
+          "Oblique weights bank size exceeds 32-bit limit.");
+    }
+  }
+
+  if (!ir.leaf_value_bank.empty()) {
+    assets.leaf_value_bank_content = absl::StrJoin(ir.leaf_value_bank, ",");
+  }
+
+  return assets;
+}
+
+absl::StatusOr<BaseTypes> BuildTypes(const proto::Options& options,
+                                     const ModelIR& model_ir,
+                                     const std::string pseudo_namespace) {
+  BaseTypes types;
+
+  // Global
+  ASSIGN_OR_RETURN(
+      types.num_trees,
+      StorageToPrimitiveType(MaxUnsignedValueToNumBytes(model_ir.num_trees),
+                             false, false));
+  types.accumulator =
+      !model_ir.winner_takes_all
+          ? "float"
+          : UnsignedInteger(MaxUnsignedValueToNumBytes(model_ir.num_trees));
+  types.eval = UnsignedInteger(model_ir.node_offset_bytes);
+  types.boolean = "bool";
+  if (model_ir.task == ModelIR::Task::kRegression) {
+    types.output = "float";
+  } else {
+    switch (options.classification_output()) {
+      case proto::ClassificationOutput::CLASS:
+        types.output = absl::Substitute("$0LabelEnum", pseudo_namespace);
+        break;
+      case proto::ClassificationOutput::SCORE:
+        types.output = types.accumulator;
+        break;
+      case proto::ClassificationOutput::PROBABILITY:
+        types.output = "float";
+        break;
+      default:
+        return absl::InvalidArgumentError(
+            "Unknown classification output type.");
+    }
+  }
+
+  // Instance
+  types.numerical_feature = "";
+  for (const auto& feature : model_ir.features) {
+    if (feature.is_label) continue;
+    if (feature.type == FeatureInfo::Type::kNumerical) {
+      if (feature.is_float) {
+        types.numerical_feature = "float";
+        break;
+      } else if (types.numerical_feature.empty()) {
+        types.numerical_feature = SignedInteger(model_ir.feature_value_bytes);
+      }
+    }
+  }
+  types.categorical_feature = UnsignedInteger(model_ir.feature_value_bytes);
+  types.integerized_categorical_feature =
+      SignedInteger(model_ir.feature_value_bytes);
+
+  // Node data structure
+  ASSIGN_OR_RETURN(
+      types.pos,
+      StorageToPrimitiveType(MaxUnsignedValueToNumBytes(model_ir.nodes.size()),
+                             false, false));
+  ASSIGN_OR_RETURN(
+      types.feature_idx,
+      StorageToPrimitiveType(
+          MaxUnsignedValueToNumBytes(model_ir.features.size()), false, false));
+  types.threshold = types.numerical_feature;
+  if (!model_ir.bitset_bank.empty()) {
+    ASSIGN_OR_RETURN(types.cat_bank_idx,
+                     StorageToPrimitiveType(MaxUnsignedValueToNumBytes(
+                                                model_ir.bitset_bank.size()),
+                                            false, false));
+  }
+  ASSIGN_OR_RETURN(types.obl_bank_idx,
+                   StorageToPrimitiveType(MaxUnsignedValueToNumBytes(
+                                              model_ir.oblique_weights.size()),
+                                          false, false));
+  if (model_ir.leaf_value_dims == 1) {
+    // The leaf value is stored in the node struct.
+    types.leaf_value = DTypeToCppType(model_ir.leaf_value_dtype);
+  } else {
+    // The leaf values are stored in a separate buffer. The node struct contains
+    // an index to this buffer.
+    types.leaf_value = UnsignedInteger(MaxUnsignedValueToNumBytes(
+        model_ir.num_leaves / model_ir.leaf_value_dims));
+  }
+
+  // Banks
+  types.categorical_bank = "uint8_t";
+  types.condition_types = "uint8_t";
+  const NodeIdx max_root_delta = model_ir.tree_start_offsets.empty()
+                                     ? 0
+                                     : model_ir.tree_start_offsets.back();
+  ASSIGN_OR_RETURN(
+      types.root_deltas,
+      StorageToPrimitiveType(MaxUnsignedValueToNumBytes(max_root_delta), false,
+                             false));
+  types.oblique_weights = "float";
+  ASSIGN_OR_RETURN(types.oblique_features,
+                   StorageToPrimitiveType(
+                       MaxUnsignedValueToNumBytes(GetMaxObliqueFeatureValue(
+                           model_ir.oblique_features)),
+                       false, false));
+  types.feature_offsets = "size_t";
+  types.leaf_value_bank = "float";
+
+  return types;
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

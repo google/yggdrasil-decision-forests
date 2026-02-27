@@ -83,7 +83,7 @@ void CppEmitter::EmitIncludes(std::string* out) const {
 void CppEmitter::EmitEnums(std::string* out) const {
   for (const auto& feature_enum : ir_.enums) {
     absl::SubstituteAndAppend(out, "enum class $0 : $1 {\n", feature_enum.name,
-                              ir_.unsigned_integer_type);
+                              ir_.types.categorical_feature);
     for (const auto& item : feature_enum.items) {
       absl::SubstituteAndAppend(out, "  $0 = $1,\n", item.name, item.value);
     }
@@ -123,15 +123,15 @@ void CppEmitter::EmitInstanceStruct(std::string* out) const {
   absl::SubstituteAndAppend(out, "constexpr const int kNumFeatures = $0;\n",
                             ir_.features.size());
   absl::SubstituteAndAppend(out, "constexpr const $1 kNumTrees = $0;\n\n",
-                            ir_.num_trees, ir_.num_trees_type);
+                            ir_.num_trees, ir_.types.num_trees);
 
   absl::StrAppend(out, "struct Instance {\n");
   // 4. Constants and Typedefs
-  if (!ir_.numerical_type.empty()) {
+  if (!ir_.types.numerical_feature.empty()) {
     absl::SubstituteAndAppend(out, "  typedef $0 Numerical;\n",
-                              ir_.numerical_type);
+                              ir_.types.numerical_feature);
   }
-  if (ir_.has_integerized_numerical_features) {
+  if (ir_.has_integerized_categorical_features) {
     absl::SubstituteAndAppend(
         out, R"(  // Integerized categorical features require special care.
   // The PredictUnsafe() function has undefined behavior if an integerized
@@ -141,7 +141,7 @@ void CppEmitter::EmitInstanceStruct(std::string* out) const {
   // sanitizes the input values.
   typedef $0 IntegerizedCategorical;
 )",
-        ir_.signed_integer_type);
+        ir_.types.integerized_categorical_feature);
   }
   absl::StrAppend(out, "\n");
 
@@ -154,24 +154,25 @@ void CppEmitter::EmitInstanceStruct(std::string* out) const {
 absl::Status CppEmitter::EmitRoutingData(std::string* out) const {
   // 1. Define Node Struct
   absl::StrAppend(out, "struct __attribute__((packed)) Node {\n");
-  absl::SubstituteAndAppend(out, "  $0 pos = 0;\n", ir_.pos_type);
+  absl::SubstituteAndAppend(out, "  $0 pos = 0;\n", ir_.types.pos);
   absl::StrAppend(out, "  union {\n");
   absl::StrAppend(out, "    struct __attribute__((packed)) {\n");
-  absl::SubstituteAndAppend(out, "      $0 feat;\n", ir_.feature_idx_type);
+  absl::SubstituteAndAppend(out, "      $0 feat;\n", ir_.types.feature_idx);
   absl::StrAppend(out, "      union {\n");
-  if (!ir_.numerical_type.empty()) {
-    absl::SubstituteAndAppend(out, "        $0 thr;\n", ir_.numerical_type);
+  if (!ir_.types.numerical_feature.empty()) {
+    absl::SubstituteAndAppend(out, "        $0 thr;\n",
+                              ir_.types.numerical_feature);
   }
-  if (!ir_.cat_idx_type.empty()) {
-    absl::SubstituteAndAppend(out, "        $0 cat;\n", ir_.cat_idx_type);
+  if (!ir_.categorical_bank_content.empty()) {
+    absl::SubstituteAndAppend(out, "        $0 cat;\n", ir_.types.cat_bank_idx);
   }
-  if (!ir_.obl_idx_type.empty()) {
-    absl::SubstituteAndAppend(out, "        $0 obl;\n", ir_.obl_idx_type);
+  if (!ir_.oblique_features_content.empty()) {
+    absl::SubstituteAndAppend(out, "        $0 obl;\n", ir_.types.obl_bank_idx);
   }
   absl::StrAppend(out, "      };\n");
   absl::StrAppend(out, "    } cond;\n");
   absl::StrAppend(out, "    struct __attribute__((packed)) {\n");
-  absl::SubstituteAndAppend(out, "      $0 val;\n", ir_.leaf_val_type);
+  absl::SubstituteAndAppend(out, "      $0 val;\n", ir_.types.leaf_value);
   absl::StrAppend(out, "    } leaf;\n");
   absl::StrAppend(out, "  };\n");
   absl::StrAppend(out, "};\n");
@@ -188,13 +189,13 @@ absl::Status CppEmitter::EmitRoutingData(std::string* out) const {
     STATUS_CHECK(!ir_.condition_types_content.empty());
     absl::SubstituteAndAppend(
         out, "static const $0 condition_types[] = {$1};\n\n",
-        ir_.condition_types_type, ir_.condition_types_content);
+        ir_.types.condition_types, ir_.condition_types_content);
   }
 
   if (!ir_.root_deltas_content.empty()) {
     absl::SubstituteAndAppend(out,
                               "\nstatic const $0 root_deltas[] = {$1};\n\n",
-                              ir_.root_deltas_type, ir_.root_deltas_content);
+                              ir_.types.root_deltas, ir_.root_deltas_content);
   }
 
   if (ir_.categorical_bank_size > 0) {
@@ -204,17 +205,18 @@ absl::Status CppEmitter::EmitRoutingData(std::string* out) const {
   }
 
   if (!ir_.leaf_value_bank_content.empty()) {
-    absl::StrAppend(out, "\nstatic const float leaf_value_bank[] = {",
-                    ir_.leaf_value_bank_content, "};\n\n");
+    absl::SubstituteAndAppend(
+        out, "\nstatic const $0 leaf_value_bank[] = {$1};\n\n",
+        ir_.types.leaf_value_bank, ir_.leaf_value_bank_content);
   }
 
   if (!ir_.oblique_weights_content.empty()) {
     absl::SubstituteAndAppend(
         out, "static const $0 oblique_weights[] = {$1};\n\n",
-        ir_.oblique_weights_type, ir_.oblique_weights_content);
+        ir_.types.oblique_weights, ir_.oblique_weights_content);
     absl::SubstituteAndAppend(
         out, "static const $0 oblique_features[] = {$1};\n\n",
-        ir_.oblique_features_type, ir_.oblique_features_content);
+        ir_.types.oblique_features, ir_.oblique_features_content);
   }
   return absl::OkStatus();
 }
@@ -240,11 +242,11 @@ absl::Status CppEmitter::EmitPredictUnsafeIfElse(std::string* out) const {
 // This function is called by `Predict()`.
 inline $0 PredictUnsafe(const Instance& instance) {
 )",
-        ir_.output_type);
+        ir_.full_output_type);
   } else {
     absl::SubstituteAndAppend(out,
                               "inline $0 Predict(const Instance& instance) {\n",
-                              ir_.output_type);
+                              ir_.full_output_type);
   }
 
   // Accumulator init
@@ -323,11 +325,11 @@ absl::Status CppEmitter::EmitPredictUnsafeRouting(std::string* out) const {
 // This function is called by `Predict()`.
 inline $0 PredictUnsafe(const Instance& instance) {
 )",
-        ir_.output_type);
+        ir_.full_output_type);
   } else {
     absl::SubstituteAndAppend(out,
                               "inline $0 Predict(const Instance& instance) {\n",
-                              ir_.output_type);
+                              ir_.full_output_type);
   }
 
   // Accumulator init
@@ -338,13 +340,13 @@ inline $0 PredictUnsafe(const Instance& instance) {
   absl::StrAppend(out, "  const Node* node;\n");
   absl::StrAppend(out,
                   "  const char* raw_instance = (const char*)(&instance);\n");
-  absl::SubstituteAndAppend(out, "  $0 eval;\n", ir_.node_offset_type);
+  absl::SubstituteAndAppend(out, "  $0 eval;\n", ir_.types.eval);
 
   // Tree loop
   absl::SubstituteAndAppend(out,
                             "  for ($0 tree_idx = 0; tree_idx != kNumTrees; "
                             "tree_idx++) {\n",
-                            ir_.num_trees_type);
+                            ir_.types.num_trees);
   absl::StrAppend(out, "    node = root;\n");
   absl::StrAppend(out, "    while(node->pos) {\n");
 
@@ -403,7 +405,7 @@ void CppEmitter::EmitPredictSanitized(std::string* out) const {
 // Sanitizes the given instance, then calls `PredictUnsafe()`.
 inline $0 Predict(Instance instance) {
 )",
-                            ir_.output_type);
+                            ir_.full_output_type);
 
   for (const auto& feat : ir_.features) {
     for (const auto& sanitization : feat.na_sanitization) {

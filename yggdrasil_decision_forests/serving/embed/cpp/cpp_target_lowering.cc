@@ -31,6 +31,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/serving/embed/common.h"
 #include "yggdrasil_decision_forests/serving/embed/cpp/cpp_ir.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
@@ -39,39 +40,6 @@
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 namespace {
-// Number of feature indexes to reserve.
-// The precision of feature indexes should be sufficient to encode the index
-// of any features + kReservedFeatureIndexes. For example, if the model has
-// 254 features, but kReservedFeatureIndexes=2, the maximum feature index is
-// 254+2=256, and feature indexes are encoded as uint16 (instead of uint8).
-static constexpr int kReservedFeatureIndexes = 1;
-
-std::string DTypeToCCType(const proto::DType::Enum value) {
-  switch (value) {
-    case proto::DType::UNDEFINED:
-      return "UNDEFINED";
-
-    case proto::DType::INT8:
-      return "int8_t";
-    case proto::DType::INT16:
-      return "int16_t";
-    case proto::DType::INT32:
-      return "int32_t";
-
-    case proto::DType::UINT8:
-      return "uint8_t";
-    case proto::DType::UINT16:
-      return "uint16_t";
-    case proto::DType::UINT32:
-      return "uint32_t";
-
-    case proto::DType::FLOAT32:
-      return "float";
-
-    case proto::DType::BOOL:
-      return "bool";
-  }
-}
 
 bool IsZero(const DoubleOrInt64 val) {
   if (IsDouble(val)) {
@@ -130,8 +98,8 @@ absl::Status CppTargetLowering::LowerGlobalFormatting() {
       model_ir_.activation == ModelIR::Activation::kSoftmax) {
     cpp_ir_.includes.insert("<cmath>");
   }
-  cpp_ir_.node_offset_type = UnsignedInteger(model_ir_.node_offset_bytes);
-  cpp_ir_.root_deltas_type = UnsignedInteger(model_ir_.node_offset_bytes);
+
+  ASSIGN_OR_RETURN(cpp_ir_.types, BuildTypes(options_, model_ir_));
 
   return absl::OkStatus();
 }
@@ -141,10 +109,6 @@ absl::Status CppTargetLowering::LowerEnumsAndFeatures() {
   absl::flat_hash_set<std::string> sanitized_categorical_type_names;
 
   const size_t num_features = model_ir_.features.size();
-
-  cpp_ir_.unsigned_integer_type =
-      UnsignedInteger(model_ir_.feature_value_bytes);
-  cpp_ir_.signed_integer_type = SignedInteger(model_ir_.feature_value_bytes);
 
   std::vector<int> condition_types_bank;
   condition_types_bank.reserve(num_features);
@@ -168,7 +132,6 @@ absl::Status CppTargetLowering::LowerEnumsAndFeatures() {
     return absl::InvalidArgumentError(
         "The number of condition types exceeds the maximum value of uint8_t.");
   }
-  cpp_ir_.condition_types_type = "uint8_t";
 
   return absl::OkStatus();
 }
@@ -185,17 +148,8 @@ absl::Status CppTargetLowering::LowerFeature(
   }
 
   const std::string var_name = StringToVariableSymbol(feature.original_name);
-  if (!sanitized_feature_names.insert(var_name).second) {
-    std::vector<std::string> model_ir_features;
-    model_ir_features.reserve(model_ir_.features.size());
-    for (const auto& f : model_ir_.features) {
-      model_ir_features.push_back(f.original_name);
-    }
-    return absl::InvalidArgumentError(
-        absl::Substitute("Feature name clash on feature $0, consider "
-                         "renaming your features!",
-                         var_name));
-  }
+  RETURN_IF_ERROR(CheckFeatureNameCollision(var_name, sanitized_feature_names,
+                                            model_ir_.features));
 
   CppFeature cpp_feature;
   cpp_feature.var_name = var_name;
@@ -209,18 +163,15 @@ absl::Status CppTargetLowering::LowerFeature(
       if (feature.is_float) {
         // If we have a float feature, we need at least 4 bytes.
         STATUS_CHECK_EQ(model_ir_.feature_value_bytes, 4);
-        cpp_ir_.numerical_type = "float";
         STATUS_CHECK(feature.na_replacement.has_value());
         ASSIGN_OR_RETURN(const std::string un,
-                         FormatLiteral(*feature.na_replacement,
-                                       /*is_float=*/true));
+                         FormatExampleLiteral(*feature.na_replacement,
+                                              /*is_float=*/true));
         cpp_feature.na_sanitization = {absl::Substitute(
             "instance.$0 = std::isnan(instance.$0) ? $1 : instance.$0;",
             var_name, un)};
         cpp_ir_.includes.insert("<cmath>");
         cpp_ir_.needs_predict_unsafe = true;
-      } else if (cpp_ir_.numerical_type.empty()) {
-        cpp_ir_.numerical_type = SignedInteger(model_ir_.feature_value_bytes);
       }
       condition_types_bank.push_back(
           static_cast<int>(ConditionType::HIGHER_CONDITION));
@@ -239,7 +190,7 @@ absl::Status CppTargetLowering::LowerFeature(
           static_cast<int>(ConditionType::CONTAINS_CONDITION_BUFFER_BITMAP));
     } break;
     case FeatureInfo::Type::kIntegerizedCategorical: {
-      cpp_ir_.has_integerized_numerical_features = true;
+      cpp_ir_.has_integerized_categorical_features = true;
       cpp_feature.cpp_type = "IntegerizedCategorical";
       STATUS_CHECK(feature.na_replacement.has_value());
       STATUS_CHECK(feature.maximum_value.has_value());
@@ -284,12 +235,7 @@ absl::Status CppTargetLowering::LowerEnum(
           feature.vocabulary[i], /*ensure_letter_first=*/false);
 
       if (sanitized_items.contains(item_symbol)) {
-        int local_index = 1;
-        std::string extended_item_symbol;
-        do {
-          extended_item_symbol = absl::StrCat(item_symbol, "_", local_index++);
-        } while (sanitized_items.contains(extended_item_symbol));
-        item_symbol = extended_item_symbol;
+        item_symbol = ResolveNameCollision(item_symbol, sanitized_items);
       }
       sanitized_items.insert(item_symbol);
 
@@ -325,13 +271,7 @@ absl::Status CppTargetLowering::LowerEnum(
 
         // Exact collision resolution logic from common.cc
         if (sanitized_items.contains(item_symbol)) {
-          int local_index = 1;
-          std::string extended_item_symbol;
-          do {
-            extended_item_symbol =
-                absl::StrCat(item_symbol, "_", local_index++);
-          } while (sanitized_items.contains(extended_item_symbol));
-          item_symbol = extended_item_symbol;
+          item_symbol = ResolveNameCollision(item_symbol, sanitized_items);
         }
         sanitized_items.insert(item_symbol);
 
@@ -359,11 +299,6 @@ absl::Status CppTargetLowering::LowerInferenceEngine() {
 }
 
 absl::Status CppTargetLowering::LowerAccumulator() {
-  const std::string base_type =
-      model_ir_.winner_takes_all
-          ? UnsignedInteger(MaxUnsignedValueToNumBytes(model_ir_.num_trees))
-          : "float";
-
   if (model_ir_.num_output_classes == 1) {
     cpp_ir_.accumulator_sum_statement = "accumulator += node->leaf.val;";
   } else {
@@ -384,41 +319,37 @@ absl::Status CppTargetLowering::LowerAccumulator() {
       }
     }
   }
-  ASSIGN_OR_RETURN(
-      cpp_ir_.num_trees_type,
-      StorageToCppType(MaxUnsignedValueToNumBytes(model_ir_.num_trees), false,
-                       false));
 
   // 2. Initialize Accumulator
   if (model_ir_.num_output_classes == 1) {
-    cpp_ir_.accumulator_type = base_type;
-    ASSIGN_OR_RETURN(const std::string init_val,
-                     FormatLiteral(model_ir_.accumulator_initialization[0],
-                                   /*is_float=*/!model_ir_.winner_takes_all));
-    cpp_ir_.accumulator_init_statement =
-        absl::Substitute("$0 accumulator {$1};", base_type, init_val);
+    cpp_ir_.full_output_type = cpp_ir_.types.output;
+    ASSIGN_OR_RETURN(
+        const std::string init_val,
+        FormatExampleLiteral(model_ir_.accumulator_initialization[0],
+                             /*is_float=*/!model_ir_.winner_takes_all));
+    cpp_ir_.accumulator_init_statement = absl::Substitute(
+        "$0 accumulator {$1};", cpp_ir_.types.accumulator, init_val);
   } else {
-    cpp_ir_.accumulator_type = absl::Substitute("std::array<$0, $1>", base_type,
-                                                model_ir_.num_output_classes);
-    cpp_ir_.output_type =
-        absl::Substitute("std::array<float, $0>", model_ir_.num_output_classes);
+    cpp_ir_.full_output_type =
+        absl::Substitute("std::array<$0, $1>", cpp_ir_.types.accumulator,
+                         model_ir_.num_output_classes);
     cpp_ir_.includes.insert("<array>");
 
     std::vector<std::string> init_vals;
     for (const auto& val : model_ir_.accumulator_initialization) {
       ASSIGN_OR_RETURN(
           const std::string str_val,
-          FormatLiteral(val, /*is_float=*/!model_ir_.winner_takes_all));
+          FormatExampleLiteral(val, /*is_float=*/!model_ir_.winner_takes_all));
       init_vals.push_back(str_val);
     }
     cpp_ir_.accumulator_init_statement =
-        absl::Substitute("$0 accumulator {$1};", cpp_ir_.accumulator_type,
+        absl::Substitute("$0 accumulator {$1};", cpp_ir_.full_output_type,
                          absl::StrJoin(init_vals, ", "));
   }
 
   if (model_ir_.task == ModelIR::Task::kRegression) {
     // Regression always returns the accumulated float score.
-    cpp_ir_.output_type = "float";
+    cpp_ir_.full_output_type = cpp_ir_.types.output;
   }
   return absl::OkStatus();
 }
@@ -433,7 +364,7 @@ absl::Status CppTargetLowering::LowerActivation() {
   // requested output format.
   switch (options_.classification_output()) {
     case proto::ClassificationOutput::CLASS:
-      cpp_ir_.output_type = "Label";
+      cpp_ir_.full_output_type = "Label";
       if (model_ir_.num_output_classes == 1) {
         if (model_ir_.winner_takes_all) {
           cpp_ir_.activation_statement =
@@ -463,7 +394,6 @@ absl::Status CppTargetLowering::LowerActivation() {
 
     case proto::ClassificationOutput::SCORE:
       cpp_ir_.activation_statement = "return accumulator;";
-      cpp_ir_.output_type = cpp_ir_.accumulator_type;
       break;
 
     case proto::ClassificationOutput::PROBABILITY:
@@ -471,27 +401,30 @@ absl::Status CppTargetLowering::LowerActivation() {
         // Normalize integer votes into float probabilities.
         if (model_ir_.num_output_classes == 1) {
           cpp_ir_.activation_statement =
-              absl::Substitute("return static_cast<float>(accumulator) / $0;",
-                               model_ir_.num_trees);
-          cpp_ir_.output_type = "float";
+              absl::Substitute("return static_cast<$0>(accumulator) / $1;",
+                               cpp_ir_.types.output, model_ir_.num_trees);
+          cpp_ir_.full_output_type = cpp_ir_.types.output;
         } else {
           cpp_ir_.activation_statement = absl::Substitute(
-              R"(  std::array<float, $0> probas;
-  for (int i = 0; i < $0; ++i) { 
-    probas[i] = static_cast<float>(accumulator[i]) / $1.0f; 
+              R"(  std::array<$0, $1> probas;
+  for (int i = 0; i < $1; ++i) { 
+    probas[i] = static_cast<$0>(accumulator[i]) / $2.0f; 
   }
   return probas;)",
-              model_ir_.num_output_classes, model_ir_.num_trees);
+              cpp_ir_.types.output, model_ir_.num_output_classes,
+              model_ir_.num_trees);
 
-          cpp_ir_.output_type = absl::Substitute("std::array<float, $0>",
-                                                 model_ir_.num_output_classes);
+          cpp_ir_.full_output_type =
+              absl::Substitute("std::array<$0, $1>", cpp_ir_.types.output,
+                               model_ir_.num_output_classes);
         }
       } else {
         if (model_ir_.num_output_classes == 1) {
-          cpp_ir_.output_type = "float";
+          cpp_ir_.full_output_type = cpp_ir_.types.output;
         } else {
-          cpp_ir_.output_type = absl::StrCat("std::array<float, ",
-                                             model_ir_.num_output_classes, ">");
+          cpp_ir_.full_output_type =
+              absl::Substitute("std::array<$0, $1>", cpp_ir_.types.output,
+                               model_ir_.num_output_classes);
         }
         // Apply continuous activation functions.
         if (model_ir_.activation == ModelIR::Activation::kSigmoid) {
@@ -502,18 +435,18 @@ absl::Status CppTargetLowering::LowerActivation() {
           cpp_ir_.includes.insert("<cmath>");
           cpp_ir_.includes.insert("<algorithm>");
           cpp_ir_.activation_statement = absl::Substitute(
-              R"(  std::array<float, $0> probas;
-  const float max_logit = *std::max_element(accumulator.begin(), accumulator.end());
-  float sum_exps = 0.f;
-  for (int i = 0; i < $0; ++i) { 
+              R"(  std::array<$0, $1> probas;
+  const auto max_logit = *std::max_element(accumulator.begin(), accumulator.end());
+  $0 sum_exps = 0.f;
+  for (int i = 0; i < $1; ++i) { 
     probas[i] = std::exp(accumulator[i] - max_logit); 
     sum_exps += probas[i];
   }
-  for (int i = 0; i < $0; ++i) { 
+  for (int i = 0; i < $1; ++i) { 
     probas[i] /= sum_exps; 
   }
   return probas;)",
-              model_ir_.num_output_classes);
+              cpp_ir_.types.output, model_ir_.num_output_classes);
 
         } else {
           // ModelIR::Activation::kEquality
@@ -533,9 +466,9 @@ absl::Status CppTargetLowering::LowerNodes() {
   // This value is used as a marker in the feature index field to indicate an
   // oblique split. It is chosen to be the largest representable value for the
   // feature index type.
-  const uint32_t oblique_feature_idx = NumBytesToMaxUnsignedValue(
-      MaxUnsignedValueToNumBytes(static_cast<int64_t>(model_ir_.num_features) +
-                                 kReservedFeatureIndexes));
+  // feature index type.
+  const auto oblique_feature_idx =
+      GetObliqueFeatureSentinel(model_ir_.num_features);
   cpp_ir_.oblique_feature_idx = oblique_feature_idx;
 
   for (NodeIdx i = 0; i < model_ir_.nodes.size(); ++i) {
@@ -568,9 +501,10 @@ absl::Status CppTargetLowering::LowerLeafNode(const Node& ir_node,
     // Scalar Leaf
     // Note: Using threshold_or_offset because builder.cc populated it here
     // instead of leaf_value
-    ASSIGN_OR_RETURN(const std::string val_str,
-                     FormatLiteral(ir_node.threshold_or_offset,
-                                   /*is_float=*/!model_ir_.winner_takes_all));
+    ASSIGN_OR_RETURN(
+        const std::string val_str,
+        FormatExampleLiteral(ir_node.threshold_or_offset,
+                             /*is_float=*/!model_ir_.winner_takes_all));
     if (model_ir_.winner_takes_all) {
       if (model_ir_.num_output_classes == 1) {
         if (!IsZero(ir_node.threshold_or_offset)) {
@@ -586,7 +520,7 @@ absl::Status CppTargetLowering::LowerLeafNode(const Node& ir_node,
           cpp_node->if_else_leaf =
               absl::Substitute("accumulator += $0;", val_str);
         } else {
-          const int32_t accumulator_idx =
+          const auto accumulator_idx =
               ir_node.tree_idx % model_ir_.num_output_classes;
           cpp_node->if_else_leaf = absl::Substitute("accumulator[$0] += $1;",
                                                     accumulator_idx, val_str);
@@ -603,8 +537,9 @@ absl::Status CppTargetLowering::LowerLeafNode(const Node& ir_node,
     for (int j = 0; j < model_ir_.num_output_classes; ++j) {
       const auto& val = model_ir_.leaf_value_bank[offset + j];
       if (!IsZero(val)) {
-        ASSIGN_OR_RETURN(const std::string val_str,
-                         FormatLiteral(val, !model_ir_.winner_takes_all));
+        ASSIGN_OR_RETURN(
+            const std::string val_str,
+            FormatExampleLiteral(val, !model_ir_.winner_takes_all));
         unrolled.push_back(
             absl::Substitute("accumulator[$0] += $1;", j, val_str));
       }
@@ -613,7 +548,9 @@ absl::Status CppTargetLowering::LowerLeafNode(const Node& ir_node,
 
     // Routing optimizes binary size by dividing the offset by the
     // dimension.
-    const int encoded_leaf_value = offset / model_ir_.num_output_classes;
+    // dimension.
+    const int encoded_leaf_value =
+        GetEncodedLeafValue(offset, model_ir_.num_output_classes);
     cpp_node->routing_def =
         absl::Substitute("{.leaf={.val=$0}}", encoded_leaf_value);
   }
@@ -653,7 +590,7 @@ absl::Status CppTargetLowering::LowerConditionNode(const Node& ir_node,
         val = static_cast<int64_t>(std::ceil(AsDouble(val)));
       }
       ASSIGN_OR_RETURN(const std::string routing_thresh_str,
-                       FormatLiteral(val, is_float));
+                       FormatExampleLiteral(val, is_float));
 
       cpp_node->routing_def = absl::Substitute(
           "{.pos=$0,.cond={.feat=$1,.thr=$2}}", cpp_node->jump_offset_false,
@@ -788,104 +725,44 @@ absl::StatusOr<std::string> CppTargetLowering::FormatContainsCondition(
 }
 
 absl::Status CppTargetLowering::LowerRoutingData() {
-  cpp_ir_.root_deltas_content =
-      absl::StrJoin(model_ir_.tree_start_offsets, ",");
-  const NodeIdx max_root_delta = model_ir_.tree_start_offsets.empty()
-                                     ? 0
-                                     : model_ir_.tree_start_offsets.back();
-  ASSIGN_OR_RETURN(cpp_ir_.root_deltas_type,
-                   StorageToCppType(MaxUnsignedValueToNumBytes(max_root_delta),
-                                    false, false));
+  ASSIGN_OR_RETURN(RoutingDataAssets assets,
+                   PrepareRoutingDataAssets(model_ir_));
+
+  cpp_ir_.root_deltas_content = std::move(assets.root_deltas_content);
 
   if (!model_ir_.bitset_bank.empty()) {
-    // Determine the size of the bitset and format the string.
-    cpp_ir_.categorical_bank_size = model_ir_.bitset_bank.size();
+    cpp_ir_.categorical_bank_size = assets.categorical_bank_size;
+
     cpp_ir_.includes.insert("<bitset>");
 
     // In YDF, the bitset is printed in reverse order as a string of '0's and
     // '1's.
-    std::string bitset_str;
-    bitset_str.reserve(model_ir_.bitset_bank.size());
-    for (auto it = model_ir_.bitset_bank.rbegin();
-         it != model_ir_.bitset_bank.rend(); ++it) {
-      bitset_str.push_back(*it ? '1' : '0');
-    }
-    cpp_ir_.categorical_bank_content = bitset_str;
-
-    // Type used to index into the categorical bank
-    ASSIGN_OR_RETURN(cpp_ir_.cat_idx_type,
-                     StorageToCppType(MaxUnsignedValueToNumBytes(
-                                          model_ir_.bitset_bank.size()),
-                                      false, false));
+    cpp_ir_.categorical_bank_content =
+        GetBitsetBankString(model_ir_.bitset_bank);
   }
-  ASSIGN_OR_RETURN(
-      cpp_ir_.pos_type,
-      StorageToCppType(MaxUnsignedValueToNumBytes(model_ir_.nodes.size()),
-                       false, false));
 
   if (!model_ir_.oblique_weights.empty()) {
-    cpp_ir_.oblique_weights_type = "float";
-    cpp_ir_.oblique_weights_content =
-        absl::StrJoin(model_ir_.oblique_weights, ",");
-
-    // Oblique Features (Integer)
-    int max_val = 0;
-    for (int f : model_ir_.oblique_features) {
-      if (f > max_val) max_val = f;
-    }
-    ASSIGN_OR_RETURN(
-        cpp_ir_.oblique_features_type,
-        StorageToCppType(MaxUnsignedValueToNumBytes(max_val), false, false));
+    cpp_ir_.oblique_weights_content = std::move(assets.oblique_weights_content);
     cpp_ir_.oblique_features_content =
-        absl::StrJoin(model_ir_.oblique_features, ",");
-
-    // Index into Oblique Bank
-    if (model_ir_.oblique_weights.size() >
-        std::numeric_limits<uint32_t>::max()) {
-      return absl::InternalError(
-          "Oblique weights bank size exceeds 32-bit limit.");
-    }
-    ASSIGN_OR_RETURN(cpp_ir_.obl_idx_type,
-                     StorageToCppType(MaxUnsignedValueToNumBytes(
-                                          model_ir_.oblique_weights.size()),
-                                      false, false));
-  }
-
-  ASSIGN_OR_RETURN(
-      cpp_ir_.feature_idx_type,
-      StorageToCppType(MaxUnsignedValueToNumBytes(model_ir_.features.size()),
-                       false, false));
-  cpp_ir_.leaf_val_type = model_ir_.winner_takes_all ? "int32_t" : "float";
-  STATUS_CHECK_GE(model_ir_.leaf_value_dims, 1);
-  if (model_ir_.leaf_value_dims == 1) {
-    // The leaf value is stored in the node struct.
-    cpp_ir_.leaf_val_type = DTypeToCCType(model_ir_.leaf_value_dtype);
-  } else {
-    // The leaf values are stored in a separate buffer. The node struct contains
-    // an index to this buffer.
-    cpp_ir_.leaf_val_type = UnsignedInteger(MaxUnsignedValueToNumBytes(
-        model_ir_.num_leaves / model_ir_.leaf_value_dims));
+        std::move(assets.oblique_features_content);
   }
 
   for (const auto& cond_type : model_ir_.active_condition_types) {
     if (cond_type == ConditionType::HIGHER_CONDITION) {
-      STATUS_CHECK(!cpp_ir_.numerical_type.empty());
       cpp_ir_.routing_condition_eval_blocks.push_back(
           std::make_pair(cond_type, absl::Substitute(
                                         R"(        $0 numerical_feature;
         std::memcpy(&numerical_feature, raw_instance + node->cond.feat * sizeof($0), sizeof($0));
         eval = numerical_feature >= node->cond.thr;)",
-                                        cpp_ir_.numerical_type)));
+                                        cpp_ir_.types.numerical_feature)));
     } else if (cond_type == ConditionType::OBLIQUE_CONDITION) {
-      STATUS_CHECK(!cpp_ir_.oblique_features_type.empty());
-      STATUS_CHECK(!cpp_ir_.numerical_type.empty());
       cpp_ir_.routing_condition_eval_blocks.insert(
           cpp_ir_.routing_condition_eval_blocks.begin(),
           std::make_pair(
               cond_type,
               absl::Substitute(
                   R"(        const $0 num_projs = oblique_features[node->cond.obl];
-        float obl_acc = -oblique_weights[node->cond.obl];
+        auto obl_acc = -oblique_weights[node->cond.obl];
         for ($0 proj_idx=0; proj_idx<num_projs; proj_idx++){
           const auto off = node->cond.obl + proj_idx + 1;
           $1 numerical_feature;
@@ -893,15 +770,15 @@ absl::Status CppTargetLowering::LowerRoutingData() {
           obl_acc += numerical_feature * oblique_weights[off];
         }
         eval = obl_acc >= 0;)",
-                  cpp_ir_.oblique_features_type, cpp_ir_.numerical_type)));
+                  cpp_ir_.types.oblique_features,
+                  cpp_ir_.types.numerical_feature)));
     } else if (cond_type == ConditionType::CONTAINS_CONDITION_BUFFER_BITMAP) {
-      STATUS_CHECK(!cpp_ir_.unsigned_integer_type.empty());
       cpp_ir_.routing_condition_eval_blocks.push_back(
           std::make_pair(cond_type, absl::Substitute(
                                         R"(        $0 categorical_feature;
         std::memcpy(&categorical_feature, raw_instance + node->cond.feat * sizeof($0), sizeof($0));
         eval = categorical_bank[categorical_feature + node->cond.cat];)",
-                                        cpp_ir_.unsigned_integer_type)));
+                                        cpp_ir_.types.categorical_feature)));
     } else if (cond_type == ConditionType::TRUE_CONDITION) {
       // Find what type categorical features use
       cpp_ir_.routing_condition_eval_blocks.push_back(
@@ -912,62 +789,11 @@ absl::Status CppTargetLowering::LowerRoutingData() {
     }
   }
 
-  if (!model_ir_.leaf_value_bank.empty()) {
-    cpp_ir_.leaf_value_bank_content =
-        absl::StrJoin(model_ir_.leaf_value_bank, ",");
+  if (!assets.leaf_value_bank_content.empty()) {
+    cpp_ir_.leaf_value_bank_content = std::move(assets.leaf_value_bank_content);
   }
 
   return absl::OkStatus();
-}
-
-// --- Helpers ---
-
-absl::StatusOr<std::string> CppTargetLowering::FormatLiteral(
-    const DoubleOrInt64& val, const bool is_float) const {
-  if (is_float) {
-    if (IsDouble(val)) {
-      // Ensure it always prints with a decimal to be treated as a float in C++
-      std::string s = absl::StrCat(AsDouble(val));
-      // TODO: Update this and all golden tests.
-      // if (!absl::StrContains(s, ".") && !absl::StrContains(s, "e")) {
-      //   s += ".0";
-      // }
-      return s;
-    } else {
-      return absl::InternalError(
-          "Expected float value but found integer in variant.");
-    }
-  } else {
-    if (IsInt(val)) {
-      return absl::StrCat(AsInt(val));
-    } else {
-      return absl::InternalError(
-          "Expected integer value but found float in variant.");
-    }
-  }
-}
-
-absl::StatusOr<std::string> CppTargetLowering::StorageToCppType(
-    const int bytes, const bool is_float, const bool is_signed) const {
-  if (is_float) {
-    if (bytes == 4) return "float";
-    if (bytes == 8) return "double";
-  } else {
-    if (is_signed) {
-      if (bytes == 1) return "int8_t";
-      if (bytes == 2) return "int16_t";
-      if (bytes == 4) return "int32_t";
-      if (bytes == 8) return "int64_t";
-    } else {
-      if (bytes == 1) return "uint8_t";
-      if (bytes == 2) return "uint16_t";
-      if (bytes == 4) return "uint32_t";
-      if (bytes == 8) return "uint64_t";
-    }
-  }
-  return absl::InvalidArgumentError(
-      absl::StrCat("Unsupported storage type: bytes=", bytes,
-                   " float=", is_float, " signed=", is_signed));
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

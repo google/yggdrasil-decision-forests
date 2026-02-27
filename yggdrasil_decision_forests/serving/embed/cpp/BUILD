@@ -13,6 +13,7 @@ cc_library_ydf(
     hdrs = ["cpp_target_lowering.h"],
     deps = [
         ":cpp_ir",
+        "//yggdrasil_decision_forests/serving/embed:common",
         "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "//yggdrasil_decision_forests/serving/embed:utils",
         "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
@@ -30,6 +31,7 @@ cc_library_ydf(
     name = "cpp_ir",
     hdrs = ["cpp_ir.h"],
     deps = [
+        "//yggdrasil_decision_forests/serving/embed:common",
         "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
         "@com_google_absl//absl/container:flat_hash_set",
     ],

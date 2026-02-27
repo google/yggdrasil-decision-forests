@@ -1,0 +1,479 @@
+/*
+   ydf_model.h - Single-Header C Library for YDF Model Prediction
+   
+   USAGE:
+   
+   1. In EXACTLY ONE .c file, define the implementation before including:
+      #define YDF_MODEL_YDF_MODEL_IMPL_
+      #include "ydf_model.h"
+
+   2. In all other .c files, just include it normally:
+      #include "ydf_model.h"
+*/
+
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
+typedef enum {
+  YdfModel_LabelEnum_Lt50K = 0,
+  YdfModel_LabelEnum_Gt50K = 1,
+} YdfModel_LabelEnum;
+typedef uint32_t YdfModel_Label;
+
+typedef enum {
+  YdfModel_FeatureWorkclassEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureWorkclassEnum_Private = 1,
+  YdfModel_FeatureWorkclassEnum_SelfEmpNotInc = 2,
+  YdfModel_FeatureWorkclassEnum_LocalGov = 3,
+  YdfModel_FeatureWorkclassEnum_StateGov = 4,
+  YdfModel_FeatureWorkclassEnum_SelfEmpInc = 5,
+  YdfModel_FeatureWorkclassEnum_FederalGov = 6,
+  YdfModel_FeatureWorkclassEnum_WithoutPay = 7,
+} YdfModel_FeatureWorkclassEnum;
+typedef uint32_t YdfModel_FeatureWorkclass;
+
+typedef enum {
+  YdfModel_FeatureEducationEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureEducationEnum_HsGrad = 1,
+  YdfModel_FeatureEducationEnum_SomeCollege = 2,
+  YdfModel_FeatureEducationEnum_Bachelors = 3,
+  YdfModel_FeatureEducationEnum_Masters = 4,
+  YdfModel_FeatureEducationEnum_AssocVoc = 5,
+  YdfModel_FeatureEducationEnum_11th = 6,
+  YdfModel_FeatureEducationEnum_AssocAcdm = 7,
+  YdfModel_FeatureEducationEnum_10th = 8,
+  YdfModel_FeatureEducationEnum_7th8th = 9,
+  YdfModel_FeatureEducationEnum_ProfSchool = 10,
+  YdfModel_FeatureEducationEnum_9th = 11,
+  YdfModel_FeatureEducationEnum_12th = 12,
+  YdfModel_FeatureEducationEnum_Doctorate = 13,
+  YdfModel_FeatureEducationEnum_5th6th = 14,
+  YdfModel_FeatureEducationEnum_1st4th = 15,
+  YdfModel_FeatureEducationEnum_Preschool = 16,
+} YdfModel_FeatureEducationEnum;
+typedef uint32_t YdfModel_FeatureEducation;
+
+typedef enum {
+  YdfModel_FeatureMaritalStatusEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureMaritalStatusEnum_MarriedCivSpouse = 1,
+  YdfModel_FeatureMaritalStatusEnum_NeverMarried = 2,
+  YdfModel_FeatureMaritalStatusEnum_Divorced = 3,
+  YdfModel_FeatureMaritalStatusEnum_Widowed = 4,
+  YdfModel_FeatureMaritalStatusEnum_Separated = 5,
+  YdfModel_FeatureMaritalStatusEnum_MarriedSpouseAbsent = 6,
+  YdfModel_FeatureMaritalStatusEnum_MarriedAfSpouse = 7,
+} YdfModel_FeatureMaritalStatusEnum;
+typedef uint32_t YdfModel_FeatureMaritalStatus;
+
+typedef enum {
+  YdfModel_FeatureOccupationEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureOccupationEnum_ProfSpecialty = 1,
+  YdfModel_FeatureOccupationEnum_ExecManagerial = 2,
+  YdfModel_FeatureOccupationEnum_CraftRepair = 3,
+  YdfModel_FeatureOccupationEnum_AdmClerical = 4,
+  YdfModel_FeatureOccupationEnum_Sales = 5,
+  YdfModel_FeatureOccupationEnum_OtherService = 6,
+  YdfModel_FeatureOccupationEnum_MachineOpInspct = 7,
+  YdfModel_FeatureOccupationEnum_TransportMoving = 8,
+  YdfModel_FeatureOccupationEnum_HandlersCleaners = 9,
+  YdfModel_FeatureOccupationEnum_FarmingFishing = 10,
+  YdfModel_FeatureOccupationEnum_TechSupport = 11,
+  YdfModel_FeatureOccupationEnum_ProtectiveServ = 12,
+  YdfModel_FeatureOccupationEnum_PrivHouseServ = 13,
+} YdfModel_FeatureOccupationEnum;
+typedef uint32_t YdfModel_FeatureOccupation;
+
+typedef enum {
+  YdfModel_FeatureRelationshipEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureRelationshipEnum_Husband = 1,
+  YdfModel_FeatureRelationshipEnum_NotInFamily = 2,
+  YdfModel_FeatureRelationshipEnum_OwnChild = 3,
+  YdfModel_FeatureRelationshipEnum_Unmarried = 4,
+  YdfModel_FeatureRelationshipEnum_Wife = 5,
+  YdfModel_FeatureRelationshipEnum_OtherRelative = 6,
+} YdfModel_FeatureRelationshipEnum;
+typedef uint32_t YdfModel_FeatureRelationship;
+
+typedef enum {
+  YdfModel_FeatureRaceEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureRaceEnum_White = 1,
+  YdfModel_FeatureRaceEnum_Black = 2,
+  YdfModel_FeatureRaceEnum_AsianPacIslander = 3,
+  YdfModel_FeatureRaceEnum_AmerIndianEskimo = 4,
+  YdfModel_FeatureRaceEnum_Other = 5,
+} YdfModel_FeatureRaceEnum;
+typedef uint32_t YdfModel_FeatureRace;
+
+typedef enum {
+  YdfModel_FeatureSexEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureSexEnum_Male = 1,
+  YdfModel_FeatureSexEnum_Female = 2,
+} YdfModel_FeatureSexEnum;
+typedef uint32_t YdfModel_FeatureSex;
+
+typedef enum {
+  YdfModel_FeatureNativeCountryEnum_OutOfVocabulary = 0,
+  YdfModel_FeatureNativeCountryEnum_UnitedStates = 1,
+  YdfModel_FeatureNativeCountryEnum_Mexico = 2,
+  YdfModel_FeatureNativeCountryEnum_Philippines = 3,
+  YdfModel_FeatureNativeCountryEnum_Germany = 4,
+  YdfModel_FeatureNativeCountryEnum_Canada = 5,
+  YdfModel_FeatureNativeCountryEnum_PuertoRico = 6,
+  YdfModel_FeatureNativeCountryEnum_India = 7,
+  YdfModel_FeatureNativeCountryEnum_ElSalvador = 8,
+  YdfModel_FeatureNativeCountryEnum_Cuba = 9,
+  YdfModel_FeatureNativeCountryEnum_England = 10,
+  YdfModel_FeatureNativeCountryEnum_Jamaica = 11,
+  YdfModel_FeatureNativeCountryEnum_DominicanRepublic = 12,
+  YdfModel_FeatureNativeCountryEnum_South = 13,
+  YdfModel_FeatureNativeCountryEnum_China = 14,
+  YdfModel_FeatureNativeCountryEnum_Italy = 15,
+  YdfModel_FeatureNativeCountryEnum_Columbia = 16,
+  YdfModel_FeatureNativeCountryEnum_Guatemala = 17,
+  YdfModel_FeatureNativeCountryEnum_Japan = 18,
+  YdfModel_FeatureNativeCountryEnum_Vietnam = 19,
+  YdfModel_FeatureNativeCountryEnum_Taiwan = 20,
+  YdfModel_FeatureNativeCountryEnum_Iran = 21,
+  YdfModel_FeatureNativeCountryEnum_Poland = 22,
+  YdfModel_FeatureNativeCountryEnum_Haiti = 23,
+  YdfModel_FeatureNativeCountryEnum_Nicaragua = 24,
+  YdfModel_FeatureNativeCountryEnum_Greece = 25,
+  YdfModel_FeatureNativeCountryEnum_Portugal = 26,
+  YdfModel_FeatureNativeCountryEnum_Ecuador = 27,
+  YdfModel_FeatureNativeCountryEnum_France = 28,
+  YdfModel_FeatureNativeCountryEnum_Peru = 29,
+  YdfModel_FeatureNativeCountryEnum_Thailand = 30,
+  YdfModel_FeatureNativeCountryEnum_Cambodia = 31,
+  YdfModel_FeatureNativeCountryEnum_Ireland = 32,
+  YdfModel_FeatureNativeCountryEnum_Laos = 33,
+  YdfModel_FeatureNativeCountryEnum_Yugoslavia = 34,
+  YdfModel_FeatureNativeCountryEnum_TrinadadTobago = 35,
+  YdfModel_FeatureNativeCountryEnum_Honduras = 36,
+  YdfModel_FeatureNativeCountryEnum_Hong = 37,
+  YdfModel_FeatureNativeCountryEnum_Hungary = 38,
+  YdfModel_FeatureNativeCountryEnum_Scotland = 39,
+  YdfModel_FeatureNativeCountryEnum_OutlyingUsGuamUsviEtc = 40,
+} YdfModel_FeatureNativeCountryEnum;
+typedef uint32_t YdfModel_FeatureNativeCountry;
+
+typedef int32_t YdfModel_Numerical;
+
+typedef struct {
+  YdfModel_Numerical age;
+  YdfModel_FeatureWorkclass workclass;
+  YdfModel_Numerical fnlwgt;
+  YdfModel_FeatureEducation education;
+  YdfModel_Numerical education_num;
+  YdfModel_FeatureMaritalStatus marital_status;
+  YdfModel_FeatureOccupation occupation;
+  YdfModel_FeatureRelationship relationship;
+  YdfModel_FeatureRace race;
+  YdfModel_FeatureSex sex;
+  YdfModel_Numerical capital_gain;
+  YdfModel_Numerical capital_loss;
+  YdfModel_Numerical hours_per_week;
+  YdfModel_FeatureNativeCountry native_country;
+} YdfModel_Instance;
+
+// Prediction function.
+float YdfModel_Predict(const YdfModel_Instance* instance);
+
+#ifdef __cplusplus
+}
+#endif  // __cplusplus
+
+#endif  // YDF_MODEL_YDF_MODEL_H_
+
+// This code is compiled ONLY when YDF_MODEL_YDF_MODEL_IMPL_ is defined.
+#ifdef YDF_MODEL_YDF_MODEL_IMPL_
+
+#include <assert.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+// Portable packing macros.
+#if defined(_MSC_VER)
+    #define YDF_MODEL_PACK_PUSH __pragma(pack(push, 1))
+    #define YDF_MODEL_PACK_POP __pragma(pack(pop))
+    #define YDF_MODEL_PACKED_ATTR
+#elif defined(__GNUC__) || defined(__clang__)
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR __attribute__((packed))
+#else
+    #define YDF_MODEL_PACK_PUSH
+    #define YDF_MODEL_PACK_POP
+    #define YDF_MODEL_PACKED_ATTR
+#endif
+
+// Helper to test a bit in a byte array (for categorical byte arrays)
+static inline bool YdfModel_BitTest(const uint8_t* array, const uint32_t bit_index) {
+  return array[bit_index / 8] & (1 << (bit_index % 8));
+}
+
+static const uint8_t YdfModel_NumTrees = 3;
+
+YDF_MODEL_PACK_PUSH
+typedef struct YDF_MODEL_PACKED_ATTR {
+  uint8_t pos;
+  union {
+    struct YDF_MODEL_PACKED_ATTR {
+      uint8_t feat;
+      union {
+        int32_t thr;
+        uint16_t cat;
+        uint8_t obl;
+      };
+    } cond;
+    struct YDF_MODEL_PACKED_ATTR {
+      float val;
+    } leaf;
+  };
+} YdfModel_Node;
+YDF_MODEL_PACK_POP
+
+static const YdfModel_Node YdfModel_nodes[] = {
+{.pos=27,.cond={.feat=7,.cat=28}},
+{.pos=15,.cond={.feat=255,.obl=19}},
+{.pos=7,.cond={.feat=255,.obl=6}},
+{.pos=3,.cond={.feat=6,.cat=0}},
+{.pos=1,.cond={.feat=255,.obl=0}},
+{.leaf={.val=-0.0991408}},
+{.leaf={.val=0.0942537}},
+{.pos=1,.cond={.feat=255,.obl=3}},
+{.leaf={.val=0.389359}},
+{.leaf={.val=0.00215018}},
+{.pos=3,.cond={.feat=255,.obl=12}},
+{.pos=1,.cond={.feat=255,.obl=10}},
+{.leaf={.val=-0.123387}},
+{.leaf={.val=0.0807619}},
+{.pos=1,.cond={.feat=255,.obl=16}},
+{.leaf={.val=-0.0841764}},
+{.leaf={.val=0.262488}},
+{.pos=5,.cond={.feat=255,.obl=28}},
+{.pos=3,.cond={.feat=255,.obl=25}},
+{.pos=1,.cond={.feat=255,.obl=21}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.309737}},
+{.pos=3,.cond={.feat=6,.cat=14}},
+{.pos=1,.cond={.feat=255,.obl=33}},
+{.leaf={.val=0.19949}},
+{.leaf={.val=-0.131252}},
+{.leaf={.val=0.419984}},
+{.pos=13,.cond={.feat=255,.obl=48}},
+{.pos=7,.cond={.feat=255,.obl=43}},
+{.pos=3,.cond={.feat=6,.cat=35}},
+{.pos=1,.cond={.feat=255,.obl=37}},
+{.leaf={.val=0.166177}},
+{.leaf={.val=0.0374939}},
+{.pos=1,.cond={.feat=255,.obl=41}},
+{.leaf={.val=0.255586}},
+{.leaf={.val=0.383011}},
+{.pos=3,.cond={.feat=255,.obl=45}},
+{.pos=1,.cond={.feat=6,.cat=49}},
+{.leaf={.val=0.309737}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.309737}},
+{.pos=7,.cond={.feat=255,.obl=61}},
+{.pos=3,.cond={.feat=255,.obl=56}},
+{.pos=1,.cond={.feat=255,.obl=52}},
+{.leaf={.val=-0.0898212}},
+{.leaf={.val=-0.0308532}},
+{.pos=1,.cond={.feat=6,.cat=63}},
+{.leaf={.val=-0.00339856}},
+{.leaf={.val=0.0982247}},
+{.pos=3,.cond={.feat=255,.obl=67}},
+{.pos=1,.cond={.feat=255,.obl=63}},
+{.leaf={.val=0.419984}},
+{.leaf={.val=0.309737}},
+{.pos=1,.cond={.feat=6,.cat=77}},
+{.leaf={.val=-0.0210046}},
+{.leaf={.val=0.344815}},
+{.pos=23,.cond={.feat=7,.cat=119}},
+{.pos=15,.cond={.feat=255,.obl=87}},
+{.pos=7,.cond={.feat=255,.obl=78}},
+{.pos=3,.cond={.feat=255,.obl=70}},
+{.pos=1,.cond={.feat=6,.cat=91}},
+{.leaf={.val=-0.113028}},
+{.leaf={.val=-0.0510374}},
+{.pos=1,.cond={.feat=255,.obl=74}},
+{.leaf={.val=-0.119126}},
+{.leaf={.val=0.0646254}},
+{.pos=3,.cond={.feat=255,.obl=81}},
+{.pos=1,.cond={.feat=6,.cat=105}},
+{.leaf={.val=-0.0564977}},
+{.leaf={.val=0.0547216}},
+{.pos=1,.cond={.feat=255,.obl=84}},
+{.leaf={.val=-0.129776}},
+{.leaf={.val=0.165322}},
+{.pos=1,.cond={.feat=255,.obl=89}},
+{.leaf={.val=0.0752609}},
+{.pos=1,.cond={.feat=255,.obl=93}},
+{.leaf={.val=0.131493}},
+{.pos=1,.cond={.feat=255,.obl=95}},
+{.leaf={.val=0.311433}},
+{.leaf={.val=0.226719}},
+{.pos=13,.cond={.feat=255,.obl=111}},
+{.pos=7,.cond={.feat=255,.obl=104}},
+{.pos=3,.cond={.feat=6,.cat=126}},
+{.pos=1,.cond={.feat=255,.obl=99}},
+{.leaf={.val=-0.0774895}},
+{.leaf={.val=0.00716627}},
+{.pos=1,.cond={.feat=255,.obl=101}},
+{.leaf={.val=0.121947}},
+{.leaf={.val=-0.00945509}},
+{.pos=3,.cond={.feat=255,.obl=108}},
+{.pos=1,.cond={.feat=255,.obl=106}},
+{.leaf={.val=0.310429}},
+{.leaf={.val=0.264424}},
+{.leaf={.val=0.0711064}},
+{.pos=7,.cond={.feat=255,.obl=124}},
+{.pos=3,.cond={.feat=255,.obl=117}},
+{.pos=1,.cond={.feat=255,.obl=113}},
+{.leaf={.val=0.0689106}},
+{.leaf={.val=0.328077}},
+{.pos=1,.cond={.feat=255,.obl=121}},
+{.leaf={.val=0.291686}},
+{.leaf={.val=0.309933}},
+{.pos=3,.cond={.feat=6,.cat=181}},
+{.pos=1,.cond={.feat=13,.cat=140}},
+{.leaf={.val=0.0672693}},
+{.leaf={.val=0.370993}},
+{.pos=1,.cond={.feat=255,.obl=127}},
+{.leaf={.val=0.205867}},
+{.leaf={.val=-0.0652492}},
+{.pos=23,.cond={.feat=7,.cat=195}},
+{.pos=15,.cond={.feat=255,.obl=151}},
+{.pos=7,.cond={.feat=255,.obl=140}},
+{.pos=3,.cond={.feat=255,.obl=132}},
+{.pos=1,.cond={.feat=255,.obl=129}},
+{.leaf={.val=0.158489}},
+{.leaf={.val=0.0139145}},
+{.pos=1,.cond={.feat=255,.obl=136}},
+{.leaf={.val=-0.0255225}},
+{.leaf={.val=-0.0900962}},
+{.pos=3,.cond={.feat=255,.obl=146}},
+{.pos=1,.cond={.feat=255,.obl=144}},
+{.leaf={.val=-0.110397}},
+{.leaf={.val=0.0423275}},
+{.pos=1,.cond={.feat=255,.obl=149}},
+{.leaf={.val=0.275216}},
+{.leaf={.val=-0.0105495}},
+{.pos=1,.cond={.feat=255,.obl=153}},
+{.leaf={.val=0.0901531}},
+{.pos=1,.cond={.feat=255,.obl=157}},
+{.leaf={.val=0.116682}},
+{.pos=1,.cond={.feat=255,.obl=162}},
+{.leaf={.val=0.183824}},
+{.leaf={.val=0.254308}},
+{.pos=15,.cond={.feat=255,.obl=182}},
+{.pos=7,.cond={.feat=255,.obl=173}},
+{.pos=3,.cond={.feat=6,.cat=202}},
+{.pos=1,.cond={.feat=255,.obl=167}},
+{.leaf={.val=0.116391}},
+{.leaf={.val=-0.00890938}},
+{.pos=1,.cond={.feat=255,.obl=171}},
+{.leaf={.val=0.181507}},
+{.leaf={.val=-0.0522977}},
+{.pos=3,.cond={.feat=255,.obl=175}},
+{.pos=1,.cond={.feat=6,.cat=216}},
+{.leaf={.val=0.176257}},
+{.leaf={.val=0.252977}},
+{.pos=1,.cond={.feat=255,.obl=180}},
+{.leaf={.val=-0.0482188}},
+{.leaf={.val=0.272084}},
+{.pos=7,.cond={.feat=255,.obl=195}},
+{.pos=3,.cond={.feat=6,.cat=230}},
+{.pos=1,.cond={.feat=255,.obl=186}},
+{.leaf={.val=-0.0945367}},
+{.leaf={.val=-0.0246615}},
+{.pos=1,.cond={.feat=255,.obl=191}},
+{.leaf={.val=-0.0313654}},
+{.leaf={.val=0.0799974}},
+{.pos=3,.cond={.feat=255,.obl=200}},
+{.pos=1,.cond={.feat=13,.cat=244}},
+{.leaf={.val=-0.0967573}},
+{.leaf={.val=0.171455}},
+{.pos=1,.cond={.feat=13,.cat=285}},
+{.leaf={.val=-0.0286497}},
+{.leaf={.val=0.413736}},
+};
+
+static const uint8_t YdfModel_condition_types[] = {0,1,0,1,0,1,1,1,1,1,0,0,0,1};
+
+
+static const uint8_t YdfModel_root_deltas[] = {57,53,55};
+
+
+static const uint8_t YdfModel_categorical_bank[] = {0x26,0x98,0xa,0x33,0x32,0xc1,0xfe,0x37,0x1f,0xec,0xb6,0x70,0xc9,0x48,0x84,0x91,0xd,0x6,0x1,0x8,0xe,0x8,0xc0,0x6,0x1b,0x99,0x60,0xff,0x9b,0x6f,0x6,0x0,0xc0,0x8,0xc0,0x0,0x4,0x0,0x6,0xa0,0x0};
+
+static const float YdfModel_oblique_weights[] = {0.875222,0.0589885,0.000130299,-2.82861,-0.00110184,-0.00391027,-4.39274,-0.030971,-0.0950091,-0.045673,2218.5,1,6.131,0.0253274,0.208307,0.0660617,0.221025,4.73438e-05,-0.00103273,7073.5,1,1.23801,0.0503401,-3.15151e-05,0.00157436,-1.3714,-0.337004,0.0325812,-4.87832,-0.0487011,-3.45733e-06,-0.116549,-0.0406906,0.199635,9.0964e-06,-0.000473765,-0.0446421,-2.72891,-0.0268237,-0.0492184,-0.0287724,1782.5,1,5095.5,1,0.912029,0.0203875,-0.0183571,-3.46664,-0.253348,-0.00177869,-0.00509135,1.99557,0.0454592,0.000703983,0.0410716,2.83912,0.0130462,0.263606,-8.90169e-05,-0.00206909,5095.5,1,2.11646,0.0584315,0.000945858,-0.0445074,4.11294,0.0731134,-4.55677e-06,-4.5089,-0.0342588,4.595e-05,-0.0721305,5.69044,0.104668,0.000104302,0.00210441,4.72543,0.00909707,0.336553,3.14058,0.21334,-0.000115206,1.83417,0.0580332,1.78927e-07,7073.5,1,2.26767,0.0405766,-3.28583e-06,0.0769774,7565.5,1,-0.299833,-5.23652e-06,-0.260057,0.0506563,8.5,1,-1.77219,-0.00722983,-0.038197,5095.5,1,60.5,1,3.40626,0.0622691,-0.000122705,12.5,1,0.498856,9.33045e-05,-0.00206049,-0.00978286,-3.17909,-0.0418459,-0.113679,0.0412746,-2.66861,-5.33752e-06,-0.0012442,-0.526749,-0.000103375,-0.0016021,3120,1,-1.20759,-0.082737,-1.04432e-05,-1.33648,-0.001709,-0.000754278,-0.028782,-2.48412,-0.00224747,-9.78004e-05,-0.0602208,-4.73801,-0.0136335,-0.333568,0.000124826,4668.5,1,4.525,-9.15817e-05,0.00203967,125450,1,7073.5,1,4.26781,0.0991027,7.59452e-05,0.0693224,5.24286,0.0528021,9.21215e-06,0.0841194,0.0537783,-2.30813,-0.0110387,0.276692,-0.000969926,-0.0743734,-3.55391,-0.0112707,-0.108756,-0.0516706,3120,1,5095.5,1,0.635133,0.016452,-2.72883e-07,-0.00107603,-0.0186576,8076.5,1,-1.64929,-0.127004,-0.000132137,-0.00160587,0.922287,6.82072e-07,0.0489917,-0.000383971,0.0130997,2.67543,0.00998518,-0.00184372,0.0605607,-3.7964,-0.0331518,-0.290143,-4.97571e-05,-0.000704097,2.88565,0.0109421,0.0539681,9.43172e-05,0.0520747};
+
+static const uint8_t YdfModel_oblique_features[] = {2,4,11,2,11,12,3,0,4,12,1,11,3,0,4,12,2,10,11,1,10,3,0,10,11,2,4,12,4,0,2,4,12,3,2,4,12,3,0,4,12,1,11,1,10,2,0,12,3,4,11,12,3,4,11,12,4,0,4,10,11,1,10,3,0,11,12,2,0,2,3,0,10,12,3,4,10,11,2,0,4,2,4,10,2,0,2,1,10,3,0,2,12,1,10,3,2,4,12,1,4,2,0,12,1,10,1,0,2,0,10,1,4,3,10,11,12,3,0,4,12,2,2,11,2,10,11,1,10,2,4,10,3,0,11,12,3,0,10,12,3,0,4,10,1,10,2,10,11,1,2,1,10,3,4,10,12,4,0,2,4,12,4,0,4,11,12,3,0,4,12,1,10,1,10,4,0,2,11,12,1,10,3,4,10,11,4,2,4,11,12,3,0,11,12,4,0,4,10,11,4,0,4,10,12};
+
+static const size_t YdfModel_FeatureOffsets[] = {
+    offsetof(YdfModel_Instance, age),
+    offsetof(YdfModel_Instance, workclass),
+    offsetof(YdfModel_Instance, fnlwgt),
+    offsetof(YdfModel_Instance, education),
+    offsetof(YdfModel_Instance, education_num),
+    offsetof(YdfModel_Instance, marital_status),
+    offsetof(YdfModel_Instance, occupation),
+    offsetof(YdfModel_Instance, relationship),
+    offsetof(YdfModel_Instance, race),
+    offsetof(YdfModel_Instance, sex),
+    offsetof(YdfModel_Instance, capital_gain),
+    offsetof(YdfModel_Instance, capital_loss),
+    offsetof(YdfModel_Instance, hours_per_week),
+    offsetof(YdfModel_Instance, native_country),
+};
+
+float YdfModel_Predict(const YdfModel_Instance* instance) {
+  float accumulator = -1.1631;
+
+  const YdfModel_Node* root = YdfModel_nodes;
+  const YdfModel_Node* node;
+  const char* raw_instance = (const char*)(instance);
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != YdfModel_NumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+      if (node->cond.feat == 255) {
+        const uint8_t num_projs = YdfModel_oblique_features[node->cond.obl];
+        float obl_acc = -YdfModel_oblique_weights[node->cond.obl];
+        for (uint8_t proj_idx=0; proj_idx<num_projs; proj_idx++){
+          const size_t proj_off = node->cond.obl + proj_idx + 1;
+          int32_t numerical_feature;
+          const uint8_t feat_idx = YdfModel_oblique_features[proj_off];
+          const size_t safe_off = YdfModel_FeatureOffsets[feat_idx];
+          memcpy(&numerical_feature, raw_instance + safe_off, sizeof(int32_t));
+          obl_acc += numerical_feature * YdfModel_oblique_weights[proj_off];
+        }
+        eval = obl_acc >= 0;
+      } else if (YdfModel_condition_types[node->cond.feat] == 1) {
+        const size_t off = YdfModel_FeatureOffsets[node->cond.feat];
+        uint32_t categorical_feature = *(uint32_t*)(raw_instance + off);
+        eval = YdfModel_BitTest(YdfModel_categorical_bank, categorical_feature + node->cond.cat);
+      } else {
+        assert(false);
+      }
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator += node->leaf.val;
+    root += YdfModel_root_deltas[tree_idx];
+  }
+
+  return 1.f / (1.f + expf(-accumulator));
+}
+
+#endif  // YDF_MODEL_YDF_MODEL_IMPL_

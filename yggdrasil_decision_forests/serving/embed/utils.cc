@@ -305,7 +305,6 @@ std::string JavaInteger(int bytes) {
 std::string DTypeToCppType(const proto::DType::Enum value) {
   switch (value) {
     case proto::DType::UNDEFINED:
-      DCHECK(false);
       return "UNDEFINED";
 
     case proto::DType::INT8:
@@ -370,6 +369,52 @@ proto::DType::Enum UnsignedIntegerToDtype(int bytes) {
       DCHECK(false);
       return proto::DType::UNDEFINED;
   }
+}
+
+absl::StatusOr<std::string> FormatExampleLiteral(const DoubleOrInt64& val,
+                                                 const bool is_float) {
+  if (is_float) {
+    if (IsDouble(val)) {
+      // Ensure it always prints with a decimal to be treated as a float in
+      // C/C++
+      std::string s = absl::StrCat(AsDouble(val));
+      return s;
+    } else {
+      return absl::InternalError(
+          "Expected float value but found integer in variant.");
+    }
+  } else {
+    if (IsInt(val)) {
+      return absl::StrCat(AsInt(val));
+    } else {
+      return absl::InternalError(
+          "Expected integer value but found float in variant.");
+    }
+  }
+}
+
+absl::StatusOr<std::string> StorageToPrimitiveType(const int bytes,
+                                                   const bool is_float,
+                                                   const bool is_signed) {
+  if (is_float) {
+    if (bytes == 4) return "float";
+    if (bytes == 8) return "double";
+  } else {
+    if (is_signed) {
+      if (bytes == 1) return "int8_t";
+      if (bytes == 2) return "int16_t";
+      if (bytes == 4) return "int32_t";
+      if (bytes == 8) return "int64_t";
+    } else {
+      if (bytes == 1) return "uint8_t";
+      if (bytes == 2) return "uint16_t";
+      if (bytes == 4) return "uint32_t";
+      if (bytes == 8) return "uint64_t";
+    }
+  }
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unsupported storage type: bytes=", bytes,
+                   " float=", is_float, " signed=", is_signed));
 }
 
 int NumLeavesToNumNodes(int num_leaves) {

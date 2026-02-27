@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-// Test the code to embed models.
+// Golden tests to embed models.
 
 #include <memory>
 #include <optional>
@@ -43,21 +43,159 @@ struct GoldenGeneratedCCase {
   proto::Algorithm::Enum algorithm;
   std::optional<proto::ClassificationOutput::Enum> output;
   int crop_num_trees = 3;
-  bool categorical_from_string = false;
 };
 
 // Compare the generated .h files against golden files.
-SIMPLE_PARAMETERIZED_TEST(GoldenGeneratedC, GoldenGeneratedCCase,
-                          {
-
-                              // TODO : b/481596783 - Test more models.
-                              {
-                                  "abalone_regression_gbdt_v2",
-                                  "abalone_regression_gbdt_v2_routing.h.golden",
-                                  "abalone_regression_gbdt_v2_routing.c.golden",
-                                  proto::Algorithm::ROUTING,
-                              },
-                          }) {
+SIMPLE_PARAMETERIZED_TEST(
+    GoldenGeneratedC, GoldenGeneratedCCase,
+    {
+        // GBT
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_class_routing.h.golden",
+            "adult_binary_class_gbdt_v2_class_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_probability_routing.h.golden",
+            "adult_binary_class_gbdt_v2_probability_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_gbdt_v2",
+            "adult_binary_class_gbdt_v2_score_routing.h.golden",
+            "adult_binary_class_gbdt_v2_score_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "iris_multi_class_gbdt_v2",
+            "iris_multi_class_gbdt_v2_class_routing.h.golden",
+            "iris_multi_class_gbdt_v2_class_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "iris_multi_class_gbdt_v2",
+            "iris_multi_class_gbdt_v2_probability_routing.h.golden",
+            "iris_multi_class_gbdt_v2_probability_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "iris_multi_class_gbdt_v2",
+            "iris_multi_class_gbdt_v2_score_routing.h.golden",
+            "iris_multi_class_gbdt_v2_score_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "abalone_regression_gbdt_v2",
+            "abalone_regression_gbdt_v2_routing.h.golden",
+            "abalone_regression_gbdt_v2_routing.c.golden",
+            proto::Algorithm::ROUTING,
+        },
+        {
+            "adult_binary_class_gbdt_oblique",
+            "adult_binary_class_gbdt_oblique_proba_routing.h.golden",
+            "adult_binary_class_gbdt_oblique_proba_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        // RF
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_class_routing.h.golden",
+            "adult_binary_class_rf_nwta_small_class_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_proba_routing.h.golden",
+            "adult_binary_class_rf_nwta_small_proba_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_score_routing.h.golden",
+            "adult_binary_class_rf_nwta_small_score_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_class_routing.h.golden",
+            "adult_binary_class_rf_wta_small_class_routing.c.golden",
+            proto::Algorithm::ROUTING,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_proba_routing.h.golden",
+            "adult_binary_class_rf_wta_small_proba_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "adult_binary_class_rf_wta_small",
+            "adult_binary_class_rf_wta_small_score_routing.h.golden",
+            "adult_binary_class_rf_wta_small_score_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "abalone_regression_rf_small",
+            "abalone_regression_rf_small_routing.h.golden",
+            "abalone_regression_rf_small_routing.c.golden",
+            proto::Algorithm::ROUTING,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_class_routing.h.golden",
+            "iris_multi_class_rf_wta_small_class_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_score_routing.h.golden",
+            "iris_multi_class_rf_wta_small_score_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+        {
+            "iris_multi_class_rf_wta_small",
+            "iris_multi_class_rf_wta_small_proba_routing.h.golden",
+            "iris_multi_class_rf_wta_small_proba_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "iris_multi_class_rf_nwta_small",
+            "iris_multi_class_rf_nwta_small_class_routing.h.golden",
+            "iris_multi_class_rf_nwta_small_class_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::CLASS,
+        },
+        {
+            "iris_multi_class_rf_nwta_small",
+            "iris_multi_class_rf_nwta_small_proba_routing.h.golden",
+            "iris_multi_class_rf_nwta_small_proba_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+        },
+        {
+            "iris_multi_class_rf_nwta_small",
+            "iris_multi_class_rf_nwta_small_score_routing.h.golden",
+            "iris_multi_class_rf_nwta_small_score_routing.c.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::SCORE,
+        },
+    }) {
   const auto& test_case = GetParam();
 
   ASSERT_OK_AND_ASSIGN(

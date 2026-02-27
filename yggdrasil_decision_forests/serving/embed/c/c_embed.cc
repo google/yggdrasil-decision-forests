@@ -16,19 +16,42 @@
 #include "yggdrasil_decision_forests/serving/embed/c/c_embed.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
+#include "yggdrasil_decision_forests/serving/embed/c/c_emitter.h"
+#include "yggdrasil_decision_forests/serving/embed/c/c_ir.h"
+#include "yggdrasil_decision_forests/serving/embed/c/c_target_lowering.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
+#include "yggdrasil_decision_forests/serving/embed/ir/builder.h"
+#include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
+#include "yggdrasil_decision_forests/serving/embed/utils.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 
 absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModelC(
     const model::AbstractModel& model, const proto::Options& options) {
-  absl::node_hash_map<Filename, Content> result;
-  result[absl::StrCat(options.name(), ".h")] = "";
-  result[absl::StrCat(options.name(), ".c")] = "";
-  return result;
+  if (options.algorithm() != proto::Algorithm::ROUTING) {
+    return absl::InvalidArgumentError(
+        "Export to C is only implemented for the ROUTING algorithm");
+  }
+  RETURN_IF_ERROR(CheckModelName(options.name(), proto::Options::kC));
+  for (const auto& column_idx : model.input_features()) {
+    RETURN_IF_ERROR(
+        CheckFeatureName(model.data_spec().columns(column_idx).name()));
+  }
+
+  ASSIGN_OR_RETURN(internal::ModelIR ir,
+                   internal::ModelIRBuilder::Build(model, options));
+
+  ASSIGN_OR_RETURN(internal::CIR cpp_ir,
+                   internal::CTargetLowering::Lower(ir, options));
+
+  ASSIGN_OR_RETURN(const auto& generated_code,
+                   internal::CEmitter::Emit(cpp_ir, options));
+
+  return generated_code;
 }
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

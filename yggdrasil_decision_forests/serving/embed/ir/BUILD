@@ -10,7 +10,10 @@ cc_library_ydf(
     name = "model_ir",
     srcs = [],
     hdrs = ["model_ir.h"],
-    deps = ["//yggdrasil_decision_forests/serving/embed:embed_cc_proto"],
+    deps = [
+        "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
+        "//yggdrasil_decision_forests/serving/embed:utils",
+    ],
 )
 
 cc_library_ydf(

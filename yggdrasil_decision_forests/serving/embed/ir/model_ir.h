@@ -19,26 +19,15 @@
 #include <cstdint>
 #include <optional>
 #include <string>
-#include <variant>
 #include <vector>
 
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
+#include "yggdrasil_decision_forests/serving/embed/utils.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 
 using FeatureIdx = int32_t;
 using NodeIdx = int64_t;
-
-typedef std::variant<double, int64_t> DoubleOrInt64;
-
-inline bool IsDouble(const DoubleOrInt64& v) {
-  return std::holds_alternative<double>(v);
-}
-inline bool IsInt(const DoubleOrInt64& v) {
-  return std::holds_alternative<int64_t>(v);
-}
-inline double AsDouble(const DoubleOrInt64& v) { return std::get<double>(v); }
-inline int64_t AsInt(const DoubleOrInt64& v) { return std::get<int64_t>(v); }
 
 struct FeatureInfo {
   // The name in the data_spec.

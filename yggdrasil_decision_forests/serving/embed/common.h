@@ -37,6 +37,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/structure_analysis.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
+#include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
 typedef std::string Filename;
@@ -250,6 +251,57 @@ struct SpecializedConversion {
   absl::Status Validate(const proto::Options& options) const;
 };
 
+// All types used for in the emitted code.
+//
+// If an object is two-dimensional (vector / array / ...), only stores the base
+// Type. This struct only stores the base types, not aliases such as
+// `Numerical`.
+struct BaseTypes {
+  // Global
+  std::string num_trees;
+  std::string accumulator;
+  std::string eval;  // Evaluation of a routing condition.
+  std::string boolean;
+  std::string output;  // Return value or output parameter.
+
+  // Instance
+  std::string numerical_feature;
+  std::string categorical_feature;
+  std::string integerized_categorical_feature;
+
+  // Node data structure.
+  std::string pos;
+  std::string feature_idx;
+  std::string threshold;
+  std::string cat_bank_idx;
+  std::string obl_bank_idx;
+  std::string leaf_value;
+
+  // Banks
+  std::string categorical_bank;
+  std::string condition_types;
+  std::string root_deltas;
+  std::string oblique_weights;
+  std::string oblique_features;
+  std::string feature_offsets;
+  std::string leaf_value_bank;
+};
+
+// Common IR data extracted from ModelIR for the Routing algorithm.
+struct RoutingDataAssets {
+  std::string root_deltas_content;
+
+  size_t categorical_bank_size = 0;
+
+  std::string oblique_weights_content;
+  std::string oblique_features_content;
+  std::string leaf_value_bank_content;
+};
+
+// Evaluates shared assets needed for text generation on routing target
+// lowering.
+absl::StatusOr<RoutingDataAssets> PrepareRoutingDataAssets(const ModelIR& ir);
+
 // Computes the statistics of the model.
 absl::StatusOr<ModelStatistics> ComputeStatistics(
     const model::AbstractModel& model,
@@ -279,6 +331,38 @@ absl::StatusOr<std::vector<uint8_t>> GenRoutingModelDataConditionType(
 // Reserved feature index used for oblique conditions.
 int ObliqueFeatureIndex(const proto::Options& options,
                         const BaseInternalOptions& internal_options);
+
+// Resolves name collisions by appending a suffix to the name until it is
+// unique.
+std::string ResolveNameCollision(
+    const std::string& name,
+    const absl::flat_hash_set<std::string>& existing_names);
+
+// Gets the sentinel value for the oblique feature index.
+uint32_t GetObliqueFeatureSentinel(int64_t num_features);
+
+// Gets the encoded leaf value for vector leaves.
+int GetEncodedLeafValue(int64_t offset, int num_output_classes);
+
+// Maps storage requirements to C/C++ primitive types (e.g., int8_t, float).
+absl::StatusOr<std::string> StorageToType(int bytes, bool is_float,
+                                          bool is_signed);
+
+// Generates the string representation of the bitset bank (reversed).
+std::string GetBitsetBankString(const std::vector<bool>& bitset_bank);
+
+// Calculates the maximum value in the oblique features vector.
+int GetMaxObliqueFeatureValue(const std::vector<int>& oblique_features);
+
+// Checks if a feature variable name collides with existing sanitized names.
+absl::Status CheckFeatureNameCollision(
+    const std::string& var_name,
+    absl::flat_hash_set<std::string>& sanitized_feature_names,
+    const std::vector<FeatureInfo>& features);
+
+absl::StatusOr<BaseTypes> BuildTypes(const proto::Options& options,
+                                     const ModelIR& model_ir,
+                                     std::string pseudo_namespace = "");
 }  // namespace internal
 }  // namespace yggdrasil_decision_forests::serving::embed
 

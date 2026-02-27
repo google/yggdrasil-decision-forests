@@ -372,7 +372,7 @@ inline float Predict(const Instance& instance) {
     while(node->pos) {
       if (node->cond.feat == 255) {
         const uint8_t num_projs = oblique_features[node->cond.obl];
-        float obl_acc = -oblique_weights[node->cond.obl];
+        auto obl_acc = -oblique_weights[node->cond.obl];
         for (uint8_t proj_idx=0; proj_idx<num_projs; proj_idx++){
           const auto off = node->cond.obl + proj_idx + 1;
           int32_t numerical_feature;
