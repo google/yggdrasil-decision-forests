@@ -861,6 +861,102 @@ Use `model.describe()` for more details.
     raise NotImplementedError
 
   @abc.abstractmethod
+  def to_standalone_c(
+      self,
+      name: str = "ydf_model",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+  ) -> Union[str, Dict[str, bytes]]:
+    """Generates standalone, dependency-free C code for model inference.
+
+    This method generates a Single-Header C Library (C11 standard) from a YDF
+    model.
+
+    **Comparison with C++ export:**
+
+    The C export is more limited than the C++ export (`to_standalone_cc`). It
+    does not support:
+    - `categorical_from_string`: Categorical features must be passed as
+      integers.
+    - `algorithm`: Only the "ROUTING" algorithm is supported.
+    - Integerized features.
+
+    If possible, prefer using `to_standalone_cc`.
+
+    **How to use:**
+
+    1.  Generate the C code:
+        ```python
+        model = ydf.load_model(...)
+        c_code = model.to_standalone_c(name="my_model")
+        with open("my_model.h", "w") as f:
+            f.write(c_code)
+        ```
+
+    2.  In **exactly one** C file, define the implementation macro before
+        including the header:
+        ```c
+        #define YDF_MODEL_MY_MODEL_IMPL_
+        #include "my_model.h"
+        ```
+
+    3.  In other C files, just include the header:
+        ```c
+        #include "my_model.h"
+        ```
+
+    4.  Call the prediction function:
+        ```c
+        // Create the instance struct.
+        // The struct definition is in the header file.
+        MyModel_Instance instance;
+        instance.f1 = 5.0f;
+        instance.f2 = 1; // Categorical value index
+
+        // Get the prediction.
+        // For multi-class classification, Predict uses an output parameter.
+        float prediction = MyModel_Predict(&instance);
+        ```
+        The function is thread-safe.
+
+    Alternatively, you can use the `c_ydf_standalone_model` Bazel rule for
+    automated code generation (internal to Google).
+
+    1. Save the model with `model.save(...)` in a directory in Google3.
+    2. Create a BUILD file with a filegroup in the model directory e.g.:
+      ```
+      filegroup(
+        name = "model",
+        srcs = glob(["**"]),
+      )
+      ```
+    3. In your library's BUILD, create a "c_ydf_standalone_model" build rule.
+      ```
+      load("//external/ydf_cc/yggdrasil_decision_forests/serving/embed:embed.bzl",
+        "c_ydf_standalone_model")
+      c_ydf_standalone_model(
+        name = "my_model",
+        classification_output = "SCORE",
+        data = "<path to filegroup>",
+      )
+      ```
+    4. In your cc_binary or cc_library, add ":my_model" as a dependency.
+    5. In your C code, include the generated header (e.g., `my_model.h`) and use
+       it as described above.
+
+    Args:
+      name: A name for the model, used to prefix functions and types (e.g.
+        `{name}_Predict`).
+      classification_output: The output format for classification models. -
+        "CLASS" (default): The predicted class index (fast). - "SCORE": The raw
+        scores (e.g., logits) for all classes. - "PROBABILITY": The
+        probabilities for all classes (slower, as it requires a softmax).
+
+    Returns:
+      A dictionary containing header and implementation of the C code.
+    """
+    raise NotImplementedError
+
+  @abc.abstractmethod
   def to_standalone_java(
       self,
       name: str = "YdfModel",
@@ -2016,6 +2112,26 @@ class GenericCCModel(GenericModel):
         algorithm=embed_pb2.Algorithm.Enum.Value(algorithm),
         categorical_from_string=categorical_from_string,
         cpp=embed_pb2.Cpp(),
+    )
+    results = self._model.EmbedModel(options)
+    if len(results) == 1:
+      return list(results.values())[0].decode()
+    else:
+      return results
+
+  def to_standalone_c(
+      self,
+      name: str = "ydf_model",
+      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
+  ) -> Union[str, Dict[str, bytes]]:
+    options = embed_pb2.Options(
+        name=name,
+        classification_output=embed_pb2.ClassificationOutput.Enum.Value(
+            classification_output
+        ),
+        algorithm=embed_pb2.Algorithm.Enum.Value("ROUTING"),
+        categorical_from_string=False,
+        c=embed_pb2.C(),
     )
     results = self._model.EmbedModel(options)
     if len(results) == 1:
