@@ -76,7 +76,7 @@ absl::StatusOr<uint64_t> StartWorkerNonBlocking(const int port) {
       });
 
   NonBlockingWorkers& workers = GetNonBlockingWorkers();
-  utils::concurrency::MutexLock l(&workers.mutex);
+  utils::concurrency::MutexLock l(workers.mutex);
   const uint64_t uid = utils::GenUniqueIdUint64();
   NonBlockingWorker& worker = workers.per_uid[uid];
   worker.server = std::move(server);
@@ -90,7 +90,7 @@ absl::Status StopWorkerNonBlocking(const uint64_t uid) {
   NonBlockingWorker worker;
   {
     NonBlockingWorkers& workers = GetNonBlockingWorkers();
-    utils::concurrency::MutexLock l(&workers.mutex);
+    utils::concurrency::MutexLock l(workers.mutex);
 
     auto it = workers.per_uid.find(uid);
     if (it == workers.per_uid.end()) {

@@ -379,7 +379,7 @@ absl::Status NDCGLoss::UpdateGradients(
          &global_mutex](const size_t block_idx, const size_t begin_idx,
                         const size_t end_idx) -> void {
           {
-            utils::concurrency::MutexLock lock(&global_mutex);
+            utils::concurrency::MutexLock lock(global_mutex);
             if (!global_status.ok()) {
               return;
             }
@@ -392,7 +392,7 @@ absl::Status NDCGLoss::UpdateGradients(
               enable_indicator_labels_optimization, random_seeds[block_idx],
               absl::MakeSpan(gradient_data), absl::MakeSpan(hessian_data));
           if (!thread_status.ok()) {
-            utils::concurrency::MutexLock lock(&global_mutex);
+            utils::concurrency::MutexLock lock(global_mutex);
             global_status.Update(thread_status);
             return;
           }

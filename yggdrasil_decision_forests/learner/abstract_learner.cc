@@ -899,7 +899,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
           const int fold_idx, utils::RandomEngine* rnd) {
         metric::proto::EvaluationResults evaluation;
         {
-          utils::concurrency::MutexLock lock(&evaluation_mutex);
+          utils::concurrency::MutexLock lock(evaluation_mutex);
           if (!status_train_and_evaluate.ok()) {
             return;
           }
@@ -922,7 +922,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
             testing_dataset, evaluation_options, rnd, &evaluation);
         // Aggregate the evaluations.
         {
-          utils::concurrency::MutexLock lock(&evaluation_mutex);
+          utils::concurrency::MutexLock lock(evaluation_mutex);
           status_train_and_evaluate.Update(status_append);
           status_train_and_evaluate.Update(metric::MergeEvaluation(
               evaluation_options, evaluation, &aggregated_evaluation));
