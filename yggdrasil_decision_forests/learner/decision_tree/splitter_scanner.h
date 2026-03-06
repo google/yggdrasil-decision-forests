@@ -52,6 +52,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <type_traits>
@@ -60,6 +61,8 @@
 
 #include "absl/base/attributes.h"
 #include "absl/types/span.h"
+#include "hwy/base.h"
+#include "hwy/contrib/sort/vqsort.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
@@ -72,6 +75,24 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace decision_tree {
+
+namespace internal {
+inline uint32_t FloatToUintForSort(float f) {
+  uint32_t k;
+  std::memcpy(&k, &f, sizeof(k));
+  uint32_t mask = -int32_t(k >> 31) | 0x80000000;
+  return k ^ mask;
+}
+
+inline float UintToFloatFromSort(uint32_t k) {
+  uint32_t mask = ((k >> 31) - 1) | 0x80000000;
+  k ^= mask;
+  float f;
+  std::memcpy(&f, &k, sizeof(f));
+  return f;
+}
+
+}  // namespace internal
 
 // TODO: Explain the expected signature of FeatureBucket and LabelBucket.
 template <typename FeatureBucket, typename LabelBucket>
@@ -355,6 +376,10 @@ struct PerThreadCacheV2 {
   FeatureNumericalLabelUpliftNumericalOneValue example_bucket_set_ul_n_1;
   FeatureCategoricalLabelUpliftNumerical example_bucket_set_ul_n_2;
 
+  // Cache for flat highway representations
+  std::vector<hwy::K32V32> hwy_k32v32_buffer;
+  std::vector<hwy::K64V64> hwy_k64v64_buffer;
+
   // Cache for the label score accumulator;
   LabelNumericalScoreAccumulator label_numerical_score_accumulator[2];
   LabelCategoricalScoreAccumulator label_categorical_score_accumulator[2];
@@ -381,6 +406,263 @@ struct PerThreadCacheV2 {
 
   // Selected categorical attribute values;
   std::vector<int> categorical_attribute;
+};
+
+// Encodes the mapping from an ExampleBucket to a Flat Buffer
+template <typename ExampleBucketType, typename Enable = void>
+struct FlatBucketTraits;
+
+// Regression Unweighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<
+    ExampleBucketType,
+    std::enable_if_t<std::is_same_v<typename ExampleBucketType::LabelBucketType,
+                                    LabelNumericalOneValueBucket<false>>>> {
+  // Sorted with Key: Feature (float). Value: Label (float).
+  using HWY_T = hwy::K32V32;
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k32v32_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k32v32_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    hwy.key = internal::FloatToUintForSort(bucket.feature.value);
+    std::memcpy(&hwy.value, &bucket.label.content.value, sizeof(hwy.value));
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key);
+    std::memcpy(&bucket.label.content.value, &hwy.value, sizeof(hwy.value));
+  }
+};
+
+// Regression Weighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<
+    ExampleBucketType,
+    std::enable_if_t<std::is_same_v<typename ExampleBucketType::LabelBucketType,
+                                    LabelNumericalOneValueBucket<true>>>> {
+  using HWY_T = hwy::K64V64;
+  // Sorted with Key: Feature (float). Value: Label (float) and Weight (float).
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    hwy.key = static_cast<uint64_t>(
+                  internal::FloatToUintForSort(bucket.feature.value))
+              << 32;
+    float v[2] = {bucket.label.content.value, bucket.label.content.weight};
+    std::memcpy(&hwy.value, v, sizeof(v));
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key >> 32);
+    float v[2];
+    std::memcpy(v, &hwy.value, sizeof(v));
+    bucket.label.content.value = v[0];
+    bucket.label.content.weight = v[1];
+  }
+};
+
+// Classification Unweighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<ExampleBucketType,
+                        std::enable_if_t<std::is_same_v<
+                            typename ExampleBucketType::LabelBucketType,
+                            LabelUnweightedCategoricalOneValueBucket>>> {
+  using HWY_T = hwy::K32V32;
+  // Sorted with Key: Feature (float). Value: Label (int).
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k32v32_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k32v32_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    hwy.key = internal::FloatToUintForSort(bucket.feature.value);
+    hwy.value = bucket.label.content.value;
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key);
+    bucket.label.content.value = hwy.value;
+  }
+};
+
+// Classification Weighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<
+    ExampleBucketType,
+    std::enable_if_t<std::is_same_v<typename ExampleBucketType::LabelBucketType,
+                                    LabelCategoricalOneValueBucket<true>>>> {
+  using HWY_T = hwy::K64V64;
+  // Sorted with Key: Feature (float). Value: Label (int) and Weight (Float).
+  // Note that this assumes that the int type is not larger than  32 bits (which
+  // is generally true, but may cause issues on exotic systems).
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    hwy.key = static_cast<uint64_t>(
+                  internal::FloatToUintForSort(bucket.feature.value))
+              << 32;
+    uint32_t v[2] = {static_cast<uint32_t>(bucket.label.content.value), 0};
+    std::memcpy(&v[1], &bucket.label.content.weight, 4);
+    std::memcpy(&hwy.value, v, sizeof(v));
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key >> 32);
+    uint32_t v[2];
+    std::memcpy(v, &hwy.value, sizeof(v));
+    bucket.label.content.value = v[0];
+    std::memcpy(&bucket.label.content.weight, &v[1], 4);
+  }
+};
+
+// Binary Classification Unweighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<
+    ExampleBucketType,
+    std::enable_if_t<
+        std::is_same_v<typename ExampleBucketType::LabelBucketType,
+                       LabelBinaryCategoricalOneValueBucket<false>> ||
+        std::is_same_v<typename ExampleBucketType::LabelBucketType,
+                       LabelUnweightedBinaryCategoricalOneValueBucket>>> {
+  using HWY_T = hwy::K32V32;
+  // Sorted with Key: Feature (float). Value: Label (bool).
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k32v32_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k32v32_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    hwy.key = internal::FloatToUintForSort(bucket.feature.value);
+    hwy.value = bucket.label.content.value ? 1 : 0;
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key);
+    bucket.label.content.value = hwy.value != 0;
+  }
+};
+
+// Binary Classification Weighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<ExampleBucketType,
+                        std::enable_if_t<std::is_same_v<
+                            typename ExampleBucketType::LabelBucketType,
+                            LabelBinaryCategoricalOneValueBucket<true>>>> {
+  using HWY_T = hwy::K64V64;
+  // Sorted with Key: Feature (float). Value: Label (bool) and Weight (float).
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    hwy.key = static_cast<uint64_t>(
+                  internal::FloatToUintForSort(bucket.feature.value))
+              << 32;
+    uint32_t v[2] = {static_cast<uint32_t>(bucket.label.content.value ? 1 : 0),
+                     0};
+    std::memcpy(&v[1], &bucket.label.content.weight, 4);
+    std::memcpy(&hwy.value, v, sizeof(v));
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key >> 32);
+    uint32_t v[2];
+    std::memcpy(v, &hwy.value, sizeof(v));
+    bucket.label.content.value = v[0] != 0;
+    std::memcpy(&bucket.label.content.weight, &v[1], 4);
+  }
+};
+
+// Hessian Regression Unweighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<ExampleBucketType,
+                        std::enable_if_t<std::is_same_v<
+                            typename ExampleBucketType::LabelBucketType,
+                            LabelHessianNumericalOneValueBucket<false>>>> {
+  using HWY_T = hwy::K64V64;
+  // Sorted with Key: Feature (float). Value: Gradient (float) and Hessian
+  // (float).
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    hwy.key = static_cast<uint64_t>(
+                  internal::FloatToUintForSort(bucket.feature.value))
+              << 32;
+    float v[2] = {bucket.label.content.gradient, bucket.label.content.hessian};
+    std::memcpy(&hwy.value, v, sizeof(v));
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key >> 32);
+    float v[2];
+    std::memcpy(v, &hwy.value, sizeof(v));
+    bucket.label.content.gradient = v[0];
+    bucket.label.content.hessian = v[1];
+  }
+};
+
+// Hessian Regression Weighted.
+template <typename ExampleBucketType>
+struct FlatBucketTraits<ExampleBucketType,
+                        std::enable_if_t<std::is_same_v<
+                            typename ExampleBucketType::LabelBucketType,
+                            LabelHessianNumericalOneValueBucket<true>>>> {
+  using HWY_T = hwy::K64V64;
+  // Sorted with Key: Feature (float) and Gradient (float). Value: Hessian
+  // (float) and Weight (float). Note that the Gradient is in the lower bits of
+  // the label and only influences the sorting in the case of ties in the
+  // feature. Ties are irrelevant for split finding here.
+  static constexpr bool kIsSupported = true;
+  static HWY_T* GetBuffer(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.data();
+  }
+  static size_t GetSize(PerThreadCacheV2* cache) {
+    return cache->hwy_k64v64_buffer.size();
+  }
+
+  static void Pack(HWY_T& hwy, const ExampleBucketType& bucket) {
+    uint32_t feat_k = internal::FloatToUintForSort(bucket.feature.value);
+    uint32_t grad_bits;
+    std::memcpy(&grad_bits, &bucket.label.content.gradient, sizeof(grad_bits));
+    hwy.key = (static_cast<uint64_t>(feat_k) << 32) | grad_bits;
+    float v[2] = {bucket.label.content.hessian, bucket.label.content.weight};
+    std::memcpy(&hwy.value, v, sizeof(v));
+  }
+  static void Unpack(const HWY_T& hwy, ExampleBucketType& bucket) {
+    bucket.feature.value = internal::UintToFloatFromSort(hwy.key >> 32);
+    uint32_t grad_bits = hwy.key & 0xFFFFFFFF;
+    std::memcpy(&bucket.label.content.gradient, &grad_bits, sizeof(grad_bits));
+    float v[2];
+    std::memcpy(v, &hwy.value, sizeof(v));
+    bucket.label.content.hessian = v[0];
+    bucket.label.content.weight = v[1];
+  }
 };
 
 // Get the example bucket set from the thread cache.
@@ -1336,6 +1618,172 @@ SplitSearchResult FindBestSplit(
       selected_examples.size(), min_num_obs, attribute_idx, condition, cache);
 }
 
+// Fast split scanning for the fast buffers. The ExampleBuckets handled here are
+// exclusively OneValueBuckets, which simplifies some of the logic compared to
+// ScanSplits (e.g. no bucket interpolation).
+template <typename ExampleBucketSet, typename LabelScoreAccumulator>
+SplitSearchResult ScanSplitsFlat(
+    const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
+    PerThreadCacheV2* cache, const SignedExampleIdx num_examples,
+    const int min_num_obs, const int attribute_idx,
+    proto::NodeCondition* condition) {
+  using ExampleBucketType = typename ExampleBucketSet::ExampleBucketType;
+  using FeatureBucketType = typename ExampleBucketType::FeatureBucketType;
+  using FlatTraits = FlatBucketTraits<ExampleBucketType>;
+
+  const auto* sorted_hwy_array = FlatTraits::GetBuffer(cache);
+  const size_t num_selected_examples = FlatTraits::GetSize(cache);
+
+  if (num_selected_examples <= 1) {
+    return SplitSearchResult::kInvalidAttribute;
+  }
+
+  ExampleBucketType first_bucket;
+  FlatTraits::Unpack(sorted_hwy_array[0], first_bucket);
+  ExampleBucketType last_bucket;
+  FlatTraits::Unpack(sorted_hwy_array[num_selected_examples - 1], last_bucket);
+  if (!FeatureBucketType::IsValidAttribute(first_bucket.feature,
+                                           last_bucket.feature)) {
+    return SplitSearchResult::kInvalidAttribute;
+  }
+
+  // Initialize the accumulators.
+  LabelScoreAccumulator& neg =
+      *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(false, cache);
+  LabelScoreAccumulator& pos =
+      *GetCachedLabelScoreAccumulator<LabelScoreAccumulator>(true, cache);
+
+  initializer.InitEmpty(&neg);
+  initializer.InitFull(&pos);
+
+  // Running statistics.
+  SignedExampleIdx num_pos_examples = num_examples;
+  SignedExampleIdx num_neg_examples = 0;
+  bool tried_one_split = false;
+
+  const double weighted_num_examples = pos.WeightedNumExamples();
+  const int end_bucket_idx = num_selected_examples - 1;
+
+  double best_score =
+      std::max<double>(condition->split_score(), initializer.MinimumScore());
+  int best_bucket_idx = -1;
+
+  ExampleBucketType current_bucket;
+  ExampleBucketType next_bucket;
+
+  for (int bucket_idx = 0; bucket_idx < end_bucket_idx; bucket_idx++) {
+    FlatTraits::Unpack(sorted_hwy_array[bucket_idx], current_bucket);
+    FlatTraits::Unpack(sorted_hwy_array[bucket_idx + 1], next_bucket);
+
+    current_bucket.label.AddToScoreAcc(&neg);
+    current_bucket.label.SubToScoreAcc(&pos);
+
+    // Only support OneValue buckets.
+    DCHECK_EQ(current_bucket.label.count, 1);
+    num_pos_examples--;
+    num_neg_examples++;
+
+    if (!FeatureBucketType::IsValidSplit(current_bucket.feature,
+                                         next_bucket.feature)) {
+      continue;
+    }
+
+    if (num_pos_examples < min_num_obs) {
+      break;
+    }
+
+    if (num_neg_examples < min_num_obs) {
+      continue;
+    }
+
+    if (!initializer.IsValidSplit(neg, pos)) {
+      continue;
+    }
+
+    const auto score = Score<>(initializer, weighted_num_examples, pos, neg);
+    tried_one_split = true;
+
+    if (score > best_score) {
+      best_bucket_idx = bucket_idx;
+      best_score = score;
+      condition->set_num_pos_training_examples_without_weight(num_pos_examples);
+      condition->set_num_pos_training_examples_with_weight(
+          pos.WeightedNumExamples());
+    }
+  }
+
+  if (best_bucket_idx != -1) {
+    ExampleBucketType best_current_bucket;
+    ExampleBucketType best_next_bucket;
+    FlatTraits::Unpack(sorted_hwy_array[best_bucket_idx], best_current_bucket);
+    FlatTraits::Unpack(sorted_hwy_array[best_bucket_idx + 1], best_next_bucket);
+
+    feature_filler.SetConditionFinalFromThresholds(
+        best_current_bucket.feature.value, best_next_bucket.feature.value,
+        condition);
+
+    condition->set_attribute(attribute_idx);
+    condition->set_num_training_examples_without_weight(num_examples);
+    condition->set_num_training_examples_with_weight(weighted_num_examples);
+    condition->set_split_score(best_score);
+    return SplitSearchResult::kBetterSplitFound;
+  } else {
+    return tried_one_split ? SplitSearchResult::kNoBetterSplitFound
+                           : SplitSearchResult::kInvalidAttribute;
+  }
+}
+
+template <typename ExampleBucketSet, typename LabelBucketSet>
+SplitSearchResult FindBestSplitFlatHighway(
+    absl::Span<const UnsignedExampleIdx> selected_examples,
+    const typename ExampleBucketSet::FeatureBucketType::Filler& feature_filler,
+    const typename ExampleBucketSet::LabelBucketType::Filler& label_filler,
+    const typename ExampleBucketSet::LabelBucketType::Initializer& initializer,
+    const int min_num_obs, const int attribute_idx,
+    proto::NodeCondition* condition, PerThreadCacheV2* cache) {
+  DCHECK(condition != nullptr);
+
+  using ExampleBucketType = typename ExampleBucketSet::ExampleBucketType;
+  using FlatTraits = FlatBucketTraits<ExampleBucketType>;
+
+  const size_t num_selected_examples = selected_examples.size();
+  if (num_selected_examples <= 1) {
+    return SplitSearchResult::kInvalidAttribute;
+  }
+
+  // Populate the flat highway arrays.
+  if constexpr (std::is_same_v<typename FlatTraits::HWY_T, hwy::K32V32>) {
+    cache->hwy_k32v32_buffer.resize(num_selected_examples);
+  } else {
+    cache->hwy_k64v64_buffer.resize(num_selected_examples);
+  }
+
+  auto* hwy_buffer = FlatTraits::GetBuffer(cache);
+
+  ExampleBucketType temp_bucket;
+  feature_filler.InitializeAndZero(0, &temp_bucket.feature);
+  label_filler.InitializeAndZero(&temp_bucket.label);
+
+  for (size_t select_idx = 0; select_idx < num_selected_examples;
+       ++select_idx) {
+    const UnsignedExampleIdx example_idx = selected_examples[select_idx];
+    feature_filler.ConsumeExample(example_idx, &temp_bucket.feature);
+    label_filler.ConsumeExample(example_idx, &temp_bucket.label);
+    label_filler.Finalize(&temp_bucket.label);
+
+    FlatTraits::Pack(hwy_buffer[select_idx], temp_bucket);
+  }
+
+  // Run VQSort.
+  hwy::VQSort(hwy_buffer, num_selected_examples, hwy::SortAscending());
+
+  // Call ScanSplitsFlat.
+  return ScanSplitsFlat<ExampleBucketSet, LabelBucketSet>(
+      feature_filler, initializer, cache, selected_examples.size(), min_num_obs,
+      attribute_idx, condition);
+}
+
 // Find the best possible split (and update the condition accordingly) using
 // a random scan of the buckets.  See "ScanSplitsRandomBuckets".
 template <typename ExampleBucketSet, typename LabelBucketSet>
@@ -1379,9 +1827,8 @@ void AddLabelBucket(const ExampleBucketSet& src, ExampleBucketSet* dst) {
 
 template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureNumerical =
-    FindBestSplit<FeatureNumericalLabelNumericalOneValue<weighted>,
-                  LabelNumericalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+    FindBestSplitFlatHighway<FeatureNumericalLabelNumericalOneValue<weighted>,
+                             LabelNumericalScoreAccumulator>;
 
 template <bool weighted>
 constexpr auto FindBestSplit_LabelRegressionFeatureDiscretizedNumerical =
@@ -1416,9 +1863,8 @@ constexpr auto FindBestSplit_LabelRegressionFeatureNACart =
 // Label: Classification.
 
 constexpr auto FindBestSplit_LabelClassificationFeatureNumerical =
-    FindBestSplit<FeatureNumericalLabelCategoricalOneValue,
-                  LabelCategoricalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+    FindBestSplitFlatHighway<FeatureNumericalLabelCategoricalOneValue,
+                             LabelCategoricalScoreAccumulator>;
 
 constexpr auto FindBestSplit_LabelClassificationFeatureDiscretizedNumerical =
     FindBestSplit<FeatureDiscretizedNumericalLabelCategorical,
@@ -1444,9 +1890,8 @@ constexpr auto FindBestSplit_LabelClassificationFeatureNACart =
 // Label: Unweighted Classification.
 
 constexpr auto FindBestSplit_LabelUnweightedClassificationFeatureNumerical =
-    FindBestSplit<FeatureNumericalLabelUnweightedCategoricalOneValue,
-                  LabelCategoricalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+    FindBestSplitFlatHighway<FeatureNumericalLabelUnweightedCategoricalOneValue,
+                             LabelCategoricalScoreAccumulator>;
 
 constexpr auto
     FindBestSplit_LabelUnweightedClassificationFeatureDiscretizedNumerical =
@@ -1474,9 +1919,8 @@ constexpr auto FindBestSplit_LabelUnweightedClassificationFeatureNACart =
 // Label: Binary Classification.
 
 constexpr auto FindBestSplit_LabelBinaryClassificationFeatureNumerical =
-    FindBestSplit<FeatureNumericalLabelBinaryCategoricalOneValue,
-                  LabelBinaryCategoricalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+    FindBestSplitFlatHighway<FeatureNumericalLabelBinaryCategoricalOneValue,
+                             LabelBinaryCategoricalScoreAccumulator>;
 
 constexpr auto
     FindBestSplit_LabelBinaryClassificationFeatureDiscretizedNumerical =
@@ -1504,9 +1948,9 @@ constexpr auto FindBestSplit_LabelBinaryClassificationFeatureNACart =
 
 constexpr auto
     FindBestSplit_LabelUnweightedBinaryClassificationFeatureNumerical =
-        FindBestSplit<FeatureNumericalLabelUnweightedBinaryCategoricalOneValue,
-                      LabelBinaryCategoricalScoreAccumulator,
-                      /*require_label_sorting*/ false>;
+        FindBestSplitFlatHighway<
+            FeatureNumericalLabelUnweightedBinaryCategoricalOneValue,
+            LabelBinaryCategoricalScoreAccumulator>;
 
 constexpr auto
     FindBestSplit_LabelUnweightedBinaryClassificationFeatureDiscretizedNumerical =
@@ -1537,9 +1981,9 @@ constexpr auto FindBestSplit_LabelUnweightedBinaryClassificationFeatureNACart =
 
 template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureNumerical =
-    FindBestSplit<FeatureNumericalLabelHessianNumericalOneValue<weighted>,
-                  LabelHessianNumericalScoreAccumulator,
-                  /*require_label_sorting*/ false>;
+    FindBestSplitFlatHighway<
+        FeatureNumericalLabelHessianNumericalOneValue<weighted>,
+        LabelHessianNumericalScoreAccumulator>;
 
 template <bool weighted>
 constexpr auto FindBestSplit_LabelHessianRegressionFeatureDiscretizedNumerical =

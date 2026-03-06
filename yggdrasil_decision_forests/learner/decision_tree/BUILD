@@ -150,6 +150,9 @@ cc_library_ydf(
         "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
+        "@com_google_highway//:hwy",
+        "@com_google_highway//hwy/contrib/sort:vqsort",
+        "@com_google_highway//hwy/contrib/sort:vqsort_shared",
         "@eigen",
     ] + select({
         "//conditions:default": [
