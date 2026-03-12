@@ -10,7 +10,8 @@ local_path_override(
 )
 
 # Must match the Abseil and Protobuf version used by the Tensorflow version you're compiling for.
-bazel_dep(name = "abseil-cpp", version = "20250127.1", repo_name = "com_google_absl")
+# The current value is set for TF 2.21.0
+bazel_dep(name = "abseil-cpp", version = "20250814.2", repo_name = "com_google_absl")
 bazel_dep(name = "protobuf", version = "28.3", repo_name = "com_google_protobuf")
 single_version_override(
     module_name = "protobuf",
@@ -19,7 +20,7 @@ single_version_override(
 
 single_version_override(
     module_name = "abseil-cpp",
-    version = "20250127.1",
+    version = "20250814.2",
 )
 
 tf_ext = use_extension("@ydf_cc//third_party:tf_downloader.bzl", "tf_downloaded_header_extension")
