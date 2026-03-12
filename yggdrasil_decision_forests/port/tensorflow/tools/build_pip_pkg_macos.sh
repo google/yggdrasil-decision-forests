@@ -19,9 +19,12 @@
 #
 # Usage:
 #   ./tools/build_pip_pkg_macos.sh
+#   TF_VERSIONS="2.21.0" PY_VERSIONS="3.10 3.11 3.12 3.13" ./tools/build_pip_pkg_macos.sh
 #
 # For a local install location of ydf, provide YDF_LOCAL_DEPENDENCY_DIR.
-# To build for TF < 2.20.0, use LEGACY=1.
+# To build for specific TF or Python versions, use TF_VERSIONS and PY_VERSIONS.
+# Example: TF_VERSIONS="2.21.0" PY_VERSIONS="3.10 3.11 3.12 3.13" ./tools/build_pip_pkg_macos.sh
+# When building for TF < 2.20, pass LEGACY=1
 
 set -e
 
@@ -57,17 +60,31 @@ if [[ "$LEGACY" == "1" ]]; then
   # Patching compile.bzl
   sed -i '' 's|load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")|load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")|g' ../../utils/compile.bzl
   sed -i '' 's|load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")|load("@rules_cc//cc:defs.bzl", "cc_proto_library")|g' ../../utils/compile.bzl
-
+  if [[ -z "${TF_VERSIONS+x}" ]]; then
   # Note: TensorFlow <2.18.0 depends on Protobuf 4.25.3 or less, which is not
   # compatible with YDF versions using ydf-tf.
   # Technically, YDF users could still use the ydf-tf op manually, see
   # export_tf.py for details. However, this is neither tested nor supported.
-  TF_VERSIONS=("2.19.1" "2.19.0" "2.18.1" "2.18.0")
-  PY_VERSIONS=("3.9" "3.10" "3.11" "3.12")
+    TF_VERSIONS=("2.19.1" "2.19.0" "2.18.1" "2.18.0")
+  fi
+  if [[ -z "${PY_VERSIONS+x}" ]]; then
+    PY_VERSIONS=("3.9" "3.10" "3.11" "3.12")
+  fi
 else
-  # Default mode uses the existing files (no cp needed, backups are already made)
-  TF_VERSIONS=("2.20.0")
-  PY_VERSIONS=("3.9" "3.10" "3.11" "3.12" "3.13")
+  if [[ -z "${TF_VERSIONS+x}" ]]; then
+    TF_VERSIONS=("2.20.0")
+  fi
+  if [[ -z "${PY_VERSIONS+x}" ]]; then
+    PY_VERSIONS=("3.9" "3.10" "3.11" "3.12" "3.13")
+  fi
+fi
+
+# Convert TF_VERSIONS and PY_VERSIONS to arrays if they are passed as strings.
+if [[ -n "${TF_VERSIONS}" ]] && [[ "$(declare -p TF_VERSIONS 2>/dev/null)" != *"declare -a"* ]]; then
+  TF_VERSIONS=(${TF_VERSIONS})
+fi
+if [[ -n "${PY_VERSIONS}" ]] && [[ "$(declare -p PY_VERSIONS 2>/dev/null)" != *"declare -a"* ]]; then
+  PY_VERSIONS=(${PY_VERSIONS})
 fi
 
 rm -rf pip_pkg/wheelhouse
