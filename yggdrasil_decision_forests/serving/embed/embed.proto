@@ -130,13 +130,4 @@ message Java {
 message Cpp {}
 
 message C {
-  // Enables floating-point free, fixed-point integer inference with linux
-  // kernel types. Note: Missing values are not supported when this is enabled.
-  optional bool linux_kernel_compatible = 1 [default = false];
-
-  // The number of bits reserved for the fractional part of the numbers
-  // (e.g., 16 for Q16.16 format).
-  // This applies to the initial bias, thresholds, and leaf values.
-  // Higher values provide more precision but increase the risk of overflow.
-  optional int32 fixed_point_fractional_bits = 2 [default = 16];
 }

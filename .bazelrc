@@ -48,7 +48,7 @@ build --announce_rc
 build --noincompatible_strict_action_env
 
 # Enable after adding python headers to protobuf.
-build --define=use_fast_cpp_protos=true
+# build --define=use_fast_cpp_protos=true
 build --define=allow_oversize_protos=true
 build --define=grpc_no_ares=true
 
