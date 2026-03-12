@@ -528,16 +528,6 @@ class GenericJAXModel(generic_model.GenericModel):
   ) -> Dict[str, bytes]:
     raise NotImplementedError
 
-  def to_standalone_c(
-      self,
-      name: str = "ydf_model",
-      classification_output: Literal["CLASS", "SCORE", "PROBABILITY"] = "CLASS",
-      *,
-      linux_kernel_compatible: bool = False,
-      fixed_point_fractional_bits: Optional[int] = None,
-  ) -> Union[str, Dict[str, bytes]]:
-    raise NotImplementedError
-
   # TODO: Change default value of "mode" before 1.0 release.
   def to_tensorflow_saved_model(  # pylint: disable=dangerous-default-value
       self,

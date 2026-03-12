@@ -671,9 +671,6 @@ absl::StatusOr<BaseTypes> BuildTypesKernel(const proto::Options& options,
 absl::StatusOr<BaseTypes> BuildTypes(const proto::Options& options,
                                      const ModelIR& model_ir,
                                      const std::string pseudo_namespace) {
-  if (options.c().linux_kernel_compatible()) {
-    return BuildTypesKernel(options, model_ir, pseudo_namespace);
-  }
 
   return BuildTypesStandard(options, model_ir, pseudo_namespace);
 }

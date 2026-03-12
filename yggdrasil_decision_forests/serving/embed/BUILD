@@ -20,7 +20,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/model/random_forest",
-        "//yggdrasil_decision_forests/serving/embed/c:c_embed",
         "//yggdrasil_decision_forests/serving/embed/cpp:cpp_embed",
         "//yggdrasil_decision_forests/serving/embed/java:java_embed",
         "@com_google_absl//absl/container:node_hash_map",

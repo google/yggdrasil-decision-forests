@@ -749,6 +749,21 @@ cc_library_ydf(
     hdrs = ["random.h"],
 )
 
+alias(
+    name = "endian",
+    actual = ":endian_default",
+)
+
+cc_library_ydf(
+    name = "endian_default",
+    hdrs = [
+        "endian.h",
+        "endian_default.h",
+    ],
+    defines = ["YGG_ENDIAN_USES_DEFAULT"],
+    visibility = ["//visibility:private"],
+)
+
 cc_library_ydf(
     name = "compatibility",
     hdrs = ["compatibility.h"],
@@ -762,9 +777,9 @@ cc_library_ydf(
     hdrs = ["blob_sequence.h"],
     deps = [
         ":bytestream",
+        ":endian",
         ":status_macros",
         ":zlib",
-        "@com_google_absl//absl/base:endian",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -1138,6 +1153,15 @@ cc_test(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "endian_test",
+    srcs = ["endian_test.cc"],
+    deps = [
+        ":endian",
         "@com_google_googletest//:gtest_main",
     ],
 )
