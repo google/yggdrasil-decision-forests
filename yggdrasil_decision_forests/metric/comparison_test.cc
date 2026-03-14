@@ -53,7 +53,7 @@ class ModelComparisonPValueTest : public ::testing::Test {
                                        proto::EvaluationResults* eval_result) {
     model::proto::Prediction pred;
     auto* pred_proba = pred.mutable_classification()->mutable_distribution();
-    pred_proba->mutable_counts()->Resize(2, 0);
+    pred_proba->mutable_counts()->resize(2, 0);
     pred_proba->set_sum(1);
     pred.mutable_classification()->set_value(value);
     pred_proba->set_counts(0, proba);

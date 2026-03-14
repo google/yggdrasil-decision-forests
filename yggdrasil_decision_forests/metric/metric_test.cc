@@ -74,7 +74,7 @@ TEST(Metric, EvaluationOfClassification) {
   CHECK_OK(InitializeEvaluation(option, label_column, &eval));
   model::proto::Prediction pred;
   auto* pred_proba = pred.mutable_classification()->mutable_distribution();
-  pred_proba->mutable_counts()->Resize(3, 0);
+  pred_proba->mutable_counts()->resize(3, 0);
   pred_proba->set_sum(1);
 
   // Add some predictions.
@@ -172,7 +172,7 @@ TEST(Metric, EvaluationOfClassificationWithNumericalWeights) {
   CHECK_OK(InitializeEvaluation(option, label_column, &eval));
   model::proto::Prediction pred;
   auto* pred_proba = pred.mutable_classification()->mutable_distribution();
-  pred_proba->mutable_counts()->Resize(3, 0);
+  pred_proba->mutable_counts()->resize(3, 0);
   pred_proba->set_sum(1);
 
   // Add some predictions.
@@ -324,7 +324,7 @@ classification {
       std::uniform_int_distribution<int> label_dist(0, 1);
       model::proto::Prediction pred;
       auto* pred_proba = pred.mutable_classification()->mutable_distribution();
-      pred_proba->mutable_counts()->Resize(2, 0);
+      pred_proba->mutable_counts()->resize(2, 0);
       for (int pred_idx = 0; pred_idx < num_predictions; pred_idx++) {
         const int ground_truth = label_dist(rnd);
         float prediction = unit_normal_dist(rnd) * (1 - label_correlation) +

@@ -52,7 +52,7 @@ TEST(Report, HtmlReportClassification) {
   CHECK_OK(InitializeEvaluation(option, label_column, &eval));
   model::proto::Prediction pred;
   auto* pred_proba = pred.mutable_classification()->mutable_distribution();
-  pred_proba->mutable_counts()->Resize(3, 0);
+  pred_proba->mutable_counts()->resize(3, 0);
   pred_proba->set_sum(1);
 
   // Add some predictions.
@@ -165,7 +165,7 @@ TEST(Report, HtmlReportAnomalyDetection) {
   ASSERT_OK(InitializeEvaluation(option, label_column, &eval));
   model::proto::Prediction pred;
   auto* pred_proba = pred.mutable_classification()->mutable_distribution();
-  pred_proba->mutable_counts()->Resize(3, 0);
+  pred_proba->mutable_counts()->resize(3, 0);
   pred_proba->set_sum(1);
 
   // Add some predictions.

@@ -1979,7 +1979,7 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
   model::proto::Prediction prediction_proto;
   auto& prediction_distribution =
       *prediction_proto.mutable_classification()->mutable_distribution();
-  prediction_distribution.mutable_counts()->Resize(3, 0);
+  prediction_distribution.mutable_counts()->resize(3, 0);
 
   for (int example_idx = 0; example_idx < labels.size(); example_idx++) {
     prediction_proto.mutable_classification()->set_ground_truth(
