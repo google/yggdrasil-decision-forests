@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.16.0 - 2026-03-16
+
+### Features
+
+-   Training on numerical features, esp. when using oblique splits, is now much
+    faster, >60% for some datasets.
+-   Import Monotonic in the top-level namespace.
+-   Update Protobuf / Abseil dependencies.
+
+### Fix
+
+-   Fix weighted SHAP for models with hessian splits.
+-   Fix training logs crash.
+
+### Release music
+
+Präludium und Fuge Es-Dur BWV 552. Johann Sebastian Bach
+
 ## 0.15.0 - 2026-02-04
 
 ### API Changes

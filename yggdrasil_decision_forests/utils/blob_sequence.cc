@@ -18,12 +18,12 @@
 #include <cstdint>
 #include <string>
 
-#include "absl/base/internal/endian.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
+#include "yggdrasil_decision_forests/utils/endian.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/zlib.h"
 
@@ -48,7 +48,7 @@ absl::StatusOr<Reader> Reader::Create(utils::InputByteStream* stream) {
   if (header.magic[0] != 'B' || header.magic[1] != 'S') {
     return absl::InvalidArgumentError("Invalid header");
   }
-  reader.version_ = absl::little_endian::ToHost16(header.version);
+  reader.version_ = utils::LittleEndianToHost16(header.version);
 
   if (reader.version_ > kCurrentVersion) {
     return absl::InvalidArgumentError(absl::Substitute(
@@ -85,7 +85,7 @@ absl::StatusOr<bool> Reader::Read(std::string* blob) {
     return false;
   }
 
-  header.length = absl::little_endian::ToHost32(header.length);
+  header.length = utils::LittleEndianToHost32(header.length);
 
   blob->resize(header.length);
   ASSIGN_OR_RETURN(has_content,
@@ -113,7 +113,7 @@ absl::StatusOr<Writer> Writer::Create(utils::OutputByteStream* stream,
   internal::FileHeader header;
   header.magic[0] = 'B';
   header.magic[1] = 'S';
-  header.version = absl::little_endian::FromHost16(kCurrentVersion);
+  header.version = utils::HostToLittleEndian16(kCurrentVersion);
   header.compression = static_cast<uint8_t>(compression);
 
   RETURN_IF_ERROR(writer.raw_stream_->Write(
@@ -133,7 +133,7 @@ absl::StatusOr<Writer> Writer::Create(utils::OutputByteStream* stream,
 
 absl::Status Writer::Write(const absl::string_view blob) {
   internal::RecordHeader header;
-  header.length = absl::little_endian::FromHost32(blob.size());
+  header.length = utils::HostToLittleEndian32(blob.size());
 
   RETURN_IF_ERROR(stream().Write(
       absl::string_view((char*)&header, sizeof(internal::RecordHeader))));

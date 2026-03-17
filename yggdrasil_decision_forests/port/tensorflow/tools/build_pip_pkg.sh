@@ -20,7 +20,10 @@
 # docker run --rm -it -v ~/dev/scratch/ydf-tf/yggdrasil-decision-forests/:/work_dir -w /work_dir quay.io/pypa/manylinux_2_28_x86_64:latest /bin/bash
 #
 # For a local install location of ydf, provide YDF_LOCAL_DEPENDENCY_DIR.
-# To build for TF < 2.20.0, use LEGACY=1.
+# To build for specific TF or Python versions, use TF_VERSIONS and PY_VERSIONS.
+# Example: TF_VERSIONS="2.21.0" PY_VERSIONS="3.10 3.11 3.12 3.13" ./build_pip_pkg.sh
+# When building for TF < 2.20, pass LEGACY=1. Note that this might not work
+# out-of-the box if dependencies have changed too much.
 
 set -e
 
@@ -74,11 +77,27 @@ if [[ "$LEGACY" == "1" ]]; then
   # compatible with YDF versions using ydf-tf.
   # Technically, YDF users could still use the ydf-tf op manually, see
   # export_tf.py for details. However, this is neither tested nor supported.
-  TF_VERSIONS=("2.19.1" "2.19.0" "2.18.1" "2.18.0")
-  PY_VERSIONS=("3.9" "3.10" "3.11" "3.12")
+  if [[ -z "${TF_VERSIONS+x}" ]]; then
+    TF_VERSIONS=("2.19.1" "2.19.0" "2.18.1" "2.18.0")
+  fi
+  if [[ -z "${PY_VERSIONS+x}" ]]; then
+    PY_VERSIONS=("3.9" "3.10" "3.11" "3.12")
+  fi
 else
-  TF_VERSIONS=("2.20.0")
-  PY_VERSIONS=("3.9" "3.10" "3.11" "3.12" "3.13")
+  if [[ -z "${TF_VERSIONS+x}" ]]; then
+    TF_VERSIONS=("2.20.0")
+  fi
+  if [[ -z "${PY_VERSIONS+x}" ]]; then
+    PY_VERSIONS=("3.9" "3.10" "3.11" "3.12" "3.13")
+  fi
+fi
+
+# Convert TF_VERSIONS and PY_VERSIONS to arrays if they are passed as strings.
+if [[ -n "${TF_VERSIONS}" ]] && [[ "$(declare -p TF_VERSIONS 2>/dev/null)" != *"declare -a"* ]]; then
+  TF_VERSIONS=(${TF_VERSIONS})
+fi
+if [[ -n "${PY_VERSIONS}" ]] && [[ "$(declare -p PY_VERSIONS 2>/dev/null)" != *"declare -a"* ]]; then
+  PY_VERSIONS=(${PY_VERSIONS})
 fi
 
 for YDF_PY_VERSION in "${PY_VERSIONS[@]}"; do
