@@ -240,6 +240,7 @@ pybind_library(
         "@com_google_absl//absl/status:statusor",
         "@ydf_cc//yggdrasil_decision_forests/utils:concurrency",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
+        "@ydf_cc//yggdrasil_decision_forests/utils:synchronization_primitives",
         "@ydf_cc//yggdrasil_decision_forests/utils:uid",
         "@ydf_cc//yggdrasil_decision_forests/utils/distribute/implementations/grpc",
         "@ydf_cc//yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_worker",

@@ -16,13 +16,21 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_WORKER_H_
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "grpcpp/server.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/utils.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -170,7 +178,7 @@ class WorkerService final : public proto::Server::Service {
   std::unique_ptr<InterWorkerCommunication> intra_worker_communication_;
 
   // utils::concurrency::Mutex protecting the initialization of the worker.
-  utils::concurrency::Mutex mutex_ GUARDED_BY(mutex_);
+  utils::concurrency::Mutex mutex_;
 
   // True when the worker is being stopped (i.e. waiting for all the requests to
   // be completed) because the user called "Done" on the manager, or because the

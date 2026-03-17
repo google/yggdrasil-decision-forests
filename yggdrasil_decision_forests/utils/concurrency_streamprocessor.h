@@ -130,7 +130,7 @@ StreamProcessor<Input, Output>::~StreamProcessor() {
 template <typename Input, typename Output>
 void StreamProcessor<Input, Output>::StartWorkers() {
   {
-    MutexLock results_lock(&mutex_);
+    MutexLock results_lock(mutex_);
     num_active_threads_ = num_threads_;
   }
   while (threads_.size() < num_threads_) {
@@ -169,7 +169,7 @@ void StreamProcessor<Input, Output>::ThreadLoop(const int thread_idx) {
 
     if (result_in_order_) {
       // The results should be returned in order.
-      MutexLock results_lock(&mutex_);
+      MutexLock results_lock(mutex_);
       while (query_id != next_query_id) {
         // Not my turn yet.
         cond_var_.Wait(&mutex_, &results_lock);
@@ -185,7 +185,7 @@ void StreamProcessor<Input, Output>::ThreadLoop(const int thread_idx) {
     }
   }
 
-  MutexLock results_lock(&mutex_);
+  MutexLock results_lock(mutex_);
   num_active_threads_--;
   if (num_active_threads_ == 0) {
     output_channel_.Close();

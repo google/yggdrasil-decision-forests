@@ -187,7 +187,7 @@ absl::Status ConcurrentForLoopWithWorker(
       const auto status = run(block_idx, begin_item_idx, end_item_idx, &cache);
       // Record job status.
       if (!status.ok()) {
-        MutexLock l(&global_status_mutex);
+        MutexLock l(global_status_mutex);
         global_status.Update(status);
         has_failure = true;
       }
