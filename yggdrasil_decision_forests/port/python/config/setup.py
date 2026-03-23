@@ -30,7 +30,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 REQUIRED_PACKAGES = [
     "numpy",
     "absl_py",
-    "protobuf>=5.29.1,<7.0.0",
+    "protobuf>=6.31.1,<8.0.0",
 ]
 
 OPTIONAL_PACKAGES = {"pandas": ["pandas"], "tensorflow": ["ydf-tf"]}
