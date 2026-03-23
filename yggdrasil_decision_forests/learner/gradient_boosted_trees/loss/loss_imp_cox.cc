@@ -17,13 +17,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <tuple>
 #include <vector>
 
-#include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"
@@ -112,30 +111,37 @@ absl::StatusOr<LossResults> CoxProportionalHazardLoss::Loss(
   }
   const auto* cox_cache = dynamic_cast<const Cache*>(cache);
   // TODO: Add support for non-uniform weights.
-  const double w = 1.f / log_hazard_predictions.size();
-  const double log_w = std::log(w);
+  const double w = 1.0 / log_hazard_predictions.size();
 
-  double loss = 0.f;
-  double hazard = 0.f;
-  absl::flat_hash_set<row_t> at_risk;
+  std::vector<double> exp_preds(log_hazard_predictions.size());
+  for (size_t i = 0; i < log_hazard_predictions.size(); ++i) {
+    exp_preds[i] = std::exp(log_hazard_predictions[i]);
+  }
+
+  double loss = 0.;
+  double hazard = 0.;
+  // Updates are sorted by time and every item first arrives before
+  // event / censor.
   for (const auto& [time, update_type, example_idx] : cox_cache->updates) {
     switch (update_type) {
       case CoxProportionalHazardLoss::Update::Type::ARRIVAL:
-        at_risk.insert(example_idx);
+        hazard += exp_preds[example_idx];
         break;
       case CoxProportionalHazardLoss::Update::Type::EVENT:
-        hazard = 0.f;
-        for (auto at_risk_idx : at_risk) {
-          hazard += w * std::exp(log_hazard_predictions[at_risk_idx]);
+        if (hazard > 0.0) {
+          loss += w * (std::log(hazard) - log_hazard_predictions[example_idx]);
         }
-        loss += w * (std::log(hazard) - log_hazard_predictions[example_idx] -
-                     log_w);
         [[fallthrough]];
       case CoxProportionalHazardLoss::Update::Type::CENSORING:
-        at_risk.erase(example_idx);
+        hazard -= exp_preds[example_idx];
+        if (hazard < 0.0) {
+          LOG_EVERY_POW_2(INFO) << "Cox loss has encountered negative hazard "
+                                << hazard << " setting hazard to 0.";
+          hazard = 0.0;
+        }
+        break;
     }
   }
-  DCHECK(at_risk.empty());
 
   return LossResults{static_cast<float>(loss), /*.secondary_metrics =*/{}};
 }
@@ -152,33 +158,63 @@ absl::Status CoxProportionalHazardLoss::UpdateGradients(
 
   std::vector<float>& hessians = *(*gradient_data)[0].hessian;
   std::vector<float>& gradients = *(*gradient_data)[0].gradient;
-  std::fill(hessians.begin(), hessians.end(), 0.f);
-  std::fill(gradients.begin(), gradients.end(), 0.f);
 
-  double hazard = 0.f;
-  absl::flat_hash_set<row_t> at_risk;
+  std::vector<double> exp_preds(log_hazard_predictions.size());
+  for (size_t i = 0; i < log_hazard_predictions.size(); ++i) {
+    exp_preds[i] = std::exp(log_hazard_predictions[i]);
+  }
+
+  double hazard = 0.;
+  double sum_1_over_hazard = 0.;
+  double sum_1_over_hazard_sq = 0.;
+  std::vector<double> snapshot_S1(log_hazard_predictions.size(), 0.0);
+  std::vector<double> snapshot_S2(log_hazard_predictions.size(), 0.0);
+
+  // Updates are sorted by time and every item first arrives before
+  // event / censor.
   for (const auto& [time, update_type, example_idx] : cox_cache->updates) {
     switch (update_type) {
       case CoxProportionalHazardLoss::Update::Type::ARRIVAL:
-        at_risk.insert(example_idx);
+        snapshot_S1[example_idx] = sum_1_over_hazard;
+        snapshot_S2[example_idx] = sum_1_over_hazard_sq;
+        hazard += exp_preds[example_idx];
         break;
-      case CoxProportionalHazardLoss::Update::Type::EVENT:
-        hazard = 0.f;
-        for (auto at_risk_idx : at_risk) {
-          hazard += std::exp(log_hazard_predictions[at_risk_idx]);
+      case CoxProportionalHazardLoss::Update::Type::EVENT: {
+        if (hazard > 0.0) {
+          sum_1_over_hazard += 1.0 / hazard;
+          sum_1_over_hazard_sq += 1.0 / (hazard * hazard);
         }
-        for (auto at_risk_idx : at_risk) {
-          float p = std::exp(log_hazard_predictions[at_risk_idx]) / hazard;
-          gradients[at_risk_idx] -= w * p;
-          hessians[at_risk_idx] += w * p * (1.f - p);
+        double dS1 = sum_1_over_hazard - snapshot_S1[example_idx];
+        double dS2 = sum_1_over_hazard_sq - snapshot_S2[example_idx];
+        double exp_pred = exp_preds[example_idx];
+        gradients[example_idx] = w * (1.0 - exp_pred * dS1);
+        hessians[example_idx] =
+            w * (exp_pred * dS1 - exp_pred * exp_pred * dS2);
+        hazard -= exp_preds[example_idx];
+        if (hazard < 0.0) {
+          LOG_EVERY_POW_2(INFO) << "Cox loss has encountered negative hazard "
+                                << hazard << " setting hazard to 0.";
+          hazard = 0.0;
         }
-        gradients[example_idx] += w;
-        [[fallthrough]];
-      case CoxProportionalHazardLoss::Update::Type::CENSORING:
-        at_risk.erase(example_idx);
+        break;
+      }
+      case CoxProportionalHazardLoss::Update::Type::CENSORING: {
+        double dS1 = sum_1_over_hazard - snapshot_S1[example_idx];
+        double dS2 = sum_1_over_hazard_sq - snapshot_S2[example_idx];
+        double exp_pred = exp_preds[example_idx];
+        gradients[example_idx] = w * (-exp_pred * dS1);
+        hessians[example_idx] =
+            w * (exp_pred * dS1 - exp_pred * exp_pred * dS2);
+        hazard -= exp_preds[example_idx];
+        if (hazard < 0.0) {
+          LOG_EVERY_POW_2(INFO) << "Cox loss has encountered negative hazard "
+                                << hazard << " setting hazard to 0.";
+          hazard = 0.0;
+        }
+        break;
+      }
     }
   }
-  DCHECK(at_risk.empty());
   return absl::OkStatus();
 }
 
