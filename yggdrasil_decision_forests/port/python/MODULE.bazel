@@ -1,6 +1,6 @@
 module(
     name = "ydf",
-    version = "0.16.0",
+    version = "0.16.1",
 )
 
 bazel_dep(name = "abseil-cpp", version = "20250814.1", repo_name = "com_google_absl")
