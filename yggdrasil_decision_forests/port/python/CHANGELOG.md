@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.1 - 2026-03-24
+
+### Fix
+
+-   Fix Python protobuf dependency
+
+### Release music
+
+Präludium und Fuge Es-Dur BWV 552, für Orchester gesetzt. Johann Sebastian Bach (arr. Arnold Schönberg)
+
 ## 0.16.0 - 2026-03-16
 
 ### Features
