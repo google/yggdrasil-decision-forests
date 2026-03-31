@@ -286,10 +286,14 @@ ModelDataBank::GetOrderedNodeDataArrays() const {
 
 absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
     const BaseInternalOptions& internal_options, absl::string_view class_name,
-    absl::string_view resource_name) const {
+    absl::string_view resource_name,
+    bool use_runtime_derived_resource_path) const {
   std::string declarations;
-  std::string static_block;
-
+  std::string field_initialization_code;
+  const std::string maybe_static_final =
+      use_runtime_derived_resource_path ? "" : "static final ";
+  const std::string maybe_this =
+      use_runtime_derived_resource_path ? "this." : "";
   // Helper to generate loader for NodeDataArray
   auto generate_node_array_loader =
       [&](const std::optional<NodeDataArray>& array) -> absl::Status {
@@ -310,19 +314,21 @@ absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
       return absl::InternalError(
           absl::StrCat("Array ", java_name, " is unexpectedly empty."));
     }
-    absl::SubstituteAndAppend(&declarations, "private static final $0[] $1;\n",
-                              java_type, java_name);
 
-    absl::SubstituteAndAppend(&static_block,
+    absl::SubstituteAndAppend(&declarations, "private $0$1[] $2;\n",
+                              maybe_static_final, java_type, java_name);
+
+    absl::SubstituteAndAppend(&field_initialization_code,
                               "  int $0Length = dis.readInt();\n"
-                              "  $1 = new $2[$0Length];\n"
+                              "  $1$0 = new $2[$0Length];\n"
                               "  for (int i = 0; i < $0Length; i++) {\n",
-                              java_name, java_name, java_type);
+                              java_name, maybe_this, java_type);
 
     ASSIGN_OR_RETURN(const std::string read_method, array->GetJavaReadMethod());
-    absl::SubstituteAndAppend(&static_block, "    $0[i] = dis.$1;\n", java_name,
+    absl::SubstituteAndAppend(&field_initialization_code,
+                              "    $0$1[i] = dis.$2;\n", maybe_this, java_name,
                               read_method);
-    absl::StrAppend(&static_block, "  }\n");
+    absl::StrAppend(&field_initialization_code, "  }\n");
     return absl::OkStatus();
   };
 
@@ -336,38 +342,58 @@ absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
 
   // 2. Categorical condition bank if categorical conditions exist.
   if (node_cat.has_value()) {
-    absl::StrAppend(&declarations,
-                    "private static final BitSet categoricalBank;\n");
-    absl::StrAppend(&static_block,
-                    "  int categoricalBankNumLongs = dis.readInt();\n"
-                    "  if (categoricalBankNumLongs > 0) {\n"
-                    "    long[] longs = new long[categoricalBankNumLongs];\n"
-                    "    for (int i = 0; i < categoricalBankNumLongs; i++) {\n"
-                    "      longs[i] = dis.readLong();\n"
-                    "    }\n"
-                    "    categoricalBank = BitSet.valueOf(longs);\n"
-                    "  } else {\n"
-                    "    categoricalBank = new BitSet();\n"
-                    "  }\n");
+    absl::SubstituteAndAppend(&declarations,
+                              "private $0BitSet categoricalBank;\n",
+                              maybe_static_final);
+    absl::SubstituteAndAppend(
+        &field_initialization_code,
+        "  int categoricalBankNumLongs = dis.readInt();\n"
+        "  if (categoricalBankNumLongs > 0) {\n"
+        "    long[] longs = new long[categoricalBankNumLongs];\n"
+        "    for (int i = 0; i < categoricalBankNumLongs; i++) {\n"
+        "      longs[i] = dis.readLong();\n"
+        "    }\n"
+        "    $0categoricalBank = BitSet.valueOf(longs);\n"
+        "  } else {\n"
+        "    $0categoricalBank = new BitSet();\n"
+        "  }\n",
+        maybe_this);
   }
 
   std::string content = declarations;
-  absl::StrAppend(&content, "\nstatic {\n");
-  absl::SubstituteAndAppend(&content,
-                            "  try (InputStream is = "
-                            "$0.class.getResourceAsStream(\"$1\");\n"
-                            "       DataInputStream dis = new "
-                            "DataInputStream(new "
-                            "BufferedInputStream(is))) {\n",
-                            class_name, resource_name);
-  absl::StrAppend(&content, static_block);
-  absl::StrAppend(&content,
-                  "  } catch (IOException e) {\n"
-                  "    throw new RuntimeException(\"Failed to load model "
-                  "data resource: \" + e.getMessage(), e);\n"
-                  "  }\n"
-                  "}\n");
+  if (use_runtime_derived_resource_path) {
+    absl::StrAppend(&content, "private boolean isInitialized = false;\n");
+    absl::SubstituteAndAppend(&content,
+                              R"(
+private void init(InputStream stream) throws IOException {
+  try (DataInputStream dis = new DataInputStream(new BufferedInputStream(stream))) {
+$0
+  isInitialized = true;
+  }
+}
 
+public boolean isInitialized() {
+  return isInitialized;
+}
+)",
+                              field_initialization_code);
+  } else {
+    absl::StrAppend(&content, "\nstatic {\n");
+    absl::SubstituteAndAppend(
+        &content,
+        "  try (InputStream is = "
+        "$0.class.getResourceAsStream(\"$1\");\n"
+        "       DataInputStream dis = new DataInputStream(new "
+        "BufferedInputStream(is))) {\n",
+        class_name, resource_name);
+    absl::StrAppend(&content, field_initialization_code);
+    absl::StrAppend(&content,
+                    "  } catch (IOException e) {\n"
+                    "    throw new RuntimeException(\"Failed to load model "
+                    "data resource: \" + e.getMessage(), e);\n"
+                    "  }\n"
+                    "}\n");
+  }
   return content;
 }
 

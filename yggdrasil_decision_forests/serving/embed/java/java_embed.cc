@@ -579,24 +579,67 @@ public final class $0 {
   }
   STATUS_CHECK(!predict_output_type.empty());
 
-  absl::SubstituteAndAppend(&model_code, R"(
+  if (options.java().use_runtime_derived_resource_path()) {
+    absl::SubstituteAndAppend(&model_code, R"(
+private $0 internalPredict(Instance instance) {
+)",
+                              predict_output_type);
+    absl::StrAppend(&model_code, predict_body);
+    absl::SubstituteAndAppend(&model_code, R"(}
+
+/**
+ * Predicts the outcome for a given {@link Instance} using the loaded YDF model.
+ *
+ * <p>This method requires that the model has been successfully initialized by calling
+ * {@link #maybeInit(InputStream)} at least once before this method is invoked. Failure to
+ * initialize the model will result in an {@link IllegalStateException}.
+ *
+ * @param instance The input instance containing feature values for prediction.
+ * @return The predicted float value from the model.
+ * @throws IllegalStateException if the model has not been initialized via {@link #maybeInit(InputStream)}.
+ * @throws AssertionError if an unexpected internal error occurs during the prediction process.
+ */
+public static $0 predict(Instance instance) {
+  return getInstance().internalPredict(instance);
+}
+)",
+                              predict_output_type);
+  } else {
+    absl::SubstituteAndAppend(&model_code, R"(
 public static $0 predict(Instance instance) {
 )",
-                            predict_output_type);
-
-  absl::StrAppend(&model_code, predict_body);
-
-  absl::StrAppend(&model_code, "}\n");
+                              predict_output_type);
+    absl::StrAppend(&model_code, predict_body);
+    absl::StrAppend(&model_code, "}\n");
+  }
 
   absl::StrAppend(&code, IndentString(model_code, 2));
 
   // Close define and namespace.
-  absl::SubstituteAndAppend(&code, R"(
+  if (options.java().use_runtime_derived_resource_path()) {
+    absl::SubstituteAndAppend(&code, R"(
+  private $0() {}
+
+  private static final $0 INSTANCE = new $0();
+
+  public static $0 getInstance() {
+    return INSTANCE;
+  }
+
+  public static void maybeInit(InputStream is) throws IOException {
+    getInstance().init(is);
+  }
+}
+)",
+                              options.name());
+  } else {
+    absl::SubstituteAndAppend(&code, R"(
 
   private $0() {} // Prevent instantiation
 }
 )",
-                            options.name());
+                              options.name());
+  }
 
   result[absl::StrCat(options.name(), ".java")] = code;
   ASSIGN_OR_RETURN(result[GetResourceName(options)],
@@ -971,9 +1014,11 @@ absl::Status GenRoutingModelDataJava(
   RETURN_IF_ERROR(bank->FinalizeJavaTypes());
 
   // Append the node bank Java code.
-  ASSIGN_OR_RETURN(const std::string bank_code,
-                   bank->GenerateJavaCode(internal_options, options.name(),
-                                          GetResourceName(options)));
+  ASSIGN_OR_RETURN(
+      const std::string bank_code,
+      bank->GenerateJavaCode(
+          internal_options, options.name(), GetResourceName(options),
+          options.java().use_runtime_derived_resource_path()));
   absl::StrAppend(content, bank_code);
 
   return absl::OkStatus();
@@ -1159,6 +1204,13 @@ absl::Status CorePredictJava(
     const ModelStatistics& stats, const JavaInternalOptions& internal_options,
     const proto::Options& options, const ModelDataBank& routing_bank,
     std::string* content) {
+  if (options.java().use_runtime_derived_resource_path()) {
+    absl::StrAppend(content, R"(
+  if (!isInitialized()) {
+    throw new IllegalStateException("Model is not loaded");
+  }
+)");
+  }
   // Accumulator
   absl::SubstituteAndAppend(content, "  $0 accumulator = $1;\n",
                             specialized_conversion.accumulator_type,

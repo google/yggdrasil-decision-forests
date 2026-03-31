@@ -85,7 +85,8 @@ struct ModelDataBank {
 
   absl::StatusOr<std::string> GenerateJavaCode(
       const BaseInternalOptions& internal_options, absl::string_view class_name,
-      absl::string_view resource_name) const;
+      absl::string_view resource_name,
+      bool use_runtime_derived_resource_path) const;
 
   absl::StatusOr<std::string> SerializeData(
       const BaseInternalOptions& internal_options) const;

@@ -278,7 +278,8 @@ TEST_F(ModelDataBankTest, GenerateJavaCode) {
 
   ASSERT_OK_AND_ASSIGN(
       const std::string java_code,
-      bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin"));
+      bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin",
+                            /*use_runtime_derived_resource_path=*/false));
 
   const std::string expected_code =
       R"(private static final int[] nodePos;
@@ -358,6 +359,107 @@ static {
   EXPECT_EQ(java_code, expected_code);
 }
 
+TEST_F(ModelDataBankTest, GenerateJavaCodeWithRuntimeDerivedResourcePath) {
+  ModelDataBank bank(internal_options_, stats_, specialized_conversion_);
+  ASSERT_OK(bank.AddNode({.pos = 1,
+                          .val = 2.f,
+                          .feat = 3,
+                          .thr = int64_t{4},
+                          .cat = 5,
+                          .obl = 0,
+                          .oblique_weights = {1.f},
+                          .oblique_features = {10}}));
+  bank.categorical = {true, false, true};
+  ASSERT_OK(bank.AddRootDelta(10));
+  ASSERT_OK(bank.FinalizeJavaTypes());
+
+  ASSERT_OK_AND_ASSIGN(
+      const std::string java_code,
+      bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin",
+                            /*use_runtime_derived_resource_path=*/true));
+
+  const std::string expected_code =
+      R"(private int[] nodePos;
+private float[] nodeVal;
+private short[] nodeFeat;
+private int[] nodeThr;
+private short[] nodeCat;
+private byte[] nodeObl;
+private int[] rootDeltas;
+private float[] obliqueWeights;
+private short[] obliqueFeatures;
+private BitSet categoricalBank;
+private boolean isInitialized = false;
+
+private void init(InputStream stream) throws IOException {
+  try (DataInputStream dis = new DataInputStream(new BufferedInputStream(stream))) {
+  int nodePosLength = dis.readInt();
+  this.nodePos = new int[nodePosLength];
+  for (int i = 0; i < nodePosLength; i++) {
+    this.nodePos[i] = dis.readInt();
+  }
+  int nodeValLength = dis.readInt();
+  this.nodeVal = new float[nodeValLength];
+  for (int i = 0; i < nodeValLength; i++) {
+    this.nodeVal[i] = dis.readFloat();
+  }
+  int nodeFeatLength = dis.readInt();
+  this.nodeFeat = new short[nodeFeatLength];
+  for (int i = 0; i < nodeFeatLength; i++) {
+    this.nodeFeat[i] = dis.readShort();
+  }
+  int nodeThrLength = dis.readInt();
+  this.nodeThr = new int[nodeThrLength];
+  for (int i = 0; i < nodeThrLength; i++) {
+    this.nodeThr[i] = dis.readInt();
+  }
+  int nodeCatLength = dis.readInt();
+  this.nodeCat = new short[nodeCatLength];
+  for (int i = 0; i < nodeCatLength; i++) {
+    this.nodeCat[i] = dis.readShort();
+  }
+  int nodeOblLength = dis.readInt();
+  this.nodeObl = new byte[nodeOblLength];
+  for (int i = 0; i < nodeOblLength; i++) {
+    this.nodeObl[i] = dis.readByte();
+  }
+  int rootDeltasLength = dis.readInt();
+  this.rootDeltas = new int[rootDeltasLength];
+  for (int i = 0; i < rootDeltasLength; i++) {
+    this.rootDeltas[i] = dis.readInt();
+  }
+  int obliqueWeightsLength = dis.readInt();
+  this.obliqueWeights = new float[obliqueWeightsLength];
+  for (int i = 0; i < obliqueWeightsLength; i++) {
+    this.obliqueWeights[i] = dis.readFloat();
+  }
+  int obliqueFeaturesLength = dis.readInt();
+  this.obliqueFeatures = new short[obliqueFeaturesLength];
+  for (int i = 0; i < obliqueFeaturesLength; i++) {
+    this.obliqueFeatures[i] = dis.readShort();
+  }
+  int categoricalBankNumLongs = dis.readInt();
+  if (categoricalBankNumLongs > 0) {
+    long[] longs = new long[categoricalBankNumLongs];
+    for (int i = 0; i < categoricalBankNumLongs; i++) {
+      longs[i] = dis.readLong();
+    }
+    this.categoricalBank = BitSet.valueOf(longs);
+  } else {
+    this.categoricalBank = new BitSet();
+  }
+
+  isInitialized = true;
+  }
+}
+
+public boolean isInitialized() {
+  return isInitialized;
+}
+)";
+  EXPECT_EQ(java_code, expected_code);
+}
+
 TEST_F(ModelDataBankTest, GenerateJavaCodeWithMultiDimLeaves) {
   specialized_conversion_.leaf_value_spec.dims = 3;
   ModelDataBank bank(internal_options_, stats_, specialized_conversion_);
@@ -376,7 +478,8 @@ TEST_F(ModelDataBankTest, GenerateJavaCodeWithMultiDimLeaves) {
 
   ASSERT_OK_AND_ASSIGN(
       const std::string java_code,
-      bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin"));
+      bank.GenerateJavaCode(internal_options_, "MyModel", "MyModelData.bin",
+                            /*use_runtime_derived_resource_path=*/false));
 
   const std::string expected_code =
       R"(private static final int[] nodePos;
