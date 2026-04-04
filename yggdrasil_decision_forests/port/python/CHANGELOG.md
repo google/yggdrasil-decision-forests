@@ -1,6 +1,53 @@
 # Changelog
 
-## HEAD
+## 0.16.1 - 2026-03-24
+
+### Fix
+
+-   Fix Python protobuf dependency
+
+### Release music
+
+Präludium und Fuge Es-Dur BWV 552, für Orchester gesetzt. Johann Sebastian Bach (arr. Arnold Schönberg)
+
+## 0.16.0 - 2026-03-16
+
+### Features
+
+-   Training on numerical features, esp. when using oblique splits, is now much
+    faster, >60% for some datasets.
+-   Import Monotonic in the top-level namespace.
+-   Update Protobuf / Abseil dependencies.
+
+### Fix
+
+-   Fix weighted SHAP for models with hessian splits.
+-   Fix training logs crash.
+
+### Release music
+
+Präludium und Fuge Es-Dur BWV 552. Johann Sebastian Bach
+
+## 0.15.0 - 2026-02-04
+
+### API Changes
+
+-   Export to Tensorflow now uses the ydf-tf package instead of TF-DF.
+    Tensorflow Decision Forests is no longer required for exporting to
+    TensorFlow SavedModel.
+-   `model.to_tensorflow_saved_model(mode="keras")` is now strongly discouraged
+    and will be removed in a future version. This mode still requires
+    Tensorflow Decision Forests (TF-DF) to be installed.
+
+### Fix
+
+-   Fixed compatibility with Pandas 3.0
+
+### Release music
+
+Allegretto, op. 1. Louis Vierne
+
+## 0.14.0 - 2026-01-08
 
 ### API Changes
 
@@ -8,16 +55,39 @@
     hyperparameter. Support for honest uplift trees is not yet implemented.
     Training an uplift model with `honest=True` will now raise an error. Please
     reach out to the YDF team if you have a use case for this functionality.
-
+-   Removed support for Python 3.8
+-   Moved Python package and Docker to manylinux_2_28.
 
 ### Feature
 
 -   Added new versions of the hyperparameter templates for Random Forests with
-    `winner_take_all=False`.
--   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random 
+    `winner_take_all=False`. The new version generally has better quality
+-   Add `learner.in_bag_example_indices(num_examples, tree_idx)` to Random
     Forest Learner to retrieve the indices of the in-bag samples used for
     training each tree.
 -   Add export to standalone Java.
+-   The output_logits option is now explicitly exposed in the Python API for GBT
+    models.
+-   Added SHAP value computation support for weighted models.
+-   Added support for integerized numerical features in the Python port.
+-   Added a new inference engine for QuickScorer based on the Highway SIMD
+    library. This engine provides up to a 70% speedup on AVX3 machines and
+    maintains high performance on modern ARM and AVX2 architectures.
+
+### Fixes
+
+-   Removed Pandas as a hard dependency (it is now optional for dataset
+    ingestion).
+-   Model descriptions now group multi-dimensional features together for better
+    readability.
+-   Support for missing features for standalone models.
+-   Fixed a rare undefined behavior bug in oblique splits caused by incorrect
+    initialization of the binomial distribution.
+
+### Release music
+
+Sortie en mi bémol majeur, L’Organiste Moderne, vol. 11. Louis James Alfred Lefébure-Wély
+
 
 ## 0.13.0 - 2025-07-15
 

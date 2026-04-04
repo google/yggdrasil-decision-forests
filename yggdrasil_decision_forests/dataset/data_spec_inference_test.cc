@@ -30,6 +30,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -49,9 +50,10 @@ namespace {
 
 using test::ApproximatelyEqualsProto;
 using test::EqualsProto;
+using test::StatusIs;
 
-// Detects the names and types of the columns. This is the first stage of the
-// full dataspec creation.
+// Detects the names and types of the columns. This is the first stage of
+// the full dataspec creation.
 absl::Status InferDataSpecType(
     const absl::string_view typed_path,
     const proto::DataSpecificationGuide& guide,
@@ -83,9 +85,14 @@ std::string ToyDatasetTypedPathCsv() {
   return absl::StrCat("csv:", file::JoinPath(DatasetDir(), "toy.csv"));
 }
 
-std::string ToyDatasetTypedPathTFExampleTFRecord() {
+std::string ToyDatasetTypedPathTFExampleCompressedTFRecord() {
   return absl::StrCat("tfrecord:",
                       file::JoinPath(DatasetDir(), "toy.tfe-tfrecord@2"));
+}
+std::string ToyDatasetTypedPathTFExampleUncompressedTFRecord() {
+  return absl::StrCat(
+      "tfrecordv2+tfe:",
+      file::JoinPath(DatasetDir(), "toy.nocompress-tfe-tfrecord@2"));
 }
 
 // Sort the column in lexicographic order.
@@ -800,13 +807,23 @@ TEST(Dataset, InferDataSpecTypeCsvIntegerizedCat) {
 TEST(Dataset, InferDataSpecTypeTFExampleTFRecord) {
   proto::DataSpecificationGuide guide;
   proto::DataSpecification data_spec;
-  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide,
-                             &data_spec));
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathTFExampleCompressedTFRecord(),
+                             guide, &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyNoGuide(/*with_dtype=*/true);
   // Since tf.Example use dictionary, the columns can be in any random order.
   SortColumnByName(&data_spec);
   SortColumnByName(&target);
   EXPECT_THAT(data_spec, EqualsProto(target));
+}
+
+TEST(Dataset, InferDataSpecTypeTFExampleTFRecordBadFormat) {
+  proto::DataSpecificationGuide guide;
+  proto::DataSpecification data_spec;
+  std::string path_with_bad_format =
+      absl::StrReplaceAll(ToyDatasetTypedPathTFExampleUncompressedTFRecord(),
+                          {{"tfrecordv2+tfe:", "tfrecord:"}});
+  EXPECT_THAT(InferDataSpecType(path_with_bad_format, guide, &data_spec),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(Dataset, InferDataSpecTypeTFExampleTFRecordInterrupt) {
@@ -816,9 +833,10 @@ TEST(Dataset, InferDataSpecTypeTFExampleTFRecordInterrupt) {
   std::atomic<bool> stop;
   stop = true;
   config.stop = &stop;
-  EXPECT_FALSE(InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide,
-                                 &data_spec, config)
-                   .ok());
+  EXPECT_FALSE(
+      InferDataSpecType(ToyDatasetTypedPathTFExampleCompressedTFRecord(), guide,
+                        &data_spec, config)
+          .ok());
 }
 
 TEST(Dataset, InferDataSpecTypeCsvGuide2) {
@@ -832,8 +850,8 @@ TEST(Dataset, InferDataSpecTypeCsvGuide2) {
 TEST(Dataset, InferDataSpecTypeTFExampleTFRecordGuide2) {
   auto guide = ToyDatasetGuide2();
   proto::DataSpecification data_spec;
-  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathTFExampleTFRecord(), guide,
-                             &data_spec));
+  CHECK_OK(InferDataSpecType(ToyDatasetTypedPathTFExampleCompressedTFRecord(),
+                             guide, &data_spec));
   auto target = ToyDatasetExpectedDataSpecTypeOnlyGuide2(/*with_dtype=*/true);
   // Since tf.Example use dictionary, the columns can be in any random order.
   SortColumnByName(&data_spec);
@@ -913,7 +931,7 @@ TEST(Dataset, CreateLocalDataSpecFromCsvAllHash) {
 TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordGuide1) {
   auto guide = ToyDatasetGuide1();
   proto::DataSpecification data_spec;
-  CreateDataSpec(ToyDatasetTypedPathTFExampleTFRecord(), false, guide,
+  CreateDataSpec(ToyDatasetTypedPathTFExampleCompressedTFRecord(), false, guide,
                  &data_spec);
   auto target = ToyDatasetExpectedDataSpecGuide1(/*with_dtype=*/true);
   SortColumnByName(&data_spec);
@@ -927,7 +945,7 @@ TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordAllHash) {
   col_guide->set_column_name_pattern(".*");
   col_guide->set_type(proto::ColumnType::HASH);
   proto::DataSpecification data_spec;
-  CreateDataSpec(ToyDatasetTypedPathTFExampleTFRecord(), false, guide,
+  CreateDataSpec(ToyDatasetTypedPathTFExampleCompressedTFRecord(), false, guide,
                  &data_spec);
   auto target = ToyDatasetExpectedDataSpecGuide1();
   SortColumnByName(&data_spec);
@@ -1008,7 +1026,7 @@ TEST(Dataset, CreateLocalDataSpecFromCsvGuide3) {
 TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordGuide3) {
   auto guide = ToyDatasetGuide3();
   proto::DataSpecification data_spec;
-  CreateDataSpec(ToyDatasetTypedPathTFExampleTFRecord(), false, guide,
+  CreateDataSpec(ToyDatasetTypedPathTFExampleCompressedTFRecord(), false, guide,
                  &data_spec);
   auto target = ToyDatasetExpectedDataSpecGuide3(/*with_dtype=*/true);
   SortColumnByName(&data_spec);
@@ -1027,7 +1045,7 @@ TEST(Dataset, CreateLocalDataSpecFromCsvIgnoreColumn) {
 TEST(Dataset, CreateLocalDataSpecFromTFExampleTFRecordIgnoreColumn) {
   auto guide = ToyDatasetGuideIgnoreColumn();
   proto::DataSpecification data_spec;
-  CreateDataSpec(ToyDatasetTypedPathTFExampleTFRecord(), false, guide,
+  CreateDataSpec(ToyDatasetTypedPathTFExampleCompressedTFRecord(), false, guide,
                  &data_spec);
   auto target =
       ToyDatasetExpectedDataSpecGuideIgnoreColumn(/*with_dtype=*/true);
@@ -1043,8 +1061,8 @@ int64_t GroundTruthCounterNumberOfExamples(absl::string_view typed_path) {
 }
 
 TEST(CountNumberOfExamples, Base) {
-  for (const auto& path :
-       {ToyDatasetTypedPathCsv(), ToyDatasetTypedPathTFExampleTFRecord()}) {
+  for (const auto& path : {ToyDatasetTypedPathCsv(),
+                           ToyDatasetTypedPathTFExampleCompressedTFRecord()}) {
     EXPECT_EQ(CountNumberOfExamples(path).value(),
               GroundTruthCounterNumberOfExamples(path))
         << "path:" << path;

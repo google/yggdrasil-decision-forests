@@ -184,13 +184,13 @@ absl::Status CsvDataSpecCreator::InferColumnsAndTypes(
   int nrow = 0;
   for (const auto& path : paths) {
     // Open the csv file.
-    auto csv_file = file::OpenInputFile(path).value();
+    ASSIGN_OR_RETURN(auto csv_file, file::OpenInputFile(path));
     yggdrasil_decision_forests::utils::csv::Reader reader(csv_file.get());
     file::InputFileCloser closer(std::move(csv_file));
 
     // Read the header.
     std::vector<absl::string_view>* row;
-    const bool has_header = reader.NextRow(&row).value();
+    ASSIGN_OR_RETURN(const bool has_header, reader.NextRow(&row));
     if (!has_header) {
       return absl::InvalidArgumentError(absl::StrCat(path, " is empty."));
     }
@@ -208,7 +208,11 @@ absl::Status CsvDataSpecCreator::InferColumnsAndTypes(
                          " does not match the header of ", paths.front()));
       }
     }
-    while (reader.NextRow(&row).value()) {
+    while (true) {
+      ASSIGN_OR_RETURN(const bool has_next_row, reader.NextRow(&row));
+      if (!has_next_row) {
+        break;
+      }
       LOG_EVERY_N_SEC(INFO, 30) << nrow << " row(s) processed";
 
       if ((nrow % 100) == 0 && should_stop()) {
@@ -274,13 +278,13 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
       guide.max_num_scanned_rows_to_accumulate_statistics();
   for (const auto& path : paths) {
     // Open the csv file.
-    auto csv_file = file::OpenInputFile(path).value();
+    ASSIGN_OR_RETURN(auto csv_file, file::OpenInputFile(path));
     yggdrasil_decision_forests::utils::csv::Reader reader(csv_file.get());
     file::InputFileCloser closer(std::move(csv_file));
 
     // Read the header.
     std::vector<absl::string_view>* row;
-    const bool has_header = reader.NextRow(&row).value();
+    ASSIGN_OR_RETURN(const bool has_header, reader.NextRow(&row));
     if (!has_header) {
       return absl::InvalidArgumentError(absl::StrCat(path, " is empty."));
     }
@@ -299,7 +303,11 @@ absl::Status CsvDataSpecCreator::ComputeColumnStatistics(
       }
     }
     bool scan_complete = false;
-    while (reader.NextRow(&row).value()) {
+    while (true) {
+      ASSIGN_OR_RETURN(const bool has_next_row, reader.NextRow(&row));
+      if (!has_next_row) {
+        break;
+      }
       if ((nrow % 100) == 0 && should_stop()) {
         return absl::InvalidArgumentError("Dataset scanning interrupted");
       }

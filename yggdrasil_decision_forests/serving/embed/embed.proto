@@ -50,8 +50,10 @@ message Options {
 
   // Which programming language should be produced.
   oneof language {
-    CC cc = 8;
+    CC cc = 8 [deprecated = true];
     Java java = 9;
+    Cpp cpp = 10;
+    C c = 11;
   }
 }
 
@@ -117,8 +119,16 @@ message Algorithm {
   }
 }
 
-message CC {}
+message CC {
+  option deprecated = true;
+}
 
 message Java {
   optional string package_name = 1 [default = "com.google.ydf"];
+  optional bool use_runtime_derived_resource_path = 2 [default = false];
+}
+
+message Cpp {}
+
+message C {
 }

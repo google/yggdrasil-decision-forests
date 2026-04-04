@@ -16,12 +16,12 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_ZLIB_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_ZLIB_H_
 
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "absl/base/nullability.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -105,6 +105,9 @@ class GZipOutputByteStream : public utils::OutputByteStream {
 // Inflates (i.e. decompress) "input" and appends it to "output".
 absl::Status Inflate(absl::string_view input, std::string* output,
                      std::string* working_buffer, bool raw_deflate = false);
+
+// Returns true if the given magic number corresponds to a gzip-compressed file.
+bool IsGZipMagicNumber(std::array<char, 2> magic_number);
 
 }  // namespace yggdrasil_decision_forests::utils
 

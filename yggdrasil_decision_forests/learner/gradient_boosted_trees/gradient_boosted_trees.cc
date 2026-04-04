@@ -498,6 +498,10 @@ proto::LossConfiguration GradientBoostedTreesLearner::BuildLossConfiguration(
     case proto::GradientBoostedTreesTrainingConfig::kXeNdcg:
       loss_config.mutable_xe_ndcg()->CopyFrom(gbt_config.xe_ndcg());
       break;
+    case proto::GradientBoostedTreesTrainingConfig::kMultinomialLossOptions:
+      loss_config.mutable_multinomial_loss()->CopyFrom(
+          gbt_config.multinomial_loss_options());
+      break;
     case proto::GradientBoostedTreesTrainingConfig::LOSS_OPTIONS_NOT_SET:
       break;
   }
@@ -560,18 +564,16 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
     }
   }
 
-  int trees_per_iteration = all_config->loss->Shape().gradient_dim;
   int specified_num_trees = all_config->gbt_config->num_trees();
   int specified_initial_iteration =
       all_config->gbt_config->early_stopping_initial_iteration();
-  if (specified_initial_iteration * trees_per_iteration > specified_num_trees) {
-    LOG(WARNING)
-        << "The model configuration specifies " << specified_num_trees
-        << " trees but computation of the validation loss will only start "
-           "at iteration "
-        << specified_initial_iteration << " with " << trees_per_iteration
-        << " trees per iteration. No validation loss will be "
-           "computed, early stopping is not used.";
+  if (specified_initial_iteration > specified_num_trees) {
+    LOG(WARNING) << "The model is configured to train for "
+                 << specified_num_trees
+                 << " iterations, but early stopping is configured to start "
+                    "checking after iteration "
+                 << specified_initial_iteration << ". "
+                 << "Therefore, early stopping will not trigger.";
   }
 
   return absl::OkStatus();
@@ -789,7 +791,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     auto time_begin_load = absl::Now();
     std::vector<std::string> selected_shards;
     {
-      utils::concurrency::MutexLock lock(&shard_random_mutex);
+      utils::concurrency::MutexLock lock(shard_random_mutex);
       selected_shards = SampleTrainingShards(
           training_shards, num_sample_train_shards, &shard_random);
     }
@@ -2026,6 +2028,16 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamMultinomialInitializeClassPriors);
+    if (hparam.has_value()) {
+      gbt_config->mutable_multinomial_loss_options()
+          ->set_initialize_with_class_priors(
+              hparam.value().value().categorical() == "true");
+    }
+  }
+
   return absl::OkStatus();
 }
 
@@ -2486,6 +2498,8 @@ For example, in the case of binary classification, the pre-link function output 
         kHParamXENDCGTruncation);
     param.mutable_mutual_exclusive()->add_other_parameters(
         kHParamNDCGTruncation);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamMultinomialInitializeClassPriors);
   }
 
   {
@@ -2502,6 +2516,8 @@ For example, in the case of binary classification, the pre-link function output 
         kHParamXENDCGTruncation);
     param.mutable_mutual_exclusive()->add_other_parameters(
         kHParamNDCGTruncation);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamMultinomialInitializeClassPriors);
   }
 
   {
@@ -2519,6 +2535,8 @@ For example, in the case of binary classification, the pre-link function output 
         kHParamFocalLossAlpha);
     param.mutable_mutual_exclusive()->add_other_parameters(
         kHParamFocalLossGamma);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamMultinomialInitializeClassPriors);
   }
 
   {
@@ -2536,6 +2554,30 @@ For example, in the case of binary classification, the pre-link function output 
         kHParamFocalLossAlpha);
     param.mutable_mutual_exclusive()->add_other_parameters(
         kHParamFocalLossGamma);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamMultinomialInitializeClassPriors);
+  }
+
+  {
+    auto& param = hparam_def.mutable_fields()->operator[](
+        kHParamMultinomialInitializeClassPriors);
+    param.mutable_categorical()->set_default_value(
+        gbt_config.multinomial_loss_options().initialize_with_class_priors()
+            ? "true"
+            : "false");
+    param.mutable_categorical()->add_possible_values("true");
+    param.mutable_categorical()->add_possible_values("false");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Only for multinomial classification loss. If false (default), the initial prediction (bias) of the model is 0 for all classes. If true, the initial prediction is set to the logarithm of class priors i.e. log(P(y=i)). Initializing with class priors is equivalent to starting boosting from a constant model that predicts the marginal distribution of the label. This can result in faster convergence on some datasets, but it may also trigger early stopping prematurely in other cases.)");
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamNDCGTruncation);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamFocalLossAlpha);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamFocalLossGamma);
+    param.mutable_mutual_exclusive()->add_other_parameters(
+        kHParamXENDCGTruncation);
   }
 
   {

@@ -54,5 +54,7 @@ runs:
       if: inputs.test_outcome == 'failure'
       shell: bash
       run: |
-        echo "${{ inputs.failure_message }}"
+        echo "${INPUTS_FAILURE_MESSAGE}"
         exit 1
+      env:
+        INPUTS_FAILURE_MESSAGE: ${{ inputs.failure_message }}

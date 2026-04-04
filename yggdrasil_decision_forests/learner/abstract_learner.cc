@@ -587,7 +587,9 @@ absl::Status AbstractLearner::CheckConfiguration(
             "The categorical training label column \"", config.label(),
             "\" contains out-of-dictionary values. This is not allowed. Make "
             "sure the Dataspec guide of the label column is configured with "
-            "`min_vocab_frequency=0` and `max_vocab_count=-1`."));
+            "`min_vocab_frequency=0` and `max_vocab_count=-1`. If you "
+            "explicitly provided label classes, make sure the list "
+            "contains all the unique values present in the label column"));
       }
     } break;
     case model::proto::Task::REGRESSION:
@@ -897,7 +899,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
           const int fold_idx, utils::RandomEngine* rnd) {
         metric::proto::EvaluationResults evaluation;
         {
-          utils::concurrency::MutexLock lock(&evaluation_mutex);
+          utils::concurrency::MutexLock lock(evaluation_mutex);
           if (!status_train_and_evaluate.ok()) {
             return;
           }
@@ -920,7 +922,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
             testing_dataset, evaluation_options, rnd, &evaluation);
         // Aggregate the evaluations.
         {
-          utils::concurrency::MutexLock lock(&evaluation_mutex);
+          utils::concurrency::MutexLock lock(evaluation_mutex);
           status_train_and_evaluate.Update(status_append);
           status_train_and_evaluate.Update(metric::MergeEvaluation(
               evaluation_options, evaluation, &aggregated_evaluation));

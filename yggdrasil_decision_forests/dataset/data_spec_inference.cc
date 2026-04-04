@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -33,6 +34,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -272,120 +274,180 @@ void FinalizeComputeSpecColumnNumerical(
   }
 }
 
-// Converted the dictionary (stored as a map) into a vector ordered in
-// decreasing order of item frequency. The "OutOfDictionary" item is skipped.
-void DictionaryMapToSortedDictionaryVector(
-    const proto::Column& col,
-    std::vector<std::pair<uint64_t, std::string>>* item_frequency_vector,
-    uint64_t* count_ood_items) {
-  (*count_ood_items) = 0;
-  const auto& items = col.categorical().items();
-  item_frequency_vector->reserve(items.size());
-  for (auto& item : items) {
-    if (item.first == kOutOfDictionaryItemKey) {
-      (*count_ood_items) = item.second.count();
-    } else {
-      item_frequency_vector->emplace_back(item.second.count(), item.first);
+absl::StatusOr<std::vector<std::pair<std::string, int64_t>>> BuildVocabulary(
+    const proto::Column& col, const proto::ColumnGuide& col_guide) {
+  const auto& raw_vocabulary = col.categorical().items();
+  std::vector<std::pair<std::string, int64_t>> vocabulary;
+  // OOD item is always the first one.
+  static_assert(kOutOfDictionaryItemIndex == 0,
+                "This function assumest that the OOD item has index 0");
+  vocabulary.push_back({kOutOfDictionaryItemKey, 0});
+
+  if (col_guide.categorial().vocabulary_size() > 0) {
+    const auto& user_vocab = col_guide.categorial().vocabulary();
+    absl::flat_hash_set<std::string> vocabulary_set(user_vocab.begin(),
+                                                    user_vocab.end());
+    if (vocabulary_set.contains(kOutOfDictionaryItemKey)) {
+      return absl::InvalidArgumentError(
+          "The forced vocabulary must not contain the OOD item.");
+    }
+    if (user_vocab.size() != vocabulary_set.size()) {
+      return absl::InvalidArgumentError(
+          "The forced vocabulary argument contains duplicate values");
+    }
+
+    if (col_guide.categorial().vocabulary_must_be_complete()) {
+      std::vector<std::string> missing_items;
+      for (const auto& item : raw_vocabulary) {
+        if (item.first != kOutOfDictionaryItemKey &&
+            !vocabulary_set.contains(item.first)) {
+          missing_items.push_back(item.first);
+        }
+      }
+      if (!missing_items.empty()) {
+        std::sort(missing_items.begin(), missing_items.end());
+        return absl::InvalidArgumentError(absl::StrCat(
+            "The provided vocabulary for column \"", col.name(),
+            "\" is incomplete. The following values are present in the data "
+            "but missing from the vocabulary: ",
+            absl::StrJoin(missing_items, ", ")));
+      }
+    }
+
+    int64_t count_ood_items = 0;
+    for (const auto& item : raw_vocabulary) {
+      if (item.first == kOutOfDictionaryItemKey) {
+        count_ood_items += item.second.count();
+      } else if (!vocabulary_set.contains(item.first)) {
+        count_ood_items += item.second.count();
+      }
+    }
+    vocabulary[0].second = count_ood_items;
+
+    for (const auto& value : user_vocab) {
+      int64_t count = 0;
+      const auto it = raw_vocabulary.find(value);
+      if (it != raw_vocabulary.end()) {
+        count = it->second.count();
+      }
+      vocabulary.push_back({value, count});
+    }
+
+  } else {
+    std::vector<std::pair<int64_t, std::string>> sorted_items;
+    int64_t count_ood_items = 0;
+    for (const auto& item : raw_vocabulary) {
+      if (item.first == kOutOfDictionaryItemKey) {
+        count_ood_items = item.second.count();
+      } else {
+        sorted_items.push_back({item.second.count(), item.first});
+      }
+    }
+    std::sort(sorted_items.begin(), sorted_items.end(),
+              std::greater<std::pair<int64_t, std::string>>());
+
+    const uint64_t non_pruned_number_of_unique_values = sorted_items.size();
+
+    if (col_guide.categorial().min_vocab_frequency() > 0) {
+      while (!sorted_items.empty() &&
+             sorted_items.back().first <
+                 col_guide.categorial().min_vocab_frequency()) {
+        count_ood_items += sorted_items.back().first;
+        sorted_items.pop_back();
+      }
+    }
+
+    if (col_guide.categorial().max_vocab_count() > 0 &&
+        sorted_items.size() > col_guide.categorial().max_vocab_count()) {
+      for (size_t i = col_guide.categorial().max_vocab_count();
+           i < sorted_items.size(); ++i) {
+        count_ood_items += sorted_items[i].first;
+      }
+      sorted_items.resize(col_guide.categorial().max_vocab_count());
+    }
+
+    const uint64_t count_pruned_items =
+        non_pruned_number_of_unique_values - sorted_items.size();
+    if (count_pruned_items > 0) {
+      LOG(INFO) << count_pruned_items
+                << " item(s) have been pruned (i.e. they are considered "
+                   "out of dictionary) for the column "
+                << col.name() << " (" << sorted_items.size()
+                << " item(s) left) because min_value_count="
+                << col_guide.categorial().min_vocab_frequency()
+                << " and max_number_of_unique_values="
+                << col_guide.categorial().max_vocab_count();
+    }
+
+    vocabulary[0].second = count_ood_items;
+    for (const auto& item : sorted_items) {
+      vocabulary.push_back({item.second, item.first});
     }
   }
-  std::sort(item_frequency_vector->begin(), item_frequency_vector->end(),
-            std::greater<std::pair<uint64_t, std::string>>());
-}
-
-// Converted the dictionary (stored as a vector ordered in decreasing order of
-// item frequency) into a map. This is the reverse of
-// "DictionaryMapToSortedDictionaryVector".
-void SortedDictionaryVectorToDictionaryMap(
-    const std::vector<std::pair<uint64_t, std::string>>& item_frequency_vector,
-    proto::Column* col) {
-  auto* items = col->mutable_categorical()->mutable_items();
-  items->clear();
-  for (int item_idx = 0; item_idx < item_frequency_vector.size(); item_idx++) {
-    auto& item = (*items)[item_frequency_vector[item_idx].second];
-    item.set_count(item_frequency_vector[item_idx].first);
-    item.set_index(item_idx + 1);
-  }
+  return vocabulary;
 }
 
 // Finalize the information about a categorical column i.e. finalize the
 // token dictionary.
 absl::Status FinalizeComputeSpecColumnCategorical(
-    const uint64_t count_valid_records,
-    const proto::DataSpecificationAccumulator::Column& col_acc,
     const proto::DataSpecificationGuide& guide, proto::Column* col) {
-  if (col->categorical().is_already_integerized()) {
-    // Nothing to finalize for already integerized categorical columns.
-    return absl::OkStatus();
-  }
-  // Compute the dictionary item indices so the item frequency decrease with
-  // the index value.
-  std::vector<std::pair<uint64_t, std::string>> item_frequency_vector;
-  uint64_t count_ood_items;
-  DictionaryMapToSortedDictionaryVector(*col, &item_frequency_vector,
-                                        &count_ood_items);
-  const uint64_t non_pruned_number_of_unique_values =
-      item_frequency_vector.size();
-
-  // Remove items with frequency (i.e. count) below the user defined
-  // threshold.
-  if (col->categorical().min_value_count() > 0) {
-    while (!item_frequency_vector.empty() &&
-           item_frequency_vector.back().first <
-               col->categorical().min_value_count()) {
-      count_ood_items += item_frequency_vector.back().first;
-      item_frequency_vector.pop_back();
-    }
-  }
-
-  // If the number of unique items is higher than the maximum threshold
-  // "max_vocab_count", we remove the less frequent items.
-  if (col->categorical().max_number_of_unique_values() > 0 &&
-      item_frequency_vector.size() >
-          col->categorical().max_number_of_unique_values()) {
-    item_frequency_vector.resize(
-        col->categorical().max_number_of_unique_values());
-  }
-
-  // Information message if items have been pruned.
-  const uint64_t count_pruned_items =
-      non_pruned_number_of_unique_values - item_frequency_vector.size();
-  if (count_pruned_items > 0) {
-    LOG(INFO) << count_pruned_items
-              << " item(s) have been pruned (i.e. they are considered "
-                 "out of dictionary) for the column "
-              << col->name() << " (" << item_frequency_vector.size()
-              << " item(s) left) because min_value_count="
-              << col->categorical().min_value_count()
-              << " and max_number_of_unique_values="
-              << col->categorical().max_number_of_unique_values();
-  }
-
-  // Update the dictionary map.
-  SortedDictionaryVectorToDictionaryMap(item_frequency_vector, col);
-
-  // Special OutOfDictionary item.
-  auto* items = col->mutable_categorical()->mutable_items();
-  auto& ood_item = (*items)[kOutOfDictionaryItemKey];
-  ood_item.set_count(count_ood_items);
-  ood_item.set_index(kOutOfDictionaryItemIndex);
-
-  // Most frequent item.
-  if (item_frequency_vector.empty() ||
-      ood_item.count() > item_frequency_vector.front().first) {
-    col->mutable_categorical()->set_most_frequent_value(
-        kOutOfDictionaryItemIndex);
-  } else {
-    // Note: "1" because indices are attributes by decreasing frequency
-    // (starting from 1).
-    col->mutable_categorical()->set_most_frequent_value(1);
-  }
-
-  // Override most frequent item.
   proto::ColumnGuide col_guide;
   ASSIGN_OR_RETURN(bool has_user_col_guide,
                    BuildColumnGuide(col->name(), guide, &col_guide));
+  bool has_custom_vocabulary =
+      has_user_col_guide && col_guide.categorial().vocabulary_size() > 0;
+  if (col->categorical().is_already_integerized()) {
+    if (has_custom_vocabulary) {
+      return absl::InvalidArgumentError(
+          "A vocabulary cannot be provided for an already integerized "
+          "categorical column.");
+    }
+    // Nothing to finalize for integerized categorical columns.
+    return absl::OkStatus();
+  }
+
+  ASSIGN_OR_RETURN(const auto vocabulary, BuildVocabulary(*col, col_guide));
+
+  // Update the column spec.
+  auto* items = col->mutable_categorical()->mutable_items();
+  items->clear();
+  int64_t most_frequent_idx = -1;
+  int64_t most_frequent_count = -1;
+  for (size_t token_idx = 0; token_idx < vocabulary.size(); token_idx++) {
+    const auto& token = vocabulary[token_idx].first;
+    const auto& token_count = vocabulary[token_idx].second;
+    auto& col_vocab_item = (*items)[token];
+    col_vocab_item.set_count(token_count);
+    col_vocab_item.set_index(token_idx);
+    // If the OOD token and one or more other tokens have the same count, the
+    // most frequent value is the first non-OOD token.
+    if (token_idx > 0) {
+      if (token_count > most_frequent_count) {
+        most_frequent_count = token_count;
+        most_frequent_idx = token_idx;
+      }
+    }
+  }
+
+  // Set helper fields in the column spec.
+  if (!vocabulary.empty()) {
+    int64_t count_ood_items = vocabulary[0].second;
+    if (most_frequent_count >= count_ood_items && most_frequent_idx != -1) {
+      col->mutable_categorical()->set_most_frequent_value(most_frequent_idx);
+    } else {
+      col->mutable_categorical()->set_most_frequent_value(
+          kOutOfDictionaryItemIndex);
+    }
+  }
+
+  // Override most frequent item.
   if (has_user_col_guide &&
       col_guide.categorial().has_override_most_frequent_item()) {
+    if (col_guide.categorial().vocabulary_size() > 0) {
+      return absl::InvalidArgumentError(
+          "override_most_frequent_item cannot be set when a vocabulary is "
+          "provided.");
+    }
     // Check the column does not have missing values.
     if (col->count_nas() > 0) {
       return absl::InvalidArgumentError(
@@ -412,7 +474,7 @@ absl::Status FinalizeComputeSpecColumnCategorical(
     }
   }
 
-  // Number of unique item.
+  // Number of unique items.
   col->mutable_categorical()->set_number_of_unique_values(items->size());
   return absl::OkStatus();
 }
@@ -594,10 +656,10 @@ absl::Status FinalizeComputeSpec(
     auto* col = data_spec->mutable_columns(col_idx);
     const auto& col_acc = accumulator.columns(col_idx);
     // Valid records i.e. non NA records.
-    uint64_t count_valid_records =
-        data_spec->created_num_rows() - col->count_nas();
     // Numerical type.
     if (IsNumerical(col->type())) {
+      uint64_t count_valid_records =
+          data_spec->created_num_rows() - col->count_nas();
       if (col->type() == ColumnType::NUMERICAL_VECTOR_SEQUENCE) {
         count_valid_records = col->numerical_vector_sequence().count_values();
       }
@@ -605,8 +667,7 @@ absl::Status FinalizeComputeSpec(
     }
     // Categorical type.
     if (IsCategorical(col->type())) {
-      RETURN_IF_ERROR(FinalizeComputeSpecColumnCategorical(
-          count_valid_records, col_acc, guide, col));
+      RETURN_IF_ERROR(FinalizeComputeSpecColumnCategorical(guide, col));
     }
     if (col->type() == ColumnType::DISCRETIZED_NUMERICAL) {
       RETURN_IF_ERROR(FinalizeComputeSpecDiscretizedNumerical(col_acc, col));

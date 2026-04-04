@@ -22,8 +22,8 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
-#include "yggdrasil_decision_forests/serving/embed/cc_embed.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
+#include "yggdrasil_decision_forests/serving/embed/cpp/cpp_embed.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/java/java_embed.h"
 
@@ -32,13 +32,18 @@ namespace yggdrasil_decision_forests::serving::embed {
 absl::StatusOr<absl::node_hash_map<Filename, Content>> EmbedModel(
     const model::AbstractModel& model, const proto::Options& options) {
   switch (options.language_case()) {
-    case proto::Options::kCc:
-      return internal::EmbedModelCC(model, options);
     case proto::Options::kJava:
       return internal::EmbedModelJava(model, options);
+    case proto::Options::kCpp:
+      return internal::EmbedModelCpp(model, options);
+    case proto::Options::kC:
+      return absl::InvalidArgumentError("C export not yet available");
+    case proto::Options::kCc:
+      return absl::InvalidArgumentError(
+          "Language identifier CC is deprecated, use Cpp instead.");
     case proto::Options::LANGUAGE_NOT_SET:
       return absl::InvalidArgumentError(
-          "No language for export set, options are CC, Java");
+          "No language for export set, options are C, Cpp, Java");
   }
   LOG(ERROR) << "Unexpected value for Language: "
              << static_cast<int>(options.language_case());

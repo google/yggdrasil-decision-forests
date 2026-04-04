@@ -39,20 +39,20 @@ class Channel {
  public:
   // Close the channel. No new items can be push in the channel.
   void Close() {
-    MutexLock results_lock(&mutex_);
+    MutexLock results_lock(mutex_);
     close_channel_ = true;
     cond_var_.SignalAll();
   }
 
   // Clear the content of a channel.
   void Clear() {
-    MutexLock results_lock(&mutex_);
+    MutexLock results_lock(mutex_);
     std::queue<Input>().swap(content_);
   }
 
   // Re-open a previously closed channel.
   void Reopen() {
-    MutexLock results_lock(&mutex_);
+    MutexLock results_lock(mutex_);
     close_channel_ = false;
     cond_var_.SignalAll();
   }
@@ -63,7 +63,7 @@ class Channel {
       LOG(ERROR) << "Ignoring value added to closed channel.";
       return;
     }
-    MutexLock results_lock(&mutex_);
+    MutexLock results_lock(mutex_);
     content_.push(std::move(item));
     cond_var_.Signal();
   }
@@ -76,7 +76,7 @@ class Channel {
   // "Pop" results returned so far. The number of pops returned by
   // "PopAndNumPop" is guaranteed to be unique, dense and in order.
   std::optional<Input> Pop(int64_t* get_num_pop = nullptr) {
-    MutexLock results_lock(&mutex_);
+    MutexLock results_lock(mutex_);
     while (content_.empty() && !close_channel_) {
       cond_var_.Wait(&mutex_, &results_lock);
     }

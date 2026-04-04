@@ -1,8 +1,10 @@
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 
 # Model bindings for PYDF
-# pytype binary, test, library
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(
@@ -82,7 +84,7 @@ pybind_library(
         "//ydf/utils:status_casters",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
-        "@com_google_pybind11_protobuf//pybind11_protobuf:native_proto_caster",
+        "@pybind11_protobuf//pybind11_protobuf:native_proto_caster",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
         "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees",
@@ -305,7 +307,8 @@ py_test(
 cc_test(
     name = "export_cc_run_test",
     srcs = [
-        "export_cc_generated_lib.h",
+        "export_cc_generated_lib_adult_binary_class_gbdt.h",
+        "export_cc_generated_lib_adult_binary_class_gbdt_integerized.h",
         "export_cc_run_test.cc",
     ],
     data = [
@@ -329,8 +332,18 @@ cc_test(
 genrule(
     name = "export_cc_generate_lib",
     srcs = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
-    outs = ["export_cc_generated_lib.h"],
-    cmd = "$(location export_cc_generator) --input_model=third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt --output_code=$@",
+    outs = [
+        "export_cc_generated_lib_adult_binary_class_gbdt.h",
+        "export_cc_generated_lib_adult_binary_class_gbdt_integerized.h",
+    ],
+    cmd = """
+      $(location :export_cc_generator) \
+          --input_model=third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt \
+          --output_code=$(location export_cc_generated_lib_adult_binary_class_gbdt.h);
+      $(location :export_cc_generator) \
+          --input_model=third_party/yggdrasil_decision_forests/test_data/model/adult_binary_class_gbdt_integerized \
+          --output_code=$(location export_cc_generated_lib_adult_binary_class_gbdt_integerized.h);
+    """,
     tags = ["manual"],
     tools = [":export_cc_generator"],
 )

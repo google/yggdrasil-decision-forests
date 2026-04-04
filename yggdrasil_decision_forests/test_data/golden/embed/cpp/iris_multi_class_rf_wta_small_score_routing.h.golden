@@ -1,0 +1,128 @@
+#ifndef YDF_MODEL_YDF_MODEL_H_
+#define YDF_MODEL_YDF_MODEL_H_
+
+#include <array>
+#include <cassert>
+#include <cmath>
+#include <cstring>
+#include <stdint.h>
+
+namespace ydf_model {
+
+enum class Label : uint32_t {
+  kSetosa = 0,
+  kVersicolor = 1,
+  kVirginica = 2,
+};
+
+constexpr const int kNumFeatures = 4;
+constexpr const uint8_t kNumTrees = 3;
+
+struct Instance {
+  typedef float Numerical;
+
+  Numerical sepal_length;
+  Numerical sepal_width;
+  Numerical petal_length;
+  Numerical petal_width;
+};
+
+struct __attribute__((packed)) Node {
+  uint8_t pos = 0;
+  union {
+    struct __attribute__((packed)) {
+      uint8_t feat;
+      union {
+        float thr;
+      };
+    } cond;
+    struct __attribute__((packed)) {
+      uint8_t val;
+    } leaf;
+  };
+};
+static const Node nodes[] = {
+{.pos=1,.cond={.feat=3,.thr=0.75}},
+{.leaf={.val=0}},
+{.pos=7,.cond={.feat=3,.thr=1.65}},
+{.pos=1,.cond={.feat=3,.thr=1.35}},
+{.leaf={.val=1}},
+{.pos=1,.cond={.feat=1,.thr=2.65}},
+{.leaf={.val=1}},
+{.pos=1,.cond={.feat=0,.thr=6.65}},
+{.leaf={.val=1}},
+{.leaf={.val=1}},
+{.pos=1,.cond={.feat=2,.thr=4.85}},
+{.leaf={.val=1}},
+{.leaf={.val=2}},
+{.pos=1,.cond={.feat=3,.thr=0.8}},
+{.leaf={.val=0}},
+{.pos=3,.cond={.feat=2,.thr=4.95}},
+{.pos=1,.cond={.feat=3,.thr=1.65}},
+{.leaf={.val=1}},
+{.leaf={.val=2}},
+{.pos=1,.cond={.feat=3,.thr=1.75}},
+{.leaf={.val=2}},
+{.leaf={.val=2}},
+{.pos=1,.cond={.feat=2,.thr=2.6}},
+{.leaf={.val=0}},
+{.pos=3,.cond={.feat=3,.thr=1.75}},
+{.pos=1,.cond={.feat=3,.thr=1.55}},
+{.leaf={.val=1}},
+{.leaf={.val=1}},
+{.leaf={.val=2}},
+};
+
+
+static const uint8_t root_deltas[] = {13,9,7};
+
+// Predicts on an instance without any safety checks.
+//
+// The caller must ensure that the instance meets the following conditions:
+// - Numerical features must not be NaN.
+// - Integerized categorical features must be within the range [0, max_value],
+//   where max_value is the maximum value observed during training.
+//
+// Failure to meet these conditions may result in undefined behavior.
+//
+// It is recommended to use `Predict()` instead, unless the instance has
+// already been sanitized.
+//
+// This function is called by `Predict()`.
+inline std::array<uint8_t, 3> PredictUnsafe(const Instance& instance) {
+  std::array<uint8_t, 3> accumulator {0, 0, 0};
+
+  const Node* root = nodes;
+  const Node* node;
+  const char* raw_instance = (const char*)(&instance);
+  uint8_t eval;
+  for (uint8_t tree_idx = 0; tree_idx != kNumTrees; tree_idx++) {
+    node = root;
+    while(node->pos) {
+        float numerical_feature;
+        std::memcpy(&numerical_feature, raw_instance + node->cond.feat * sizeof(float), sizeof(float));
+        eval = numerical_feature >= node->cond.thr;
+
+      node += (node->pos & -eval) + 1;
+    }
+    accumulator[node->leaf.val]++;
+    root += root_deltas[tree_idx];
+  }
+
+  return accumulator;
+}
+
+// Prediction function.
+//
+// Sanitizes the given instance, then calls `PredictUnsafe()`.
+inline std::array<uint8_t, 3> Predict(Instance instance) {
+  instance.sepal_length = std::isnan(instance.sepal_length) ? 5.84333 : instance.sepal_length;
+  instance.sepal_width = std::isnan(instance.sepal_width) ? 3.05733 : instance.sepal_width;
+  instance.petal_length = std::isnan(instance.petal_length) ? 3.758 : instance.petal_length;
+  instance.petal_width = std::isnan(instance.petal_width) ? 1.19933 : instance.petal_width;
+
+  return PredictUnsafe(instance);
+}
+
+}  // namespace ydf_model
+#endif

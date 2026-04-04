@@ -76,13 +76,13 @@ void ActivationGradientBoostedTreesMultinomialLogLikelihood(
   float* cache = static_cast<float*>(alloca(sizeof(float) * num_values));
   float sum = 0;
   for (int i = 0; i < num_values; i++) {
-    const float value = std::exp(values[i]);
+    const float value = std::exp(values[i] + model.initial_predictions[i]);
     cache[i] = value;
     sum += value;
   }
-  const float noramlize = 1.f / sum;
+  const float inv_sum = 1.f / sum;
   for (int i = 0; i < num_values; i++) {
-    values[i] = cache[i] * noramlize;
+    values[i] = std::clamp(cache[i] * inv_sum, 0.f, 1.f);
   }
 }
 

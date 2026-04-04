@@ -70,7 +70,7 @@ class SharedMutex {
 
 class MutexLock {
  public:
-  MutexLock(Mutex* mutex) : lock_(mutex->std()) {}
+  MutexLock(Mutex& mutex) : lock_(mutex.std()) {}
   std::unique_lock<std::mutex>& std() { return lock_; }
 
  private:
@@ -79,7 +79,7 @@ class MutexLock {
 
 class WriterMutexLock {
  public:
-  WriterMutexLock(SharedMutex* mutex) : lock_(mutex->std()) {}
+  WriterMutexLock(SharedMutex& mutex) : lock_(mutex.std()) {}
   std::unique_lock<std_shared_mutex>& std() { return lock_; }
 
  private:
@@ -88,7 +88,7 @@ class WriterMutexLock {
 
 class ReaderMutexLock {
  public:
-  ReaderMutexLock(SharedMutex* mutex) : lock_(mutex->std()) {}
+  ReaderMutexLock(SharedMutex& mutex) : lock_(mutex.std()) {}
   std::shared_lock<std_shared_mutex>& std() { return lock_; }
 
  private:

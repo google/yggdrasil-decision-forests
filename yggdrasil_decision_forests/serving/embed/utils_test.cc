@@ -27,12 +27,12 @@ namespace yggdrasil_decision_forests::serving::embed {
 namespace {
 
 TEST(Embed, CheckModelNameCC) {
-  EXPECT_OK(CheckModelName("my_model_123", proto::Options::kCc));
-  EXPECT_THAT(CheckModelName("my-model", proto::Options::kCc),
+  EXPECT_OK(CheckModelName("my_model_123", proto::Options::kCpp));
+  EXPECT_THAT(CheckModelName("my-model", proto::Options::kCpp),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(CheckModelName("MyModel", proto::Options::kCc),
+  EXPECT_THAT(CheckModelName("MyModel", proto::Options::kCpp),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
-  EXPECT_THAT(CheckModelName("my model", proto::Options::kCc),
+  EXPECT_THAT(CheckModelName("my model", proto::Options::kCpp),
               test::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
@@ -103,11 +103,11 @@ TEST(Embed, MaxSignedValueToNumBytes) {
   EXPECT_EQ(MaxSignedValueToNumBytes(-2147483648), 4);
 }
 
-TEST(Embed, DTypeToCCType) {
-  EXPECT_EQ(DTypeToCCType(proto::DType::INT8), "int8_t");
-  EXPECT_EQ(DTypeToCCType(proto::DType::INT16), "int16_t");
-  EXPECT_EQ(DTypeToCCType(proto::DType::INT32), "int32_t");
-  EXPECT_EQ(DTypeToCCType(proto::DType::FLOAT32), "float");
+TEST(Embed, DTypeToCppType) {
+  EXPECT_EQ(DTypeToCppType(proto::DType::INT8), "int8_t");
+  EXPECT_EQ(DTypeToCppType(proto::DType::INT16), "int16_t");
+  EXPECT_EQ(DTypeToCppType(proto::DType::INT32), "int32_t");
+  EXPECT_EQ(DTypeToCppType(proto::DType::FLOAT32), "float");
 }
 
 TEST(Embed, NumLeavesToNumNodes) {

@@ -1086,8 +1086,8 @@ TEST_F(GradientBoostedTreesOnAdult, RandomCategorical) {
   // Note: Accuracy is similar as RF (see :random_forest_test). However logloss
   // is significantly better (which is expected as, unlike RF,  GBT is
   // calibrated).
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8642, 0.0097, 0.863);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2954, 0.0095, 0.294);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8642, 0.0097, 0.8676);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2954, 0.0095, 0.2941);
 
   auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
@@ -1512,8 +1512,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0085, 0.859);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2945, 0.0103, 0.2934);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0085, 0.867);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2945, 0.0103, 0.2884);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
@@ -1781,6 +1781,30 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9467, 0.04, 0.9733);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.2019);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
+}
+TEST_F(GradientBoostedTreesOnIris, InitializeWithClassPriors) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_multinomial_loss_options()
+      ->set_initialize_with_class_priors(true);
+  pass_validation_dataset_ = true;
+  TrainAndEvaluateModel();
+
+  ASSERT_TRUE(model_->ValidationEvaluation().has_classification());
+  ASSERT_TRUE(model_->ValidationEvaluation().classification().has_confusion());
+  auto training_logs_confusion_table =
+      model_->ValidationEvaluation().classification().confusion();
+
+  utils::RandomEngine rnd(1234);
+  const auto a_posteriori_evaluation =
+      model_->Evaluate(valid_dataset_, {}, &rnd);
+
+  ASSERT_TRUE(a_posteriori_evaluation.has_classification());
+  ASSERT_TRUE(a_posteriori_evaluation.classification().has_confusion());
+  auto evaluation_confusion_table =
+      a_posteriori_evaluation.classification().confusion();
+  EXPECT_THAT(training_logs_confusion_table,
+              EqualsProto(evaluation_confusion_table));
 }
 
 class GradientBoostedTreesOnDNA : public utils::TrainAndTestTester {

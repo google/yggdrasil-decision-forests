@@ -19,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -28,7 +29,10 @@
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/substitute.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
@@ -38,6 +42,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -50,25 +55,96 @@ MultinomialLogLikelihoodLoss::RegistrationCreate(const ConstructorArgs& args) {
         "Multinomial log-likelihood loss is only compatible with a "
         "classification task");
   }
-  return absl::make_unique<MultinomialLogLikelihoodLoss>(args);
+  return std::make_unique<MultinomialLogLikelihoodLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>>
 MultinomialLogLikelihoodLoss::InitialPredictions(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const absl::Span<const float> weights) const {
-  // YDF follows Friedman's paper "Greedy Function Approximation: A Gradient
-  // Boosting Machine" (https://statweb.stanford.edu/~jhf/ftp/trebst.pdf),
-  // setting the initial prediction to 0 for multi-class classification
-  // (Algorithm 6).
-  // TODO: Experiment with different initial predictions.
-  return std::vector<float>(dimension_, 0);
+  if (!initialize_with_class_priors_) {
+    return std::vector<float>(dimension_, 0);
+  }
+  // Return: log(pr(i)) with pr(i) the probability of class i.
+  std::vector<double> weighted_counts(dimension_, 0.0);
+  double sum_weights = 0;
+
+  ASSIGN_OR_RETURN(
+      const auto* labels,
+      dataset.ColumnWithCastWithStatus<
+          dataset::VerticalDataset::CategoricalColumn>(label_col_idx));
+  const UnsignedExampleIdx n = dataset.nrow();
+  if (weights.empty()) {
+    sum_weights = static_cast<double>(n);
+    const auto& label_values = labels->values();
+    for (UnsignedExampleIdx example_idx = 0; example_idx < n; ++example_idx) {
+      int label_val = label_values[example_idx];
+      if (label_val >= 1 && label_val <= dimension_) {
+        weighted_counts[label_val - 1] += 1.0;
+      } else {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Label value at example_idx ", example_idx, " is invalid: ",
+            label_val, ". Expected value between 1 and ", dimension_));
+      }
+    }
+  } else {
+    const auto& label_values = labels->values();
+    for (UnsignedExampleIdx example_idx = 0; example_idx < n; ++example_idx) {
+      float w = weights[example_idx];
+      sum_weights += w;
+      int label_val = label_values[example_idx];
+      if (label_val >= 1 && label_val <= dimension_) {
+        weighted_counts[label_val - 1] += w;
+      } else {
+        return absl::InvalidArgumentError(absl::StrCat(
+            "Label value at example_idx ", example_idx, " is invalid: ",
+            label_val, ". Expected value between 1 and ", dimension_));
+      }
+    }
+  }
+  STATUS_CHECK_GT(sum_weights, 0);
+
+  std::vector<float> initial_predictions(dimension_);
+  const double inv_sum_weights = 1. / sum_weights;
+  for (int dim = 0; dim < dimension_; ++dim) {
+    const double prob = weighted_counts[dim] * inv_sum_weights;
+    if (prob <= 0.) {
+      initial_predictions[dim] = std::numeric_limits<float>::lowest();
+    } else {
+      initial_predictions[dim] = static_cast<float>(std::log(prob));
+    }
+  }
+  return initial_predictions;
 }
 
 absl::StatusOr<std::vector<float>>
 MultinomialLogLikelihoodLoss::InitialPredictions(
     const decision_tree::proto::LabelStatistics& label_statistics) const {
-  return std::vector<float>(dimension_, 0);
+  if (!initialize_with_class_priors_) {
+    return std::vector<float>(dimension_, 0);
+  }
+  // Return: log(pr(i)) with pr(i) the probability of class i.
+  if (label_statistics.classification().labels().counts_size() !=
+      dimension_ + 1) {
+    return absl::InternalError(absl::Substitute(
+        "The multinomial loglikelihood loss expects $0 classes i.e. $1 "
+        "unique values (including the OOV item). Got $2 unique values "
+        "instead.",
+        dimension_, dimension_ + 1,
+        label_statistics.classification().labels().counts_size()));
+  }
+  const auto& counts = label_statistics.classification().labels().counts();
+  const double inv_sum = 1. / label_statistics.classification().labels().sum();
+  std::vector<float> initial_predictions(dimension_);
+  for (size_t dim = 0; dim < dimension_; ++dim) {
+    double prob = counts[dim + 1] * inv_sum;
+    if (prob <= 0.) {
+      initial_predictions[dim] = std::numeric_limits<float>::lowest();
+    } else {
+      initial_predictions[dim] = static_cast<float>(std::log(prob));
+    }
+  }
+  return initial_predictions;
 }
 
 template <typename T>

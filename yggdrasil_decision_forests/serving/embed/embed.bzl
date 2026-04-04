@@ -2,6 +2,7 @@
 
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 
+# TODO: b/481596783 - Rename to cpp_ydf_standalone_model
 def cc_ydf_standalone_model(
         name,
         data,
@@ -11,7 +12,7 @@ def cc_ydf_standalone_model(
         monitor_usage = False,
         categorical_from_string = False,
         **attrs):
-    """Embed a YDF model into a CC library.
+    """Embed a YDF model into a C++ library.
 
     Args:
         name: Name of the model. The library can be injected with the ":<name>" bazel/bazel rule,
@@ -61,7 +62,7 @@ def cc_ydf_standalone_model(
 
     # Convert the model into source files.
 
-    options = "classification_output: " + classification_output + " algorithm: " + algorithm + " monitor_usage: " + str(monitor_usage) + " categorical_from_string: " + str(categorical_from_string) + " cc: {}"
+    options = "classification_output: " + classification_output + " algorithm: " + algorithm + " monitor_usage: " + str(monitor_usage) + " categorical_from_string: " + str(categorical_from_string) + " cpp: {}"
 
     native.genrule(
         name = name + "_write_embed",
@@ -70,7 +71,6 @@ def cc_ydf_standalone_model(
         tools = ["//yggdrasil_decision_forests/serving/embed:write_embed", name + "_create_path", data],
     )
 
-    # Creates a cc library with the model.
     cc_library(
         name = name,
         srcs = [],

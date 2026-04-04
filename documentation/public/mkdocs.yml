@@ -154,8 +154,8 @@ plugins:
       handlers:
         python:
           # paths: [../../port/python]  # For dev
-          import:
-            - https://docs.python.org/3/objects.inv
+          # import:
+          #   - https://docs.python.org/3/objects.inv
           options:
             preload_modules:
               - ydf  # For prod

@@ -220,13 +220,12 @@ cc_library_ydf(
         "@com_google_protobuf//:protobuf",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:framework",
-            "@org_tensorflow//tensorflow/core:lib",
-            "@org_tensorflow//tensorflow/core/platform:path",
+            "@tensorflow//tensorflow/core:framework",
+            "@tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core/platform:path",
         ],
     }),
     alwayslink = 1,
@@ -287,11 +286,10 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
-            "@release_or_nightly//:tensorflow_libtensorflow_framework",
-            "@release_or_nightly//:tensorflow_tf_header_lib",
+            "@local_config_tf//:tensorflow",
         ],
         "//conditions:default": [
-            "@org_tensorflow//tensorflow/core:lib",
+            "@tensorflow//tensorflow/core:lib",
         ],
     }),
 )
@@ -751,6 +749,21 @@ cc_library_ydf(
     hdrs = ["random.h"],
 )
 
+alias(
+    name = "endian",
+    actual = ":endian_default",
+)
+
+cc_library_ydf(
+    name = "endian_default",
+    hdrs = [
+        "endian.h",
+        "endian_default.h",
+    ],
+    defines = ["YGG_ENDIAN_USES_DEFAULT"],
+    visibility = ["//visibility:private"],
+)
+
 cc_library_ydf(
     name = "compatibility",
     hdrs = ["compatibility.h"],
@@ -764,9 +777,9 @@ cc_library_ydf(
     hdrs = ["blob_sequence.h"],
     deps = [
         ":bytestream",
+        ":endian",
         ":status_macros",
         ":zlib",
-        "@com_google_absl//absl/base:endian",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
@@ -830,7 +843,7 @@ cc_library_ydf(
         "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/strings",
     ] + [
-        "@farmhash_archive//:farmhash",
+        "@farmhash",
     ],
 )
 
@@ -945,7 +958,6 @@ cc_library_ydf(
     deps = [
         ":bytestream",
         ":status_macros",
-        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
@@ -1141,6 +1153,15 @@ cc_test(
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "endian_test",
+    srcs = ["endian_test.cc"],
+    deps = [
+        ":endian",
         "@com_google_googletest//:gtest_main",
     ],
 )

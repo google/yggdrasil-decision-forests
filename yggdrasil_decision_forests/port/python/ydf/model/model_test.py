@@ -871,6 +871,7 @@ Use `model.describe()` for more details.
             test_utils.ydf_test_data_path(),
             "golden",
             "embed",
+            "cpp",
             "adult_binary_class_gbdt_v2_class.h.golden",
         ),
     )
@@ -881,6 +882,7 @@ Use `model.describe()` for more details.
             test_utils.ydf_test_data_path(),
             "golden",
             "embed",
+            "cpp",
             "adult_binary_class_gbdt_v2_probability_routing.h.golden",
         ),
     )
@@ -907,6 +909,7 @@ Use `model.describe()` for more details.
             test_utils.ydf_test_data_path(),
             "golden",
             "embed",
+            "java",
             "adult_binary_class_gbdt_v2_probability_routing.java.golden",
         ),
     )
@@ -917,6 +920,7 @@ Use `model.describe()` for more details.
             test_utils.ydf_test_data_path(),
             "golden",
             "embed",
+            "java",
             "adult_binary_class_gbdt_v2_probability_routing_data.bin.golden",
         ),
     )

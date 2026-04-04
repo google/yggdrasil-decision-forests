@@ -22,4 +22,4 @@
     release_linux.sh.
 -   change_version.sh: Change the YDF version in all the source / config files.
 -   simple_test.py: Minimal standalone test of pydf.
--   build_test_linux.sh:
+-   build_test_linux.sh: ompile and runs the unit tests for the Python port of YDF

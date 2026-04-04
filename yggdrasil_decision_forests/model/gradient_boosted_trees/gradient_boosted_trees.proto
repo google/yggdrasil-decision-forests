@@ -189,9 +189,18 @@ message LossConfiguration {
     // https://arxiv.org/pdf/1708.02002.pdf
     optional float positive_sample_coefficient = 2 [default = 0.5];
   }
+
+  message MultinomialLoss {
+    // If false, uses a vector of zeros as initial predictions as suggested by
+    // Friedman. If true, use the logarithm of the class average as initial
+    // predictions. The latter is consistent with the binomial loss
+    // implementation and generally improves model quality.
+    optional bool initialize_with_class_priors = 1 [default = false];
+  }
   oneof loss_options {
     LambdaMartNdcg lambda_mart_ndcg = 1;
     XeNdcg xe_ndcg = 2;
     BinaryFocalLossOptions binary_focal_loss_options = 3;
+    MultinomialLoss multinomial_loss = 4;
   }
 }

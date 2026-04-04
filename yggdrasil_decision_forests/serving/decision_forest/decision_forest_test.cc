@@ -344,6 +344,7 @@ TEST_P(AllCompatibleEnginesTest, Checks) {
 std::unordered_set<std::string> AllGBTEngines() {
   return {
       gradient_boosted_trees::kQuickScorerExtended,
+      gradient_boosted_trees::kQuickScorerExtendedHighway,
       gradient_boosted_trees::kOptPred,
       gradient_boosted_trees::kGeneric,
   };
@@ -352,6 +353,7 @@ std::unordered_set<std::string> AllGBTEngines() {
 std::unordered_set<std::string> GBTQSAndGenericEngines() {
   return {
       gradient_boosted_trees::kQuickScorerExtended,
+      gradient_boosted_trees::kQuickScorerExtendedHighway,
       gradient_boosted_trees::kGeneric,
   };
 }
@@ -754,6 +756,17 @@ TEST(DecisionForest, NonGlobalImputationQuickScorer) {
   Predict(engine, *examples, examples->NumberOfExamples(), &predictions);
 
   CheckNonGlobalImputationPredictions(predictions);
+
+  GradientBoostedTreesRegressionQuickScorerExtended engine_hwy;
+  CHECK_OK(GenericToSpecializedModel(*model.get(), &engine_hwy));
+  LOG(INFO) << "Highway Engine:\n" << DescribeQuickScorer(engine_hwy);
+
+  const auto examples_hwy = BuildNonGlobalImputationExamples(engine_hwy);
+  std::vector<float> predictions_hwy;
+  Predict(engine_hwy, *examples_hwy, examples_hwy->NumberOfExamples(),
+          &predictions_hwy);
+
+  CheckNonGlobalImputationPredictions(predictions_hwy);
 }
 
 TEST(DecisionForest, NonGlobalImputationEngines) {
@@ -761,6 +774,7 @@ TEST(DecisionForest, NonGlobalImputationEngines) {
   CheckCompatibleEngine(*model,
                         {
                             gradient_boosted_trees::kQuickScorerExtended,
+                            gradient_boosted_trees::kQuickScorerExtendedHighway,
                             gradient_boosted_trees::kGeneric,
                         });
 }

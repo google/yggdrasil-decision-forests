@@ -142,6 +142,11 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       reading, but skew statistics in the dataspec, which can hurt model quality
       (e.g. if an important category of a categorical feature is considered
       OOV). Set to -1 to scan the entire dataset.
+    label_classes: An ordered list of possible values for the label. This
+      argument is optional and typically not required. If not provided, the
+      label classes are determined automatically from the dataset. If provided,
+      it forces a specific order for the label classes. All label values present
+      in the dataset must be included in this list.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -483,6 +488,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       num_discretized_numerical_bins: int = 255,
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
+      label_classes: Optional[list[str]] = None,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       extra_training_config: Optional[
           abstract_learner_pb2.TrainingConfig
@@ -648,6 +654,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         num_discretized_numerical_bins=num_discretized_numerical_bins,
         max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
+        label_classes=label_classes,
     )
 
     deployment_config = self._build_deployment_config(
@@ -765,6 +772,15 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             ),
             parameters={"winner_take_all": True},
         ),
+        "better_defaultv2": hyperparameters.HyperparameterTemplate(
+            name="better_default",
+            version=2,
+            description=(
+                "A configuration that is generally better than the default"
+                " parameters without being more expensive."
+            ),
+            parameters={"winner_take_all": False},
+        ),
         "benchmark_rank1v1": hyperparameters.HyperparameterTemplate(
             name="benchmark_rank1",
             version=1,
@@ -774,6 +790,21 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
             ),
             parameters={
                 "winner_take_all": True,
+                "categorical_algorithm": "RANDOM",
+                "split_axis": "SPARSE_OBLIQUE",
+                "sparse_oblique_normalization": "MIN_MAX",
+                "sparse_oblique_num_projections_exponent": 1.0,
+            },
+        ),
+        "benchmark_rank1v2": hyperparameters.HyperparameterTemplate(
+            name="benchmark_rank1",
+            version=2,
+            description=(
+                "Top ranking hyper-parameters on our benchmark slightly"
+                " modified to run in reasonable time."
+            ),
+            parameters={
+                "winner_take_all": False,
                 "categorical_algorithm": "RANDOM",
                 "split_axis": "SPARSE_OBLIQUE",
                 "sparse_oblique_normalization": "MIN_MAX",
@@ -929,6 +960,11 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
       reading, but skew statistics in the dataspec, which can hurt model quality
       (e.g. if an important category of a categorical feature is considered
       OOV). Set to -1 to scan the entire dataset.
+    label_classes: An ordered list of possible values for the label. This
+      argument is optional and typically not required. If not provided, the
+      label classes are determined automatically from the dataset. If provided,
+      it forces a specific order for the label classes. All label values present
+      in the dataset must be included in this list.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -1060,6 +1096,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
       num_discretized_numerical_bins: int = 255,
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
+      label_classes: Optional[list[str]] = None,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       extra_training_config: Optional[
           abstract_learner_pb2.TrainingConfig
@@ -1129,6 +1166,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
         num_discretized_numerical_bins=num_discretized_numerical_bins,
         max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
+        label_classes=label_classes,
     )
 
     deployment_config = self._build_deployment_config(
@@ -1317,6 +1355,11 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       reading, but skew statistics in the dataspec, which can hurt model quality
       (e.g. if an important category of a categorical feature is considered
       OOV). Set to -1 to scan the entire dataset.
+    label_classes: An ordered list of possible values for the label. This
+      argument is optional and typically not required. If not provided, the
+      label classes are determined automatically from the dataset. If provided,
+      it forces a specific order for the label classes. All label values present
+      in the dataset must be included in this list.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -1524,6 +1567,14 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       et al. in "Random Survival Forests"
       (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
         Default: "GLOBAL_IMPUTATION".
+    multinomial_initial_class_priors: Only for multinomial classification loss.
+      If false (default), the initial prediction (bias) of the model is 0 for
+      all classes. If true, the initial prediction is set to the logarithm of
+      class priors i.e. log(P(y=i)). Initializing with class priors is
+      equivalent to starting boosting from a constant model that predicts the
+      marginal distribution of the label. This can result in faster convergence
+      on some datasets, but it may also trigger early stopping prematurely in
+      other cases. Default: None.
     ndcg_truncation: Truncation of the NDCG loss (default 5). Only used with
       NDCG loss i.e. `loss="LAMBDA_MART_NDCG". ` Default: None.
     num_candidate_attributes: Number of unique valid attributes tested for each
@@ -1771,6 +1822,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       num_discretized_numerical_bins: int = 255,
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
+      label_classes: Optional[list[str]] = None,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       extra_training_config: Optional[
           abstract_learner_pb2.TrainingConfig
@@ -1813,6 +1865,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: int = 5,
       missing_value_policy: str = "GLOBAL_IMPUTATION",
+      multinomial_initial_class_priors: Optional[bool] = None,
       ndcg_truncation: Optional[int] = None,
       num_candidate_attributes: Optional[int] = -1,
       num_candidate_attributes_ratio: Optional[float] = None,
@@ -1912,6 +1965,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "mhld_oblique_sample_attributes": mhld_oblique_sample_attributes,
         "min_examples": min_examples,
         "missing_value_policy": missing_value_policy,
+        "multinomial_initial_class_priors": multinomial_initial_class_priors,
         "ndcg_truncation": ndcg_truncation,
         "num_candidate_attributes": num_candidate_attributes,
         "num_candidate_attributes_ratio": num_candidate_attributes_ratio,
@@ -1979,6 +2033,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         num_discretized_numerical_bins=num_discretized_numerical_bins,
         max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
+        label_classes=label_classes,
     )
 
     deployment_config = self._build_deployment_config(
@@ -2199,6 +2254,11 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       reading, but skew statistics in the dataspec, which can hurt model quality
       (e.g. if an important category of a categorical feature is considered
       OOV). Set to -1 to scan the entire dataset.
+    label_classes: An ordered list of possible values for the label. This
+      argument is optional and typically not required. If not provided, the
+      label classes are determined automatically from the dataset. If provided,
+      it forces a specific order for the label classes. All label values present
+      in the dataset must be included in this list.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -2352,6 +2412,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       num_discretized_numerical_bins: int = 255,
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
+      label_classes: Optional[list[str]] = None,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       extra_training_config: Optional[
           abstract_learner_pb2.TrainingConfig
@@ -2422,6 +2483,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         num_discretized_numerical_bins=num_discretized_numerical_bins,
         max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
+        label_classes=label_classes,
     )
 
     deployment_config = self._build_deployment_config(
@@ -2498,7 +2560,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
   @classmethod
   def _capabilities(cls) -> abstract_learner_pb2.LearnerCapabilities:
     return abstract_learner_pb2.LearnerCapabilities(
-        support_max_training_duration=False,
+        support_max_training_duration=True,
         resume_training=True,
         support_validation_dataset=True,
         support_partial_cache_dataset_format=True,
@@ -2611,6 +2673,11 @@ class CartLearner(generic_learner.GenericCCLearner):
       reading, but skew statistics in the dataspec, which can hurt model quality
       (e.g. if an important category of a categorical feature is considered
       OOV). Set to -1 to scan the entire dataset.
+    label_classes: An ordered list of possible values for the label. This
+      argument is optional and typically not required. If not provided, the
+      label classes are determined automatically from the dataset. If provided,
+      it forces a specific order for the label classes. All label values present
+      in the dataset must be included in this list.
     data_spec: Dataspec to be used (advanced). If a data spec is given,
       `columns`, `include_all_columns`, `max_vocab_count`,
       `min_vocab_frequency`, `discretize_numerical_columns` and
@@ -2916,6 +2983,7 @@ class CartLearner(generic_learner.GenericCCLearner):
       num_discretized_numerical_bins: int = 255,
       max_num_scanned_rows_to_infer_semantic: int = 100_000,
       max_num_scanned_rows_to_compute_statistics: int = 100_000,
+      label_classes: Optional[list[str]] = None,
       data_spec: Optional[data_spec_pb2.DataSpecification] = None,
       extra_training_config: Optional[
           abstract_learner_pb2.TrainingConfig
@@ -3061,6 +3129,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         num_discretized_numerical_bins=num_discretized_numerical_bins,
         max_num_scanned_rows_to_infer_semantic=max_num_scanned_rows_to_infer_semantic,
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
+        label_classes=label_classes,
     )
 
     deployment_config = self._build_deployment_config(

@@ -629,7 +629,7 @@ RandomForestLearner::TrainWithStatusImpl(
 
   // Initialize the concurrent_fields.
   {
-    utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+    utils::concurrency::MutexLock lock(concurrent_fields.mutex);
     concurrent_fields.num_nodes_completed_trees.assign(rf_config.num_trees(),
                                                        -1);
     concurrent_fields.model_size_in_bytes =
@@ -678,7 +678,7 @@ RandomForestLearner::TrainWithStatusImpl(
 
         // Check if the training should be stopped.
         {
-          utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+          utils::concurrency::MutexLock lock(concurrent_fields.mutex);
           if (!concurrent_fields.status.ok()) {
             // Some other thread already failed.
             return;
@@ -717,7 +717,7 @@ RandomForestLearner::TrainWithStatusImpl(
             &random, &selected_examples);
 
         {
-          utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+          utils::concurrency::MutexLock lock(concurrent_fields.mutex);
           concurrent_fields.status.Update(status_sampling);
           if (!concurrent_fields.status.ok()) {
             // Sampling training examples for one of the fields has failed.
@@ -743,7 +743,7 @@ RandomForestLearner::TrainWithStatusImpl(
 
         int current_num_trained_trees;
         {
-          utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+          utils::concurrency::MutexLock lock(concurrent_fields.mutex);
           concurrent_fields.status.Update(status_train);
           if (!concurrent_fields.status.ok()) {
             // The training of the tree has failed.
@@ -819,7 +819,7 @@ RandomForestLearner::TrainWithStatusImpl(
                                   *bootstrap_size_ratio_factor);
           }
           if (training_config().has_maximum_model_size_in_memory_in_bytes()) {
-            utils::concurrency::MutexLock lock2(&concurrent_fields.mutex);
+            utils::concurrency::MutexLock lock2(concurrent_fields.mutex);
             absl::StrAppendFormat(&snippet, " model-size:%d bytes",
                                   concurrent_fields.model_size_in_bytes);
           }
@@ -835,14 +835,14 @@ RandomForestLearner::TrainWithStatusImpl(
 
         // OOB Metrics.
         if (compute_oob_performances) {
-          utils::concurrency::MutexLock lock(&oob_metrics_mutex);
+          utils::concurrency::MutexLock lock(oob_metrics_mutex);
           // Update the prediction accumulator.
           auto update_oob_status = internal::UpdateOOBPredictionsWithNewTree(
               train_dataset, config_with_default, selected_examples,
               rf_config.winner_take_all_inference(), *decision_tree, {},
               &random, &oob_predictions);
           if (!update_oob_status.ok()) {
-            utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+            utils::concurrency::MutexLock lock(concurrent_fields.mutex);
             concurrent_fields.status.Update(update_oob_status);
             return;
           }
@@ -872,7 +872,7 @@ RandomForestLearner::TrainWithStatusImpl(
                 oob_predictions,
                 /*for_permutation_importance=*/false);
             if (!evaluation_or.ok()) {
-              utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+              utils::concurrency::MutexLock lock(concurrent_fields.mutex);
               concurrent_fields.status.Update(evaluation_or.status());
               return;
             }
@@ -904,7 +904,7 @@ RandomForestLearner::TrainWithStatusImpl(
                         feature_idx, &random,
                         &oob_predictions_per_input_features[feature_idx]);
                 if (!update_oob_status.ok()) {
-                  utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+                  utils::concurrency::MutexLock lock(concurrent_fields.mutex);
                   concurrent_fields.status.Update(update_oob_status);
                   return;
                 }
@@ -932,7 +932,7 @@ RandomForestLearner::TrainWithStatusImpl(
 
   {
     // Note: At this point, there are not concurrent workers running.
-    utils::concurrency::MutexLock lock(&concurrent_fields.mutex);
+    utils::concurrency::MutexLock lock(concurrent_fields.mutex);
 
     // Check for any pending failure during the training.
     RETURN_IF_ERROR(concurrent_fields.status);

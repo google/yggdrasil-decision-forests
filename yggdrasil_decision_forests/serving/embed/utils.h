@@ -18,12 +18,32 @@
 
 #include <cstdint>
 #include <string>
+#include <variant>
+#include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
+
+typedef std::variant<double, int64_t> DoubleOrInt64;
+
+inline bool IsDouble(const DoubleOrInt64& v) {
+  return std::holds_alternative<double>(v);
+}
+inline bool IsInt(const DoubleOrInt64& v) {
+  return std::holds_alternative<int64_t>(v);
+}
+inline double AsDouble(const DoubleOrInt64& v) { return std::get<double>(v); }
+inline int64_t AsInt(const DoubleOrInt64& v) { return std::get<int64_t>(v); }
+
+bool IsJava(const proto::Options& options);
+
+bool IsCpp(const proto::Options& options);
+
+bool IsC(const proto::Options& options);
 
 // Checks that a model name is valid. A model name can only contain certain
 // letters depending on the language.
@@ -77,7 +97,7 @@ uint32_t NumBytesToMaxUnsignedValue(int bytes);
 int MaxSignedValueToNumBytes(int32_t value);
 
 // Convert a proto dtype to the corresponding C++ class.
-std::string DTypeToCCType(proto::DType::Enum value);
+std::string DTypeToCppType(proto::DType::Enum value);
 
 // Convert a proto dtype to the corresponding Java primitive type.
 std::string DTypeToJavaType(proto::DType::Enum value);
@@ -91,12 +111,34 @@ std::string SignedInteger(int bytes);
 // Java integer representation. There are no unsigned primitive types in Java.
 std::string JavaInteger(int bytes);
 
+// Converts a DoubleOrInt64 variant into a valid C/C++ literal string.
+// E.g., returns "40.5f" or "405" based on the expected type.
+absl::StatusOr<std::string> FormatExampleLiteral(const DoubleOrInt64& val,
+                                                 bool is_float);
+
+// Maps the abstract storage requirements to C/C++ primitive names.
+absl::StatusOr<std::string> StorageToPrimitiveType(int bytes, bool is_float,
+                                                   bool is_signed);
+
 // Computes the number of nodes (leaves and non-leaves) in a tree given the
 // number of leaves. Note: The trees are binary trees.
 int NumLeavesToNumNodes(int num_leaves);
 
 // Indents every line of the string by the given number of spaces.
 std::string IndentString(absl::string_view input, int num_spaces);
+
+// Packs a vector of booleans into a vector of bytes (8 booleans per byte).
+// The first boolean is the least significant bit of the first byte.
+std::vector<uint8_t> PackBoolVector(const std::vector<bool>& input);
+
+absl::StatusOr<std::string> KernelStorageToPrimitiveType(int bytes,
+                                                         bool is_float,
+                                                         bool is_signed);
+std::string KernelUnsignedInteger(int bytes);
+
+std::string KernelSignedInteger(int bytes);
+
+std::string KernelDTypeToCppType(proto::DType::Enum value);
 
 }  // namespace yggdrasil_decision_forests::serving::embed
 

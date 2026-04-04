@@ -49,6 +49,7 @@ struct GoldenGeneratedJavaCase {
   std::optional<proto::ClassificationOutput::Enum> output;
   int crop_num_trees = 3;
   bool categorical_from_string = false;
+  bool use_runtime_derived_resource_path = false;
 };
 
 // Compare the generated .h files against golden files.
@@ -97,6 +98,17 @@ SIMPLE_PARAMETERIZED_TEST(
             proto::Algorithm::ROUTING,
             proto::ClassificationOutput::PROBABILITY,
         },
+        {
+            "adult_binary_class_rf_nwta_small",
+            "adult_binary_class_rf_nwta_small_proba_routing_use_runtime_"
+            "derived_resource_path.java.golden",
+            "adult_binary_class_rf_nwta_small_proba_routing_data.bin.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+            /*crop_num_trees=*/3,
+            /*categorical_from_string=*/false,
+            /*use_runtime_derived_resource_path=*/true,
+        },
 
     }) {
   const auto& test_case = GetParam();
@@ -111,7 +123,8 @@ SIMPLE_PARAMETERIZED_TEST(
 
   proto::Options options;
   options.set_name("YdfModel");
-  options.mutable_java();
+  options.mutable_java()->set_use_runtime_derived_resource_path(
+      test_case.use_runtime_derived_resource_path);
   options.set_algorithm(test_case.algorithm);
   options.set_categorical_from_string(test_case.categorical_from_string);
   if (test_case.output.has_value()) {
@@ -125,13 +138,13 @@ SIMPLE_PARAMETERIZED_TEST(
   test::ExpectEqualGolden(
       embed.at("YdfModel.java"),
       file::JoinPath("yggdrasil_decision_forests/test_data/"
-                     "golden/embed",
+                     "golden/embed/java",
                      test_case.golden_filename));
 
   test::ExpectEqualGolden(
       embed.at("YdfModelData.bin"),
       file::JoinPath("yggdrasil_decision_forests/test_data/"
-                     "golden/embed",
+                     "golden/embed/java",
                      test_case.golden_resource_filename));
 }
 

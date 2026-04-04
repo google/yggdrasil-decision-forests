@@ -1706,7 +1706,8 @@ struct LabelHessianNumericalBucket {
     if constexpr (weighted) {
       acc->Add(content.sum_gradient, content.sum_hessian, content.sum_weight);
     } else {
-      acc->Add(content.sum_gradient, content.sum_hessian, 1.f);
+      acc->Add(content.sum_gradient, content.sum_hessian,
+               static_cast<float>(count));
     }
   }
 
@@ -1714,7 +1715,8 @@ struct LabelHessianNumericalBucket {
     if constexpr (weighted) {
       acc->Sub(content.sum_gradient, content.sum_hessian, content.sum_weight);
     } else {
-      acc->Sub(content.sum_gradient, content.sum_hessian, 1.f);
+      acc->Sub(content.sum_gradient, content.sum_hessian,
+               static_cast<float>(count));
     }
   }
 

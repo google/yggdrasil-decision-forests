@@ -15,7 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/test.h"
 
-#include <random>
+#include <algorithm>
+#include <cstddef>
 #include <regex>  // NOLINT
 #include <string>
 #include <utility>
@@ -23,14 +24,16 @@
 
 #include "gtest/gtest.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"  // Required for diffing
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
-#include "yggdrasil_decision_forests/utils/uid.h"
+#include "yggdrasil_decision_forests/utils/uid.h"  // IWYU pragma: keep
 
 namespace yggdrasil_decision_forests {
 namespace test {
@@ -92,31 +95,84 @@ void ExpectEqualGolden(
     expected_content =
         std::regex_replace(expected_content, token_regex, token.second);
   }
+
   if (expected_content != content) {
     LOG(INFO) << "The given value does not match the golden value: " << path;
 
-    const int max_print = 1000;
-    if (content.size() < max_print) {
-      LOG(INFO) << "Given value  (" << content.size()
-                << " characters)\n====================\n"
-                << content << "\n====================";
-    } else {
-      LOG(INFO)
-          << "The content is too large (" << content.size()
-          << " characters) to be printed.\nFirst part:\n====================\n"
-          << content.substr(0, max_print) << "\n====================";
+    std::vector<absl::string_view> expected_lines =
+        absl::StrSplit(expected_content, '\n');
+    std::vector<absl::string_view> actual_lines = absl::StrSplit(content, '\n');
+
+    const size_t n = expected_lines.size();
+    const int m = actual_lines.size();
+
+    // Compute LCS table
+    std::vector<std::vector<int>> lcs_table(n + 1, std::vector<int>(m + 1, 0));
+
+    for (int i = 1; i <= n; ++i) {
+      for (int j = 1; j <= m; ++j) {
+        if (expected_lines[i - 1] == actual_lines[j - 1]) {
+          lcs_table[i][j] = lcs_table[i - 1][j - 1] + 1;
+        } else {
+          lcs_table[i][j] = std::max(lcs_table[i - 1][j], lcs_table[i][j - 1]);
+        }
+      }
     }
 
-    if (expected_content.size() < max_print) {
-      LOG(INFO) << "Expected value  (" << expected_content.size()
-                << " characters)\n====================\n"
-                << expected_content << "\n====================";
-    } else {
-      LOG(INFO)
-          << "The expected_content is too large (" << expected_content.size()
-          << " characters) to be printed.\nFirst part:\n====================\n"
-          << expected_content.substr(0, max_print) << "\n====================";
+    // Backtrack to find the diff trace
+    struct DiffStep {
+      char type;  // ' ' = Match, '-' = Deletion, '+' = Addition
+      absl::string_view line;
+    };
+    std::vector<DiffStep> trace;
+    int i = n, j = m;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && expected_lines[i - 1] == actual_lines[j - 1]) {
+        // Lines match.
+        trace.push_back({' ', expected_lines[i - 1]});
+        i--;
+        j--;
+      } else if (j > 0 &&
+                 (i == 0 || lcs_table[i][j - 1] >= lcs_table[i - 1][j])) {
+        // Addition.
+        trace.push_back({'+', actual_lines[j - 1]});
+        j--;
+      } else {
+        // Deletion.
+        trace.push_back({'-', expected_lines[i - 1]});
+        i--;
+      }
     }
+    std::reverse(trace.begin(), trace.end());
+
+    // Determine what to print with context.
+    std::vector<bool> should_print(trace.size(), false);
+    const int context_lines = 2;
+
+    for (int k = 0; k < trace.size(); ++k) {
+      if (trace[k].type != ' ') {
+        int start = std::max(0, k - context_lines);
+        int end =
+            std::min(static_cast<int>(trace.size()) - 1, k + context_lines);
+        for (int c = start; c <= end; ++c) {
+          should_print[c] = true;
+        }
+      }
+    }
+
+    LOG(INFO) << "Diff:";
+    LOG(INFO) << "==========================================";
+
+    for (int k = 0; k < trace.size(); ++k) {
+      if (should_print[k]) {
+        if (k > 0 && !should_print[k - 1]) {
+          LOG(INFO) << "@@ ... @@";
+        }
+        LOG(INFO) << trace[k].type << " " << trace[k].line;
+      }
+    }
+    LOG(INFO) << "==========================================";
+    // --- Diff Logic End ---
 
     static int actual_idx = 0;
     const std::string output_path = file::JoinPath(

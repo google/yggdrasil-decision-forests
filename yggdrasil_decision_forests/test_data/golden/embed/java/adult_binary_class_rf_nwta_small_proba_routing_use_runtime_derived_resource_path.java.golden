@@ -1,0 +1,284 @@
+package com.google.ydf;
+
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.BitSet;
+
+public final class YdfModel {
+
+  public enum Label {
+    LT50K,
+    GT50K,
+  };
+
+  public enum FeatureWorkclass {
+    OUT_OF_VOCABULARY,
+    PRIVATE,
+    SELF_EMP_NOT_INC,
+    LOCAL_GOV,
+    STATE_GOV,
+    SELF_EMP_INC,
+    FEDERAL_GOV,
+    WITHOUT_PAY,
+  };
+
+  public enum FeatureEducation {
+    OUT_OF_VOCABULARY,
+    HS_GRAD,
+    SOME_COLLEGE,
+    BACHELORS,
+    MASTERS,
+    ASSOC_VOC,
+    V11TH,
+    ASSOC_ACDM,
+    V10TH,
+    V7TH_8TH,
+    PROF_SCHOOL,
+    V9TH,
+    V12TH,
+    DOCTORATE,
+    V5TH_6TH,
+    V1ST_4TH,
+    PRESCHOOL,
+  };
+
+  public enum FeatureMaritalStatus {
+    OUT_OF_VOCABULARY,
+    MARRIED_CIV_SPOUSE,
+    NEVER_MARRIED,
+    DIVORCED,
+    WIDOWED,
+    SEPARATED,
+    MARRIED_SPOUSE_ABSENT,
+    MARRIED_AF_SPOUSE,
+  };
+
+  public enum FeatureOccupation {
+    OUT_OF_VOCABULARY,
+    PROF_SPECIALTY,
+    EXEC_MANAGERIAL,
+    CRAFT_REPAIR,
+    ADM_CLERICAL,
+    SALES,
+    OTHER_SERVICE,
+    MACHINE_OP_INSPCT,
+    TRANSPORT_MOVING,
+    HANDLERS_CLEANERS,
+    FARMING_FISHING,
+    TECH_SUPPORT,
+    PROTECTIVE_SERV,
+    PRIV_HOUSE_SERV,
+  };
+
+  public enum FeatureRelationship {
+    OUT_OF_VOCABULARY,
+    HUSBAND,
+    NOT_IN_FAMILY,
+    OWN_CHILD,
+    UNMARRIED,
+    WIFE,
+    OTHER_RELATIVE,
+  };
+
+  public enum FeatureRace {
+    OUT_OF_VOCABULARY,
+    WHITE,
+    BLACK,
+    ASIAN_PAC_ISLANDER,
+    AMER_INDIAN_ESKIMO,
+    OTHER,
+  };
+
+  public enum FeatureSex {
+    OUT_OF_VOCABULARY,
+    MALE,
+    FEMALE,
+  };
+
+  public enum FeatureNativeCountry {
+    OUT_OF_VOCABULARY,
+    UNITED_STATES,
+    MEXICO,
+    PHILIPPINES,
+    GERMANY,
+    CANADA,
+    PUERTO_RICO,
+    INDIA,
+    EL_SALVADOR,
+    CUBA,
+    ENGLAND,
+    JAMAICA,
+    DOMINICAN_REPUBLIC,
+    SOUTH,
+    CHINA,
+    ITALY,
+    COLUMBIA,
+    GUATEMALA,
+    JAPAN,
+    VIETNAM,
+    TAIWAN,
+    IRAN,
+    POLAND,
+    HAITI,
+    NICARAGUA,
+    GREECE,
+    PORTUGAL,
+    ECUADOR,
+    FRANCE,
+    PERU,
+    THAILAND,
+    CAMBODIA,
+    IRELAND,
+    LAOS,
+    YUGOSLAVIA,
+    TRINADADTOBAGO,
+    HONDURAS,
+    HONG,
+    HUNGARY,
+    SCOTLAND,
+    OUTLYING_USGUAM_USVI_ETC,
+  };
+
+  private static final int NUM_FEATURES = 14;
+  private static final int NUM_TREES = 3;
+
+  public static class Instance {
+
+    private final int[] numericalFeatureValues;
+    private final int[] categoricalOrBooleanFeatureValues;
+
+    public Instance(int age, FeatureWorkclass workclass, int fnlwgt, FeatureEducation education, int educationNum, FeatureMaritalStatus maritalStatus, FeatureOccupation occupation, FeatureRelationship relationship, FeatureRace race, FeatureSex sex, int capitalGain, int capitalLoss, int hoursPerWeek, FeatureNativeCountry nativeCountry) {
+      this.numericalFeatureValues = new int[] {age, 0, fnlwgt, 0, educationNum, 0, 0, 0, 0, 0, capitalGain, capitalLoss, hoursPerWeek, 0};
+      this.categoricalOrBooleanFeatureValues = new int[] {-1, workclass.ordinal(), -1, education.ordinal(), -1, maritalStatus.ordinal(), occupation.ordinal(), relationship.ordinal(), race.ordinal(), sex.ordinal(), -1, -1, -1, nativeCountry.ordinal()};
+    }
+  }
+
+  private short[] nodePos;
+  private float[] nodeVal;
+  private byte[] nodeFeat;
+  private int[] nodeThr;
+  private short[] nodeCat;
+  private short[] rootDeltas;
+  private byte[] conditionTypes;
+  private BitSet categoricalBank;
+  private boolean isInitialized = false;
+
+  private void init(InputStream stream) throws IOException {
+    try (DataInputStream dis = new DataInputStream(new BufferedInputStream(stream))) {
+    int nodePosLength = dis.readInt();
+    this.nodePos = new short[nodePosLength];
+    for (int i = 0; i < nodePosLength; i++) {
+      this.nodePos[i] = dis.readShort();
+    }
+    int nodeValLength = dis.readInt();
+    this.nodeVal = new float[nodeValLength];
+    for (int i = 0; i < nodeValLength; i++) {
+      this.nodeVal[i] = dis.readFloat();
+    }
+    int nodeFeatLength = dis.readInt();
+    this.nodeFeat = new byte[nodeFeatLength];
+    for (int i = 0; i < nodeFeatLength; i++) {
+      this.nodeFeat[i] = dis.readByte();
+    }
+    int nodeThrLength = dis.readInt();
+    this.nodeThr = new int[nodeThrLength];
+    for (int i = 0; i < nodeThrLength; i++) {
+      this.nodeThr[i] = dis.readInt();
+    }
+    int nodeCatLength = dis.readInt();
+    this.nodeCat = new short[nodeCatLength];
+    for (int i = 0; i < nodeCatLength; i++) {
+      this.nodeCat[i] = dis.readShort();
+    }
+    int rootDeltasLength = dis.readInt();
+    this.rootDeltas = new short[rootDeltasLength];
+    for (int i = 0; i < rootDeltasLength; i++) {
+      this.rootDeltas[i] = dis.readShort();
+    }
+    int conditionTypesLength = dis.readInt();
+    this.conditionTypes = new byte[conditionTypesLength];
+    for (int i = 0; i < conditionTypesLength; i++) {
+      this.conditionTypes[i] = dis.readByte();
+    }
+    int categoricalBankNumLongs = dis.readInt();
+    if (categoricalBankNumLongs > 0) {
+      long[] longs = new long[categoricalBankNumLongs];
+      for (int i = 0; i < categoricalBankNumLongs; i++) {
+        longs[i] = dis.readLong();
+      }
+      this.categoricalBank = BitSet.valueOf(longs);
+    } else {
+      this.categoricalBank = new BitSet();
+    }
+
+    isInitialized = true;
+    }
+  }
+
+  public boolean isInitialized() {
+    return isInitialized;
+  }
+
+  private float internalPredict(Instance instance) {
+
+    if (!isInitialized()) {
+      throw new IllegalStateException("Model is not loaded");
+    }
+    float accumulator = 0;
+
+    int nodeIndex = 0;
+    for (byte treeIdx = 0; treeIdx != NUM_TREES; treeIdx++) {
+      int currentNodeIndex = nodeIndex;
+      while(nodePos[currentNodeIndex] != 0) {
+        boolean conditionResult;
+        byte featureIndex = nodeFeat[currentNodeIndex];
+        if (conditionTypes[featureIndex] == 0) {
+          int numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+          int threshold = nodeThr[currentNodeIndex];
+          conditionResult = numericalFeatureValue >= threshold;
+        } else if (conditionTypes[featureIndex] == 1) {
+          int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];
+          int bitIndex = categoricalFeatureValue + nodeCat[currentNodeIndex];
+          conditionResult = categoricalBank.get(bitIndex);
+        } else {
+          throw new AssertionError("Internal Error");
+        }
+        currentNodeIndex += conditionResult ? nodePos[currentNodeIndex] + 1 : 1;
+      }
+      accumulator += nodeVal[currentNodeIndex];
+      nodeIndex += rootDeltas[treeIdx];
+    }
+
+    return accumulator;
+  }
+
+  /**
+   * Predicts the outcome for a given {@link Instance} using the loaded YDF model.
+   *
+   * <p>This method requires that the model has been successfully initialized by calling
+   * {@link #maybeInit(InputStream)} at least once before this method is invoked. Failure to
+   * initialize the model will result in an {@link IllegalStateException}.
+   *
+   * @param instance The input instance containing feature values for prediction.
+   * @return The predicted float value from the model.
+   * @throws IllegalStateException if the model has not been initialized via {@link #maybeInit(InputStream)}.
+   * @throws AssertionError if an unexpected internal error occurs during the prediction process.
+   */
+  public static float predict(Instance instance) {
+    return getInstance().internalPredict(instance);
+  }
+
+  private YdfModel() {}
+
+  private static final YdfModel INSTANCE = new YdfModel();
+
+  public static YdfModel getInstance() {
+    return INSTANCE;
+  }
+
+  public static void maybeInit(InputStream is) throws IOException {
+    getInstance().init(is);
+  }
+}

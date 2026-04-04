@@ -263,7 +263,7 @@ absl::Status TreeBuilder::FindBestSplits(
       &done_find_splits, &status));
 
   done_find_splits.Wait();
-  utils::concurrency::MutexLock l(&mutex);
+  utils::concurrency::MutexLock l(mutex);
 
   return status;
 }
@@ -869,7 +869,7 @@ absl::Status EvaluateSplits(const ExampleToNodeMap& example_to_node,
                            &splits = feature_and_split_idx.second]() {
       auto local_status = process(feature_idx, splits);
       {
-        utils::concurrency::MutexLock l(&mutex);
+        utils::concurrency::MutexLock l(mutex);
         status.Update(local_status);
       }
       blocker.DecrementCount();

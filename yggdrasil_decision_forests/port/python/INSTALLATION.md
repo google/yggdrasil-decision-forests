@@ -19,7 +19,7 @@ remember to update `CHANGELOG.md`.
 
 #### Docker
 
-For building manylinux2014-compatible packages, you can use an appropriate
+For building manylinux_2_28-compatible packages, you can use an appropriate
 Docker image. The pre-configured build script at
 `tools/release_linux_in_docker.sh` starts a container and builds the wheels
 end-to-end. You can find the wheels in the `dist/`subdirectory.
@@ -70,7 +70,7 @@ This build configuration is experimental at this time and may break.
 
 #### Docker
 
-For building manylinux2014-compatible packages, you can use an appropriate
+For building manylinux_2_28-compatible packages, you can use an appropriate
 Docker image. The pre-configured build script at
 `tools/build_linux_aarch64_release_in_docker.sh` starts a container and builds
 the wheels end-to-end. You can find the wheels in the `dist/`subdirectory.
@@ -107,6 +107,8 @@ it is on our roadmap.
 We have not tested AArch64 compilation for YDF yet.
 
 ### Windows
+
+Windows builds are not yet officially supported.
 
 See `tools\release_windows.bat` for details.
 

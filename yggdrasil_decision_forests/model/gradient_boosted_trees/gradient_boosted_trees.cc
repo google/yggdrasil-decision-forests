@@ -324,9 +324,11 @@ void GradientBoostedTreesModel::Predict(
     } break;
 
     case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
+      DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
       absl::FixedArray<float> accumulator(num_trees_per_iter_);
-      // Zero initial prediction for the MULTINOMIAL_LOG_LIKELIHOOD.
-      std::fill(accumulator.begin(), accumulator.end(), 0);
+      // Initialize accumulator with initial_predictions_.
+      std::copy(initial_predictions_.begin(), initial_predictions_.end(),
+                accumulator.begin());
 
       {
         int accumulator_cell_idx = 0;
@@ -976,7 +978,7 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
     const proto::TrainingLogs& training_logs, const model::proto::Task& task,
     const dataset::proto::Column& label_col_spec,
     const proto::LossConfiguration& loss_config,
-    const absl::string_view loss_name,
+    const std::string& loss_name,
     const TrainingLogEvaluationSet eval_set) {
   metric::proto::EvaluationResults evaluation;
   evaluation.set_task(task);
@@ -984,9 +986,14 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
   evaluation.set_loss_value(eval_set == TrainingLogEvaluationSet::kValidation
                                 ? log_entry.validation_loss()
                                 : log_entry.training_loss());
+  int secondary_metric_size =
+      eval_set == TrainingLogEvaluationSet::kValidation
+          ? log_entry.validation_secondary_metrics_size()
+          : log_entry.training_secondary_metrics_size();
+  secondary_metric_size = std::min(secondary_metric_size,
+                                   training_logs.secondary_metric_names_size());
 
-  for (int metrix_idx = 0;
-       metrix_idx < training_logs.secondary_metric_names_size(); metrix_idx++) {
+  for (int metrix_idx = 0; metrix_idx < secondary_metric_size; metrix_idx++) {
     const auto& metric_name = training_logs.secondary_metric_names(metrix_idx);
     const auto metric_value =
         eval_set == TrainingLogEvaluationSet::kValidation
