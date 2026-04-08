@@ -19,7 +19,8 @@
 #include <vector>
 
 #include "absl/base/attributes.h"
-#include "absl/log/log.h"
+#include "absl/log/log.h"  // IWYU pragma: keep
+#include "absl/numeric/bits.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended.h"
 #include "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended_internal.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
