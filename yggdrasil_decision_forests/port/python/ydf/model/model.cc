@@ -278,6 +278,8 @@ void init_model(py::module_& m) {
       .def("loss", &GradientBoostedTreesCCModel::loss)
       .def("num_trees_per_iter",
            &GradientBoostedTreesCCModel::num_trees_per_iter)
+      .def("early_stopping_triggered",
+           &GradientBoostedTreesCCModel::early_stopping_triggered)
       .def_property_readonly_static(
           "kRegisteredName", [](py::object /* self */) {
             return model::gradient_boosted_trees::GradientBoostedTreesModel::

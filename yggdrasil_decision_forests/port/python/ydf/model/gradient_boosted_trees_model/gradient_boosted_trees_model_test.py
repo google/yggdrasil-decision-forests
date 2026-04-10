@@ -345,6 +345,39 @@ class GradientBoostedTreesTest(parameterized.TestCase):
   def test_num_trees_per_iterations(self):
     self.assertEqual(self.adult_binary_class_gbdt.num_trees_per_iteration(), 1)
 
+  def test_early_stopping_triggered_is_none_when_field_is_not_available(self):
+    self.assertIsNone(self.adult_binary_class_gbdt.early_stopping_triggered())
+    self.assertIs(self.adult_binary_class_gbdt.early_stopping_triggered(), None)
+
+  def test_early_stopping_triggered_is_false_after_training(self):
+    dataset = {"x": np.array([0, 0, 1, 1]), "y": np.array([0, 0, 0, 1])}
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="y", validation_ratio=0.5, num_trees=2
+    ).train(dataset)
+    self.assertIsInstance(
+        model, gradient_boosted_trees_model.GradientBoostedTreesModel
+    )
+    self.assertIsNotNone(model.early_stopping_triggered())
+    self.assertFalse(model.early_stopping_triggered())
+
+  def test_early_stopping_triggered_is_true_after_training_triggers_it(
+      self,
+  ):
+    # This configuration triggers early stopping.
+    dataset = {"x": np.array([0, 0, 1, 1]), "y": np.array([0, 0, 1, 1])}
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        validation_ratio=0.5,
+        num_trees=5,
+        early_stopping_num_trees_look_ahead=1,
+        early_stopping_initial_iteration=1,
+    ).train(dataset)
+    self.assertIsInstance(
+        model, gradient_boosted_trees_model.GradientBoostedTreesModel
+    )
+    self.assertIsNotNone(model.early_stopping_triggered())
+    self.assertTrue(model.early_stopping_triggered())
+
   def test_set_output_logits_classification(self):
     dataset = pd.read_csv(
         os.path.join(
@@ -713,6 +746,7 @@ class EditModelTest(absltest.TestCase):
     model.remove_tree(0)
     self.assertEqual(model.num_trees(), 0)
     self.assertSequenceEqual(model.input_feature_names(), ["x1", "x2", "x3"])
+
 
 if __name__ == "__main__":
   absltest.main()

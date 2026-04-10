@@ -257,6 +257,33 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
 
     return self._model.num_trees_per_iter()
 
+  def early_stopping_triggered(self) -> Optional[bool]:
+    """Returns whether the model training finished due to early stopping.
+
+    Gradient Boosted Trees models use a validation dataset to monitor
+    performance during training. If the validation loss stops improving, the
+    training process can be stopped before building all `num_trees` to prevent
+    overfitting.
+
+    - Returns `True` if training was stopped specifically because the early
+      stopping condition was met (validation loss stopped improving). Note
+      that this returns `True` for any early stopping strategy other than
+      `NONE`.
+    - Returns `False` if early stopping was not triggered. This happens if the
+      early stopping strategy is `NONE`, if the model trained to the maximum
+      number of trees (`num_trees`) and early stopping did not prune any trees
+      after, or if the training was interrupted for other reasons (e.g. timeout
+      or manual interruption).
+    - Returns `None` for models trained with older versions of YDF before this
+      property was introduced, as the reason for stopping is unknown.
+
+    Returns:
+      Whether early stopping was triggered (`True`/`False`), or `None` if
+      unavailable.
+    """
+
+    return self._model.early_stopping_triggered()
+
   def activation(self) -> custom_loss.Activation:
     """The model activation function."""
     loss = self._model.loss()

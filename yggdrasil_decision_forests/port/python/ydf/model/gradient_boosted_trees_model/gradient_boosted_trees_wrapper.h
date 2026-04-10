@@ -19,6 +19,7 @@
 #include <pybind11/numpy.h>
 
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -86,6 +87,9 @@ class GradientBoostedTreesCCModel : public DecisionForestCCModel {
   }
 
   int num_trees_per_iter() const { return gbt_model_->num_trees_per_iter(); }
+  std::optional<bool> early_stopping_triggered() const {
+    return gbt_model_->early_stopping_triggered();
+  }
 
  private:
   // This is a non-owning pointer to the model held by `model_`.
