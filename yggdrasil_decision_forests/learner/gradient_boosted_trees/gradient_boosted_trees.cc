@@ -268,6 +268,7 @@ absl::Status FinalizeModelWithValidationDataset(
                "'early_stopping=MIN_LOSS_FINAL'. (4) Disable early "
                "stopping completely with 'early_stopping=NONE'.";
       }
+      mdl->set_early_stopping_triggered(true);
     }
 
     // Final snippet
@@ -857,6 +858,9 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
            denominator;
   };
 
+  // Reset the early stopping flag. In all cases, the flag is set to false.
+  mdl->set_early_stopping_triggered(false);
+
   for (int iter_idx = 0; iter_idx < config.gbt_config->num_trees();
        iter_idx++) {
     // If true, the sample in "current_train_dataset" will be re-used (instead
@@ -1416,6 +1420,10 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     goss_weights = weights;
     tree_weights = &goss_weights;
   }
+
+  // Reset the early stopping flag. In all cases, the flag is set to false.
+  mdl->set_early_stopping_triggered(false);
+
   const auto begin_tree_grow = absl::Now();
   for (; iter_idx < config.gbt_config->num_trees(); iter_idx++) {
     // The user interrupted the training.

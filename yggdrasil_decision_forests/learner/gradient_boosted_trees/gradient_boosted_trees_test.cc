@@ -2239,6 +2239,40 @@ TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingInitialIteration) {
   const GradientBoostedTreesModel* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model.get());
   EXPECT_EQ(gbt_model->NumTrees(), 1);
+  EXPECT_EQ(gbt_model->early_stopping_triggered(), true);
+}
+
+TEST_F(GradientBoostedTreesOnAdult,
+       EarlyStoppingBaseTriggeredWithValidationLossIncrease) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(200);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+
+  TrainAndEvaluateModel();
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  EXPECT_EQ(
+      gbt_config->early_stopping(),
+      proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE);
+  EXPECT_TRUE(gbt_model->early_stopping_triggered().has_value());
+  EXPECT_TRUE(gbt_model->early_stopping_triggered().value());
+}
+
+TEST_F(GradientBoostedTreesOnAdult,
+       EarlyStoppingBaseTriggeredWithMinValidationLossOnFullModel) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(200);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_early_stopping(proto::GradientBoostedTreesTrainingConfig::
+                                     MIN_VALIDATION_LOSS_ON_FULL_MODEL);
+
+  TrainAndEvaluateModel();
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  EXPECT_TRUE(gbt_model->early_stopping_triggered().has_value());
+  EXPECT_TRUE(gbt_model->early_stopping_triggered().value());
 }
 
 TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingTooEarlyStopWarning) {
@@ -2268,7 +2302,82 @@ TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingTooEarlyStopWarning) {
   ASSERT_OK(model::GetLearner(train_config, &learner, deployment_config));
 
   log.StartCapturingLogs();
-  ASSERT_OK(learner->TrainWithStatus(dataset));
+
+  ASSERT_OK_AND_ASSIGN(const std::unique_ptr<AbstractModel> model,
+                       learner->TrainWithStatus(dataset));
+  const GradientBoostedTreesModel* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model.get());
+  EXPECT_EQ(gbt_model->early_stopping_triggered(), true);
+}
+
+TEST_F(GradientBoostedTreesOnAdult, EarlyStoppingTriggeredProgression) {
+  // Before training, it is not set (std::nullopt).
+  GradientBoostedTreesModel empty_model;
+  EXPECT_FALSE(empty_model.early_stopping_triggered().has_value());
+
+  // Once training starts but isn't early-stopped, it is false.
+  // We can interrupt training to inspect the model mid-training.
+  deployment_config_.set_try_resume_training(true);
+  deployment_config_.set_cache_path(
+      file::JoinPath(test::TmpDirectory(), "cache_progression"));
+  auto* gbt_config =
+      train_config_.MutableExtension(proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100000);
+  gbt_config->set_early_stopping(
+      proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE);
+  gbt_config->set_early_stopping_num_trees_look_ahead(5000);
+
+  interrupt_training_after = absl::ZeroDuration();
+  check_model = false;
+  TrainAndEvaluateModel();
+
+  auto* interrupted_model =
+      dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  ASSERT_TRUE(interrupted_model->early_stopping_triggered().has_value());
+  EXPECT_FALSE(interrupted_model->early_stopping_triggered().value());
+}
+
+TEST_F(GradientBoostedTreesOnIris, EarlyStoppingResetAfterTrainingStarts) {
+  deployment_config_.set_cache_path(
+      file::JoinPath(test::TmpDirectory(), "cache_iris"));
+  deployment_config_.set_try_resume_training(true);
+  deployment_config_.set_resume_training_snapshot_interval_seconds(1);
+
+  auto* gbt_config =
+      train_config_.MutableExtension(proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(100000);
+
+  // Early stopping is triggered.
+  gbt_config->set_early_stopping(
+      proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE);
+  gbt_config->set_early_stopping_num_trees_look_ahead(1);
+
+  check_model = false;
+  TrainAndEvaluateModel();
+  auto interrupted_model = std::move(model_);
+
+  const auto get_gbt = [](const std::unique_ptr<model::AbstractModel>& mdl) {
+    return dynamic_cast<const GradientBoostedTreesModel*>(mdl.get());
+  };
+
+  // Check that the early stopping is triggered.
+  EXPECT_TRUE(
+      get_gbt(interrupted_model)->early_stopping_triggered().has_value());
+  EXPECT_TRUE(get_gbt(interrupted_model)->early_stopping_triggered().value());
+
+  // Disable early stopping.
+  gbt_config->set_early_stopping(
+      proto::GradientBoostedTreesTrainingConfig::NONE);
+
+  // Resume the training, and interrupt it again.
+  interrupt_training_after = absl::Seconds(1);
+  check_model = true;
+  TrainAndEvaluateModel();
+  auto resumed_model = std::move(model_);
+
+  // Check that the early stopping is reset.
+  EXPECT_TRUE(get_gbt(resumed_model)->early_stopping_triggered().has_value());
+  EXPECT_FALSE(get_gbt(resumed_model)->early_stopping_triggered().value());
 }
 
 TEST_F(GradientBoostedTreesOnIris, InterruptAndResumeTraining) {

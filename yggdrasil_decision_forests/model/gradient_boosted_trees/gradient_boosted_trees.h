@@ -193,6 +193,11 @@ class GradientBoostedTreesModel : public AbstractModel,
 
   std::string DebugCompare(const AbstractModel& other) const override;
 
+  // Sets whether early stopping was triggered during training.
+  void set_early_stopping_triggered(bool early_stopping_triggered) {
+    early_stopping_triggered_ = early_stopping_triggered;
+  }
+
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,
@@ -286,9 +291,6 @@ class GradientBoostedTreesModel : public AbstractModel,
   // If not set, the model was either trained before this field was added
   // or this information was missing from the loaded model header.
   std::optional<bool> early_stopping_triggered_ = std::nullopt;
-  void set_early_stopping_triggered(bool early_stopping_triggered) {
-    early_stopping_triggered_ = early_stopping_triggered;
-  }
 };
 
 namespace internal {
