@@ -47,6 +47,8 @@ message Header {
   optional bool output_logits = 9 [default = false];
   // Configuration options for losses.
   optional LossConfiguration loss_configuration = 10;
+  // If true, early stopping was triggered during training.
+  optional bool early_stopping_triggered = 11;
 }
 
 enum Loss {

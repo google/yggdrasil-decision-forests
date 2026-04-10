@@ -118,6 +118,10 @@ class GradientBoostedTreesModel : public AbstractModel,
     num_trees_per_iter_ = num_trees_per_iter;
   }
 
+  std::optional<bool> early_stopping_triggered() const {
+    return early_stopping_triggered_;
+  }
+
   const proto::TrainingLogs& training_logs() const { return training_logs_; }
   proto::TrainingLogs* mutable_training_logs() { return &training_logs_; }
 
@@ -277,6 +281,14 @@ class GradientBoostedTreesModel : public AbstractModel,
   proto::Loss loss_ = proto::Loss::DEFAULT;
   // Options of the loss.
   proto::LossConfiguration loss_config_;
+
+  // If true, early stopping was triggered during training.
+  // If not set, the model was either trained before this field was added
+  // or this information was missing from the loaded model header.
+  std::optional<bool> early_stopping_triggered_ = std::nullopt;
+  void set_early_stopping_triggered(bool early_stopping_triggered) {
+    early_stopping_triggered_ = early_stopping_triggered;
+  }
 };
 
 namespace internal {

@@ -82,6 +82,9 @@ proto::Header GradientBoostedTreesModel::BuildHeaderProto() const {
   header.set_num_trees_per_iter(num_trees_per_iter_);
   header.set_validation_loss(validation_loss_);
   header.set_output_logits(output_logits_);
+  if (early_stopping_triggered_.has_value()) {
+    header.set_early_stopping_triggered(early_stopping_triggered_.value());
+  }
   *header.mutable_initial_predictions() = google::protobuf::RepeatedField<float>(
       initial_predictions_.begin(), initial_predictions_.end());
   *header.mutable_training_logs() = training_logs_;
@@ -97,6 +100,9 @@ void GradientBoostedTreesModel::ApplyHeaderProto(const proto::Header& header) {
   validation_loss_ = header.validation_loss();
   training_logs_ = header.training_logs();
   output_logits_ = header.output_logits();
+  if (header.has_early_stopping_triggered()) {
+    early_stopping_triggered_ = header.early_stopping_triggered();
+  }
   if (header.has_loss_configuration()) {
     loss_config_.CopyFrom(header.loss_configuration());
   }
@@ -502,8 +508,8 @@ void GradientBoostedTreesModel::Predict(
         CHECK_EQ(accumulator_cell_idx, 0);
       }
 
-      // Note: Why the "+1"? : "prediction" reserves the first value for the out
-      // of vocabulary which is not taken into account in "accumulator'.
+      // Note: Why the "+1"? : "prediction" reserves the first value for the
+      // out of vocabulary which is not taken into account in "accumulator'.
 
       if (output_logits_) {
         auto* logits = prediction->mutable_classification()->mutable_logits();
@@ -665,7 +671,8 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
         training_logs_.number_of_trees_in_final_model()) {
       continue;
     }
-    // `log` is the training log that corresponds to the final model. Return it.
+    // `log` is the training log that corresponds to the final model. Return
+    // it.
     return internal::TrainingLogToEvaluationResults(
         log, training_logs_, task_, label_col_spec(), loss_config_,
         GetLossName(), internal::TrainingLogEvaluationSet::kValidation);
@@ -977,8 +984,7 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
     const proto::TrainingLogs::Entry& log_entry,
     const proto::TrainingLogs& training_logs, const model::proto::Task& task,
     const dataset::proto::Column& label_col_spec,
-    const proto::LossConfiguration& loss_config,
-    const std::string& loss_name,
+    const proto::LossConfiguration& loss_config, const std::string& loss_name,
     const TrainingLogEvaluationSet eval_set) {
   metric::proto::EvaluationResults evaluation;
   evaluation.set_task(task);

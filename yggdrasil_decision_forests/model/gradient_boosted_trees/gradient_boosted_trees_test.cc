@@ -192,6 +192,47 @@ TEST(GradientBoostedTrees, Serialize) {
   EXPECT_EQ(original_model->DebugCompare(*loaded_model), "");
 }
 
+TEST(GradientBoostedTrees, EarlyStoppingNotSetWhenSavedModelDoesNotHaveIt) {
+  std::unique_ptr<model::AbstractModel> original_model;
+  EXPECT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "model", "adult_binary_class_gbdt"),
+      &original_model));
+  auto* gbt_model =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesModel*>(
+          original_model.get());
+  EXPECT_FALSE(gbt_model->early_stopping_triggered().has_value());
+}
+
+TEST(GradientBoostedTrees, EarlyStoppingNotSetAtInitialization) {
+  GradientBoostedTreesModel model;
+  EXPECT_FALSE(model.early_stopping_triggered().has_value());
+}
+
+TEST(GradientBoostedTrees, EarlyStoppingNotSetIfModelNotTrained) {
+  GradientBoostedTreesModel model;
+
+  EXPECT_FALSE(model.early_stopping_triggered().has_value());
+
+  model.set_task(model::proto::CLASSIFICATION);
+  model.set_loss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD, {});
+  dataset::AddColumn("label", dataset::proto::ColumnType::CATEGORICAL,
+                     model.mutable_data_spec());
+  model.set_label_col_idx(0);
+  model.mutable_initial_predictions()->push_back(0);
+  model.set_num_trees_per_iter(1);
+
+  std::string model_path =
+      file::JoinPath(test::TmpDirectory(), "saved_model_not_trained");
+  EXPECT_OK(SaveModel(model_path, &model, {}));
+
+  std::unique_ptr<model::AbstractModel> loaded_model;
+  EXPECT_OK(LoadModel(model_path, &loaded_model, {}));
+  auto* gbt_model =
+      dynamic_cast<GradientBoostedTreesModel*>(loaded_model.get());
+
+  EXPECT_FALSE(gbt_model->early_stopping_triggered().has_value());
+}
+
 TEST(GradientBoostedTrees, NDCGTruncationLegacyModel) {
   std::unique_ptr<model::AbstractModel> model;
   EXPECT_OK(model::LoadModel(
