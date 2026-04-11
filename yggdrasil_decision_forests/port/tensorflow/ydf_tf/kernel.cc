@@ -1119,7 +1119,7 @@ absl::Status GetModelPath(OpKernelContext* ctx, std::string* model_path) {
 
   const auto model_paths = model_path_tensor->flat<tf::tstring>();
   if (model_paths.size() != 1) {
-    return tf::errors::InvalidArgument(absl::Substitute(
+    return absl::InvalidArgumentError(absl::Substitute(
         "The \"$0\" attribute is expected to contains exactly one entry.",
         kInputPath));
   }
