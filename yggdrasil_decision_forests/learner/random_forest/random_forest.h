@@ -29,6 +29,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -44,6 +45,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -124,6 +126,13 @@ REGISTER_AbstractLearner(RandomForestLearner,
 
 namespace internal {
 
+// OOB computation uses a large number of mutexes in an array shared over many
+// threads. Padding to a cacheline should reduce false sharing between the
+// threads.
+struct alignas(64) PaddedMutex {
+  utils::concurrency::Mutex m;
+};
+
 void InitializeModelWithTrainingConfig(
     const model::proto::TrainingConfig& training_config,
     const model::proto::TrainingConfigLinking& training_config_linking,
@@ -158,10 +167,11 @@ void InitializeOOBPredictionAccumulators(
 absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
-    std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
+    const std::vector<UnsignedExampleIdx>& sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
     const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
+    absl::Span<internal::PaddedMutex> oob_stripe_locks,
     std::vector<PredictionAccumulator>* oob_predictions);
 
 // Evaluates the OOB predictions. Examples without any tree predictions are

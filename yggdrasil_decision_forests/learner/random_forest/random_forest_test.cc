@@ -34,6 +34,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/synthetic_dataset.h"
@@ -731,10 +732,12 @@ TEST(RandomForest, OOBPredictions) {
       dataset.nrow(), config, config_link, dataset.data_spec(), &predictions);
   EXPECT_EQ(predictions.size(), dataset.nrow());
 
+  auto test_stripe_locks = std::make_unique<internal::PaddedMutex[]>(1);
   std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices = {1};
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[0].get(), {}, &rnd, &predictions));
+      *model.decision_trees()[0].get(), {}, &rnd,
+      absl::MakeSpan(test_stripe_locks.get(), 1), &predictions));
   EXPECT_EQ(predictions[0].num_trees, 1);
   EXPECT_EQ(predictions[0].classification.NumObservations(), 1);
   EXPECT_EQ(predictions[0].classification.TopClass(), 1);
@@ -754,7 +757,8 @@ TEST(RandomForest, OOBPredictions) {
 
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[1].get(), {}, &rnd, &predictions));
+      *model.decision_trees()[1].get(), {}, &rnd,
+      absl::MakeSpan(test_stripe_locks.get(), 1), &predictions));
   EXPECT_EQ(predictions[0].num_trees, 2);
   EXPECT_EQ(predictions[0].classification.NumObservations(), 2);
   EXPECT_EQ(predictions[0].classification.TopClass(), 1);
@@ -799,25 +803,30 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
       dataset.nrow(), config, config_link, dataset.data_spec(),
       &oob_predictions_per_input_features[0]);
 
+  auto test_stripe_locks = std::make_unique<internal::PaddedMutex[]>(1);
   std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices = {1};
 
   // Baseline
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[0].get(), {}, &rnd, &oob_predictions));
+      *model.decision_trees()[0].get(), {}, &rnd,
+      absl::MakeSpan(test_stripe_locks.get(), 1), &oob_predictions));
   EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
       dataset, config, sorted_non_oob_example_indices, true,
-      *model.decision_trees()[1].get(), {}, &rnd, &oob_predictions));
+      *model.decision_trees()[1].get(), {}, &rnd,
+      absl::MakeSpan(test_stripe_locks.get(), 1), &oob_predictions));
 
   // Shuffled
   for (int repetition = 0; repetition < 100; repetition++) {
     EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
         dataset, config, sorted_non_oob_example_indices, true,
         *model.decision_trees()[0].get(), 0, &rnd,
+        absl::MakeSpan(test_stripe_locks.get(), 1),
         &oob_predictions_per_input_features[0]));
     EXPECT_OK(internal::UpdateOOBPredictionsWithNewTree(
         dataset, config, sorted_non_oob_example_indices, true,
         *model.decision_trees()[1].get(), 0, &rnd,
+        absl::MakeSpan(test_stripe_locks.get(), 1),
         &oob_predictions_per_input_features[0]));
   }
 
