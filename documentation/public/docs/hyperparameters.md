@@ -24,7 +24,6 @@ learner: "RANDOM_FOREST"
   num_trees: 1000
 }
 ```
-
 ## GRADIENT_BOOSTED_TREES
 
 A [Gradient Boosted Trees](https://statweb.stanford.edu/~jhf/ftp/trebst.pdf)
@@ -98,7 +97,7 @@ reasonable time.
 -   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
     RANDOM
 
--   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
+-   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purposes for classification problems and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
 
 #### [categorical_set_split_greedy_maximum_mask_size](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -303,7 +302,7 @@ reasonable time.
 -   **Type:** Categorical **Default:** DEFAULT **Possible values:** DEFAULT,
     BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD,
     LAMBDA_MART_NDCG5, XE_NDCG_MART, BINARY_FOCAL_LOSS, POISSON,
-    MEAN_AVERAGE_ERROR, LAMBDA_MART_NDCG
+    MEAN_AVERAGE_ERROR, LAMBDA_MART_NDCG, COX_PROPORTIONAL_HAZARD
 
 -   The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:<br>- `DEFAULT`: Select the loss automatically according to the task and label statistics.<br>- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.<br>- `SQUARED_ERROR`: Least square loss. Only valid for regression.<br>- `POISSON`: Poisson log likelihood loss. Mainly used for counting problems. Only valid for regression.<br>- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.<br>- `LAMBDA_MART_NDCG`: LambdaMART with NDCG@5.<br>- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.<br>- `BINARY_FOCAL_LOSS`: Focal loss. Only valid for binary classification. See https://arxiv.org/pdf/1708.02002.pdf.<br>- `POISSON`: Poisson log likelihood. Only valid for regression.<br>- `MEAN_AVERAGE_ERROR`: Mean average error a.k.a. MAE.<br>- `LAMBDA_MART_NDCG5`: DEPRECATED, use LAMBDA_MART_NDCG. LambdaMART with NDCG@5. <br>
 
@@ -372,6 +371,18 @@ reasonable time.
 
 -   Method used to handle missing attribute values.<br>- `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean (in case of numerical attribute) or the most-frequent-item (in case of categorical attribute) computed on the entire dataset (i.e. the information contained in the data spec).<br>- `LOCAL_IMPUTATION`: Missing attribute values are imputed with the mean (numerical attribute) or most-frequent-item (in the case of categorical attribute) evaluated on the training examples in the current node.<br>- `RANDOM_LOCAL_IMPUTATION`: Missing attribute values are imputed from randomly sampled values from the training examples in the current node. This method was proposed by Clinic et al. in "Random Survival Forests" (https://projecteuclid.org/download/pdfview_1/euclid.aoas/1223908043).
 
+#### [multinomial_initial_class_priors](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
+
+-   **Type:** Categorical **Default:** false **Possible values:** true, false
+
+-   Only for multinomial classification loss. If false (default), the initial
+    prediction (bias) of the model is 0 for all classes. If true, the initial
+    prediction is set to the logarithm of class priors i.e. log(P(y=i)).
+    Initializing with class priors is equivalent to starting boosting from a
+    constant model that predicts the marginal distribution of the label. This
+    can result in faster convergence on some datasets, but it may also trigger
+    early stopping prematurely in other cases.
+
 #### [ndcg_truncation](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
 -   **Type:** Integer **Default:** 5 **Possible values:** min:1
@@ -408,6 +419,22 @@ reasonable time.
     be smaller if early stopping is enabled. For multi-class classification
     problems, the number of decision trees is at most this parameter times the
     number of classes.
+
+#### [numerical_vector_sequence_enable_closer_than_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+    fixed-size numerical vectors). If true, enable conditions of type |x-A|^2 <=
+    T for learned anchor A and threshold T, and any vector x in the sequence.
+
+#### [numerical_vector_sequence_enable_projected_more_than_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+    fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+    for learned anchor A and threshold T, and any vector x in the sequence.
 
 #### [numerical_vector_sequence_num_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -586,6 +613,7 @@ reasonable time.
 
 -   **Type:** Categorical **Default:** false **Possible values:** true, false
 
+
 #### [use_hessian_gain](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.proto)
 
 -   **Type:** Categorical **Default:** false **Possible values:** true, false
@@ -599,7 +627,7 @@ reasonable time.
 -   **Type:** Integer **Default:** 1 **Possible values:** min:1
 
 -   Evaluate the model on the validation set every
-    "validation_interval_in_trees" trees. Increasing this value reduce the cost
+    "validation_interval_in_trees" trees. Increasing this value reduces the cost
     of validation and can impact the early stopping policy (as early stopping is
     only tested during the validation).
 
@@ -652,12 +680,30 @@ being more expensive.
 
 -   `winner_take_all`: true
 
+**better_default@2**
+
+A configuration that is generally better than the default parameters without
+being more expensive.
+
+-   `winner_take_all`: false
+
 **benchmark_rank1@1**
 
 Top ranking hyper-parameters on our benchmark slightly modified to run in
 reasonable time.
 
 -   `winner_take_all`: true
+-   `categorical_algorithm`: RANDOM
+-   `split_axis`: SPARSE_OBLIQUE
+-   `sparse_oblique_normalization`: MIN_MAX
+-   `sparse_oblique_num_projections_exponent`: 1
+
+**benchmark_rank1@2**
+
+Top ranking hyper-parameters on our benchmark slightly modified to run in
+reasonable time.
+
+-   `winner_take_all`: false
 -   `categorical_algorithm`: RANDOM
 -   `split_axis`: SPARSE_OBLIQUE
 -   `sparse_oblique_normalization`: MIN_MAX
@@ -705,7 +751,7 @@ reasonable time.
 -   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
     RANDOM
 
--   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
+-   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purposes for classification problems and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
 
 #### [categorical_set_split_greedy_maximum_mask_size](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -914,6 +960,22 @@ reasonable time.
     increase the quality of the model at the expense of size, training speed,
     and inference latency.
 
+#### [numerical_vector_sequence_enable_closer_than_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+    fixed-size numerical vectors). If true, enable conditions of type |x-A|^2 <=
+    T for learned anchor A and threshold T, and any vector x in the sequence.
+
+#### [numerical_vector_sequence_enable_projected_more_than_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+    fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+    for learned anchor A and threshold T, and any vector x in the sequence.
+
 #### [numerical_vector_sequence_num_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
 -   **Type:** Integer **Default:** 1000 **Possible values:** min:1
@@ -1086,7 +1148,7 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 -   **Type:** Categorical **Default:** CART **Possible values:** CART, ONE_HOT,
     RANDOM
 
--   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purpose and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
+-   How to learn splits on categorical attributes.<br>- `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.<br>- `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purposes for classification problems and generally performs worse than other alternatives.<br>- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.
 
 #### [categorical_set_split_greedy_maximum_mask_size](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1261,6 +1323,22 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
     num_candidate_attributes_ratio`. The possible values are between ]0, and 1]
     as well as -1. If not set or equal to -1, the `num_candidate_attributes` is
     used.
+
+#### [numerical_vector_sequence_enable_closer_than_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+    fixed-size numerical vectors). If true, enable conditions of type |x-A|^2 <=
+    T for learned anchor A and threshold T, and any vector x in the sequence.
+
+#### [numerical_vector_sequence_enable_projected_more_than_conditions](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
+
+-   **Type:** Categorical **Default:** true **Possible values:** true, false
+
+-   For datasets with NUMERICAL_VECTOR_SEQUENCE features (i.e., sequence of
+    fixed-size numerical vectors). If true, enable conditions of type x*A >= T
+    for learned anchor A and threshold T, and any vector x in the sequence.
 
 #### [numerical_vector_sequence_num_examples](https://github.com/google/yggdrasil-decision-forests/blob/main/yggdrasil_decision_forests/learner/decision_tree/decision_tree.proto)
 
@@ -1452,7 +1530,7 @@ The hyper-parameter protobuffers are used with the C++ and CLI APIs.
 -   **Type:** Categorical **Default:** DEFAULT **Possible values:** DEFAULT,
     BINOMIAL_LOG_LIKELIHOOD, SQUARED_ERROR, MULTINOMIAL_LOG_LIKELIHOOD,
     LAMBDA_MART_NDCG5, XE_NDCG_MART, BINARY_FOCAL_LOSS, POISSON,
-    MEAN_AVERAGE_ERROR, LAMBDA_MART_NDCG
+    MEAN_AVERAGE_ERROR, LAMBDA_MART_NDCG, COX_PROPORTIONAL_HAZARD
 
 -   The loss optimized by the model. If not specified (DEFAULT) the loss is selected automatically according to the \"task\" and label statistics. For example, if task=CLASSIFICATION and the label has two possible values, the loss will be set to BINOMIAL_LOG_LIKELIHOOD. Possible values are:<br>- `DEFAULT`: Select the loss automatically according to the task and label statistics.<br>- `BINOMIAL_LOG_LIKELIHOOD`: Binomial log likelihood. Only valid for binary classification.<br>- `SQUARED_ERROR`: Least square loss. Only valid for regression.<br>- `POISSON`: Poisson log likelihood loss. Mainly used for counting problems. Only valid for regression.<br>- `MULTINOMIAL_LOG_LIKELIHOOD`: Multinomial log likelihood i.e. cross-entropy. Only valid for binary or multi-class classification.<br>- `LAMBDA_MART_NDCG`: LambdaMART with NDCG@5.<br>- `XE_NDCG_MART`:  Cross Entropy Loss NDCG. See arxiv.org/abs/1911.09798.<br>- `BINARY_FOCAL_LOSS`: Focal loss. Only valid for binary classification. See https://arxiv.org/pdf/1708.02002.pdf.<br>- `POISSON`: Poisson log likelihood. Only valid for regression.<br>- `MEAN_AVERAGE_ERROR`: Mean average error a.k.a. MAE.<br>- `LAMBDA_MART_NDCG5`: DEPRECATED, use LAMBDA_MART_NDCG. LambdaMART with NDCG@5. <br>
 
