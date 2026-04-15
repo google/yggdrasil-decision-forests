@@ -2257,6 +2257,9 @@ TEST_F(GradientBoostedTreesOnAdult,
       proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE);
   EXPECT_TRUE(gbt_model->early_stopping_triggered().has_value());
   EXPECT_TRUE(gbt_model->early_stopping_triggered().value());
+
+  EXPECT_THAT(gbt_model->DescriptionAndStatistics(),
+              testing::HasSubstr("Early stopping triggered: true"));
 }
 
 TEST_F(GradientBoostedTreesOnAdult,

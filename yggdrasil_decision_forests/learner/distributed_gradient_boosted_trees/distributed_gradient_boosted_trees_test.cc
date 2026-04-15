@@ -27,6 +27,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -295,7 +296,14 @@ TEST_F(DatasetAdult, CompareWithClassicalAlgorithm) {
   distributed_gbt_model->mutable_training_logs()->Clear();
   const auto description_distributed = model_->DescriptionAndStatistics(true);
 
-  EXPECT_EQ(description_classical, description_distributed);
+  // Remove the early stopping information from the description as early
+  // stopping is not implemented in the distributed algorithm.
+  const std::string clean_description_classical = absl::StrReplaceAll(
+      description_classical, {{"Early stopping triggered: false\n", ""}});
+  const std::string clean_description_distributed = absl::StrReplaceAll(
+      description_distributed, {{"Early stopping triggered: NOT_SET\n", ""}});
+
+  EXPECT_EQ(clean_description_classical, clean_description_distributed);
 }
 
 // The load balancer continuously change the worker<->feature mapping.

@@ -704,6 +704,12 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
   absl::StrAppend(description,
                   "Node format: ", node_format_.value_or("NOT_SET"), "\n");
 
+  absl::StrAppend(description, "Early stopping triggered: ",
+                  early_stopping_triggered_.has_value()
+                      ? (early_stopping_triggered_.value() ? "true" : "false")
+                      : "NOT_SET",
+                  "\n");
+
   StrAppendForestStructureStatistics(data_spec(), decision_trees(),
                                      description);
 

@@ -206,6 +206,8 @@ TEST(GradientBoostedTrees, EarlyStoppingNotSetWhenSavedModelDoesNotHaveIt) {
 TEST(GradientBoostedTrees, EarlyStoppingNotSetAtInitialization) {
   GradientBoostedTreesModel model;
   EXPECT_FALSE(model.early_stopping_triggered().has_value());
+  EXPECT_THAT(model.DescriptionAndStatistics(),
+              testing::HasSubstr("Early stopping triggered: NOT_SET"));
 }
 
 TEST(GradientBoostedTrees, EarlyStoppingNotSetIfModelNotTrained) {

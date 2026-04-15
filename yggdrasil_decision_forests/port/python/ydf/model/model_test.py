@@ -703,6 +703,7 @@ Use `model.describe()` for more details.
     # Dataspec description
     self.assertIn("DATASPEC:", text_description)
     self.assertIn("Number of records:", text_description)
+    self.assertIn("Early stopping triggered:", text_description)
 
   def test_model_describe_html(self):
     html_description = self.adult_binary_class_gbdt.describe("html")

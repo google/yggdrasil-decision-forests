@@ -5845,6 +5845,7 @@ Loss: BINOMIAL_LOG_LIKELIHOOD
 Validation loss value: 0.573843
 Number of trees per iteration: 1
 Node format: BLOB_SEQUENCE
+Early stopping triggered: NOT_SET
 Number of trees: 68
 Total number of nodes: 8636
 

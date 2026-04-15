@@ -3471,6 +3471,7 @@ Loss: SQUARED_ERROR
 Validation loss value: 2.15276
 Number of trees per iteration: 1
 Node format: BLOB_SEQUENCE
+Early stopping triggered: NOT_SET
 Number of trees: 38
 Total number of nodes: 2318
 
