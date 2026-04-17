@@ -255,7 +255,7 @@ class GradientBoostedTreesModel : public AbstractModel,
   float validation_loss_ = std::numeric_limits<float>::quiet_NaN();
 
   // Number of trees extracted at each gradient boosting operation.
-  int num_trees_per_iter_;
+  int num_trees_per_iter_ = 1;
 
   // Evaluation metrics and other meta-data computed during training.
   proto::TrainingLogs training_logs_;
