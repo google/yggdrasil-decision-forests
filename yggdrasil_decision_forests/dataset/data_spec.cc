@@ -139,10 +139,8 @@ int32_t NonintegerizedCategoricalStringToValue(absl::string_view value,
   }
 }
 
-// TODO: Remove this version when external protobuffer supports dictionary
-// query with absl::string_view.
 absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
-    const std::string& value, const proto::Column& col_spec) {
+    absl::string_view value, const proto::Column& col_spec) {
   if (col_spec.categorical().is_already_integerized()) {
     int32_t int_value;
     if (!absl::SimpleAtoi(value, &int_value)) {

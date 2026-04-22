@@ -129,11 +129,8 @@ std::string PrintHumanReadable(const proto::DataSpecification& data_spec,
 
 // Returns the integer representation of a categorical value provided as a
 // string.
-//
-// TODO: Remove this version when external protobuffer will support
-// map query with absl::string_view.
 absl::StatusOr<int32_t> CategoricalStringToValueWithStatus(
-    const std::string& value, const proto::Column& col_spec);
+    absl::string_view value, const proto::Column& col_spec);
 
 int32_t CategoricalStringToValue(const std::string& value,
                                  const proto::Column& col_spec);
