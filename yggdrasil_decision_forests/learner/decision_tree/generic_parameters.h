@@ -58,6 +58,10 @@ constexpr char kHParamCategoricalAlgorithm[] = "categorical_algorithm";
 constexpr char kCategoricalAlgorithmCART[] = "CART";
 constexpr char kCategoricalAlgorithmOneHot[] = "ONE_HOT";
 constexpr char kCategoricalAlgorithmRandom[] = "RANDOM";
+constexpr char kHParamRandomCategoricalNumTrialExponent[] =
+    "categorical_random_num_trial_exponent";
+constexpr char kHParamRandomCategoricalMaxNumTrials[] =
+    "categorical_random_max_num_trials";
 
 // Axis splits.
 constexpr char kHParamSplitAxis[] = "split_axis";

@@ -485,7 +485,41 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
         R"(How to learn splits on categorical attributes.
 - `CART`: CART algorithm. Find categorical splits of the form "value \in mask". The solution is exact for binary classification, regression and ranking. It is approximated for multi-class classification. This is a good first algorithm to use. In case of overfitting (very small dataset, large dictionary), the "random" algorithm is a good alternative.
 - `ONE_HOT`: One-hot encoding. Find the optimal categorical split of the form "attribute == param". This method is similar (but more efficient) than converting each possible categorical value into a boolean feature. This method is available for comparison purposes for classification problems and generally performs worse than other alternatives.
-- `RANDOM`: Best splits among a set of random candidate. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.)");
+- `RANDOM`: Best splits among a set of random candidates. Find the a categorical split of the form "value \in mask" using a random search. This solution can be seen as an approximation of the CART algorithm. This method is a strong alternative to CART. This algorithm is inspired from section "5.1 Categorical Variables" of "Random Forest", 2001.)");
+  }
+
+  {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamRandomCategoricalNumTrialExponent));
+    param->mutable_real()->set_default_value(
+        config.categorical().random().num_trial_exponent());
+    param->mutable_real()->set_minimum(0);
+    param->mutable_documentation()->set_proto_field("num_trial_exponent");
+    param->mutable_conditional()->set_control_field(
+        kHParamCategoricalAlgorithm);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kCategoricalAlgorithmRandom);
+    param->mutable_documentation()->set_description(absl::Substitute(
+        R"(For random categorical splits i.e. `categorical_algorithm=RANDOM`. Controls the number of random splits to evaluate. The effective number of splits is `min($0, 32 + {vocab size}^$1)`, with `vocab size` being the number of unique categorical values in the node. Defaults to $2)",
+        kHParamRandomCategoricalMaxNumTrials,
+        kHParamRandomCategoricalNumTrialExponent,
+        param->real().default_value()));
+  }
+
+  {
+    ASSIGN_OR_RETURN(auto param,
+                     get_params(kHParamRandomCategoricalMaxNumTrials));
+    param->mutable_integer()->set_default_value(
+        config.categorical().random().max_num_trials());
+    param->mutable_integer()->set_minimum(1);
+    param->mutable_documentation()->set_proto_field("max_num_trials");
+    param->mutable_conditional()->set_control_field(
+        kHParamCategoricalAlgorithm);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kCategoricalAlgorithmRandom);
+    param->mutable_documentation()->set_description(absl::Substitute(
+        R"(For random categorical splits i.e. `categorical_algorithm=RANDOM`. Maximum number of candidate splits evaluated at each node. Defaults to $0.)",
+        param->integer().default_value()));
   }
 
   {
@@ -1076,6 +1110,39 @@ absl::Status SetHyperParameters(
         return absl::InvalidArgumentError(
             absl::StrFormat(R"(Unknown value "%s" for parameter "%s")", value,
                             kHParamCategoricalAlgorithm));
+      }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamRandomCategoricalNumTrialExponent);
+    if (hparam.has_value()) {
+      if (dt_config->has_categorical() &&
+          dt_config->categorical().has_random()) {
+        dt_config->mutable_categorical()
+            ->mutable_random()
+            ->set_num_trial_exponent(hparam.value().value().real());
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamRandomCategoricalNumTrialExponent,
+                         " only works with `categorical_algorithm=RANDOM`)"));
+      }
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(kHParamRandomCategoricalMaxNumTrials);
+    if (hparam.has_value()) {
+      if (dt_config->has_categorical() &&
+          dt_config->categorical().has_random()) {
+        dt_config->mutable_categorical()->mutable_random()->set_max_num_trials(
+            hparam.value().value().integer());
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamRandomCategoricalMaxNumTrials,
+                         " only works with `categorical_algorithm=RANDOM`)"));
       }
     }
   }

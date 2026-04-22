@@ -182,14 +182,24 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       One-hot encoding. Find the optimal categorical split of the form
       "attribute == param". This method is similar (but more efficient) than
       converting each possible categorical value into a boolean feature. This
-      method is available for comparison purpose and generally performs worse
-      than other alternatives. - `RANDOM`: Best splits among a set of random
-      candidate. Find the a categorical split of the form "value \\in mask"
-      using a random search. This solution can be seen as an approximation of
-      the CART algorithm. This method is a strong alternative to CART. This
-      algorithm is inspired from section "5.1 Categorical Variables" of "Random
-      Forest", 2001.
+      method is available for comparison purposes for classification problems
+      and generally performs worse than other alternatives. - `RANDOM`: Best
+      splits among a set of random candidates. Find the a categorical split of
+      the form "value \\in mask" using a random search. This solution can be
+      seen as an approximation of the CART algorithm. This method is a strong
+      alternative to CART. This algorithm is inspired from section "5.1
+      Categorical Variables" of "Random Forest", 2001.
         Default: "CART".
+    categorical_random_max_num_trials: For random categorical splits i.e.
+      `categorical_algorithm=RANDOM`. Maximum number of candidate splits
+      evaluated at each node. Defaults to 5000. Default: None.
+    categorical_random_num_trial_exponent: For random categorical splits i.e.
+      `categorical_algorithm=RANDOM`. Controls the number of random splits to
+      evaluate. The effective number of splits is
+      `min(categorical_random_max_num_trials, 32 + {vocab
+      size}^categorical_random_num_trial_exponent)`, with `vocab size` being the
+      number of unique categorical values in the node. Defaults to 2
+      Default: None.
     categorical_set_split_greedy_maximum_mask_size: For categorical set splits
       e.g. texts. Maximum number of attribute values on the positive side of the
       split mask. Smaller values might improve training speed but lead to worse
@@ -498,6 +508,8 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       bootstrap_size_ratio: float = 1.0,
       bootstrap_training_dataset: bool = True,
       categorical_algorithm: str = "CART",
+      categorical_random_max_num_trials: Optional[int] = None,
+      categorical_random_num_trial_exponent: Optional[float] = None,
       categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
@@ -561,6 +573,10 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         "bootstrap_size_ratio": bootstrap_size_ratio,
         "bootstrap_training_dataset": bootstrap_training_dataset,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_random_max_num_trials": categorical_random_max_num_trials,
+        "categorical_random_num_trial_exponent": (
+            categorical_random_num_trial_exponent
+        ),
         "categorical_set_split_greedy_maximum_mask_size": (
             categorical_set_split_greedy_maximum_mask_size
         ),
@@ -1390,14 +1406,24 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       One-hot encoding. Find the optimal categorical split of the form
       "attribute == param". This method is similar (but more efficient) than
       converting each possible categorical value into a boolean feature. This
-      method is available for comparison purpose and generally performs worse
-      than other alternatives. - `RANDOM`: Best splits among a set of random
-      candidate. Find the a categorical split of the form "value \\in mask"
-      using a random search. This solution can be seen as an approximation of
-      the CART algorithm. This method is a strong alternative to CART. This
-      algorithm is inspired from section "5.1 Categorical Variables" of "Random
-      Forest", 2001.
+      method is available for comparison purposes for classification problems
+      and generally performs worse than other alternatives. - `RANDOM`: Best
+      splits among a set of random candidates. Find the a categorical split of
+      the form "value \\in mask" using a random search. This solution can be
+      seen as an approximation of the CART algorithm. This method is a strong
+      alternative to CART. This algorithm is inspired from section "5.1
+      Categorical Variables" of "Random Forest", 2001.
         Default: "CART".
+    categorical_random_max_num_trials: For random categorical splits i.e.
+      `categorical_algorithm=RANDOM`. Maximum number of candidate splits
+      evaluated at each node. Defaults to 5000. Default: None.
+    categorical_random_num_trial_exponent: For random categorical splits i.e.
+      `categorical_algorithm=RANDOM`. Controls the number of random splits to
+      evaluate. The effective number of splits is
+      `min(categorical_random_max_num_trials, 32 + {vocab
+      size}^categorical_random_num_trial_exponent)`, with `vocab size` being the
+      number of unique categorical values in the node. Defaults to 2
+      Default: None.
     categorical_set_split_greedy_maximum_mask_size: For categorical set splits
       e.g. texts. Maximum number of attribute values on the positive side of the
       split mask. Smaller values might improve training speed but lead to worse
@@ -1831,6 +1857,8 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       allow_na_conditions: bool = False,
       apply_link_function: bool = True,
       categorical_algorithm: str = "CART",
+      categorical_random_max_num_trials: Optional[int] = None,
+      categorical_random_num_trial_exponent: Optional[float] = None,
       categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
@@ -1917,6 +1945,10 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "allow_na_conditions": allow_na_conditions,
         "apply_link_function": apply_link_function,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_random_max_num_trials": categorical_random_max_num_trials,
+        "categorical_random_num_trial_exponent": (
+            categorical_random_num_trial_exponent
+        ),
         "categorical_set_split_greedy_maximum_mask_size": (
             categorical_set_split_greedy_maximum_mask_size
         ),
@@ -2698,14 +2730,24 @@ class CartLearner(generic_learner.GenericCCLearner):
       One-hot encoding. Find the optimal categorical split of the form
       "attribute == param". This method is similar (but more efficient) than
       converting each possible categorical value into a boolean feature. This
-      method is available for comparison purpose and generally performs worse
-      than other alternatives. - `RANDOM`: Best splits among a set of random
-      candidate. Find the a categorical split of the form "value \\in mask"
-      using a random search. This solution can be seen as an approximation of
-      the CART algorithm. This method is a strong alternative to CART. This
-      algorithm is inspired from section "5.1 Categorical Variables" of "Random
-      Forest", 2001.
+      method is available for comparison purposes for classification problems
+      and generally performs worse than other alternatives. - `RANDOM`: Best
+      splits among a set of random candidates. Find the a categorical split of
+      the form "value \\in mask" using a random search. This solution can be
+      seen as an approximation of the CART algorithm. This method is a strong
+      alternative to CART. This algorithm is inspired from section "5.1
+      Categorical Variables" of "Random Forest", 2001.
         Default: "CART".
+    categorical_random_max_num_trials: For random categorical splits i.e.
+      `categorical_algorithm=RANDOM`. Maximum number of candidate splits
+      evaluated at each node. Defaults to 5000. Default: None.
+    categorical_random_num_trial_exponent: For random categorical splits i.e.
+      `categorical_algorithm=RANDOM`. Controls the number of random splits to
+      evaluate. The effective number of splits is
+      `min(categorical_random_max_num_trials, 32 + {vocab
+      size}^categorical_random_num_trial_exponent)`, with `vocab size` being the
+      number of unique categorical values in the node. Defaults to 2
+      Default: None.
     categorical_set_split_greedy_maximum_mask_size: For categorical set splits
       e.g. texts. Maximum number of attribute values on the positive side of the
       split mask. Smaller values might improve training speed but lead to worse
@@ -2990,6 +3032,8 @@ class CartLearner(generic_learner.GenericCCLearner):
       ] = None,
       allow_na_conditions: bool = False,
       categorical_algorithm: str = "CART",
+      categorical_random_max_num_trials: Optional[int] = None,
+      categorical_random_num_trial_exponent: Optional[float] = None,
       categorical_set_split_greedy_maximum_mask_size: int = -1,
       categorical_set_split_greedy_sampling: float = 0.1,
       categorical_set_split_max_num_items: int = -1,
@@ -3043,6 +3087,10 @@ class CartLearner(generic_learner.GenericCCLearner):
     hyper_parameters = {
         "allow_na_conditions": allow_na_conditions,
         "categorical_algorithm": categorical_algorithm,
+        "categorical_random_max_num_trials": categorical_random_max_num_trials,
+        "categorical_random_num_trial_exponent": (
+            categorical_random_num_trial_exponent
+        ),
         "categorical_set_split_greedy_maximum_mask_size": (
             categorical_set_split_greedy_maximum_mask_size
         ),

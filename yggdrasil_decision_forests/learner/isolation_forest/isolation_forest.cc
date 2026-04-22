@@ -814,6 +814,8 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamNumericalVectorSequenceEnableCloserThanConditions,
       decision_tree::
           kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
+      decision_tree::kHParamRandomCategoricalNumTrialExponent,
+      decision_tree::kHParamRandomCategoricalMaxNumTrials,
   };
 
   ASSIGN_OR_RETURN(auto hparam_def,

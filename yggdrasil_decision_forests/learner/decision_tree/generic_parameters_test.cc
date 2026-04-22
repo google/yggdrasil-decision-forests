@@ -80,6 +80,8 @@ TEST(GenericParameters, GiveValidAndInvalidHyperparameters) {
       kHParamNumericalVectorSequenceNumRandomAnchors,
       kHParamNumericalVectorSequenceEnableCloserThanConditions,
       kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
+      kHParamRandomCategoricalNumTrialExponent,
+      kHParamRandomCategoricalMaxNumTrials,
   };
   EXPECT_OK(GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters));
@@ -132,6 +134,8 @@ TEST(GenericParameters, MissingValidHyperparameters) {
       kHParamNumericalVectorSequenceNumRandomAnchors,
       kHParamNumericalVectorSequenceEnableCloserThanConditions,
       kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
+      kHParamRandomCategoricalNumTrialExponent,
+      kHParamRandomCategoricalMaxNumTrials,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -182,6 +186,8 @@ TEST(GenericParameters, MissingInvalidHyperparameters) {
       kHParamNumericalVectorSequenceNumRandomAnchors,
       kHParamNumericalVectorSequenceEnableCloserThanConditions,
       kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
+      kHParamRandomCategoricalNumTrialExponent,
+      kHParamRandomCategoricalMaxNumTrials,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -233,6 +239,8 @@ TEST(GenericParameters, UnknownValidHyperparameter) {
       kHParamNumericalVectorSequenceNumRandomAnchors,
       kHParamNumericalVectorSequenceEnableCloserThanConditions,
       kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
+      kHParamRandomCategoricalNumTrialExponent,
+      kHParamRandomCategoricalMaxNumTrials,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -282,6 +290,8 @@ TEST(GenericParameters, UnknownInvalidHyperparameter) {
       kHParamSplitAxisSparseObliqueWeightsIntegerMaximum,
       kHParamNumericalVectorSequenceNumExamples,
       kHParamNumericalVectorSequenceNumRandomAnchors,
+      kHParamRandomCategoricalNumTrialExponent,
+      kHParamRandomCategoricalMaxNumTrials,
       "does_not_exist_invalid"};
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
@@ -334,6 +344,8 @@ TEST(GenericParameters, ExistingHyperparameter) {
       kHParamNumericalVectorSequenceNumRandomAnchors,
       kHParamNumericalVectorSequenceEnableCloserThanConditions,
       kHParamNumericalVectorSequenceEnableProjectedMoreThanConditions,
+      kHParamRandomCategoricalNumTrialExponent,
+      kHParamRandomCategoricalMaxNumTrials,
   };
   absl::Status status = GetGenericHyperParameterSpecification(
       config, &hparam_def, valid_hyperparameters, invalid_hyperparameters);
