@@ -69,62 +69,44 @@ namespace internal {
 // objects, hence the unused fields cannot be set to void. Empty structs would
 // occupy 1 byte for the unused field. Combining two fields into a struct is
 // therefore the most space-efficient alternative.
-struct BooleanValueAndWeight {
+struct Empty {};
+
+template <bool weighted>
+struct BooleanValue {
   bool value;
-  float weight;
+  [[no_unique_address]] std::conditional_t<weighted, float, Empty> weight;
 };
 
-struct BooleanValueOnly {
-  bool value;
-};
-
-struct IntegerValueAndWeight {
+template <bool weighted>
+struct IntegerValue {
   int value;
-  float weight;
+  [[no_unique_address]] std::conditional_t<weighted, float, Empty> weight;
 };
 
-struct IntegerValueOnly {
-  int value;
-};
-
-struct FloatValueAndWeight {
+template <bool weighted>
+struct FloatValue {
   float value;
-  float weight;
+  [[no_unique_address]] std::conditional_t<weighted, float, Empty> weight;
 };
 
-struct FloatValueOnly {
-  float value;
-};
-
-struct FloatGradientHessianAndWeight {
+template <bool weighted>
+struct FloatGradientHessian {
   float gradient;
   float hessian;
-  float weight;
+  [[no_unique_address]] std::conditional_t<weighted, float, Empty> weight;
 };
 
-struct FloatGradientHessianOnly {
-  float gradient;
-  float hessian;
-};
-
-struct FloatSumGradientHessianAndWeight {
+template <bool weighted>
+struct FloatSumGradientHessian {
   float sum_gradient;
   float sum_hessian;
-  float sum_weight;
+  [[no_unique_address]] std::conditional_t<weighted, float, Empty> sum_weight;
 };
 
-struct FloatSumGradientHessianOnly {
-  float sum_gradient;
-  float sum_hessian;
-};
-
-struct SumTruesAndWeights {
+template <bool weighted>
+struct SumTrues {
   double sum_trues;
-  double sum_weights;
-};
-
-struct SumTruesOnly {
-  double sum_trues;
+  [[no_unique_address]] std::conditional_t<weighted, double, Empty> sum_weights;
 };
 
 }  // namespace internal
@@ -892,9 +874,7 @@ struct LabelHessianNumericalScoreAccumulator {
 
 template <bool weighted>
 struct LabelNumericalOneValueBucket {
-  typedef typename std::conditional_t<weighted, internal::FloatValueAndWeight,
-                                      internal::FloatValueOnly>
-      ValueAndMaybeWeight;
+  using ValueAndMaybeWeight = internal::FloatValue<weighted>;
   ValueAndMaybeWeight content;
   static constexpr int count = 1;  // NOLINT
 
@@ -1028,10 +1008,8 @@ inline std::ostream& operator<<(
 
 template <bool weighted>
 struct LabelHessianNumericalOneValueBucket {
-  typedef typename std::conditional_t<weighted,
-                                      internal::FloatGradientHessianAndWeight,
-                                      internal::FloatGradientHessianOnly>
-      GradientHessianAndMaybeWeight;
+  using GradientHessianAndMaybeWeight =
+      internal::FloatGradientHessian<weighted>;
   GradientHessianAndMaybeWeight content;
   static constexpr int count = 1;  // NOLINT
 
@@ -1210,9 +1188,7 @@ inline std::ostream& operator<<(
 
 template <bool weighted>
 struct LabelCategoricalOneValueBucket {
-  typedef typename std::conditional_t<weighted, internal::IntegerValueAndWeight,
-                                      internal::IntegerValueOnly>
-      ValueAndMaybeWeight;
+  using ValueAndMaybeWeight = internal::IntegerValue<weighted>;
   ValueAndMaybeWeight content;
 
   // Not called "kCount" because this is used as a template parameter and
@@ -1351,9 +1327,7 @@ inline std::ostream& operator<<(
 
 template <bool weighted>
 struct LabelBinaryCategoricalOneValueBucket {
-  typedef typename std::conditional_t<weighted, internal::BooleanValueAndWeight,
-                                      internal::BooleanValueOnly>
-      ValueAndMaybeWeight;
+  using ValueAndMaybeWeight = internal::BooleanValue<weighted>;
   ValueAndMaybeWeight content;
 
   // Not called "kCount" because this is used as a template parameter and
@@ -1694,11 +1668,8 @@ struct LabelHessianNumericalBucket {
   // bucket of size 4 bytes.
   float priority;
 
-  typedef
-      typename std::conditional_t<weighted,
-                                  internal::FloatSumGradientHessianAndWeight,
-                                  internal::FloatSumGradientHessianOnly>
-          SumGradientHessianAndMaybeWeights;
+  using SumGradientHessianAndMaybeWeights =
+      internal::FloatSumGradientHessian<weighted>;
   SumGradientHessianAndMaybeWeights content;
   int64_t count;
 
@@ -1996,9 +1967,7 @@ inline std::ostream& operator<<(std::ostream& os,
 
 template <bool weighted>
 struct LabelBinaryCategoricalBucket {
-  typedef typename std::conditional_t<weighted, internal::SumTruesAndWeights,
-                                      internal::SumTruesOnly>
-      SumTruesAndMaybeWeights;
+  using SumTruesAndMaybeWeights = internal::SumTrues<weighted>;
   SumTruesAndMaybeWeights content;
   int64_t count;
 
