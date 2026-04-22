@@ -86,19 +86,26 @@ cc_library(
     srcs = ["kernel.cc"],
     deps = [
         "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/dataset:vertical_dataset",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model",
         "@ydf_cc//yggdrasil_decision_forests/model:model_library",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
+        "@ydf_cc//yggdrasil_decision_forests/serving:example_set",
+        "@ydf_cc//yggdrasil_decision_forests/serving:fast_engine",
         "@ydf_cc//yggdrasil_decision_forests/utils:compatibility",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:filesystem_tensorflow_impl",  # keep
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
+        "@ydf_cc//yggdrasil_decision_forests/utils:synchronization_primitives",
     ] + select({
         "@ydf_cc//yggdrasil_decision_forests:tensorflow_with_header_lib": [
             "@local_config_tf//:tensorflow",

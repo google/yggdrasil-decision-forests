@@ -51,28 +51,43 @@
 //    are not kept.
 //
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "absl/log/check.h"
 #include "absl/log/log.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/types/span.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/resource_mgr.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
+#include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests::ydf_tf::ops {
 
 // Aliases
 namespace tf = ::tensorflow;
 namespace model = ::yggdrasil_decision_forests::model;
-namespace utils = ::yggdrasil_decision_forests::utils;
 namespace dataset = ::yggdrasil_decision_forests::dataset;
 namespace serving = ::yggdrasil_decision_forests::serving;
 
@@ -373,7 +388,7 @@ class GenericInferenceEngine : public AbstractInferenceEngine {
   };
 
   absl::StatusOr<std::unique_ptr<AbstractCache>> CreateCache() const override {
-    auto cache = absl::make_unique<GenericInferenceEngine::Cache>();
+    auto cache = std::make_unique<GenericInferenceEngine::Cache>();
     cache->dataset_.set_data_spec(model_->data_spec());
     RETURN_IF_ERROR(cache->dataset_.CreateColumnsFromDataspec());
     return cache;
@@ -392,67 +407,77 @@ class GenericInferenceEngine : public AbstractInferenceEngine {
 
     // Run the model.
     model::proto::Prediction prediction;
-    for (int example_idx = 0; example_idx < inputs.batch_size; example_idx++) {
-      model_->Predict(cache->dataset_, example_idx, &prediction);
+    switch (model_->task()) {
+      case Task::CLASSIFICATION: {
+        const bool output_is_proba =
+            model_->classification_outputs_probabilities();
+        for (int example_idx = 0; example_idx < inputs.batch_size;
+             example_idx++) {
+          model_->Predict(cache->dataset_, example_idx, &prediction);
 
-      // Copy the predictions to the output tensor.
-      switch (model_->task()) {
-        case Task::CLASSIFICATION: {
           const auto& pred = prediction.classification();
           // Note: "pred" contains a probability for each possible classes.
           // Because the label is categorical, the first label value (i.e. index
-          // 0) is reserved for the Out-of-vocabulary value. As simpleML models
-          // are not expected to output such value, we skip it (see the ".. - 1"
+          // 0) is reserved for the Out-of-vocabulary value. As YDF models are
+          // not expected to output such a value, we skip it (see the ".. - 1"
           // and ".. + 1" in the next part of the code).
           DCHECK_EQ(outputs->dense_predictions.dimension(1),
                     outputs->output_dim);
-          const bool output_is_proba =
-              model_->classification_outputs_probabilities();
           if (outputs->output_dim == 1 && !output_is_proba) {
-            // Output the logit of the positive class.
             if (pred.distribution().counts().size() != 3) {
               return absl::InternalError("Wrong \"distribution\" shape.");
             }
             const float logit =
-                prediction.classification().distribution().counts(2) /
-                prediction.classification().distribution().sum();
+                pred.distribution().counts(2) / pred.distribution().sum();
             outputs->dense_predictions(example_idx, 1) = logit;
           } else {
-            // Output the logit or probabilities.
             if (outputs->dense_predictions.dimension(1) !=
                 pred.distribution().counts().size() - 1) {
               return absl::InternalError("Wrong \"distribution\" shape.");
             }
+            const float inv_sum = 1.0f / pred.distribution().sum();
             for (int class_idx = 0; class_idx < outputs->output_dim;
                  class_idx++) {
               const float output =
-                  prediction.classification().distribution().counts(class_idx +
-                                                                    1) /
-                  prediction.classification().distribution().sum();
+                  pred.distribution().counts(class_idx + 1) * inv_sum;
               outputs->dense_predictions(example_idx, class_idx) =
                   output_is_proba ? std::clamp(output, 0.f, 1.f) : output;
             }
           }
-        } break;
+        }
+      } break;
 
-        case Task::REGRESSION: {
-          DCHECK_EQ(outputs->output_dim, 1);
-          DCHECK_EQ(outputs->dense_predictions.dimension(1), 1);
+      case Task::REGRESSION: {
+        DCHECK_EQ(outputs->output_dim, 1);
+        DCHECK_EQ(outputs->dense_predictions.dimension(1), 1);
+        for (int example_idx = 0; example_idx < inputs.batch_size;
+             example_idx++) {
+          model_->Predict(cache->dataset_, example_idx, &prediction);
+
           outputs->dense_predictions(example_idx, 0) =
               prediction.regression().value();
-        } break;
+        }
+      } break;
 
-        case Task::RANKING: {
-          DCHECK_EQ(outputs->output_dim, 1);
-          DCHECK_EQ(outputs->dense_predictions.dimension(1), 1);
+      case Task::RANKING: {
+        DCHECK_EQ(outputs->output_dim, 1);
+        DCHECK_EQ(outputs->dense_predictions.dimension(1), 1);
+        for (int example_idx = 0; example_idx < inputs.batch_size;
+             example_idx++) {
+          model_->Predict(cache->dataset_, example_idx, &prediction);
+
           outputs->dense_predictions(example_idx, 0) =
               prediction.ranking().relevance();
-        } break;
+        }
+      } break;
 
-        case Task::CATEGORICAL_UPLIFT:
-        case Task::NUMERICAL_UPLIFT: {
-          DCHECK_EQ(outputs->dense_predictions.dimension(1),
-                    outputs->output_dim);
+      case Task::CATEGORICAL_UPLIFT:
+      case Task::NUMERICAL_UPLIFT: {
+        DCHECK_EQ(outputs->dense_predictions.dimension(1), outputs->output_dim);
+        for (int example_idx = 0; example_idx < inputs.batch_size;
+             example_idx++) {
+          model_->Predict(cache->dataset_, example_idx, &prediction);
+
           const auto& pred = prediction.uplift();
           if (outputs->dense_predictions.dimension(1) !=
               pred.treatment_effect_size()) {
@@ -463,14 +488,13 @@ class GenericInferenceEngine : public AbstractInferenceEngine {
             outputs->dense_predictions(example_idx, uplift_idx) =
                 pred.treatment_effect(uplift_idx);
           }
-        } break;
+        }
+      } break;
 
-        default:
-          return absl::UnimplementedError(absl::Substitute(
-              "Non supported task $0", Task_Name(model_->task())));
-      }
+      default:
+        return absl::UnimplementedError(absl::Substitute(
+            "Non supported task $0", Task_Name(model_->task())));
     }
-
     return absl::OkStatus();
   }
 
@@ -645,16 +669,15 @@ class GenericInferenceEngine : public AbstractInferenceEngine {
   std::unique_ptr<model::AbstractModel> model_;
 };
 
-// The semi-fast generic engine uses the generic serving API
-// (go/simple_ml/serving.md#c-generic-api). When available, this solution is
-// significantly (e.g. up to 20x) faster than "GenericInferenceEngine".
-class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
+// YDF's fast inference engine. Automatically chooses the fastest inference
+// available for this model / build.
+class FastInferenceEngine : public AbstractInferenceEngine {
  public:
-  static absl::StatusOr<std::unique_ptr<SemiFastGenericInferenceEngine>> Create(
+  static absl::StatusOr<std::unique_ptr<FastInferenceEngine>> Create(
       std::unique_ptr<serving::FastEngine> engine,
       const model::AbstractModel& model, const FeatureIndex& feature_index) {
-    auto engine_wrapper = absl::WrapUnique(
-        new SemiFastGenericInferenceEngine(std::move(engine), model));
+    auto engine_wrapper =
+        absl::WrapUnique(new FastInferenceEngine(std::move(engine), model));
     RETURN_IF_ERROR(engine_wrapper->Initialize(feature_index));
     return engine_wrapper;
   }
@@ -678,11 +701,11 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
     // Number of examples allocated in "examples_".
     int num_examples_in_cache_ = -1;
 
-    friend SemiFastGenericInferenceEngine;
+    friend FastInferenceEngine;
   };
 
   absl::StatusOr<std::unique_ptr<AbstractCache>> CreateCache() const override {
-    auto cache = absl::make_unique<SemiFastGenericInferenceEngine::Cache>();
+    auto cache = std::make_unique<FastInferenceEngine::Cache>();
     cache->examples_ = engine_->AllocateExamples(1);
     cache->num_examples_in_cache_ = 1;
     return cache;
@@ -705,7 +728,7 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
                             const FeatureIndex& feature_index,
                             OutputTensors* outputs,
                             AbstractCache* abstract_cache) const override {
-    // Update the vertical dataset with the input tensors.
+    // Update the ExampleSet with the input tensors.
     auto* cache = dynamic_cast<Cache*>(abstract_cache);
     if (cache == nullptr) {
       return absl::InternalError("Unexpected cache type.");
@@ -773,9 +796,8 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
   }
 
  private:
-  explicit SemiFastGenericInferenceEngine(
-      std::unique_ptr<serving::FastEngine> engine,
-      const model::AbstractModel& model)
+  explicit FastInferenceEngine(std::unique_ptr<serving::FastEngine> engine,
+                               const model::AbstractModel& model)
       : engine_(std::move(engine)) {
     decompact_probability_ = model.task() == Task::CLASSIFICATION &&
                              engine_->NumPredictionDimension() == 1 &&
@@ -857,7 +879,7 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
                            const FeatureIndex& feature_index,
                            serving::AbstractExampleSet* examples) const {
     const auto& features = engine_->features();
-    examples->FillMissing(engine_->features());
+    examples->FillMissing(features);
 
     // Numerical features.
     for (const auto& feature : numerical_features_) {
@@ -868,17 +890,13 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
         if (!std::isnan(value)) {
           examples->SetNumerical(example_idx, feature.example_set_id, value,
                                  features);
-        } else {
-          examples->SetMissingNumerical(example_idx, feature.example_set_id,
-                                        features);
         }
       }
     }
 
     // Categorical int features.
     for (const auto& feature : categorical_int_features_) {
-      const int max_value = engine_->features()
-                                .data_spec()
+      const int max_value = features.data_spec()
                                 .columns(feature.dataspec_idx)
                                 .categorical()
                                 .number_of_unique_values();
@@ -886,10 +904,7 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
            example_idx++) {
         int value =
             inputs.categorical_int_features(example_idx, feature.tensor_col);
-        if (value == -1) {
-          examples->SetMissingCategorical(example_idx, feature.example_set_id,
-                                          features);
-        } else {
+        if (value != -1) {
           if (value < -1 || value >= max_value) {
             value = 0;
           }
@@ -902,8 +917,7 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
     // Categorical set int features.
     std::vector<int> tmp_values;
     for (const auto& feature : categorical_set_int_features_) {
-      const int max_value = engine_->features()
-                                .data_spec()
+      const int max_value = features.data_spec()
                                 .columns(feature.dataspec_idx)
                                 .categorical()
                                 .number_of_unique_values();
@@ -913,10 +927,7 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
                                                  feature.tensor_col, max_value,
                                                  example_idx, &tmp_values));
 
-        if (!tmp_values.empty() && tmp_values.front() < 0) {
-          examples->SetMissingCategoricalSet(example_idx,
-                                             feature.example_set_id, features);
-        } else {
+        if (tmp_values.empty() || tmp_values.front() >= 0) {
           examples->SetCategoricalSet(example_idx, feature.example_set_id,
                                       tmp_values, features);
         }
@@ -932,9 +943,6 @@ class SemiFastGenericInferenceEngine : public AbstractInferenceEngine {
         if (!std::isnan(value)) {
           examples->SetBoolean(example_idx, feature.example_set_id, value,
                                features);
-        } else {
-          examples->SetMissingBoolean(example_idx, feature.example_set_id,
-                                      features);
         }
       }
     }
@@ -1023,12 +1031,11 @@ class YggdrasilModelResource : public tf::ResourceBase {
       std::unique_ptr<model::AbstractModel> model) {
     // Currently, none of the fast engines support leaves output.
     if (!output_types.leaves) {
-      auto semi_fast_engine = model->BuildFastEngine();
-      if (semi_fast_engine.ok()) {
+      auto fast_engine = model->BuildFastEngine();
+      if (fast_engine.ok()) {
         // Semi-fast generic engine.
-        auto inference_engine_or_status =
-            SemiFastGenericInferenceEngine::Create(
-                std::move(semi_fast_engine.value()), *model, feature_index());
+        auto inference_engine_or_status = FastInferenceEngine::Create(
+            std::move(fast_engine.value()), *model, feature_index());
         RETURN_IF_ERROR(inference_engine_or_status.status());
         inference_engine_ = std::move(inference_engine_or_status.value());
         LOG(INFO) << "Use fast generic engine";
@@ -1050,7 +1057,7 @@ class YggdrasilModelResource : public tf::ResourceBase {
     // Slow generic engine.
     LOG(INFO) << "Use slow generic engine";
     inference_engine_ =
-        absl::make_unique<GenericInferenceEngine>(std::move(model));
+        std::make_unique<GenericInferenceEngine>(std::move(model));
     return absl::OkStatus();
   }
 
@@ -1315,7 +1322,7 @@ class SimpleMLInferenceOp : public OpKernel {
   absl::StatusOr<YggdrasilModelResource*> GetModelResource(
       OpKernelContext* ctx) {
     {
-      tf::tf_shared_lock l(model_container_mutex_);
+      absl::ReaderMutexLock l(model_container_mutex_);
       if (model_container_) {
         return model_container_;
       }
@@ -1324,7 +1331,7 @@ class SimpleMLInferenceOp : public OpKernel {
     {
       // The resource might exist but is not tracked in the class.
       // This case is only met during the initialization.
-      tf::mutex_lock l(model_container_mutex_);
+      absl::MutexLock l(model_container_mutex_);
       if (model_container_ == nullptr) {
         ASSIGN_OR_RETURN(model_container_, ImportModelResource(ctx));
       }
@@ -1474,7 +1481,7 @@ class SimpleMLInferenceOp : public OpKernel {
   // "ReturnEngineCache".
   absl::StatusOr<std::unique_ptr<AbstractInferenceEngine::AbstractCache>>
   GetEngineCache(YggdrasilModelResource* model_resource) {
-    tf::mutex_lock lock_engine_mutex(engine_cache_mutex_);
+    absl::MutexLock lock_engine_mutex(engine_cache_mutex_);
     if (engine_caches_.empty()) {
       // Allocate a new engine cache.
       return model_resource->engine()->CreateCache();
@@ -1490,7 +1497,7 @@ class SimpleMLInferenceOp : public OpKernel {
       // The cache is too large for being kept.
       return;
     }
-    tf::mutex_lock lock_engine_mutex(engine_cache_mutex_);
+    absl::MutexLock lock_engine_mutex(engine_cache_mutex_);
     if (engine_caches_.size() < kMaxPreAllocatedEngineCaches) {
       engine_caches_.push_back(std::move(cache));
     }
@@ -1520,14 +1527,14 @@ class SimpleMLInferenceOp : public OpKernel {
   YggdrasilModelResource* model_container_ GUARDED_BY(model_container_mutex_) =
       nullptr;
 
-  tensorflow::mutex model_container_mutex_;
+  absl::Mutex model_container_mutex_;
 
   // List of pre-allocated working memory to re-use in between inference calls.
   std::vector<std::unique_ptr<AbstractInferenceEngine::AbstractCache>>
       engine_caches_ GUARDED_BY(engine_cache_mutex_);
 
   // Protect calls to the engine inference.
-  tensorflow::mutex engine_cache_mutex_;
+  absl::Mutex engine_cache_mutex_;
 
   // Copy of the attributes of the same name.
   int dense_output_dim_;
@@ -1604,7 +1611,7 @@ class SimpleMLCreateModelResource : public OpKernel {
   }
 
   void Compute(OpKernelContext* ctx) override {
-    tf::mutex_lock l(mu_);
+    absl::MutexLock l(mu_);
     if (!model_handle_set_) {
       OP_REQUIRES_OK(ctx, cinfo_.Init(ctx->resource_manager(), def(), false));
     }
@@ -1646,7 +1653,7 @@ class SimpleMLCreateModelResource : public OpKernel {
   }
 
  private:
-  tf::mutex mu_;
+  absl::Mutex mu_;
   tf::Tensor model_handle_ TF_GUARDED_BY(mu_);
   bool model_handle_set_ TF_GUARDED_BY(mu_);
   tf::ContainerInfo cinfo_;

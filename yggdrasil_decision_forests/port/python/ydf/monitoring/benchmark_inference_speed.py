@@ -27,7 +27,7 @@ You can run the benchmark locally with:
   sudo apt install linux-cpupower
   sudo cpupower frequency-set --governor performance
 
-  bazel run -c opt --copt=-mfma --copt=-mavx2 --copt=-mavx \
+  bazel run -c opt --cpu=haswell \
       //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/monitoring:benchmark_inference_speed_test\
           --test_filter=ToJaxTest.test_benchmark
 
