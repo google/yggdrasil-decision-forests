@@ -709,25 +709,25 @@ struct LabelBinaryCategoricalScoreAccumulator {
   }
 
   void AddOne(const bool value, const float weights) {
-    static float table[] = {0.f, 1.f};
+    static constexpr float table[] = {0.f, 1.f};
     sum_trues += table[value] * weights;
     sum_weights += weights;
   }
 
   void AddOne(const bool value) {
-    static float table[] = {0.f, 1.f};
+    static constexpr float table[] = {0.f, 1.f};
     sum_trues += table[value];
     sum_weights += 1.;
   }
 
   void SubOne(const bool value, const float weights) {
-    static float table[] = {0.f, 1.f};
+    static constexpr float table[] = {0.f, 1.f};
     sum_trues -= table[value] * weights;
     sum_weights -= weights;
   }
 
   void SubOne(const bool value) {
-    static float table[] = {0.f, 1.f};
+    static constexpr float table[] = {0.f, 1.f};
     sum_trues -= table[value];
     sum_weights -= 1.;
   }
@@ -2069,7 +2069,7 @@ struct LabelBinaryCategoricalBucket {
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelBinaryCategoricalBucket* bucket) const {
-      static float table[] = {0.f, 1.f};
+      static constexpr float table[] = {0.f, 1.f};
       bucket->count++;
       if constexpr (weighted) {
         bucket->content.sum_trues +=
