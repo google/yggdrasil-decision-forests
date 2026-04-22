@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <memory>
 #include <string>
 #include <variant>
 
@@ -127,15 +128,29 @@ py::array_t<T> SpanToUnsafeNumpyArray(absl::Span<T> data) {
       ~py::detail::npy_api::NPY_ARRAY_WRITEABLE_;
   return arr;
 }
+
+// Holder for objects that require the Python GIL to be held upon destruction.
+// Make sure any object wrapped by this is destroyed only when the GIL can be
+// acquired.
+template <typename Func>
+std::shared_ptr<Func> MakeSafeGilHolder(const Func& func) {
+  return std::shared_ptr<Func>(new Func(func), [](Func* ptr) {
+    if (ptr) {
+      py::gil_scoped_acquire acquire;
+      delete ptr;
+    }
+  });
+}
 }  // namespace
 
 absl::StatusOr<model::gradient_boosted_trees::CustomRegressionLossFunctions>
 CCRegressionLoss::ToCustomRegressionLossFunctions() const {
-  // Pass the functions by copy to avoid dangling references here.
-  // The Python functions only receive a view of the data and should therefore
-  // not access the data after returning.
+  // Wrap the Python functions in a std::shared_ptr with a custom deleter
+  // that acquires the GIL before deleting the underlying Python function.
+  // This avoids dangling references and ensures safe out-of-scope destruction.
+  auto safe_initial_predictions = MakeSafeGilHolder(initial_predictions);
   auto cc_initial_predictions =
-      [initial_predictions = initial_predictions](
+      [safe_initial_predictions](
           const absl::Span<const float>& labels,
           const absl::Span<const float>& weights) -> absl::StatusOr<float> {
     float current_initial_predictions;
@@ -144,7 +159,8 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
       auto pylabels = SpanToUnsafeNumpyArray(labels);
       auto pyweights = SpanToUnsafeNumpyArray(weights);
       try {
-        current_initial_predictions = initial_predictions(pylabels, pyweights);
+        current_initial_predictions =
+            (*safe_initial_predictions)(pylabels, pyweights);
       } catch (const std::exception& e) {
         return absl::UnknownError(
             absl::Substitute("initial predictions raised: $0", e.what()));
@@ -152,8 +168,9 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
     }
     return current_initial_predictions;
   };
+  auto safe_loss = MakeSafeGilHolder(loss);
   auto cc_loss =
-      [loss = loss](
+      [safe_loss](
           const absl::Span<const float>& labels,
           const absl::Span<const float>& predictions,
           const absl::Span<const float>& weights) -> absl::StatusOr<float> {
@@ -164,7 +181,7 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
       auto pyweights = SpanToUnsafeNumpyArray(weights);
       auto pypredictions = SpanToUnsafeNumpyArray(predictions);
       try {
-        current_loss = loss(pylabels, pypredictions, pyweights);
+        current_loss = (*safe_loss)(pylabels, pypredictions, pyweights);
       } catch (const std::exception& e) {
         return absl::UnknownError(
             absl::Substitute("loss raised: $0", e.what()));
@@ -172,9 +189,9 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
     }
     return current_loss;
   };
+  auto safe_gradient_and_hessian = MakeSafeGilHolder(gradient_and_hessian);
   auto cc_gradient_and_hessian =
-      [gradient_and_hessian = gradient_and_hessian,
-       may_trigger_gc = may_trigger_gc](
+      [safe_gradient_and_hessian, may_trigger_gc = may_trigger_gc](
           const absl::Span<const float>& labels,
           const absl::Span<const float>& predictions,
           absl::Span<float> gradient,
@@ -185,7 +202,7 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
       auto pypredictions = SpanToUnsafeNumpyArray(predictions);
       py::sequence py_result;
       try {
-        py_result = gradient_and_hessian(pylabels, pypredictions);
+        py_result = (*safe_gradient_and_hessian)(pylabels, pypredictions);
       } catch (const std::exception& e) {
         return absl::UnknownError(
             absl::Substitute("gradient_and_hessian raised: $0", e.what()));
@@ -221,11 +238,12 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
 absl::StatusOr<
     model::gradient_boosted_trees::CustomBinaryClassificationLossFunctions>
 CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
-  // Pass the functions by copy to avoid dangling references here.
-  // The Python functions only receive a view of the data and should therefore
-  // not access the data after returning.
+  // Wrap the Python functions in a std::shared_ptr with a custom deleter
+  // that acquires the GIL before deleting the underlying Python function.
+  // This avoids dangling references and ensures safe out-of-scope destruction.
+  auto safe_initial_predictions = MakeSafeGilHolder(initial_predictions);
   auto cc_initial_predictions =
-      [initial_predictions = initial_predictions](
+      [safe_initial_predictions](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& weights) -> absl::StatusOr<float> {
     float current_initial_predictions;
@@ -234,15 +252,17 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
       auto pylabels = SpanToUnsafeNumpyArray(labels);
       auto pyweights = SpanToUnsafeNumpyArray(weights);
       try {
-        current_initial_predictions = initial_predictions(pylabels, pyweights);
+        current_initial_predictions =
+            (*safe_initial_predictions)(pylabels, pyweights);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(e.what());
       }
     }
     return current_initial_predictions;
   };
+  auto safe_loss = MakeSafeGilHolder(loss);
   auto cc_loss =
-      [loss = loss](
+      [safe_loss](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& predictions,
           const absl::Span<const float>& weights) -> absl::StatusOr<float> {
@@ -253,16 +273,16 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
       auto pyweights = SpanToUnsafeNumpyArray(weights);
       auto pypredictions = SpanToUnsafeNumpyArray(predictions);
       try {
-        current_loss = loss(pylabels, pypredictions, pyweights);
+        current_loss = (*safe_loss)(pylabels, pypredictions, pyweights);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(e.what());
       }
     }
     return current_loss;
   };
+  auto safe_gradient_and_hessian = MakeSafeGilHolder(gradient_and_hessian);
   auto cc_gradient_and_hessian =
-      [gradient_and_hessian = gradient_and_hessian,
-       may_trigger_gc = may_trigger_gc](
+      [safe_gradient_and_hessian, may_trigger_gc = may_trigger_gc](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& predictions,
           absl::Span<float> gradient,
@@ -273,9 +293,9 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
       auto pypredictions = SpanToUnsafeNumpyArray(predictions);
       py::sequence py_result;
       try {
-        py_result = gradient_and_hessian(pylabels, pypredictions);
+        py_result = (*safe_gradient_and_hessian)(pylabels, pypredictions);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(e.what());
       }
       RETURN_IF_ERROR(CheckGradientAndHessianShape(py_result));
       auto py_gradient = py_result[0].cast<py::array_t<float>>();
@@ -307,11 +327,12 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
 absl::StatusOr<
     model::gradient_boosted_trees::CustomMultiClassificationLossFunctions>
 CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
-  // Pass the functions by copy to avoid dangling references here.
-  // The Python functions only receive a view of the data and should therefore
-  // not access the data after returning.
+  // Wrap the Python functions in a std::shared_ptr with a custom deleter
+  // that acquires the GIL before deleting the underlying Python function.
+  // This avoids dangling references and ensures safe out-of-scope destruction.
+  auto safe_initial_predictions = MakeSafeGilHolder(initial_predictions);
   auto cc_initial_predictions =
-      [initial_predictions = initial_predictions](
+      [safe_initial_predictions](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& weights,
           absl::Span<float> cc_initial_predictions) -> absl::Status {
@@ -322,9 +343,10 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
 
       py::array_t<float> py_initial_predictions;
       try {
-        py_initial_predictions = initial_predictions(pylabels, pyweights);
+        py_initial_predictions =
+            (*safe_initial_predictions)(pylabels, pyweights);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(e.what());
       }
 
       RETURN_IF_ERROR(Check1DArrayShape(py_initial_predictions,
@@ -338,8 +360,9 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
     }
     return absl::OkStatus();
   };
+  auto safe_loss = MakeSafeGilHolder(loss);
   auto cc_loss =
-      [loss = loss](
+      [safe_loss](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& predictions,
           const absl::Span<const float>& weights) -> absl::StatusOr<float> {
@@ -354,16 +377,16 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
       auto pypredictions = SpanToUnsafeNumpyArray(predictions);
       pypredictions = pypredictions.reshape({num_examples, dimension});
       try {
-        current_loss = loss(pylabels, pypredictions, pyweights);
+        current_loss = (*safe_loss)(pylabels, pypredictions, pyweights);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(e.what());
       }
     }
     return current_loss;
   };
+  auto safe_gradient_and_hessian = MakeSafeGilHolder(gradient_and_hessian);
   auto cc_gradient_and_hessian =
-      [gradient_and_hessian = gradient_and_hessian,
-       may_trigger_gc = may_trigger_gc](
+      [safe_gradient_and_hessian, may_trigger_gc = may_trigger_gc](
           const absl::Span<const int32_t>& labels,
           const absl::Span<const float>& predictions,
           absl::Span<const absl::Span<float>> gradient,
@@ -378,9 +401,9 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
       pypredictions = pypredictions.reshape({num_examples, dimension});
       py::sequence py_result;
       try {
-        py_result = gradient_and_hessian(pylabels, pypredictions);
+        py_result = (*safe_gradient_and_hessian)(pylabels, pypredictions);
       } catch (const std::exception& e) {
-        return absl::AbortedError(e.what());
+        return absl::UnknownError(e.what());
       }
       RETURN_IF_ERROR(CheckGradientAndHessianShape(py_result));
       auto py_gradient = py_result[0].cast<py::array_t<float>>();
