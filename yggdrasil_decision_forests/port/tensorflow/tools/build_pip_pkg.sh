@@ -22,6 +22,8 @@
 # For a local install location of ydf, provide YDF_LOCAL_DEPENDENCY_DIR.
 # To build for specific TF or Python versions, use TF_VERSIONS and PY_VERSIONS.
 # Example: TF_VERSIONS="2.21.0" PY_VERSIONS="3.10 3.11 3.12 3.13" ./build_pip_pkg.sh
+# To add a post-release tag (e.g., .post1), provide POST_RELEASE.
+# Example: POST_RELEASE="post1" TF_VERSIONS="2.21.0" ./build_pip_pkg.sh
 # When building for TF < 2.20, pass LEGACY=1. Note that this might not work
 # out-of-the box if dependencies have changed too much.
 
@@ -40,6 +42,10 @@ function cleanup {
   fi
   if [[ -f ../../utils/BUILD.bak ]]; then
     mv ../../utils/BUILD.bak ../../utils/BUILD
+  fi
+  # Restore setup.py if we modified it for a post-release
+  if [[ -f pip_pkg/setup.py.bak ]]; then
+    mv pip_pkg/setup.py.bak pip_pkg/setup.py
   fi
   rm -rf test_env test_run_dir
 }
@@ -98,6 +104,15 @@ if [[ -n "${TF_VERSIONS}" ]] && [[ "$(declare -p TF_VERSIONS 2>/dev/null)" != *"
 fi
 if [[ -n "${PY_VERSIONS}" ]] && [[ "$(declare -p PY_VERSIONS 2>/dev/null)" != *"declare -a"* ]]; then
   PY_VERSIONS=(${PY_VERSIONS})
+fi
+
+# Handle Post-Release Tag Injection
+if [[ -n "${POST_RELEASE}" ]]; then
+  echo "Injecting post-release tag (.${POST_RELEASE}) into pip_pkg/setup.py..."
+  cp pip_pkg/setup.py pip_pkg/setup.py.bak
+  # Safely appends the post-release string using Python concatenation, 
+  # preserving the TF dependency logic.
+  sed -i "s/version=tf_version,/version=tf_version + \".${POST_RELEASE}\",/g" pip_pkg/setup.py
 fi
 
 for YDF_PY_VERSION in "${PY_VERSIONS[@]}"; do
@@ -160,7 +175,7 @@ for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
 
     # Identify the repaired wheel in the wheelhouse
     PY_TAG="cp${YDF_PY_VERSION//.}"
-    # Look for the wheel with the specific TF version and Python tag we just built
+    # Look for the wheel with the specific TF version and Python tag we just built.
     REPAIRED_WHEEL=$(ls pip_pkg/wheelhouse/*$YDF_TF_VERSION*$PY_TAG*.whl | head -n 1)
 
     if [ -z "$REPAIRED_WHEEL" ]; then

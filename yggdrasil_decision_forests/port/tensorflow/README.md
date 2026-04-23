@@ -26,3 +26,15 @@ pip install ydf-tf
 
 Run `./build_pip_pkg.sh` (Linux) or `./build_pip_pkg_macos.sh` (macOS) to build
 the package locally. See the content of these scripts for customization options.
+
+## Versioning
+
+YDF-TF does not follow semantic versioning. Instead, the YDF-TF version is
+exactly pinned to the corresponding TensorFlow version. In rare cases,
+post-releases might be used for critical bug / compilation fixes.
+
+### Changelog
+
+#### YDF-TF 2.21.0.post1
+
+Restores support for all filesystems supported by TensorFlow (notably GCP).

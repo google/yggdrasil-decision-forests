@@ -4,6 +4,11 @@
 
 common --enable_platform_specific_config
 
+# Use Tensorflow for file system calls. YDF's default filesystem also works
+# for local files. Consider deprecating YDF's TensorFlow filesystem and use
+# the default file system instead.
+build --define=use_tensorflow_io=1
+
 build -c opt
 build --announce_rc
 build --color=yes

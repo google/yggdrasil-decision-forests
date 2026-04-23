@@ -24,6 +24,8 @@
 # For a local install location of ydf, provide YDF_LOCAL_DEPENDENCY_DIR.
 # To build for specific TF or Python versions, use TF_VERSIONS and PY_VERSIONS.
 # Example: TF_VERSIONS="2.21.0" PY_VERSIONS="3.10 3.11 3.12 3.13" ./tools/build_pip_pkg_macos.sh
+# To add a post-release tag (e.g., .post1), provide POST_RELEASE.
+# Example: POST_RELEASE="post1" TF_VERSIONS="2.21.0" PY_VERSIONS="3.10 3.11 3.12 3.13" ./tools/build_pip_pkg_macos.sh
 # When building for TF < 2.20, pass LEGACY=1
 
 set -e
@@ -41,6 +43,10 @@ function cleanup {
   fi
   if [[ -f ../../utils/BUILD.bak ]]; then
     mv ../../utils/BUILD.bak ../../utils/BUILD
+  fi
+  # Restore setup.py if we modified it for a post-release
+  if [[ -f pip_pkg/setup.py.bak ]]; then
+    mv pip_pkg/setup.py.bak pip_pkg/setup.py
   fi
   rm -rf test_env_build test_env test_run_dir
 }
@@ -77,6 +83,15 @@ else
   if [[ -z "${PY_VERSIONS+x}" ]]; then
     PY_VERSIONS=("3.9" "3.10" "3.11" "3.12" "3.13")
   fi
+fi
+
+# Handle Post-Release Tag Injection
+if [[ -n "${POST_RELEASE}" ]]; then
+  echo "Injecting post-release tag (.${POST_RELEASE}) into pip_pkg/setup.py..."
+  cp pip_pkg/setup.py pip_pkg/setup.py.bak
+  # Safely appends the post-release string using Python concatenation, 
+  # preserving the TF dependency logic.
+  sed -i '' "s/version=tf_version,/version=tf_version + \".${POST_RELEASE}\",/g" pip_pkg/setup.py
 fi
 
 # Convert TF_VERSIONS and PY_VERSIONS to arrays if they are passed as strings.
