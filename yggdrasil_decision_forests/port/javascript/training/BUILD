@@ -60,6 +60,7 @@ cc_binary(
 wasm_cc_binary(
     name = "training_wasm",
     cc_target = ":training",
+    simd = True,
     tags = ["manual"],
 )
 

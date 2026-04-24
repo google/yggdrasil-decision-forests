@@ -64,6 +64,7 @@ cc_binary(
 wasm_cc_binary(
     name = "inference_wasm",
     cc_target = ":inference",
+    simd = True,
     tags = [
         "manual",
     ],
