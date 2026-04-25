@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "absl/base/optimization.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
 #include "absl/memory/memory.h"
 #include "absl/status/status.h"
@@ -4449,15 +4450,38 @@ void SplitHonestExamples(
 
   // Reduce the risk of std::vector re-allocations.
   const float error_margin = 1.1f;
-  leaf_examples.reserve(selected_examples.size() * leaf_rate * error_margin);
-  working_selected_examples.reserve(selected_examples.size() *
-                                    (1.f - leaf_rate) * error_margin);
 
-  for (const auto& example : selected_examples) {
-    if (dist_01(*random_engine) < leaf_rate) {
-      leaf_examples.push_back(example);
+  // Reserve total size to avoid reallocations.
+  const size_t N = selected_examples.size();
+  leaf_examples.reserve(N * leaf_rate * error_margin);
+  working_selected_examples.reserve(N * (1.0f - leaf_rate) * error_margin);
+
+  // Collect unique IDs (keys) in insertion order.
+  absl::flat_hash_set<UnsignedExampleIdx> seen;
+  std::vector<UnsignedExampleIdx> unique_ids;
+  unique_ids.reserve(N);
+  for (const auto& example_idx : selected_examples) {
+    if (seen.insert(example_idx).second) unique_ids.push_back(example_idx);
+  }
+
+  // Shuffle unique IDs for unbiased assignment.
+  std::shuffle(unique_ids.begin(), unique_ids.end(), *random_engine);
+
+  // Choose how many unique IDs go to leaf side.
+  const size_t U = unique_ids.size();
+  const size_t num_leaf_unique = static_cast<size_t>(U * leaf_rate);
+  absl::flat_hash_set<UnsignedExampleIdx> leaf_set;
+  leaf_set.reserve(num_leaf_unique);
+  for (size_t i = 0; i < num_leaf_unique; ++i) {
+    leaf_set.insert(unique_ids[i]);
+  }
+
+  // Stream original array; keep all duplicates on their side.
+  for (const auto& example_idx : selected_examples) {
+    if (leaf_set.count(example_idx)) {
+      leaf_examples.push_back(example_idx);
     } else {
-      working_selected_examples.push_back(example);
+      working_selected_examples.push_back(example_idx);
     }
   }
 }
