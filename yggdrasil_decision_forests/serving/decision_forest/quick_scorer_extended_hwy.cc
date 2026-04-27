@@ -39,13 +39,9 @@
 #include "hwy/aligned_allocator.h"
 #include "hwy/highway.h"
 #include "hwy/per_target.h"  // IWYU pragma: keep
-#ifdef YDF_USE_DYNAMIC_DISPATCH
 HWY_BEFORE_NAMESPACE();
 namespace yggdrasil_decision_forests::serving::decision_forest {
 namespace HWY_NAMESPACE {
-#else
-namespace yggdrasil_decision_forests::serving::decision_forest {
-#endif
 
 namespace hn = hwy::HWY_NAMESPACE;
 
@@ -53,7 +49,7 @@ using LeafMask = internal::QuickScorerExtendedModel::LeafMask;
 
 // Highway implementation of the QuickScorer algorithm.
 template <typename Model, float (*Activation)(float)>
-ABSL_ATTRIBUTE_ALWAYS_INLINE void PredictQuickScorerHighwayImpl(
+HWY_NOINLINE void PredictQuickScorerHighwayImpl(
     const Model& model,
     const std::vector<NumericalOrCategoricalValue>& fixed_length_features,
     const std::vector<Rangei32>& categorical_set_begins_and_ends,
@@ -318,14 +314,9 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE void PredictQuickScorerHighwayPoisson(
       categorical_item_buffer, num_examples, major_feature_offset, predictions);
 }
 
-#ifdef YDF_USE_DYNAMIC_DISPATCH
 }  // namespace HWY_NAMESPACE
 }  // namespace yggdrasil_decision_forests::serving::decision_forest
 HWY_AFTER_NAMESPACE();
-#else
-
-}  // namespace yggdrasil_decision_forests::serving::decision_forest  // NOLINT
-#endif  // YDF_USE_DYNAMIC_DISPATCH
 
 #if HWY_ONCE
 namespace yggdrasil_decision_forests::serving::decision_forest {
@@ -359,7 +350,7 @@ void PredictQuickScorerHighway(
   }
 
 #else
-  PredictQuickScorerHighwayImpl<Model, Activation>(
+  HWY_NAMESPACE::PredictQuickScorerHighwayImpl<Model, Activation>(
       model, fixed_length_features, categorical_set_begins_and_ends,
       categorical_item_buffer, num_examples, major_feature_offset, predictions);
 #endif  // YDF_USE_DYNAMIC_DISPATCH

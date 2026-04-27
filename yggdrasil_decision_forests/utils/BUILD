@@ -314,6 +314,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests:ydf_protobuf_lite": [
             "YGG_PROTOBUF_LITE",
         ],
+        "@platforms//cpu:wasm32": ["YGG_PROTOBUF_LITE"],
         "//conditions:default": [],
     }),
     deps = [
