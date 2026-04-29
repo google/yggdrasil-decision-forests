@@ -1,3 +1,5 @@
+load("@rules_python//python:py_library.bzl", "py_library")
+load("//learning/grp/pynball:build_defs.bzl", "ipynb_deps")
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
@@ -86,5 +88,26 @@ all_proto_library(
         "//yggdrasil_decision_forests/dataset:data_spec_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner_proto",
         "//yggdrasil_decision_forests/metric:metric_proto",
+    ],
+)
+
+ipynb_deps(
+    name = "plot_results_deps",
+    srcs = ["plot_results.ipynb"],
+    pytype = False,
+    deps = [
+        # matplotlib dep,
+        # numpy dep,
+        # pandas dep,
+    ],
+)
+
+py_library(
+    name = "prepare_data",
+    srcs = ["prepare_data.py"],
+    deps = [
+        # numpy dep,
+        # pandas dep,
+        # scipy dep,
     ],
 )
