@@ -1,0 +1,439 @@
+
+<style>
+
+.tab_block .header {
+    flex-direction: row;
+    display: flex;
+}
+
+.tab_block .header .tab {
+    cursor: pointer;
+    background-color: #F6F5F5;
+    text-decoration: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: black;
+}
+
+.tab_block .header .tab.selected {
+    border-bottom: 2px solid #2F80ED;
+}
+
+.tab_block .header .tab:hover {
+    text-decoration: none;
+    background-color: #DCDCDC;
+}
+
+.tab_block .body .tab_content {
+    display: none;
+    padding: 5px;
+}
+
+.tab_block .body .tab_content.selected {
+    display: block;
+}
+
+.ydf_pre {
+    font-size: medium;
+}
+
+
+
+.variable_importance {
+}
+
+.variable_importance select {
+}
+
+.variable_importance .content {
+  display: none;
+}
+
+.variable_importance .content.selected {
+  display: block;
+}
+
+.ydf_tuning_table {
+  border-collapse: collapse;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table th {
+  background-color: #ededed;
+  font-weight: bold;
+  text-align: left;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table td {
+  text-align: right;
+  padding: 3px 4px;
+  border: 1px solid lightgray;
+}
+
+.ydf_tuning_table .best {
+  background-color: khaki;
+}
+
+</style>
+
+<script>
+
+function ydfShowTab(block_id, item) {
+    const block = document.getElementById(block_id);
+    
+    
+    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
+    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
+    
+    block.getElementsByClassName("tab selected")[0].classList.remove("selected");
+    block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_" + item).classList.add("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+  
+
+function ydfShowVariableImportance(block_id) {
+    const block = document.getElementById(block_id);
+    const item = block.getElementsByTagName("select")[0].value;
+    block.getElementsByClassName("content selected")[0].classList.remove("selected");
+    document.getElementById(block_id + "_body_" + item).classList.add("selected");
+}
+
+</script>
+  <div class="tab_block" id="123"><div class="header"><a id="123_model" class="tab selected" onclick="ydfShowTab('123', 'model')">Model</a><a id="123_dataspec" class="tab" onclick="ydfShowTab('123', 'dataspec')">Dataspec</a><a id="123_training" class="tab" onclick="ydfShowTab('123', 'training')">Training</a><a id="123_variable_importance" class="tab" onclick="ydfShowTab('123', 'variable_importance')">Variable importances</a><a id="123_structure" class="tab" onclick="ydfShowTab('123', 'structure')">Structure</a></div><div class="body"><div id="123_body_model" class="tab_content selected"><b>Name</b> : GRADIENT_BOOSTED_TREES<br><b>Task</b> : REGRESSION<br><b>Label</b> : Rings<br><b>Features (8)</b> : Type LongestShell Diameter Height WholeWeight ShuckedWeight VisceraWeight ShellWeight<br><b>Weights</b> : None<br><b>Trained with tuner</b> : No<br><b>Trained with Feature Selection</b> : No<br><b>Model size</b> : ${MODEL_SIZE}<br></div><div id="123_body_dataspec" class="tab_content"><pre class="ydf_pre">Number of records: 4177
+Number of columns: 9
+
+Number of columns by type:
+	NUMERICAL: 8 (88.8889%)
+	CATEGORICAL: 1 (11.1111%)
+
+Columns:
+
+NUMERICAL: 8 (88.8889%)
+	1: &quot;LongestShell&quot; NUMERICAL mean:0.523992 min:0.075 max:0.815 sd:0.120079
+	2: &quot;Diameter&quot; NUMERICAL mean:0.407881 min:0.055 max:0.65 sd:0.099228
+	3: &quot;Height&quot; NUMERICAL mean:0.139516 min:0 max:1.13 sd:0.041822
+	4: &quot;WholeWeight&quot; NUMERICAL mean:0.828742 min:0.002 max:2.8255 sd:0.49033
+	5: &quot;ShuckedWeight&quot; NUMERICAL mean:0.359367 min:0.001 max:1.488 sd:0.221936
+	6: &quot;VisceraWeight&quot; NUMERICAL mean:0.180594 min:0.0005 max:0.76 sd:0.109601
+	7: &quot;ShellWeight&quot; NUMERICAL mean:0.238831 min:0.0015 max:1.005 sd:0.139186
+	8: &quot;Rings&quot; NUMERICAL mean:9.93368 min:1 max:29 sd:3.22378
+
+CATEGORICAL: 1 (11.1111%)
+	0: &quot;Type&quot; CATEGORICAL has-dict vocab-size:4 zero-ood-items most-frequent:&quot;M&quot; 1528 (36.5813%)
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.
+</pre></div><div id="123_body_training" class="tab_content"><p>The following evaluation is computed on the validation or out-of-bag dataset.</p><pre class="ydf_pre">Number of predictions (with weights): 1
+Task: REGRESSION
+Loss (SQUARED_ERROR): 2.51113
+
+RMSE: 1.58466
+</pre><div style='display: grid; gap: 0px; grid-auto-columns: min-content;'><div style='grid-row:1 / span 1; grid-column:1 / span 1;'><script src='https://www.gstatic.com/external_hosted/plotly/plotly.min.js'></script><div id="chart_123self_eval_item0" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
+  Plotly.newPlot(
+    'chart_123self_eval_item0',
+    [{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72],
+y: [3.04193,2.88552,2.7532,2.63383,2.53329,2.44202,2.36538,2.29456,2.23518,2.1794,2.13511,2.09066,2.05302,2.02295,1.99753,1.97144,1.95003,1.92857,1.90913,1.88593,1.86727,1.85082,1.8397,1.83038,1.81919,1.80565,1.79252,1.78363,1.76457,1.75283,1.7487,1.73126,1.72391,1.71578,1.70465,1.70057,1.68325,1.67385,1.66188,1.65893,1.65462,1.65181,1.6367,1.62696,1.62417,1.62091,1.60612,1.59674,1.58704,1.58593,1.57767,1.57109,1.56851,1.56274,1.5602,1.55865,1.55611,1.5548,1.55147,1.54523,1.54328,1.53652,1.53508,1.52628,1.52552,1.52469,1.52344,1.52155,1.52094,1.51609,1.51477,1.51421],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'training',
+},
+{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72],
+y: [3.38696,3.25864,3.15092,3.04894,2.96222,2.89821,2.84563,2.79843,2.76407,2.7268,2.70298,2.67296,2.64111,2.63094,2.62433,2.60873,2.59777,2.59061,2.58407,2.58316,2.57692,2.57279,2.56706,2.56091,2.55734,2.55163,2.5542,2.5522,2.54886,2.5514,2.54914,2.54021,2.54005,2.53591,2.53169,2.53067,2.5246,2.51971,2.51662,2.51435,2.51264,2.51113,2.51202,2.51245,2.51473,2.51411,2.51416,2.51582,2.52023,2.51978,2.52469,2.52663,2.52216,2.52069,2.51932,2.5179,2.51732,2.51568,2.51536,2.51936,2.51774,2.51583,2.51453,2.51951,2.52032,2.52031,2.521,2.51927,2.52005,2.51669,2.516,2.51521],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'validation',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'iteration',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'loss',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+
+    }
+    function show_error(err) {
+      document.getElementById("chart_123self_eval_item0").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script></div><div style='grid-row:2 / span 1; grid-column:1 / span 1;'><div id="chart_123self_eval_item1" style="display: inline-block;" ></div><script>
+(function() {
+    function user_code(Plotly) {
+        console.log("Running user code");
+        
+  Plotly.newPlot(
+    'chart_123self_eval_item1',
+    [{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72],
+y: [3.04193,2.88552,2.7532,2.63383,2.53329,2.44202,2.36538,2.29456,2.23518,2.1794,2.13511,2.09066,2.05302,2.02295,1.99753,1.97144,1.95003,1.92857,1.90913,1.88593,1.86727,1.85082,1.8397,1.83038,1.81919,1.80565,1.79252,1.78363,1.76457,1.75283,1.7487,1.73126,1.72391,1.71578,1.70465,1.70057,1.68325,1.67385,1.66188,1.65893,1.65462,1.65181,1.6367,1.62696,1.62417,1.62091,1.60612,1.59674,1.58704,1.58593,1.57767,1.57109,1.56851,1.56274,1.5602,1.55865,1.55611,1.5548,1.55147,1.54523,1.54328,1.53652,1.53508,1.52628,1.52552,1.52469,1.52344,1.52155,1.52094,1.51609,1.51477,1.51421],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'training',
+},
+{
+x: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72],
+y: [3.38696,3.25864,3.15092,3.04894,2.96222,2.89821,2.84563,2.79843,2.76407,2.7268,2.70298,2.67296,2.64111,2.63094,2.62433,2.60873,2.59777,2.59061,2.58407,2.58316,2.57692,2.57279,2.56706,2.56091,2.55734,2.55163,2.5542,2.5522,2.54886,2.5514,2.54914,2.54021,2.54005,2.53591,2.53169,2.53067,2.5246,2.51971,2.51662,2.51435,2.51264,2.51113,2.51202,2.51245,2.51473,2.51411,2.51416,2.51582,2.52023,2.51978,2.52469,2.52663,2.52216,2.52069,2.51932,2.5179,2.51732,2.51568,2.51536,2.51936,2.51774,2.51583,2.51453,2.51951,2.52032,2.52031,2.521,2.51927,2.52005,2.51669,2.516,2.51521],
+type: 'scatter',
+mode: 'lines',
+line: {
+  dash: 'solid',
+  width: 1
+},
+name: 'validation',
+},
+],
+    {
+      width: 600,
+      height: 400,
+      title: '',
+      showlegend: true,
+      xaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'iteration',
+        },
+      font: {
+        size: 10,
+        },
+      yaxis: {
+        ticks: 'outside',
+        showgrid: true,
+        zeroline: false,
+        showline: true,
+        title: 'rmse',
+        },
+      margin: {
+        l: 50,
+        r: 50,
+        b: 50,
+        t: 50,
+      },
+    },
+    {
+      modeBarButtonsToRemove: ['sendDataToCloud'],
+      displaylogo: false,displayModeBar: false,
+    }
+  );
+
+    }
+    function show_error(err) {
+      document.getElementById("chart_123self_eval_item1").innerHTML = "Cannot load dep: " + err;
+      console.error("Cannot load dep:", err);
+    }
+    if (typeof require !== 'undefined' && typeof requirejs !== 'undefined') {
+        console.log("Use requirejs");
+        if (!requirejs.s.contexts._.config.paths.plotly) {
+            console.log("Load deps");
+            requirejs.config({
+                paths: {
+                    plotly: 'https://www.gstatic.com/external_hosted/plotly/plotly.min',
+                },
+                shim: {
+                  plotly: {
+                    exports: 'Plotly'
+                  }
+                }
+            });
+        }
+        require(['plotly'], user_code, show_error);
+    } else {
+        console.log("Use script'src");
+        if (typeof Plotly !== 'undefined') {
+            user_code(Plotly);
+        } else {
+            console.log("Load dep");
+            var script = document.createElement('script');
+            script.src = "https://www.gstatic.com/external_hosted/plotly/plotly.min.js";
+            script.async = true;
+            script.onload = function() {
+                user_code(Plotly);
+            };
+            script.onerror = show_error;
+            document.head.appendChild(script);
+        }
+    }
+})();
+</script></div></div></div><div id="123_body_variable_importance" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="123_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('123_vi')"><option value="INV_MEAN_MIN_DEPTH">INV_MEAN_MIN_DEPTH</option><option value="NUM_AS_ROOT">NUM_AS_ROOT</option><option value="NUM_NODES">NUM_NODES</option><option value="SUM_SCORE">SUM_SCORE</option></select><div id="123_vi_body_INV_MEAN_MIN_DEPTH" class="content selected"><pre class="ydf_pre">    1.   &quot;ShellWeight&quot;  0.425308 ################
+    2. &quot;ShuckedWeight&quot;  0.254458 ####
+    3.        &quot;Height&quot;  0.232658 ##
+    4. &quot;VisceraWeight&quot;  0.219805 ##
+    5.   &quot;WholeWeight&quot;  0.216416 #
+    6.      &quot;Diameter&quot;  0.208333 #
+    7.  &quot;LongestShell&quot;  0.194529 
+    8.          &quot;Type&quot;  0.190234 
+</pre></div><div id="123_vi_body_NUM_AS_ROOT" class="content"><pre class="ydf_pre">    1.   &quot;ShellWeight&quot; 25.000000 ################
+    2.        &quot;Height&quot;  7.000000 ####
+    3.   &quot;WholeWeight&quot;  4.000000 ##
+    4. &quot;ShuckedWeight&quot;  2.000000 
+    5. &quot;VisceraWeight&quot;  2.000000 
+    6.  &quot;LongestShell&quot;  1.000000 
+    7.      &quot;Diameter&quot;  1.000000 
+</pre></div><div id="123_vi_body_NUM_NODES" class="content"><pre class="ydf_pre">    1. &quot;ShuckedWeight&quot; 231.000000 ################
+    2.   &quot;ShellWeight&quot; 194.000000 ############
+    3. &quot;VisceraWeight&quot; 142.000000 ########
+    4.   &quot;WholeWeight&quot; 118.000000 #####
+    5.      &quot;Diameter&quot; 98.000000 ####
+    6.        &quot;Height&quot; 93.000000 ###
+    7.  &quot;LongestShell&quot; 87.000000 ###
+    8.          &quot;Type&quot; 53.000000 
+</pre></div><div id="123_vi_body_SUM_SCORE" class="content"><pre class="ydf_pre">    1.   &quot;ShellWeight&quot; 42795.958448 ################
+    2. &quot;ShuckedWeight&quot; 12054.081163 ###
+    3.        &quot;Height&quot; 5456.965961 #
+    4.   &quot;WholeWeight&quot; 4798.490934 #
+    5.      &quot;Diameter&quot; 3545.668412 
+    6. &quot;VisceraWeight&quot; 3338.526414 
+    7.  &quot;LongestShell&quot; 2376.141978 
+    8.          &quot;Type&quot; 1893.371821 
+</pre></div></div><p>Those variable importances are computed during training. More, and possibly more informative, variable importances are available when analyzing a model on a test dataset.</p></div><div id="123_body_structure" class="tab_content"><b>Number of trees</b> : 42<br><p>Below is the first tree of the model. The model contains 42 trees, which jointly make the prediction. Other trees can be printed with `model.print_tree(tree_idx)` or plotted with `model.plot_tree(tree_idx)`</p><pre class="ydf_pre">    &quot;ShellWeight&quot;&gt;=0.18375 [s:2.88999 n:1908 np:1189 miss:1] ; pred:4.3885e-08
+        ├─(pos)─ &quot;ShellWeight&quot;&gt;=0.31975 [s:0.772655 n:1189 np:537 miss:0] ; pred:0.132197
+        |        ├─(pos)─ &quot;ShuckedWeight&quot;&gt;=0.41425 [s:0.696121 n:537 np:479 miss:0] ; pred:0.229054
+        |        |        ├─(pos)─ &quot;ShellWeight&quot;&gt;=0.469 [s:0.890047 n:479 np:109 miss:0] ; pred:0.200021
+        |        |        |        ├─(pos)─ &quot;ShuckedWeight&quot;&gt;=0.6545 [s:1.42657 n:109 np:73 miss:0] ; pred:0.373839
+        |        |        |        |        ├─(pos)─ pred:0.289963
+        |        |        |        |        └─(neg)─ pred:0.54392
+        |        |        |        └─(neg)─ &quot;ShuckedWeight&quot;&gt;=0.59175 [s:0.425034 n:370 np:177 miss:0] ; pred:0.148815
+        |        |        |                 ├─(pos)─ pred:0.0807377
+        |        |        |                 └─(neg)─ pred:0.211249
+        |        |        └─(neg)─ &quot;ShellWeight&quot;&gt;=0.36425 [s:2.02617 n:58 np:20 miss:0] ; pred:0.468825
+        |        |                 ├─(pos)─ &quot;VisceraWeight&quot;&gt;=0.20525 [s:3.4198 n:20 np:9 miss:0] ; pred:0.665031
+        |        |                 |        ├─(pos)─ pred:0.460587
+        |        |                 |        └─(neg)─ pred:0.832304
+        |        |                 └─(neg)─ &quot;Height&quot;&gt;=0.1475 [s:1.32642 n:38 np:30 miss:0] ; pred:0.365558
+        |        |                          ├─(pos)─ pred:0.425031
+        |        |                          └─(neg)─ pred:0.142531
+        |        └─(neg)─ &quot;ShuckedWeight&quot;&gt;=0.359 [s:0.43218 n:652 np:370 miss:1] ; pred:0.0524241
+        |                 ├─(pos)─ &quot;ShellWeight&quot;&gt;=0.25775 [s:0.207646 n:370 np:242 miss:0] ; pred:-0.00496851
+        |                 |        ├─(pos)─ &quot;ShuckedWeight&quot;&gt;=0.43225 [s:0.343599 n:242 np:169 miss:0] ; pred:0.028172
+        |                 |        |        ├─(pos)─ pred:-0.0103531
+        |                 |        |        └─(neg)─ pred:0.11736
+        |                 |        └─(neg)─ &quot;ShuckedWeight&quot;&gt;=0.39825 [s:0.160789 n:128 np:85 miss:0] ; pred:-0.0676248
+        |                 |                 ├─(pos)─ pred:-0.096145
+        |                 |                 └─(neg)─ pred:-0.0112476
+        |                 └─(neg)─ &quot;WholeWeight&quot;&gt;=0.80425 [s:1.29782 n:282 np:66 miss:1] ; pred:0.127727
+        |                          ├─(pos)─ &quot;ShuckedWeight&quot;&gt;=0.277 [s:2.3299 n:66 np:56 miss:1] ; pred:0.333819
+        |                          |        ├─(pos)─ pred:0.269317
+        |                          |        └─(neg)─ pred:0.695032
+        |                          └─(neg)─ &quot;ShuckedWeight&quot;&gt;=0.30425 [s:0.625131 n:216 np:63 miss:1] ; pred:0.0647537
+        |                                   ├─(pos)─ pred:-0.0584606
+        |                                   └─(neg)─ pred:0.115489
+        └─(neg)─ &quot;ShellWeight&quot;&gt;=0.05325 [s:1.38035 n:719 np:576 miss:1] ; pred:-0.218612
+                 ├─(pos)─ &quot;Type&quot; is in [BITMAP] {&lt;OOD&gt;, M, F} [s:0.434804 n:576 np:240 miss:1] ; pred:-0.160073
+                 |        ├─(pos)─ &quot;ShuckedWeight&quot;&gt;=0.2645 [s:0.352664 n:240 np:52 miss:1] ; pred:-0.0820518
+                 |        |        ├─(pos)─ &quot;VisceraWeight&quot;&gt;=0.2025 [s:0.27234 n:52 np:5 miss:0] ; pred:-0.194969
+                 |        |        |        ├─(pos)─ pred:-0.0349685
+                 |        |        |        └─(neg)─ pred:-0.21199
+                 |        |        └─(neg)─ &quot;Height&quot;&gt;=0.1225 [s:0.446323 n:188 np:69 miss:1] ; pred:-0.0508196
+                 |        |                 ├─(pos)─ pred:0.0369155
+                 |        |                 └─(neg)─ pred:-0.101691
+                 |        └─(neg)─ &quot;ShellWeight&quot;&gt;=0.11975 [s:0.455086 n:336 np:135 miss:1] ; pred:-0.215802
+                 |                 ├─(pos)─ &quot;LongestShell&quot;&gt;=0.4525 [s:0.403875 n:135 np:107 miss:1] ; pred:-0.133487
+                 |                 |        ├─(pos)─ pred:-0.165997
+                 |                 |        └─(neg)─ pred:-0.00925422
+                 |                 └─(neg)─ &quot;Height&quot;&gt;=0.1075 [s:0.199861 n:201 np:41 miss:1] ; pred:-0.271088
+                 |                          ├─(pos)─ pred:-0.182773
+                 |                          └─(neg)─ pred:-0.293719
+                 └─(neg)─ &quot;Diameter&quot;&gt;=0.1925 [s:0.776577 n:143 np:88 miss:1] ; pred:-0.454409
+                          ├─(pos)─ &quot;VisceraWeight&quot;&gt;=0.02725 [s:0.170459 n:88 np:48 miss:1] ; pred:-0.384741
+                          |        ├─(pos)─ &quot;VisceraWeight&quot;&gt;=0.03375 [s:0.156399 n:48 np:26 miss:1] ; pred:-0.347052
+                          |        |        ├─(pos)─ pred:-0.38343
+                          |        |        └─(neg)─ pred:-0.304059
+                          |        └─(neg)─ &quot;VisceraWeight&quot;&gt;=0.0195 [s:0.300081 n:40 np:31 miss:1] ; pred:-0.429969
+                          |                 ├─(pos)─ pred:-0.459485
+                          |                 └─(neg)─ pred:-0.328302
+                          └─(neg)─ &quot;ShuckedWeight&quot;&gt;=0.00825 [s:0.264463 n:55 np:45 miss:1] ; pred:-0.565878
+                                   ├─(pos)─ &quot;VisceraWeight&quot;&gt;=0.01025 [s:0.0659866 n:45 np:29 miss:1] ; pred:-0.541635
+                                   |        ├─(pos)─ pred:-0.522555
+                                   |        └─(neg)─ pred:-0.576219
+                                   └─(neg)─ &quot;VisceraWeight&quot;&gt;=0.004 [s:0.04 n:10 np:5 miss:1] ; pred:-0.674969
+                                            ├─(pos)─ pred:-0.654969
+                                            └─(neg)─ pred:-0.694969
+</pre></div></div></div>

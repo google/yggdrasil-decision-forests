@@ -47,7 +47,21 @@ TEST(Describe, GBT) {
   test::ExpectEqualGolden(
       html,
       "yggdrasil_decision_forests/test_data/"
-      "golden/describe_gbt.html.expected",
+      "golden/describe_adult_gbt.html.expected",
+      {{"MODEL_SIZE", absl::StrCat(*model_size / 1024, " kB")}});
+}
+
+TEST(Describe, RegressionGBT) {
+  std::unique_ptr<model::AbstractModel> model;
+  ASSERT_OK(model::LoadModel(
+      file::JoinPath(TestDataDir(), "golden", "gbt_abalone"), &model));
+  const auto model_size = model->ModelSizeInBytes();
+  ASSERT_TRUE(model_size.has_value());
+  ASSERT_OK_AND_ASSIGN(const auto html, DescribeModelHtml(*model, "123"));
+  test::ExpectEqualGolden(
+      html,
+      "yggdrasil_decision_forests/test_data/"
+      "golden/describe_abalone_gbt.html.expected",
       {{"MODEL_SIZE", absl::StrCat(*model_size / 1024, " kB")}});
 }
 
