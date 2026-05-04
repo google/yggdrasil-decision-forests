@@ -4445,19 +4445,53 @@ void SplitHonestExamples(
     const float leaf_rate, utils::RandomEngine* random_engine,
     std::vector<UnsignedExampleIdx>& leaf_examples,
     std::vector<UnsignedExampleIdx>& working_selected_examples) {
-  std::uniform_real_distribution<float> dist_01;
+  DCHECK(std::is_sorted(selected_examples.begin(), selected_examples.end()));
 
   // Reduce the risk of std::vector re-allocations.
   const float error_margin = 1.1f;
-  leaf_examples.reserve(selected_examples.size() * leaf_rate * error_margin);
-  working_selected_examples.reserve(selected_examples.size() *
-                                    (1.f - leaf_rate) * error_margin);
 
-  for (const auto& example : selected_examples) {
-    if (dist_01(*random_engine) < leaf_rate) {
-      leaf_examples.push_back(example);
+  // Reserve total size to avoid reallocations.
+  const size_t N = selected_examples.size();
+  leaf_examples.reserve(N * leaf_rate * error_margin);
+  working_selected_examples.reserve(N * (1.0f - leaf_rate) * error_margin);
+
+  size_t U = 0;
+  if (!selected_examples.empty()) {
+    U = 1;
+    for (size_t i = 1; i < selected_examples.size(); ++i) {
+      if (selected_examples[i] != selected_examples[i - 1]) {
+        ++U;
+      }
+    }
+  }
+
+  size_t k_needed = static_cast<size_t>(U * leaf_rate);
+  size_t n_remaining = U;
+  std::uniform_real_distribution<float> dist_01;
+
+  if (selected_examples.empty()) return;
+
+  // Reservoir sampling
+  bool send_to_leaf = false;
+  for (size_t i = 0; i < selected_examples.size(); ++i) {
+    if (i == 0 || selected_examples[i] != selected_examples[i - 1]) {
+      if (n_remaining > 0) {
+        if (dist_01(*random_engine) <
+            static_cast<float>(k_needed) / n_remaining) {
+          send_to_leaf = true;
+          if (k_needed > 0) {
+            --k_needed;
+          }
+        } else {
+          send_to_leaf = false;
+        }
+        --n_remaining;
+      }
+    }
+    if (send_to_leaf) {
+      leaf_examples.push_back(selected_examples[i]);
     } else {
-      working_selected_examples.push_back(example);
+      working_selected_examples.push_back(selected_examples[i]);
     }
   }
 }
