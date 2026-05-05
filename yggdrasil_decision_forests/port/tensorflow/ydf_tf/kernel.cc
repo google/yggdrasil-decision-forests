@@ -54,6 +54,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -1373,28 +1374,44 @@ class SimpleMLInferenceOp : public OpKernel {
   //
   // All the input feature are expected to have a first dimension of zero
   // (unused) or equal to the batch size.
-  absl::Status ComputeBatchSize(const InputTensors& input_tensors,
-                                int* batch_size) {
-    int max_size = 0;
-    for (const int size :
-         {input_tensors.numerical_features.dimension(0),
-          input_tensors.boolean_features.dimension(0),
-          input_tensors.categorical_int_features.dimension(0),
-          input_tensors.categorical_set_int_features_row_splits_dim_2.dimension(
-              0) -
-              1}) {
-      if (size > 0) {
-        if (max_size == 0) {
+  absl::StatusOr<int> ComputeBatchSize(const InputTensors& input_tensors,
+                                       const FeatureIndex& feature_index) {
+    int max_size = -1;
+
+    auto check_size = [&](int size, bool is_used,
+                          const char* name) -> absl::Status {
+      if (is_used) {
+        if (max_size == -1) {
           max_size = size;
-        } else if (max_size != size) {
+        } else if (size != max_size) {
           return absl::InvalidArgumentError(absl::StrCat(
-              "The batch size of the input features are inconsistent: ",
-              max_size, " vs ", size, "."));
+              "The batch size of the input features are inconsistent for ",
+              name, ": ", max_size, " vs ", size, "."));
         }
       }
-    }
-    *batch_size = max_size;
-    return absl::OkStatus();
+      return absl::OkStatus();
+    };
+
+    RETURN_IF_ERROR(check_size(input_tensors.numerical_features.dimension(0),
+                               !feature_index.numerical_features().empty(),
+                               "numerical_features"));
+    RETURN_IF_ERROR(check_size(input_tensors.boolean_features.dimension(0),
+                               !feature_index.boolean_features().empty(),
+                               "boolean_features"));
+    RETURN_IF_ERROR(
+        check_size(input_tensors.categorical_int_features.dimension(0),
+                   !feature_index.categorical_int_features().empty(),
+                   "categorical_int_features"));
+
+    int cat_set_size =
+        input_tensors.categorical_set_int_features_row_splits_dim_2.dimension(
+            0) -
+        1;
+    RETURN_IF_ERROR(check_size(
+        cat_set_size, !feature_index.categorical_set_int_features().empty(),
+        "categorical_set_int_features"));
+
+    return max_size == -1 ? 0 : max_size;
   }
 
   // Gets the c++ references on all the input tensor values of the inference op.
@@ -1440,7 +1457,8 @@ class SimpleMLInferenceOp : public OpKernel {
                      categorical_set_int_features_row_splits_dim_2_tensor};
 
     // Set the batch size from the tensors.
-    RETURN_IF_ERROR(ComputeBatchSize(tensors, &tensors.batch_size));
+    ASSIGN_OR_RETURN(tensors.batch_size,
+                     ComputeBatchSize(tensors, feature_index));
 
     // Check number of dimensions of inputs.
     // Note: The user cannot impact those if using the wrapper.
