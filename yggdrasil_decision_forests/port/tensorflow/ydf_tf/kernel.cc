@@ -319,6 +319,12 @@ absl::Status ExtractCategoricalSetInt(const InputTensors& inputs,
   const int end_idx =
       inputs.categorical_set_int_features_row_splits_dim_1(d1_cell + 1);
 
+  if (begin_idx < 0 || end_idx < begin_idx ||
+      end_idx > inputs.categorical_set_int_features_values.size()) {
+    return absl::InvalidArgumentError(
+        "Invalid row splits indices for categorical set features.");
+  }
+
   // Note: The items of the "example_idx"-th example and "col_idx"-th
   // categorical-set feature are "values[begin_idx:end_idx]".
   const int num_items = end_idx - begin_idx;
@@ -1413,6 +1419,17 @@ class SimpleMLInferenceOp : public OpKernel {
         &ctx->input(kInputCategoricalSetIntFeaturesRowSplitsDim1);
     categorical_set_int_features_row_splits_dim_2_tensor =
         &ctx->input(kInputCategoricalSetIntFeaturesRowSplitsDim2);
+
+    if (numerical_features_tensor->dims() != 2 ||
+        boolean_features_tensor->dims() != 2 ||
+        categorical_int_features_tensor->dims() != 2 ||
+        categorical_set_int_features_values_tensor->dims() != 1 ||
+        categorical_set_int_features_row_splits_dim_1_tensor->dims() != 1 ||
+        categorical_set_int_features_row_splits_dim_2_tensor->dims() != 1) {
+      return absl::InvalidArgumentError(
+          "Input tensors have incorrect rank. Expected matrices for features "
+          "and vectors for categorical sets.");
+    }
 
     auto tensors =
         InputTensors{numerical_features_tensor,
