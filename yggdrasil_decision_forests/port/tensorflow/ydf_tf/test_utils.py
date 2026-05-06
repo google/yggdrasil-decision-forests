@@ -287,7 +287,12 @@ def build_toy_random_forest(path,
         output_file.write(node.SerializeToString())
 
 
-def build_toy_gbdt(path, num_classes):
+def build_toy_gbdt(
+    path,
+    num_classes,
+    classification_outputs_probabilities=True,
+    force_generic_engine=False,
+):
   """Creates a toy GBDT model compatible with _build_toy_data_spec."""
 
   logging.info("Create toy model in %s", path)
@@ -305,24 +310,29 @@ def build_toy_gbdt(path, num_classes):
       name="GRADIENT_BOOSTED_TREES",
       task=abstract_model_pb2.CLASSIFICATION,
       label_col_idx=4 if num_classes == 2 else 3,
-      input_features=[0, 1, 2])
+      input_features=[0, 1, 2],
+      classification_outputs_probabilities=classification_outputs_probabilities,
+  )
   with tf.io.gfile.GFile(os.path.join(path, "header.pb"), "w") as f:
     f.write(header.SerializeToString())
 
   num_iters = 2
   num_trees_per_iter = 1 if num_classes == 2 else num_classes
 
-  rf_header = gradient_boosted_trees_pb2.Header(
+  gbt_header = gradient_boosted_trees_pb2.Header(
       num_node_shards=1,
       num_trees=num_iters * num_trees_per_iter,
-      loss=gradient_boosted_trees_pb2.BINOMIAL_LOG_LIKELIHOOD if num_classes
-      == 2 else gradient_boosted_trees_pb2.MULTINOMIAL_LOG_LIKELIHOOD,
+      loss=gradient_boosted_trees_pb2.BINOMIAL_LOG_LIKELIHOOD
+      if num_classes == 2
+      else gradient_boosted_trees_pb2.MULTINOMIAL_LOG_LIKELIHOOD,
       initial_predictions=[1.0] if num_classes == 2 else [0.0] * num_classes,
       num_trees_per_iter=num_trees_per_iter,
-      node_format="BLOB_SEQUENCE")
+      node_format="BLOB_SEQUENCE",
+      output_logits=not classification_outputs_probabilities,
+  )
   with tf.io.gfile.GFile(
       os.path.join(path, "gradient_boosted_trees_header.pb"), "w") as f:
-    f.write(rf_header.SerializeToString())
+    f.write(gbt_header.SerializeToString())
 
   with BlobSequenceWriter(
       os.path.join(path, "nodes-00000-of-00001")
@@ -358,21 +368,66 @@ def build_toy_gbdt(path, num_classes):
                 attribute=0,
                 condition=decision_tree_pb2.Condition(
                     higher_condition=decision_tree_pb2.Condition.Higher(
-                        threshold=1.0)),
-            ))
+                        threshold=1.0
+                    )
+                ),
+            )
+        )
         output_file.write(node.SerializeToString())
 
-        # Node 1
-        node = decision_tree_pb2.Node(
-            regressor=decision_tree_pb2.NodeRegressorOutput(top_value=1.0 +
-                                                            tree_in_iter_idx))
-        output_file.write(node.SerializeToString())
+        # If we want to force the generic engine, throw in a categorical
+        # condition that does not follow global imputation.
+        if force_generic_engine:
+          # Node 1
+          node = decision_tree_pb2.Node(
+              condition=decision_tree_pb2.NodeCondition(
+                  na_value=True,
+                  attribute=1,
+                  condition=decision_tree_pb2.Condition(
+                      contains_bitmap_condition=decision_tree_pb2.Condition.ContainsBitmap(
+                          elements_bitmap=b"\x06"
+                      )
+                  ),  # [1,2]
+              )
+          )
+          output_file.write(node.SerializeToString())
+          # Node 2
+          node = decision_tree_pb2.Node(
+              regressor=decision_tree_pb2.NodeRegressorOutput(
+                  top_value=1.0 + tree_in_iter_idx
+              )
+          )
+          output_file.write(node.SerializeToString())
+          # Node 3
+          node = decision_tree_pb2.Node(
+              regressor=decision_tree_pb2.NodeRegressorOutput(
+                  top_value=1.0 + tree_in_iter_idx
+              )
+          )
+          output_file.write(node.SerializeToString())
+          # Node 4
+          node = decision_tree_pb2.Node(
+              regressor=decision_tree_pb2.NodeRegressorOutput(
+                  top_value=5.0 + tree_in_iter_idx * tree_in_iter_idx
+              )
+          )
+          output_file.write(node.SerializeToString())
+        else:
+          # Node 1
+          node = decision_tree_pb2.Node(
+              regressor=decision_tree_pb2.NodeRegressorOutput(
+                  top_value=1.0 + tree_in_iter_idx
+              )
+          )
+          output_file.write(node.SerializeToString())
 
-        # Node 2
-        node = decision_tree_pb2.Node(
-            regressor=decision_tree_pb2.NodeRegressorOutput(
-                top_value=5.0 + tree_in_iter_idx * tree_in_iter_idx))
-        output_file.write(node.SerializeToString())
+          # Node 2
+          node = decision_tree_pb2.Node(
+              regressor=decision_tree_pb2.NodeRegressorOutput(
+                  top_value=5.0 + tree_in_iter_idx * tree_in_iter_idx
+              )
+          )
+          output_file.write(node.SerializeToString())
 
 
 def build_toy_input_features(use_rank_two=False, has_catset=False):

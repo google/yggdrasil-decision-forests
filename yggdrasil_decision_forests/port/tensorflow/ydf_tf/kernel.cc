@@ -54,7 +54,6 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -73,14 +72,12 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/resource_mgr.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
-#include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -434,9 +431,8 @@ class GenericInferenceEngine : public AbstractInferenceEngine {
             if (pred.distribution().counts().size() != 3) {
               return absl::InternalError("Wrong \"distribution\" shape.");
             }
-            const float logit =
-                pred.distribution().counts(2) / pred.distribution().sum();
-            outputs->dense_predictions(example_idx, 1) = logit;
+            const float logit = pred.logits().counts(2);
+            outputs->dense_predictions(example_idx, 0) = logit;
           } else {
             if (outputs->dense_predictions.dimension(1) !=
                 pred.distribution().counts().size() - 1) {
@@ -782,7 +778,7 @@ class FastInferenceEngine : public AbstractInferenceEngine {
       const InputTensors& inputs, const FeatureIndex& feature_index,
       OutputLeavesTensors* outputs,
       AbstractCache* abstract_cache) const override {
-    // Update the vertical dataset with the input tensors.
+    // Update the ExampleSet with the input tensors.
     auto* cache = dynamic_cast<Cache*>(abstract_cache);
     if (cache == nullptr) {
       return absl::InternalError("Unexpected cache type.");

@@ -204,6 +204,32 @@ class TfOpTest(parameterized.TestCase, tf.test.TestCase):
     self.assertEqual(leaves.shape, (2, 100))
     self.assertAllEqual(leaves[0, :7], [156, 119, 139, 319, 215, 50, 151])
 
+  def test_generic_engine_raw_logits(self):
+    # Create toy GBDT binary model.
+    model_path = os.path.join(
+        tempfile.mkdtemp(dir=self.get_temp_dir()), "test_generic_raw"
+    )
+    test_utils.build_toy_gbdt(
+        model_path,
+        num_classes=2,
+        classification_outputs_probabilities=False,
+        force_generic_engine=True,
+    )
+    features = test_utils.build_toy_input_feature_values(
+        features=None, has_catset=False
+    )
+
+    # Prepare model allowing slow inference to hit GenericInferenceEngine.
+    model = inference.ModelV2(model_path, allow_slow_inference=True)
+    predictions = model.apply(features)
+
+    # Verify that dense_predictions are correctly placed in their respective row
+    # indexes without out-of-bounds shifting, and that they are indeed raw
+    # logits.
+    self.assertAllClose(
+        predictions.dense_predictions, [[11.0], [11.0], [3.0], [3.0]]
+    )
+
 
 if __name__ == "__main__":
   tf.test.main()
