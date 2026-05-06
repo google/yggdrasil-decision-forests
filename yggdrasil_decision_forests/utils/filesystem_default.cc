@@ -23,7 +23,6 @@
 #include <initializer_list>
 #include <ios>
 #include <memory>
-#include <regex>  // NOLINT
 #include <string>
 #include <utility>
 #include <vector>
@@ -36,6 +35,7 @@
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "re2/re2.h"
 #include "yggdrasil_decision_forests/utils/filesystem_interface.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -164,18 +164,12 @@ std::string JoinPathList(std::initializer_list<absl::string_view> paths) {
 
 bool GenerateShardedFilenames(absl::string_view spec,
                               std::vector<std::string>* names) {
-  std::regex num_shard_pattern(R"((.*)\@(\*|[0-9]+)(?:(\..+))?)");
-  std::smatch match;
+  static const LazyRE2 num_shard_pattern = {R"((.*)\@(\*|[0-9]+)(?:(\..+))?)"};
+  std::string prefix, count, suffix;
   std::string str_spec(spec);
-  if (!std::regex_match(str_spec, match, num_shard_pattern)) {
+  if (!RE2::FullMatch(str_spec, *num_shard_pattern, &prefix, &count, &suffix)) {
     return false;
   }
-  if (match.size() != 4) {
-    return false;
-  }
-  const auto prefix = match[1].str();
-  const auto count = match[2].str();
-  const auto suffix = match[3].str();
 
   int int_count;
   if (count == "*") {
@@ -212,7 +206,8 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
     const auto filename = fs::path(SV_ABSL_TO_STD(pattern)).filename().string();
     std::string regexp_filename =
         absl::StrReplaceAll(filename, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
-    std::regex regexp_pattern(regexp_filename);
+    RE2 regexp_pattern(regexp_filename);
+    STATUS_CHECK(regexp_pattern.ok());
     std::error_code error;
 
     const fs::directory_iterator path_end;
@@ -221,7 +216,7 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
       if (!fs::is_regular_file(path->path())) {
         continue;
       }
-      if (std::regex_match(path->path().filename().string(), regexp_pattern)) {
+      if (RE2::FullMatch(path->path().filename().string(), regexp_pattern)) {
         results->push_back(path->path().string());
       }
     }
