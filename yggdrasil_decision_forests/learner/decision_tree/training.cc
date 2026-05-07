@@ -5235,7 +5235,8 @@ absl::StatusOr<std::vector<float>> GenHistogramBins(
     default:
       return absl::InvalidArgumentError("Numerical histogram not implemented");
   }
-  std::sort(candidate_splits.begin(), candidate_splits.end());
+  hwy::VQSort(candidate_splits.data(), candidate_splits.size(),
+              hwy::SortAscending());
   return candidate_splits;
 }
 
