@@ -379,6 +379,8 @@ absl::StatusOr<proto::ColumnType> InferType(
   }
   // Boolean -> Numerical
   if (type == ColumnType::BOOLEAN) {
+    // Floating-point numbers, "True" and "False" (and their lowercase variants)
+    // are not used to infer a column's type as BOOLEAN.
     if (value != "0" && value != "1") {
       type = guide.detect_numerical_as_discretized_numerical()
                  ? ColumnType::DISCRETIZED_NUMERICAL

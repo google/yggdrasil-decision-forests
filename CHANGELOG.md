@@ -3,6 +3,13 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
+## HEAD
+
+### Features
+
+-   "True" and "False" are now recognized as boolean in CSV files. This change
+    only changes the behaviour of columns explicitly specified as BOOLEAN.
+
 ## 1.12.0 - 2026-02-04
 
 ### API Changes

@@ -226,6 +226,54 @@ Terminology:
   EXPECT_EQ(readable_representation, expected_result);
 }
 
+TEST(Dataset, CsvRowToExampleBoolean) {
+  const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: BOOLEAN name: "b1" }
+        columns { type: BOOLEAN name: "b2" }
+        columns { type: BOOLEAN name: "b3" }
+        columns { type: BOOLEAN name: "b4" }
+        columns { type: BOOLEAN name: "b5" }
+        columns { type: BOOLEAN name: "b6" }
+        columns { type: BOOLEAN name: "b7" }
+        columns { type: BOOLEAN name: "b8" }
+      )pb");
+  const std::vector<int> col_idx_to_field_idx = {0, 1, 2, 3, 4, 5, 6, 7};
+  proto::Example example;
+
+  // Check fast paths and regular parsing.
+  CHECK_OK(CsvRowToExample(
+      {"1", "0", "True", "False", "true", "false", "0.75", "0.25"}, data_spec,
+      col_idx_to_field_idx, &example));
+
+  EXPECT_EQ(example.attributes_size(), 8);
+  EXPECT_TRUE(example.attributes(0).boolean());
+  EXPECT_FALSE(example.attributes(1).boolean());
+  EXPECT_TRUE(example.attributes(2).boolean());
+  EXPECT_FALSE(example.attributes(3).boolean());
+  EXPECT_TRUE(example.attributes(4).boolean());
+  EXPECT_FALSE(example.attributes(5).boolean());
+  EXPECT_TRUE(example.attributes(6).boolean());
+  EXPECT_FALSE(example.attributes(7).boolean());
+
+  // Empty boolean is treated as missing value (attribute remains unset).
+  CHECK_OK(CsvRowToExample(
+      {"", "0", "True", "False", "true", "false", "0.75", "0.25"}, data_spec,
+      col_idx_to_field_idx, &example));
+  EXPECT_EQ(example.attributes_size(), 8);
+  EXPECT_FALSE(example.attributes(0).has_boolean());
+
+  // Unrelated text should trigger an error.
+  EXPECT_THAT(CsvRowToExample({"invalid_bool", "0", "True", "False", "true",
+                               "false", "0.75", "0.25"},
+                              data_spec, col_idx_to_field_idx, &example),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(CsvRowToExample({"truefalse", "0", "True", "False", "true",
+                               "false", "0.75", "0.25"},
+                              data_spec, col_idx_to_field_idx, &example),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(Dataset, ExampleToCsvRow) {
   const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
       R"pb(
