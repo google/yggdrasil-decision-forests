@@ -1359,6 +1359,5 @@ class TfModelTest(parameterized.TestCase):
       tfdf_predictions = tfdf_model.predict(tf_dataset)
       npt.assert_equal(tfdf_predictions.flatten(), ydf_predictions)
 
-
 if __name__ == "__main__":
   absltest.main()

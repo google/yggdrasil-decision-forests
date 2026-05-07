@@ -233,6 +233,8 @@ ModelOutput = collections.namedtuple(
 # Magic value used to indicate of a missing value for categorical stored as
 # ints, but that should not be interpreted as integer directly.
 #
+# Only used if explicitly enabled.
+#
 # Note: TF estimators don't standardize missing value representation.
 MISSING_NON_INTEGERIZED_CATEGORICAL_STORED_AS_INT = 0x7FFFFFFF - 2
 
@@ -310,6 +312,7 @@ class Model(object):
       tensor_model_path: Optional[Tensor] = None,
       verbose: Optional[bool] = True,
       force_string_to_unicode_conversion: Optional[bool] = True,
+      support_missing_nonintegerized_categorical_stored_as_int: bool = False,
   ):
     """Initialize the model.
 
@@ -326,6 +329,8 @@ class Model(object):
       force_string_to_unicode_conversion: If true, convert categorical strings
         to unicode. This is the correct approach for YDF models and TF2, but may
         fail in TF1 if there are non-ascii strings.
+      support_missing_nonintegerized_categorical_stored_as_int: If true, missing
+        categorical features stored as int can be fed with a magic value.
     """
 
     self._verbose: Optional[bool] = verbose
@@ -337,7 +342,10 @@ class Model(object):
     # separate inputs tensors.
     self.model_identifier = _create_model_identifier()
 
-    self.input_builder = _InferenceArgsBuilder(verbose)
+    self.input_builder = _InferenceArgsBuilder(
+        verbose,
+        support_missing_nonintegerized_categorical_stored_as_int=support_missing_nonintegerized_categorical_stored_as_int,
+    )
     self.input_builder.build_from_model_path(
         model_path,
         force_string_to_unicode_conversion=force_string_to_unicode_conversion,
@@ -406,6 +414,9 @@ class ModelV2(AutoTrackable):
     """Initialize the model.
 
     The model content will be serialized as an asset if necessary.
+
+    Note: support_missing_nonintegerized_categorical_stored_as_int is not
+    supported for ModelV2.
 
     Args:
       model_path: Path to the Yggdrasil model.
@@ -518,7 +529,11 @@ FeatureMaps = collections.namedtuple(
 class _InferenceArgsBuilder(AutoTrackable):
   """Utility for the creation of the argument of the inference OP."""
 
-  def __init__(self, verbose: Optional[bool] = True):
+  def __init__(
+      self,
+      verbose: Optional[bool] = True,
+      support_missing_nonintegerized_categorical_stored_as_int: bool = False,
+  ):
 
     super().__init__()
     self._verbose: bool = verbose  # pytype: disable=annotation-type-mismatch
@@ -532,6 +547,9 @@ class _InferenceArgsBuilder(AutoTrackable):
 
     # How many dimensions has the model predictions.
     self._dense_output_dim: Optional[int] = None
+    self.support_missing_nonintegerized_categorical_stored_as_int = (
+        support_missing_nonintegerized_categorical_stored_as_int
+    )
 
     super(_InferenceArgsBuilder, self).__init__()
 
@@ -779,9 +797,11 @@ class _InferenceArgsBuilder(AutoTrackable):
         if "" not in feature_spec.categorical.items:
           vocabulary.append(("", -1))
 
-        vocabulary.append(
-            (str(MISSING_NON_INTEGERIZED_CATEGORICAL_STORED_AS_INT), -1)
-        )
+        if self.support_missing_nonintegerized_categorical_stored_as_int:
+          vocabulary.append(
+              (str(MISSING_NON_INTEGERIZED_CATEGORICAL_STORED_AS_INT), -1)
+          )
+
         vocabulary.sort(key=lambda x: x[1])
 
         # Create a hasmap table with the vocabulary.
