@@ -87,15 +87,33 @@ def _unroll_column(
     return
 
   if src.ndim <= 1:
-    # The data is a numpy array containing objects that are numpy arrays.
-    # If the arrays all have the same size, using unrolled multi-dimensional
-    # features is better than CATEGORICAL_SET.
-    if src.ndim > 0 and src.size > 0 and isinstance(src[0], np.ndarray):
-      try:
-        # If columns can be stacked, do it to prevent accidental cast to
-        # CATEGORICAL_SET.
-        src = np.vstack(src)
-      except ValueError:
+    if src.ndim > 0 and src.size > 0:
+      # Find the first valid element to determine the shape/type
+      first_non_empty = next(
+          (x for x in src if not (isinstance(x, str) and not x)), None
+      )
+
+      if isinstance(first_non_empty, (list, tuple, np.ndarray)):
+        # Handle 0-D arrays (which have no len()) vs multi-dimensional items
+        if (
+            isinstance(first_non_empty, np.ndarray)
+            and first_non_empty.ndim == 0
+        ):
+          nan_fill = np.nan
+        else:
+          nan_fill = np.full(len(first_non_empty), np.nan)
+
+        # Replace empty strings uniformly
+        src_stacked = [
+            x if not (isinstance(x, str) and not x) else nan_fill for x in src
+        ]
+
+        try:
+          src = np.vstack(src_stacked)
+        except ValueError:
+          yield name, src, False
+          return
+      else:
         yield name, src, False
         return
     else:

@@ -165,6 +165,7 @@ py_test(
         ":dataset_io",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
+        # numpy dep,
     ],
 )
 
