@@ -1176,6 +1176,39 @@ B,3""")
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
+  def test_catset_nan(self):
+    ds = dataset_lib.create_vertical_dataset(
+        {
+            "feature": np.array(
+                [["x", "y"], ["z"], np.nan, ["w"]], dtype=np.object_
+            )
+        },
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=4,
+        columns=(
+            ds_pb.Column(
+                name="feature",
+                type=ds_pb.ColumnType.CATEGORICAL_SET,
+                dtype=ds_pb.DType.DTYPE_BYTES,
+                count_nas=1,
+                categorical=ds_pb.CategoricalSpec(
+                    number_of_unique_values=5,
+                    items={
+                        "<OOD>": VocabValue(index=0, count=0),
+                        "w": VocabValue(index=1, count=1),
+                        "x": VocabValue(index=2, count=1),
+                        "y": VocabValue(index=3, count=1),
+                        "z": VocabValue(index=4, count=1),
+                    },
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
   def test_multidimensional_numerical(self):
     ds = dataset_lib.create_vertical_dataset(
         {"feature": np.array([[0, 1, 2], [4, 5, 6]])}

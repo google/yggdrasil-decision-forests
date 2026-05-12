@@ -571,7 +571,11 @@ class VerticalDataset:
         else:
           column_data_are_bytes = False
           break
+      elif isinstance(row, (float, np.floating)) and np.isnan(row):
+        # This is interpreted in C++ as a missing value.
+        column_data_np[i] = np.array([b""], dtype=np.bytes_)
       elif not row:
+        # This is interpreted in C++ as a missing value.
         column_data_np[i] = np.array([b""], dtype=np.bytes_)
       else:
         raise ValueError(
