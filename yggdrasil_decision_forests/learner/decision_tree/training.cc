@@ -3657,6 +3657,11 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
   // "positive_attributes_vector".
   double variance_reduction = 0.0;
 
+  // Pre-allocate buffer for sparse updates to avoid allocation overhead inside
+  // loop.
+  std::vector<utils::NormalDistributionDouble>
+      stats_examples_containing_attr_value(num_attribute_classes);
+
   while (true) {
     // Find which attribute value currently achieves the best variance
     // reduction.
@@ -3686,7 +3691,12 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     // Fix the attribute value found to be for the positive side.
     positive_attributes_vector.push_back(best_attr_value);
     variance_reduction = best_variance_reduction;
-    // Update the attribute value distributions.
+    candidate_attributes_bitmap[best_attr_value] = false;
+
+    // Track total statistics of all examples moving to the positive side this
+    // iteration.
+    utils::NormalDistributionDouble moved_example_stats_total;
+
     for (size_t select_idx = 0; select_idx < selected_examples.size();
          select_idx++) {
       // Does this example already belong to a side?
@@ -3695,7 +3705,7 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
       }
       const auto example_idx = selected_examples[select_idx];
       const auto attr_values_range = attribute_values[example_idx];
-      // Check if the attribute is missing.
+      // Check if the example is missing.
       if (attr_values_range.first > attr_values_range.second) {
         continue;
       }
@@ -3722,70 +3732,74 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
         // change side in any distribution.
         continue;
       }
+
       const auto label = labels[example_idx];
       positive_selected_example_bitmap[select_idx] = true;
-      // Update the distribution of the result.
+
+      // Update the result distribution and the distribution of moved examples.
       if constexpr (weighted) {
         const auto weight = weights[example_idx];
         split_label_distribution.mutable_pos()->Add(label, weight);
         split_label_distribution.mutable_neg()->Sub(label, weight);
+        moved_example_stats_total.Add(label, weight);
       } else {
         split_label_distribution.mutable_pos()->Add(label);
         split_label_distribution.mutable_neg()->Sub(label);
+        moved_example_stats_total.Add(label);
       }
       split_label_distribution_no_weights.mutable_pos()->Add(label);
       split_label_distribution_no_weights.mutable_neg()->Sub(label);
-      candidate_attributes_bitmap[best_attr_value] = false;
 
-      // If the number of iterations is what we want, just stop the loop
-      if (max_iterations > 0 &&
-          positive_attributes_vector.size() >= max_iterations) {
-        break;
-      }
-
-      const auto attr_bank_begin =
-          attribute_bank.begin() + attribute_values[example_idx].first;
-      const auto attr_bank_end =
-          attribute_bank.begin() + attribute_values[example_idx].second;
-      auto current_attr_bank_iter = attr_bank_begin;
-
-      // Update the distributions of the other attribute values: Since the
-      // current example has been moved irrevocably to the positive side of
-      // the result, it has to be moved to the positive of every attribute
-      // value distribution. For the attribute values present in this example,
-      // this is already the case. Find the remaining ones and move it for
-      // them as well.
-      // attr_bank is sorted, so moving with two pointers ensures that this
-      // loop is linear in num_attribute_classes.
-      for (int current_attr_val = 0; current_attr_val < num_attribute_classes;
-           ++current_attr_val) {
-        if (!candidate_attributes_bitmap[current_attr_val]) {
-          // This attribute is already selected in the mask.
-          continue;
-        }
-        while (current_attr_bank_iter != attr_bank_end &&
-               *current_attr_bank_iter < current_attr_val) {
-          ++current_attr_bank_iter;
-        }
-        bool current_attr_val_is_in_bank =
-            (current_attr_bank_iter != attr_bank_end &&
-             *current_attr_bank_iter == current_attr_val);
-
-        if (current_attr_val_is_in_bank) {
-          // The value is already on the positive side.
-          continue;
-        }
-        auto& cur_split_stats =
-            per_attribute_value_distributions[current_attr_val];
-        if constexpr (weighted) {
-          const auto weight = weights[example_idx];
-          cur_split_stats.mutable_pos()->Add(label, weight);
-          cur_split_stats.mutable_neg()->Sub(label, weight);
-        } else {
-          cur_split_stats.mutable_pos()->Add(label);
-          cur_split_stats.mutable_neg()->Sub(label);
+      // For all attribute values of the current example, move the current
+      // example to the positive side.
+      for (auto bank_idx = attr_values_range.first;
+           bank_idx < attr_values_range.second; ++bank_idx) {
+        const int current_attr_val = attribute_bank[bank_idx];
+        if (candidate_attributes_bitmap[current_attr_val]) {
+          if constexpr (weighted) {
+            stats_examples_containing_attr_value[current_attr_val].Add(
+                label, weights[example_idx]);
+          } else {
+            stats_examples_containing_attr_value[current_attr_val].Add(label);
+          }
         }
       }
+    }
+
+    // At this point, we have identified the set S of examples that moved to the
+    // positive side. We know the total (label) distribution of S and, for each
+    // individual attribute i, the distribution of S_i, the set of examples in S
+    // containing attribute i.
+    //
+    // For any attribute i, stats_examples_containing_attr_value[i] stores the
+    // full distribution **if i was moved to the positive side**, i.e. with all
+    // examples containing i on the positive side. To update this, we need to
+    // move every example that has been moved by the current change **and does
+    // not contain i** (otherwise it's already on the positive side) and  to
+    // the positive side of stats_examples_containing_attr_value[i]. In other
+    // words, the net update is S \ S_i.
+    for (int attr_idx = 0; attr_idx < num_attribute_classes; ++attr_idx) {
+      if (!candidate_attributes_bitmap[attr_idx]) {
+        continue;
+      }
+      auto& cur_split_stats = per_attribute_value_distributions[attr_idx];
+
+      // Net stats of moved examples missing attr_idx is: Total Moved - Moved
+      // Containing attr_idx.
+      utils::NormalDistributionDouble net_update = moved_example_stats_total;
+      net_update.Sub(stats_examples_containing_attr_value[attr_idx]);
+
+      cur_split_stats.mutable_pos()->Add(net_update);
+      cur_split_stats.mutable_neg()->Sub(net_update);
+
+      // Reset the stats accumulators.
+      stats_examples_containing_attr_value[attr_idx] =
+          utils::NormalDistributionDouble();
+    }
+
+    if (max_iterations > 0 &&
+        positive_attributes_vector.size() >= max_iterations) {
+      break;
     }
   }
 
