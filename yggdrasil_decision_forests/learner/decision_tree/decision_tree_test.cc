@@ -2059,6 +2059,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
 
   utils::RandomEngine rnd(1234);
   proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
 
@@ -2066,7 +2067,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
                 TestFixture::kWeighted>(
                 selected, weights, attributes_non_valid, labels_v1,
                 num_attribute_classes, min_num_obs, dt_config,
-                label_distribution_v1, -1, &best_condition, &rnd)
+                label_distribution_v1, -1, &best_condition, &cache, &rnd)
                 .value(),
             SplitSearchResult::kInvalidAttribute);
 
@@ -2074,7 +2075,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
                 TestFixture::kWeighted>(
                 selected, weights, attributes_perfect, labels_v1,
                 num_attribute_classes, min_num_obs, dt_config,
-                label_distribution_v1, -1, &best_condition, &rnd)
+                label_distribution_v1, -1, &best_condition, &cache, &rnd)
                 .value(),
             SplitSearchResult::kBetterSplitFound);
 
@@ -2107,7 +2108,7 @@ TYPED_TEST(FindBestSplitTest, FindBestCategoricalSetSplitCartForRegression) {
                 TestFixture::kWeighted>(
                 selected, weights, attributes_perfect, labels_v2,
                 num_attribute_classes, min_num_obs, dt_config,
-                label_distribution_v2, -1, &best_condition_v2, &rnd)
+                label_distribution_v2, -1, &best_condition_v2, &cache, &rnd)
                 .value(),
             SplitSearchResult::kBetterSplitFound);
 
@@ -2171,6 +2172,7 @@ TEST(FindBestSplitTest,
 
   utils::RandomEngine rnd(1234);
   proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
   dt_config.mutable_categorical_set_greedy_forward()->set_max_selected_items(2);
@@ -2178,7 +2180,7 @@ TEST(FindBestSplitTest,
   EXPECT_EQ(
       FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<false>(
           selected, {}, attributes, labels, num_attribute_classes, min_num_obs,
-          dt_config, label_distribution, -1, &best_condition, &rnd)
+          dt_config, label_distribution, -1, &best_condition, &cache, &rnd)
           .value(),
       SplitSearchResult::kBetterSplitFound);
 
@@ -2216,25 +2218,31 @@ TEST(DecisionTree, MaskItemsForCategoricalForSetGreedySelection) {
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
   {
     std::vector<bool> candidate_attributes_bitmap(num_attribute_classes, true);
-    internal::MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
-        dt_config, num_attribute_classes, selected_examples,
-        count_examples_without_weights_by_attribute_class,
-        &candidate_attributes_bitmap, &random);
+    std::vector<int> candidate_attributes_list;
+    internal::
+        MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
+            dt_config, num_attribute_classes, selected_examples,
+            count_examples_without_weights_by_attribute_class,
+            &candidate_attributes_bitmap, &candidate_attributes_list, &random);
     // All the candidate items are selected.
     EXPECT_EQ(candidate_attributes_bitmap,
               std::vector<bool>({false, false, true, true, true}));
+    EXPECT_EQ(candidate_attributes_list, std::vector<int>({2, 3, 4}));
   }
 
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(0.f);
   {
     std::vector<bool> candidate_attributes_bitmap(num_attribute_classes, true);
-    internal::MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
-        dt_config, num_attribute_classes, selected_examples,
-        count_examples_without_weights_by_attribute_class,
-        &candidate_attributes_bitmap, &random);
+    std::vector<int> candidate_attributes_list;
+    internal::
+        MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
+            dt_config, num_attribute_classes, selected_examples,
+            count_examples_without_weights_by_attribute_class,
+            &candidate_attributes_bitmap, &candidate_attributes_list, &random);
     // None of the items are selected.
     EXPECT_EQ(candidate_attributes_bitmap,
               std::vector<bool>({false, false, false, false, false}));
+    EXPECT_EQ(candidate_attributes_list, std::vector<int>());
   }
 
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
@@ -2242,13 +2250,16 @@ TEST(DecisionTree, MaskItemsForCategoricalForSetGreedySelection) {
       4);  // The first 4 items.
   {
     std::vector<bool> candidate_attributes_bitmap(num_attribute_classes, true);
-    internal::MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
-        dt_config, num_attribute_classes, selected_examples,
-        count_examples_without_weights_by_attribute_class,
-        &candidate_attributes_bitmap, &random);
+    std::vector<int> candidate_attributes_list;
+    internal::
+        MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
+            dt_config, num_attribute_classes, selected_examples,
+            count_examples_without_weights_by_attribute_class,
+            &candidate_attributes_bitmap, &candidate_attributes_list, &random);
     // The last candidate item is not selected.
     EXPECT_EQ(candidate_attributes_bitmap,
               std::vector<bool>({false, false, true, true, false}));
+    EXPECT_EQ(candidate_attributes_list, std::vector<int>({2, 3}));
   }
 
   dt_config.mutable_categorical_set_greedy_forward()->set_max_num_items(-1);
@@ -2257,12 +2268,15 @@ TEST(DecisionTree, MaskItemsForCategoricalForSetGreedySelection) {
   // examples.
   {
     std::vector<bool> candidate_attributes_bitmap(num_attribute_classes, true);
-    internal::MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
-        dt_config, num_attribute_classes, selected_examples,
-        count_examples_without_weights_by_attribute_class,
-        &candidate_attributes_bitmap, &random);
+    std::vector<int> candidate_attributes_list;
+    internal::
+        MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
+            dt_config, num_attribute_classes, selected_examples,
+            count_examples_without_weights_by_attribute_class,
+            &candidate_attributes_bitmap, &candidate_attributes_list, &random);
     EXPECT_EQ(candidate_attributes_bitmap,
               std::vector<bool>({false, false, false, true, true}));
+    EXPECT_EQ(candidate_attributes_list, std::vector<int>({3, 4}));
   }
 }
 

@@ -75,14 +75,14 @@ struct NodeAndExamples {
 //   3. The item is pruned by the maximum number of items (see
 //   "categorical_set_split_max_num_items" in "dt_config").
 // Return true iff at least one item is non masked.
-bool MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
+bool MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
     const proto::DecisionTreeTrainingConfig& dt_config,
     int32_t num_attribute_classes,
     absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<int64_t>&
         count_examples_without_weights_by_attribute_class,
     std::vector<bool>* candidate_attributes_bitmap,
-    utils::RandomEngine* random);
+    std::vector<int>* candidate_attributes_list, utils::RandomEngine* random);
 
 // Create the histogram bins (i.e. candidate threshold values) for an histogram
 // based split finding on a numerical attribute.
@@ -139,6 +139,17 @@ struct SplitterPerThreadCache {
 
   std::vector<int> numerical_features;
   std::vector<float> projection_values;
+
+  std::vector<int> catset_candidate_attributes_list;
+  std::vector<std::vector<UnsignedExampleIdx>> catset_examples_by_candidate;
+  std::vector<bool> catset_candidate_attributes_bitmap;
+  std::vector<int> catset_positive_attributes_vector;
+  std::vector<bool> catset_positive_selected_example_bitmap;
+  std::vector<int64_t> catset_count_examples_without_weights_by_attribute_class;
+  std::vector<utils::NormalDistributionDouble>
+      catset_stats_examples_containing_attr_value;
+  std::vector<utils::BinaryToNormalDistributionDouble>
+      catset_attribute_distributions_regression;
 
   PerThreadCacheV2 cache_v2;
 
@@ -865,7 +876,7 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
-    utils::RandomEngine* random);
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 // Find the best possible condition for a uplift with categorical treatment,
 // a numerical feature and categorical outcome.

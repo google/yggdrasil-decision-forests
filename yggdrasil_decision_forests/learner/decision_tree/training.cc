@@ -250,42 +250,36 @@ bool MinMaxNumericalAttribute(
 // equivalent as the label distribution of the positive branch splitted on a
 // categorical-set condition with mask equal to {item}.
 template <bool weighted>
-std::vector<utils::BinaryToNormalDistributionDouble>
-InitializeRegressionAttributeDistributions(
+void InitializeRegressionAttributeDistributions(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& labels, const std::vector<float>& weights,
-    const std::vector<std::pair<size_t, size_t>>& attribute_values,
-    const std::vector<int>& attribute_bank,
     const utils::NormalDistributionDouble& label_distribution,
-    const std::vector<bool>& candidate_attributes_bitmap) {
+    const std::vector<int>& candidate_attributes_list,
+    const std::vector<std::vector<UnsignedExampleIdx>>& examples_by_candidate,
+    std::vector<utils::BinaryToNormalDistributionDouble>*
+        attribute_distributions) {
   if constexpr (weighted) {
     DCHECK_EQ(weights.size(), labels.size());
   } else {
     DCHECK(weights.empty());
   }
-  const int num_attribute_classes = candidate_attributes_bitmap.size();
 
-  // Initialize all candidates with the full distribution in the negative side.
-  std::vector<utils::BinaryToNormalDistributionDouble> attribute_distributions(
-      num_attribute_classes,
-      utils::BinaryToNormalDistributionDouble(label_distribution, {}));
+  const auto num_attribute_classes = examples_by_candidate.size();
 
-  // For every attribute value, push all examples containing this value to the
-  // positive side of the corresponding distribution.
-  for (const auto example_idx : selected_examples) {
-    const float label = labels[example_idx];
-    const auto& example_attrs_range = attribute_values[example_idx];
+  // Initialize active candidates with the full distribution in the negative
+  // side.
+  if (attribute_distributions->size() < num_attribute_classes) {
+    attribute_distributions->resize(num_attribute_classes);
+  }
+  for (const int candidate_attr_value : candidate_attributes_list) {
+    auto& dist = (*attribute_distributions)[candidate_attr_value];
+    dist.Clear();
+    *dist.mutable_neg() = label_distribution;
 
-    // Iterate through attributes present in this example
-    for (auto bank_idx = example_attrs_range.first;
-         bank_idx < example_attrs_range.second; ++bank_idx) {
-      const int candidate_attr_value = attribute_bank[bank_idx];
-      if (!candidate_attributes_bitmap[candidate_attr_value]) {
-        continue;
-      }
-      // This attribute is a candidate, update its stats
-      auto& dist = attribute_distributions[candidate_attr_value];
-      // Move example contribution from neg to pos.
+    // Push all examples containing this value to the positive side.
+    for (const auto select_idx : examples_by_candidate[candidate_attr_value]) {
+      const auto example_idx = selected_examples[select_idx];
+      const float label = labels[example_idx];
       if constexpr (weighted) {
         const auto weight = weights[example_idx];
         dist.mutable_pos()->Add(label, weight);
@@ -296,8 +290,6 @@ InitializeRegressionAttributeDistributions(
       }
     }
   }
-
-  return attribute_distributions;
 }
 
 // For each dictionary item of a Categorical Set attribute, computes the label
@@ -985,7 +977,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegression(
                         selected_examples, weights, *attribute_data,
                         label_stats.label_data, num_attribute_classes,
                         min_num_obs, dt_config, label_stats.label_distribution,
-                        attribute_idx, best_condition, random));
+                        attribute_idx, best_condition, cache, random));
       } else {
         ASSIGN_OR_RETURN(
             result, FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<
@@ -993,7 +985,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegression(
                         selected_examples, weights, *attribute_data,
                         label_stats.label_data, num_attribute_classes,
                         min_num_obs, dt_config, label_stats.label_distribution,
-                        attribute_idx, best_condition, random));
+                        attribute_idx, best_condition, cache, random));
       }
     } break;
 
@@ -3377,10 +3369,15 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     split_label_distribution_no_weights.Add(false, labels[example_idx]);
   }
   // Sample-out items.
-  if (!internal::MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
-          dt_config, num_attribute_classes, selected_examples,
-          count_examples_without_weights_by_attribute_class,
-          &candidate_attributes_bitmap, random)) {
+  // TODO: Add proper support for candidate_attributes_list.
+  std::vector<int> candidate_attributes_list;
+  candidate_attributes_list.reserve(num_attribute_classes);
+  if (!internal::
+          MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
+              dt_config, num_attribute_classes, selected_examples,
+              count_examples_without_weights_by_attribute_class,
+              &candidate_attributes_bitmap, &candidate_attributes_list,
+              random)) {
     return SplitSearchResult::kInvalidAttribute;
   }
 
@@ -3585,7 +3582,7 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
-    utils::RandomEngine* random) {
+    SplitterPerThreadCache* cache, utils::RandomEngine* random) {
   // TODO: `min_num_obs`is currently ignored.
   if constexpr (weighted) {
     DCHECK_EQ(weights.size(), labels.size());
@@ -3603,28 +3600,44 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
   //  - It is not pure in the negative examples i.e. it is not present in all
   //  or in none of the non-selected examples (ps: Initially, all the examples
   //  are non-selected).
-  std::vector<bool> candidate_attributes_bitmap(num_attribute_classes, true);
-  // The "positive attribute set" are the attribute values that, if present
-  // in the example, evaluates the node condition as true.
-  std::vector<int> positive_attributes_vector;
-  // Bitmap of the example that are already in the positive set i.e. for which
+  //
+  // To maximize performance, candidate attributes are both stored as a flat
+  // list (for quick iteration) and as a bitmap (for quick indexing).
+  std::vector<bool>& candidate_attributes_bitmap =
+      cache->catset_candidate_attributes_bitmap;
+  candidate_attributes_bitmap.assign(num_attribute_classes, true);
+  std::vector<int>& candidate_attributes_list =
+      cache->catset_candidate_attributes_list;
+  candidate_attributes_list.clear();
+  // This vector stores the attributes that make up the eventual split condition
+  // found by this function. The vector is sorted and does not contain
+  // duplicates.
+  std::vector<int>& positive_attributes_vector =
+      cache->catset_positive_attributes_vector;
+  positive_attributes_vector.clear();
+  // Bitmap of the examples that are already in the positive set i.e. for which
   // the condition defined by "positive_attributes_vector" is positive.
   // Instead of being indexed by the example_idx, this bitmap is indexed by
   // "selected_examples" i.e. "positive_selected_example_bitmap[i]==true"
   // means that "selected_examples[i]" is selected.
-  std::vector<bool> positive_selected_example_bitmap(selected_examples.size(),
-                                                     false);
+  std::vector<bool>& positive_selected_example_bitmap =
+      cache->catset_positive_selected_example_bitmap;
+  positive_selected_example_bitmap.assign(selected_examples.size(), false);
+
   // Weighted and non weighted distribution of the labels in the positive and
   // negative sets.
   utils::BinaryToNormalDistributionDouble split_label_distribution;
   utils::BinaryToNormalDistributionDouble split_label_distribution_no_weights;
   // All the examples are initially in the negative set.
   *split_label_distribution.mutable_neg() = label_distribution;
-  // Number of example (with weights) where the attribute value (an attribute
+  // Number of examples (with weights) where the attribute value (an attribute
   // value is a set of categorical items) that contains the i-th  categorical
   // items.
-  std::vector<int64_t> count_examples_without_weights_by_attribute_class(
-      num_attribute_classes);
+  std::vector<int64_t>& count_examples_without_weights_by_attribute_class =
+      cache->catset_count_examples_without_weights_by_attribute_class;
+  count_examples_without_weights_by_attribute_class.assign(
+      num_attribute_classes, 0);
+
   // Count per categorical item value.
   const auto& attribute_values = attributes.values();
   const auto& attribute_bank = attributes.bank();
@@ -3638,18 +3651,47 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
   }
 
   // Sample-out items.
-  if (!internal::MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
-          dt_config, num_attribute_classes, selected_examples,
-          count_examples_without_weights_by_attribute_class,
-          &candidate_attributes_bitmap, random)) {
+  if (!internal::
+          MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
+              dt_config, num_attribute_classes, selected_examples,
+              count_examples_without_weights_by_attribute_class,
+              &candidate_attributes_bitmap, &candidate_attributes_list,
+              random)) {
     return SplitSearchResult::kInvalidAttribute;
   }
 
-  // TODO: Cache this variable.
-  auto per_attribute_value_distributions =
-      InitializeRegressionAttributeDistributions<weighted>(
-          selected_examples, labels, weights, attribute_values, attribute_bank,
-          label_distribution, candidate_attributes_bitmap);
+  // For each attribute value, store the uncommitted examples.
+  // Note that examples_by_candidate stores the indices in selected_examples.
+  std::vector<std::vector<UnsignedExampleIdx>>& examples_by_candidate =
+      cache->catset_examples_by_candidate;
+  if (examples_by_candidate.size() < num_attribute_classes) {
+    examples_by_candidate.resize(num_attribute_classes);
+  }
+  for (const auto attr_idx : candidate_attributes_list) {
+    examples_by_candidate[attr_idx].clear();
+    examples_by_candidate[attr_idx].reserve(
+        count_examples_without_weights_by_attribute_class[attr_idx]);
+  }
+  for (size_t select_idx = 0; select_idx < selected_examples.size();
+       select_idx++) {
+    const auto example_idx = selected_examples[select_idx];
+    const auto attr_values_range = attribute_values[example_idx];
+    for (auto bank_idx = attr_values_range.first;
+         bank_idx < attr_values_range.second; ++bank_idx) {
+      const int value = attribute_bank[bank_idx];
+      if (candidate_attributes_bitmap[value]) {
+        examples_by_candidate[value].push_back(select_idx);
+      }
+    }
+  }
+
+  std::vector<utils::BinaryToNormalDistributionDouble>&
+      per_attribute_value_distributions =
+          cache->catset_attribute_distributions_regression;
+  InitializeRegressionAttributeDistributions<weighted>(
+      selected_examples, labels, weights, label_distribution,
+      candidate_attributes_list, examples_by_candidate,
+      &per_attribute_value_distributions);
 
   const double initial_variance = label_distribution.Var();
 
@@ -3657,24 +3699,34 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
   // "positive_attributes_vector".
   double variance_reduction = 0.0;
 
-  // Pre-allocate buffer for sparse updates to avoid allocation overhead inside
-  // loop.
-  std::vector<utils::NormalDistributionDouble>
-      stats_examples_containing_attr_value(num_attribute_classes);
+  std::vector<utils::NormalDistributionDouble>&
+      stats_examples_containing_attr_value =
+          cache->catset_stats_examples_containing_attr_value;
+  stats_examples_containing_attr_value.assign(
+      num_attribute_classes, utils::NormalDistributionDouble());
 
   while (true) {
     // Find which attribute value currently achieves the best variance
     // reduction.
     double best_variance_reduction = variance_reduction;
     int best_attr_value = -1;
-    for (int attr_idx = 0; attr_idx < num_attribute_classes; ++attr_idx) {
+    int best_active_candidate_idx = -1;
+
+    // Note: This loop modifies candidate_attributes_list.
+    for (size_t candidate_attr_idx = 0;
+         candidate_attr_idx < candidate_attributes_list.size();) {
+      const int attr_idx = candidate_attributes_list[candidate_attr_idx];
       const auto& cur_attr_value_dist =
           per_attribute_value_distributions[attr_idx];
-      if (!candidate_attributes_bitmap[attr_idx]) {
-        continue;
-      }
       if (cur_attr_value_dist.neg().NumObservations() == 0) {
         candidate_attributes_bitmap[attr_idx] = false;
+        // Quick delete: Move the last item to position `candidate_attr_idx`
+        // (destroying its current contents), then remove the end. Don't
+        // increment `candidate_attr_idx`, since there's a new element at this
+        // position now.
+        candidate_attributes_list[candidate_attr_idx] =
+            candidate_attributes_list.back();
+        candidate_attributes_list.pop_back();
         continue;
       }
       double candidate_variance_reduction =
@@ -3682,59 +3734,34 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
       if (candidate_variance_reduction > best_variance_reduction) {
         best_variance_reduction = candidate_variance_reduction;
         best_attr_value = attr_idx;
+        best_active_candidate_idx = candidate_attr_idx;
       }
+      // No deletion happened, move to the next element.
+      candidate_attr_idx++;
     }
     if (best_attr_value == -1) {
-      // No attribute value improves the current state.
+      // No attribute value improves the current state. Stop the search.
       break;
     }
-    // Fix the attribute value found to be for the positive side.
+    // Move best_attr_value permanently to the positive side.
     positive_attributes_vector.push_back(best_attr_value);
     variance_reduction = best_variance_reduction;
     candidate_attributes_bitmap[best_attr_value] = false;
+    candidate_attributes_list[best_active_candidate_idx] =
+        candidate_attributes_list.back();
+    candidate_attributes_list.pop_back();
 
     // Track total statistics of all examples moving to the positive side this
     // iteration.
     utils::NormalDistributionDouble moved_example_stats_total;
-
-    for (size_t select_idx = 0; select_idx < selected_examples.size();
-         select_idx++) {
+    for (const auto select_idx : examples_by_candidate[best_attr_value]) {
       // Does this example already belong to a side?
       if (positive_selected_example_bitmap[select_idx]) {
         continue;
       }
-      const auto example_idx = selected_examples[select_idx];
-      const auto attr_values_range = attribute_values[example_idx];
-      // Check if the example is missing.
-      if (attr_values_range.first > attr_values_range.second) {
-        continue;
-      }
-      // Since second >= first, this is reasonable even if both are unsigned.
-      const auto attr_values_list_size =
-          attr_values_range.second - attr_values_range.first;
-      bool match;
-      // Profiling shows that std::binary_search is quite slow for small ranges,
-      // common for CatSet splits. The threshold 100 has not been optimized.
-      constexpr int binary_search_threshold = 100;
-      if (attr_values_list_size <= binary_search_threshold) {
-        // Linear search.
-        match = std::find(attribute_bank.begin() + attr_values_range.first,
-                          attribute_bank.begin() + attr_values_range.second,
-                          best_attr_value) !=
-                attribute_bank.begin() + attr_values_range.second;
-      } else {
-        match = std::binary_search(
-            attribute_bank.begin() + attr_values_range.first,
-            attribute_bank.begin() + attr_values_range.second, best_attr_value);
-      }
-      if (!match) {
-        // The example does not contain `best_attr_value` and therefore does not
-        // change side in any distribution.
-        continue;
-      }
-
-      const auto label = labels[example_idx];
       positive_selected_example_bitmap[select_idx] = true;
+      const auto example_idx = selected_examples[select_idx];
+      const auto label = labels[example_idx];
 
       // Update the result distribution and the distribution of moved examples.
       if constexpr (weighted) {
@@ -3752,6 +3779,7 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
 
       // For all attribute values of the current example, move the current
       // example to the positive side.
+      const auto attr_values_range = attribute_values[example_idx];
       for (auto bank_idx = attr_values_range.first;
            bank_idx < attr_values_range.second; ++bank_idx) {
         const int current_attr_val = attribute_bank[bank_idx];
@@ -3778,23 +3806,23 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward(
     // not contain i** (otherwise it's already on the positive side) and  to
     // the positive side of stats_examples_containing_attr_value[i]. In other
     // words, the net update is S \ S_i.
-    for (int attr_idx = 0; attr_idx < num_attribute_classes; ++attr_idx) {
-      if (!candidate_attributes_bitmap[attr_idx]) {
-        continue;
+    if (moved_example_stats_total.NumObservations() > 0) {
+      // Apply batched complement updates to remaining active candidates
+      for (const int attr_idx : candidate_attributes_list) {
+        auto& cur_split_stats = per_attribute_value_distributions[attr_idx];
+
+        // Net stats of moved examples missing attr_idx is: Total Moved - Moved
+        // Containing attr_idx.
+        utils::NormalDistributionDouble net_update = moved_example_stats_total;
+        net_update.Sub(stats_examples_containing_attr_value[attr_idx]);
+
+        cur_split_stats.mutable_pos()->Add(net_update);
+        cur_split_stats.mutable_neg()->Sub(net_update);
+
+        // Reset the stats accumulators.
+        stats_examples_containing_attr_value[attr_idx] =
+            utils::NormalDistributionDouble();
       }
-      auto& cur_split_stats = per_attribute_value_distributions[attr_idx];
-
-      // Net stats of moved examples missing attr_idx is: Total Moved - Moved
-      // Containing attr_idx.
-      utils::NormalDistributionDouble net_update = moved_example_stats_total;
-      net_update.Sub(stats_examples_containing_attr_value[attr_idx]);
-
-      cur_split_stats.mutable_pos()->Add(net_update);
-      cur_split_stats.mutable_neg()->Sub(net_update);
-
-      // Reset the stats accumulators.
-      stats_examples_containing_attr_value[attr_idx] =
-          utils::NormalDistributionDouble();
     }
 
     if (max_iterations > 0 &&
@@ -3829,7 +3857,7 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<true>(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
-    utils::RandomEngine* random);
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 template absl::StatusOr<SplitSearchResult>
 FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<false>(
@@ -3841,7 +3869,7 @@ FindSplitLabelRegressionFeatureCategoricalSetGreedyForward<false>(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
-    utils::RandomEngine* random);
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 template <typename LabelBucket, typename ExampleBucketSet,
           typename LabelScoreAccumulator>
@@ -5187,41 +5215,41 @@ int8_t MonotonicConstraintSign(
 
 namespace internal {
 
-bool MaskPureSampledOrPrunedItemsForCategoricalSetGreedySelection(
+bool MaskPureSampledOrPrunedAttributeValuesForCategoricalSetGreedySelection(
     const proto::DecisionTreeTrainingConfig& dt_config,
     int32_t num_attribute_classes,
     const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<int64_t>&
         count_examples_without_weights_by_attribute_class,
     std::vector<bool>* candidate_attributes_bitmap,
-    utils::RandomEngine* random) {
+    std::vector<int>* candidate_attributes_list, utils::RandomEngine* random) {
   std::uniform_real_distribution<float> sampling_dist;
-  int64_t valid_items = 0;
+  const auto min_item_frequency =
+      dt_config.categorical_set_greedy_forward().min_item_frequency();
+  const auto sampling_rate =
+      dt_config.categorical_set_greedy_forward().sampling();
+  const auto max_num_items =
+      dt_config.categorical_set_greedy_forward().max_num_items();
+  candidate_attributes_list->reserve(num_attribute_classes *
+                                     (sampling_rate + 0.1));
   for (int attr_value = 0; attr_value < num_attribute_classes; attr_value++) {
-    if (dt_config.categorical_set_greedy_forward().max_num_items() >= 0 &&
-        attr_value >=
-            dt_config.categorical_set_greedy_forward().max_num_items()) {
-      // Too much candidate items.
+    if (max_num_items >= 0 && attr_value >= max_num_items) {
+      // Too many candidate items.
       (*candidate_attributes_bitmap)[attr_value] = false;
-    } else if (dt_config.categorical_set_greedy_forward().sampling() < 1.f &&
-               sampling_dist(*random) >
-                   dt_config.categorical_set_greedy_forward().sampling()) {
+    } else if (sampling_rate < 1.f && sampling_dist(*random) > sampling_rate) {
       // Randomly masked item.
       (*candidate_attributes_bitmap)[attr_value] = false;
     } else if (count_examples_without_weights_by_attribute_class[attr_value] <
-                   dt_config.categorical_set_greedy_forward()
-                       .min_item_frequency() ||
+                   min_item_frequency ||
                count_examples_without_weights_by_attribute_class[attr_value] >
-                   selected_examples.size() -
-                       dt_config.categorical_set_greedy_forward()
-                           .min_item_frequency()) {
+                   selected_examples.size() - min_item_frequency) {
       // Pure item.
       (*candidate_attributes_bitmap)[attr_value] = false;
     } else {
-      valid_items++;
+      candidate_attributes_list->push_back(attr_value);
     }
   }
-  return valid_items > 0;
+  return !candidate_attributes_list->empty();
 }
 
 absl::StatusOr<std::vector<float>> GenHistogramBins(
