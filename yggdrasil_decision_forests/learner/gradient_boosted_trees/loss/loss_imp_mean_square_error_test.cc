@@ -120,10 +120,20 @@ TEST_P(MeanSquareErrorLossTest, UpdateGradients) {
                                   &predictions);
 
   utils::RandomEngine random(1234);
-  ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
-                                     /* label_col_idx= */ 0, predictions,
-                                     /*ranking_index=*/nullptr, &gradients,
-                                     &random));
+  const bool threaded = std::get<1>(GetParam());
+  if (threaded) {
+    utils::concurrency::ThreadPool thread_pool(
+        4, {.name_prefix = std::string("")});
+    ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
+                                       /* label_col_idx= */ 0, predictions,
+                                       /*ranking_index=*/nullptr, &gradients,
+                                       &random, &thread_pool));
+  } else {
+    ASSERT_OK(loss_imp.UpdateGradients(gradient_dataset,
+                                       /* label_col_idx= */ 0, predictions,
+                                       /*ranking_index=*/nullptr, &gradients,
+                                       &random));
+  }
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
   if (weighted) {
@@ -164,14 +174,16 @@ TEST_P(MeanSquareErrorLossTest, ComputeRegressionLoss) {
   }
   if (weighted) {
     EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
-    // For regression, the only secondary metric is also RMSE.
+    // For regression, the first secondary metric is RMSE, the second is MSE.
     EXPECT_THAT(loss_results.secondary_metrics,
-                ElementsAre(FloatNear(std::sqrt(200. / 20.), kTestPrecision)));
+                ElementsAre(FloatNear(std::sqrt(200. / 20.), kTestPrecision),
+                            FloatNear(200. / 20., kTestPrecision)));
   } else {
     EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
-    // For regression, the only secondary metric is also RMSE.
+    // For regression, the first secondary metric is RMSE, the second is MSE.
     EXPECT_THAT(loss_results.secondary_metrics,
-                ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision)));
+                ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision),
+                            FloatNear(30. / 4., kTestPrecision)));
   }
 }
 
@@ -208,17 +220,19 @@ TEST_P(MeanSquareErrorLossTest, ComputeRankingLoss) {
   }
   if (weighted) {
     EXPECT_NEAR(loss_results.loss, std::sqrt(200. / 20.), kTestPrecision);
-    //  For ranking, first secondary metric is RMSE, second secondary metric is
-    //  NDCG@5.
+    //  For ranking, first secondary metric is RMSE, second is MSE, third
+    //  secondary metric is NDCG@5.
     EXPECT_THAT(loss_results.secondary_metrics,
                 ElementsAre(FloatNear(std::sqrt(200. / 20.), kTestPrecision),
+                            FloatNear(200. / 20., kTestPrecision),
                             FloatNear(0.86291, kTestPrecision)));
   } else {
     EXPECT_NEAR(loss_results.loss, std::sqrt(30. / 4.), kTestPrecision);
-    //  For ranking, first secondary metric is RMSE, second secondary metric is
-    //  NDCG@5.
+    //  For ranking, first secondary metric is RMSE, second is MSE, third
+    //  secondary metric is NDCG@5.
     EXPECT_THAT(loss_results.secondary_metrics,
                 ElementsAre(FloatNear(std::sqrt(30. / 4.), kTestPrecision),
+                            FloatNear(30. / 4., kTestPrecision),
                             FloatNear(0.861909, kTestPrecision)));
   }
 }
@@ -228,7 +242,8 @@ TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRegression) {
                        CreateToyDataset());
   const MeanSquaredErrorLoss loss_imp_regression(
       {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1)});
-  EXPECT_THAT(loss_imp_regression.SecondaryMetricNames(), ElementsAre("rmse"));
+  EXPECT_THAT(loss_imp_regression.SecondaryMetricNames(),
+              ElementsAre("rmse", "mse"));
 }
 
 TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRanking) {
@@ -237,7 +252,7 @@ TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRanking) {
   const MeanSquaredErrorLoss loss_imp_ranking(
       {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp_ranking.SecondaryMetricNames(),
-              ElementsAre("rmse", "NDCG@5"));
+              ElementsAre("rmse", "mse", "NDCG@5"));
 }
 
 INSTANTIATE_TEST_SUITE_P(MeanSquareErrorLossTestWithWeightsAndThreads,

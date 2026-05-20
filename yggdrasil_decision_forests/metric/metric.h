@@ -123,6 +123,7 @@ void ComputeXAtYMetrics(
 
 float Accuracy(const proto::EvaluationResults& eval);
 float LogLoss(const proto::EvaluationResults& eval);
+float MSE(const proto::EvaluationResults& eval);
 float RMSE(const proto::EvaluationResults& eval);
 float MAE(const proto::EvaluationResults& eval);
 float ErrorRate(const proto::EvaluationResults& eval);
@@ -288,22 +289,18 @@ struct MetricDefinition {
 std::vector<MetricDefinition> DefaultMetrics(
     model::proto::Task task, const dataset::proto::Column& label);
 
-// Computes the RMSE of a set of predictions.
-// If `use_weights` is false, sum_weights will not be changed.
-template <bool use_weights>
-static void RMSEImp(const absl::Span<const float> labels,
-                    const absl::Span<const float> predictions,
-                    const absl::Span<const float> weights,
-                    size_t begin_example_idx, size_t end_example_idx,
-                    double* __restrict sum_sq_err,
-                    double* __restrict sum_weights);
+// Computes the MSE of a set of predictions. If `weights` is empty, unit
+// weights are assumed.
+absl::StatusOr<double> MSE(
+    absl::Span<const float> labels, absl::Span<const float> predictions,
+    absl::Span<const float> weights,
+    utils::concurrency::ThreadPool* thread_pool = nullptr);
 
 // Computes the RMSE of a set of predictions. If `weights` is empty, unit
 // weights are assumed.
 absl::StatusOr<double> RMSE(
-    const absl::Span<const float> labels,
-    const absl::Span<const float> predictions,
-    const absl::Span<const float> weights,
+    absl::Span<const float> labels, absl::Span<const float> predictions,
+    absl::Span<const float> weights,
     utils::concurrency::ThreadPool* thread_pool = nullptr);
 
 // Computes the mean average error (MAE) of a set of predictions.

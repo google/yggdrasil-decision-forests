@@ -18,19 +18,17 @@
 
 #include <stddef.h>
 
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
-#include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 
@@ -79,26 +77,29 @@ class MeanSquaredErrorLoss : public AbstractLoss {
     return LossShape{.gradient_dim = 1, .prediction_dim = 1};
   };
 
+  bool RequireGroupingAttribute() const override {
+    return task_ == model::proto::Task::RANKING;
+  }
+
   absl::StatusOr<std::vector<float>> InitialPredictions(
       const dataset::VerticalDataset& dataset, int label_col_idx,
-      const absl::Span<const float> weights) const override;
+      absl::Span<const float> weights) const override;
 
   absl::StatusOr<std::vector<float>> InitialPredictions(
       const decision_tree::proto::LabelStatistics& label_statistics)
       const override;
 
   absl::Status UpdateGradients(
-      const absl::Span<const float> labels,
-      const absl::Span<const float> predictions, const AbstractLossCache* cache,
-      GradientDataRef* gradients, utils::RandomEngine* random,
+      absl::Span<const float> labels, absl::Span<const float> predictions,
+      const AbstractLossCache* cache, GradientDataRef* gradients,
+      utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
   std::vector<std::string> SecondaryMetricNames() const override;
 
   absl::StatusOr<LossResults> Loss(
-      const absl::Span<const float> labels,
-      const absl::Span<const float> predictions,
-      const absl::Span<const float> weights, const AbstractLossCache* cache,
+      absl::Span<const float> labels, absl::Span<const float> predictions,
+      absl::Span<const float> weights, const AbstractLossCache* cache,
       utils::concurrency::ThreadPool* thread_pool) const override;
 };
 

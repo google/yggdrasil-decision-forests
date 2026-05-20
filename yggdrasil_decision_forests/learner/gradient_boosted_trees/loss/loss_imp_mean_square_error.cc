@@ -15,12 +15,16 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_mean_square_error.h"
 
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/types/span.h"
@@ -41,6 +45,25 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
+namespace {
+
+void UpdateGradientsSingleThread(const absl::Span<const float> labels,
+                                 const absl::Span<const float> predictions,
+                                 absl::Span<float> gradient_data,
+                                 absl::Span<float> hessian_data) {
+  DCHECK_EQ(labels.size(), predictions.size());
+  DCHECK_EQ(labels.size(), gradient_data.size());
+  DCHECK_EQ(labels.size(), hessian_data.size());
+
+  for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
+    const float label = labels[example_idx];
+    const float prediction = predictions[example_idx];
+    gradient_data[example_idx] = label - prediction;
+    hessian_data[example_idx] = 1.f;
+  }
+}
+
+}  // namespace
 
 absl::StatusOr<std::unique_ptr<AbstractLoss>>
 MeanSquaredErrorLoss::RegistrationCreate(const ConstructorArgs& args) {
@@ -90,6 +113,7 @@ absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
 absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
     const decision_tree::proto::LabelStatistics& label_statistics) const {
   const auto stats = label_statistics.regression().labels();
+  STATUS_CHECK_GT(stats.count(), 0);
   return std::vector<float>{static_cast<float>(stats.sum() / stats.count())};
 }
 
@@ -98,8 +122,6 @@ absl::Status MeanSquaredErrorLoss::UpdateGradients(
     const absl::Span<const float> predictions, const AbstractLossCache* cache,
     GradientDataRef* gradients, utils::RandomEngine* random,
     utils::concurrency::ThreadPool* thread_pool) const {
-  // TODO: Implement thread_pool.
-
   // Set the gradient to:
   //   label - prediction
   if (gradients->size() != 1) {
@@ -108,22 +130,36 @@ absl::Status MeanSquaredErrorLoss::UpdateGradients(
   const auto num_examples = labels.size();
   std::vector<float>& gradient_data = *(*gradients)[0].gradient;
   std::vector<float>& hessian_data = *(*gradients)[0].hessian;
-  DCHECK_EQ(gradient_data.size(), hessian_data.size());
+  DCHECK_EQ(gradient_data.size(), num_examples);
+  DCHECK_EQ(hessian_data.size(), num_examples);
+  DCHECK_EQ(predictions.size(), num_examples);
 
-  for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
-    const float label = labels[example_idx];
-    const float prediction = predictions[example_idx];
-    gradient_data[example_idx] = label - prediction;
-    hessian_data[example_idx] = 1.f;
+  if (thread_pool == nullptr) {
+    UpdateGradientsSingleThread(labels, predictions,
+                                absl::Span<float>(gradient_data),
+                                absl::Span<float>(hessian_data));
+  } else {
+    utils::concurrency::ConcurrentForLoop(
+        thread_pool->num_threads(), thread_pool, num_examples,
+        [&labels, &predictions, &gradient_data, &hessian_data](
+            size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
+          UpdateGradientsSingleThread(
+              labels.subspan(begin_idx, end_idx - begin_idx),
+              predictions.subspan(begin_idx, end_idx - begin_idx),
+              absl::Span<float>(gradient_data)
+                  .subspan(begin_idx, end_idx - begin_idx),
+              absl::Span<float>(hessian_data)
+                  .subspan(begin_idx, end_idx - begin_idx));
+        });
   }
   return absl::OkStatus();
 }
 
 std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
   if (task_ == model::proto::Task::RANKING) {
-    return {"rmse", "NDCG@5"};
+    return {"rmse", "mse", "NDCG@5"};
   } else {
-    return {"rmse"};
+    return {"rmse", "mse"};
   }
 }
 
@@ -133,11 +169,12 @@ absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
     const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
   constexpr int kNDCG5Truncation = 5;
-  float loss_value;
+  float mse;
+  ASSIGN_OR_RETURN(mse, metric::MSE(labels, predictions, weights, thread_pool));
   // The RMSE is also the loss.
-  ASSIGN_OR_RETURN(loss_value, metric::RMSE(labels, predictions, weights));
+  const float loss_value = std::sqrt(mse);
 
-  std::vector<float> secondary_metrics = {loss_value};
+  std::vector<float> secondary_metrics = {loss_value, mse};
   if (task_ == model::proto::Task::RANKING) {
     STATUS_CHECK(cache);
     auto* ranking_index = static_cast<const Cache*>(cache)->ranking_index.get();

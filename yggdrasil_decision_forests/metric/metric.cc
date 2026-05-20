@@ -123,6 +123,28 @@ int GreatestPredictionIndex(
   return max_idx;
 }
 
+template <bool use_weights>
+void MSEImp(const absl::Span<const float> labels,
+            const absl::Span<const float> predictions,
+            const absl::Span<const float> weights, size_t begin_example_idx,
+            size_t end_example_idx, double* __restrict sum_sq_err,
+            double* __restrict sum_weights) {
+  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
+       example_idx++) {
+    const float label = labels[example_idx];
+    const float prediction = predictions[example_idx];
+    if constexpr (use_weights) {
+      const float weight = weights[example_idx];
+      *sum_weights += weight;
+      // Loss:
+      //   (label - prediction)^2
+      *sum_sq_err += weight * (label - prediction) * (label - prediction);
+    } else {
+      *sum_sq_err += (label - prediction) * (label - prediction);
+    }
+  }
+}
+
 // Extract the lower and upper bounds from the samples (using the "getter") and
 // store the values using the "setter".
 void SetLowerAndUpperBounds(
@@ -993,9 +1015,8 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
                                   model::proto::Prediction* dst_pred) {
   if (src_task == dst_task) {
     *dst_pred = src_pred;
-  }
-  // Source is CLASSIFICATION
-  else if (src_task == model::proto::Task::CLASSIFICATION) {
+  } else if (src_task == model::proto::Task::CLASSIFICATION) {
+    // Source is CLASSIFICATION
     if (dst_task == model::proto::Task::RANKING) {
       if (src_pred.classification().distribution().counts_size() != 3) {
         STATUS_FATAL(
@@ -1015,9 +1036,8 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
           src_pred.classification().distribution().counts(2) /
           src_pred.classification().distribution().sum());
     }
-  }
-  // Source is REGRESSION
-  else if (src_task == model::proto::Task::REGRESSION) {
+  } else if (src_task == model::proto::Task::REGRESSION) {
+    // Source is REGRESSION
     float value = src_pred.regression().value();
     if (dst_task == model::proto::Task::RANKING) {
       dst_pred->mutable_ranking()->set_relevance(value);
@@ -1031,15 +1051,13 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
       dst_clas->mutable_distribution()->add_counts(1.f - value);
       dst_clas->mutable_distribution()->add_counts(value);
     }
-  }
-  // Source is RANKING
-  else if (src_task == model::proto::Task::RANKING &&
-           dst_task == model::proto::Task::REGRESSION) {
+  } else if (src_task == model::proto::Task::RANKING &&
+             dst_task == model::proto::Task::REGRESSION) {
+    // Source is RANKING
     const float value = src_pred.ranking().relevance();
     dst_pred->mutable_regression()->set_value(value);
-  }
-  // Source is ANOMALY_DETECTION
-  else if (src_task == model::proto::Task::ANOMALY_DETECTION) {
+  } else if (src_task == model::proto::Task::ANOMALY_DETECTION) {
+    // Source is ANOMALY_DETECTION
     float value = src_pred.anomaly_detection().value();
     if (dst_task == model::proto::Task::CLASSIFICATION) {
       value = std::clamp(value, 0.f, 1.f);
@@ -1054,9 +1072,8 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
     } else if (dst_task == model::proto::Task::RANKING) {
       dst_pred->mutable_ranking()->set_relevance(value);
     }
-  }
-  // Non supported
-  else {
+  } else {
+    // Non supported
     STATUS_FATALS("Non supported override of task from ",
                   model::proto::Task_Name(src_task), " to ",
                   model::proto::Task_Name(dst_task));
@@ -1157,6 +1174,13 @@ float Loss(const proto::EvaluationResults& eval) {
   } else {
     return std::numeric_limits<float>::quiet_NaN();
   }
+}
+
+float MSE(const proto::EvaluationResults& eval) {
+  if (eval.count_predictions() == 0) {
+    return std::numeric_limits<float>::quiet_NaN();
+  }
+  return eval.regression().sum_square_error() / eval.count_predictions();
 }
 
 float RMSE(const proto::EvaluationResults& eval) {
@@ -2095,41 +2119,23 @@ absl::StatusOr<double> MAE(const absl::Span<const float> labels,
   }
 }
 
-template <bool use_weights>
-void RMSEImp(const absl::Span<const float> labels,
-             const absl::Span<const float> predictions,
-             const absl::Span<const float> weights, size_t begin_example_idx,
-             size_t end_example_idx, double* __restrict sum_sq_err,
-             double* __restrict sum_weights) {
-  for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
-       example_idx++) {
-    const float label = labels[example_idx];
-    const float prediction = predictions[example_idx];
-    if constexpr (use_weights) {
-      const float weight = weights[example_idx];
-      *sum_weights += weight;
-      // Loss:
-      //   (label - prediction)^2
-      *sum_sq_err += weight * (label - prediction) * (label - prediction);
-    } else {
-      *sum_sq_err += (label - prediction) * (label - prediction);
-    }
+absl::StatusOr<double> MSE(const absl::Span<const float> labels,
+                           const absl::Span<const float> predictions,
+                           const absl::Span<const float> weights,
+                           utils::concurrency::ThreadPool* thread_pool) {
+  STATUS_CHECK_EQ(labels.size(), predictions.size());
+  if (!weights.empty()) {
+    STATUS_CHECK_EQ(labels.size(), weights.size());
   }
-}
-
-absl::StatusOr<double> RMSE(const absl::Span<const float> labels,
-                            const absl::Span<const float> predictions,
-                            const absl::Span<const float> weights,
-                            utils::concurrency::ThreadPool* thread_pool) {
   double sum_sq_err = 0;
   double sum_weights = 0;
   if (thread_pool == nullptr) {
     if (weights.empty()) {
-      RMSEImp<false>(labels, predictions, weights, 0, labels.size(),
-                     &sum_sq_err, &sum_weights);
-    } else {
-      RMSEImp<true>(labels, predictions, weights, 0, labels.size(), &sum_sq_err,
+      MSEImp<false>(labels, predictions, weights, 0, labels.size(), &sum_sq_err,
                     &sum_weights);
+    } else {
+      MSEImp<true>(labels, predictions, weights, 0, labels.size(), &sum_sq_err,
+                   &sum_weights);
     }
   } else {
     const auto num_threads = thread_pool->num_threads();
@@ -2146,11 +2152,11 @@ absl::StatusOr<double> RMSE(const absl::Span<const float> labels,
             size_t block_idx, size_t begin_idx, size_t end_idx) -> void {
           auto& block = per_threads[block_idx];
           if (weights.empty()) {
-            RMSEImp<false>(labels, predictions, weights, begin_idx, end_idx,
-                           &block.sum_sq_err, &block.sum_weights);
-          } else {
-            RMSEImp<true>(labels, predictions, weights, begin_idx, end_idx,
+            MSEImp<false>(labels, predictions, weights, begin_idx, end_idx,
                           &block.sum_sq_err, &block.sum_weights);
+          } else {
+            MSEImp<true>(labels, predictions, weights, begin_idx, end_idx,
+                         &block.sum_sq_err, &block.sum_weights);
           }
         });
 
@@ -2164,7 +2170,7 @@ absl::StatusOr<double> RMSE(const absl::Span<const float> labels,
   }
 
   if (sum_weights > 0) {
-    return sqrt(sum_sq_err / sum_weights);
+    return sum_sq_err / sum_weights;
   } else {
     return std::numeric_limits<double>::quiet_NaN();
   }
@@ -2172,24 +2178,11 @@ absl::StatusOr<double> RMSE(const absl::Span<const float> labels,
 
 absl::StatusOr<double> RMSE(const absl::Span<const float> labels,
                             const absl::Span<const float> predictions,
+                            const absl::Span<const float> weights,
                             utils::concurrency::ThreadPool* thread_pool) {
-  STATUS_CHECK_EQ(labels.size(), predictions.size());
-
-  double sum_loss = 0;
-  for (size_t example_idx = 0; example_idx < labels.size(); example_idx++) {
-    const float label = labels[example_idx];
-    const float prediction = predictions[example_idx];
-    // Loss:
-    //   (label - prediction)^2
-    sum_loss += (label - prediction) * (label - prediction);
-  }
-  const auto sum_weights = labels.size();
-
-  if (sum_weights > 0) {
-    return sqrt(sum_loss / sum_weights);
-  } else {
-    return std::numeric_limits<double>::quiet_NaN();
-  }
+  ASSIGN_OR_RETURN(const auto mse,
+                   MSE(labels, predictions, weights, thread_pool));
+  return sqrt(mse);
 }
 
 }  // namespace metric
