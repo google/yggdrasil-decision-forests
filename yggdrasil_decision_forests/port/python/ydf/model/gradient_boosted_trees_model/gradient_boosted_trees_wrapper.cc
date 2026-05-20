@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -110,9 +111,16 @@ std::vector<GBTCCTrainingLogEntry> GradientBoostedTreesCCModel::training_logs()
               model::gradient_boosted_trees::internal::
                   TrainingLogEvaluationSet::kValidation);
     }
+
+    std::optional<float> time;
+    if (entry.has_time()) {
+      time = entry.time();
+    }
+
     logs.push_back({.iteration = entry.number_of_trees(),
                     .validation_evaluation = validation_evaluation,
-                    .training_evaluation = training_evaluation});
+                    .training_evaluation = training_evaluation,
+                    .time = time});
   }
   return logs;
 }

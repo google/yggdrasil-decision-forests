@@ -38,6 +38,7 @@ struct GBTCCTrainingLogEntry {
   int iteration;
   metric::proto::EvaluationResults validation_evaluation;
   metric::proto::EvaluationResults training_evaluation;
+  std::optional<float> time;
 };
 
 class GradientBoostedTreesCCModel : public DecisionForestCCModel {

@@ -196,7 +196,8 @@ void init_model(py::module_& m) {
       .def_readonly("validation_evaluation",
                     &GBTCCTrainingLogEntry::validation_evaluation)
       .def_readonly("training_evaluation",
-                    &GBTCCTrainingLogEntry::training_evaluation);
+                    &GBTCCTrainingLogEntry::training_evaluation)
+      .def_readonly("time", &GBTCCTrainingLogEntry::time);
 
   py::class_<DecisionForestCCModel,
              /*parent class*/ GenericCCModel>(m, "DecisionForestCCModel")
