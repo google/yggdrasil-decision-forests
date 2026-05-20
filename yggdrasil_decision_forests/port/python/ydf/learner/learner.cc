@@ -78,10 +78,8 @@ void (*existing_signal_handler_alarm)(int) = nullptr;
 
 void ReceiveSignal(int signal) {
   if (!stop_training) {
-    LOG(INFO) << "Interrupting YDF training.";
     stop_training = true;
   } else {
-    LOG(INFO) << "Passing signal " << signal << ".";
     // Pass the signal to any existing handler.
     if (signal == SIGINT && existing_signal_handler_int) {
       existing_signal_handler_int(signal);
@@ -198,9 +196,13 @@ class GenericCCLearner {
     create_dataspec_config.stop = learner_->stop_training_trigger();
 
     EnableUserInterruption();
-    const auto status = dataset::CreateDataSpecWithStatus(
-        typed_dataset_path, false, data_spec_guide, &generated_data_spec,
-        create_dataspec_config);
+    absl::Status status;
+    {
+      py::gil_scoped_release release;
+      status = dataset::CreateDataSpecWithStatus(
+          typed_dataset_path, false, data_spec_guide, &generated_data_spec,
+          create_dataspec_config);
+    }
     RETURN_IF_ERROR(DisableUserInterruption());
     RETURN_IF_ERROR(status);
 
@@ -224,8 +226,8 @@ class GenericCCLearner {
           learner_.get());
       if (gbt_learner != nullptr && gbt_learner->HasCustomLossFunctions()) {
         return absl::InvalidArgumentError(
-            "When using custom losses, learner evaluation cannot be "
-            "use parallel evaluations. Set parallel_evaluations=1.");
+            "When using custom losses, learner evaluation cannot use "
+            "parallel evaluations. Set parallel_evaluations=1.");
       }
     }
     EnableUserInterruption();
@@ -292,7 +294,10 @@ absl::StatusOr<std::unordered_set<std::string>> GetInvalidHyperparameters(
   std::unordered_set<std::string> invalid_hyperparameters;
   for (const auto& explicit_hp : explicit_hp_names) {
     auto it_field = hp_spec.fields().find(explicit_hp);
-    DCHECK(it_field != hp_spec.fields().end());
+    if (it_field == hp_spec.fields().end()) {
+      return absl::InvalidArgumentError(
+          absl::Substitute("Unknown hyperparameter: $0", explicit_hp));
+    }
     auto& other_hyperparameters =
         it_field->second.mutual_exclusive().other_parameters();
     if (invalid_hyperparameters.find(explicit_hp) !=
@@ -327,7 +332,7 @@ void init_learner(py::module_& m) {
         py::arg("hp_names"), py::arg("explicit_hp_names"),
         py::arg("train_config"), py::arg("deployment_config"));
   m.def("ValidateHyperparameters", WithStatus(ValidateHyperparameters),
-        py::arg("hyperparamters"), py::arg("train_config"),
+        py::arg("hyperparameters"), py::arg("train_config"),
         py::arg("deployment_config"));
   py::class_<CCRegressionLoss>(m, "CCRegressionLoss")
       .def(py::init<CCRegressionLoss::InitFunc, CCRegressionLoss::LossFunc,

@@ -727,7 +727,7 @@ class CustomLossTest(parameterized.TestCase):
     )
     with self.assertRaisesRegex(
         ValueError,
-        "When using custom losses, learner evaluation cannot be use parallel"
+        "When using custom losses, learner evaluation cannot use parallel"
         " evaluations.",
     ):
       _ = learner_custom_loss.cross_validation(

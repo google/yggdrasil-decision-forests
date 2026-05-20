@@ -480,12 +480,12 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
       .duration_per_example =
           absl::ToDoubleSeconds(single_thread_result.duration_per_example),
       .benchmark_duration =
-          absl::ToDoubleSeconds(single_thread_result.duration_per_example),
+          absl::ToDoubleSeconds(single_thread_result.benchmark_duration),
       .num_runs = single_thread_result.num_runs,
       .duration_per_example_multithread =
           absl::ToDoubleSeconds(multi_thread_result.duration_per_example),
       .benchmark_duration_multithread =
-          absl::ToDoubleSeconds(multi_thread_result.duration_per_example),
+          absl::ToDoubleSeconds(multi_thread_result.benchmark_duration),
       .num_runs_multithread = multi_thread_result.num_runs,
       .num_threads = num_threads,
       .batch_size = single_thread_result.batch_size,
