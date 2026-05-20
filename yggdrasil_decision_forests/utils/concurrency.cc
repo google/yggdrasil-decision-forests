@@ -18,10 +18,12 @@
 #include <stddef.h>
 
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <utility>
 
 #include "yggdrasil_decision_forests/utils/logging.h"  // IWYU pragma: keep
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests::utils::concurrency {
 
@@ -53,6 +55,49 @@ void ConcurrentForLoop(
     }
   }
   blocker.Wait();
+}
+
+absl::Status ConcurrentForLoopWithStatus(
+    size_t num_blocks, ThreadPool* thread_pool, size_t num_items,
+    const std::function<absl::Status(size_t block_idx, size_t begin_item_idx,
+                                     size_t end_item_idx)>& function) {
+  DCHECK(thread_pool != nullptr);
+  const size_t effective_num_blocks = std::min(num_blocks, num_items);
+
+  if (effective_num_blocks <= 1) {
+    return function(0, 0, num_items);
+  }
+  BlockingCounter blocker(effective_num_blocks);
+  size_t begin_idx = 0;
+  const size_t block_size =
+      (num_items + effective_num_blocks - 1) / effective_num_blocks;
+
+  Mutex status_mutex;
+  absl::Status status GUARDED_BY(status_mutex);
+  std::atomic<bool> has_failure{false};
+
+  for (size_t block_idx = 0; block_idx < effective_num_blocks; block_idx++) {
+    const auto end_idx = std::min(begin_idx + block_size, num_items);
+    if (begin_idx <= end_idx) {
+      thread_pool->Schedule([block_idx, begin_idx, end_idx, &blocker, &function,
+                             &status_mutex, &status, &has_failure]() -> void {
+        if (!has_failure.load(std::memory_order_relaxed)) {
+          const auto sub_status = function(block_idx, begin_idx, end_idx);
+          if (!sub_status.ok()) {
+            MutexLock l(status_mutex);
+            status.Update(sub_status);
+            has_failure.store(true, std::memory_order_relaxed);
+          }
+        }
+        blocker.DecrementCount();
+      });
+      begin_idx += block_size;
+    } else {
+      blocker.DecrementCount();
+    }
+  }
+  blocker.Wait();
+  return status;
 }
 
 namespace internal {

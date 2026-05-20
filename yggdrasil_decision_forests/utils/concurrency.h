@@ -95,6 +95,14 @@ void ConcurrentForLoop(
     const std::function<void(size_t block_idx, size_t begin_item_idx,
                              size_t end_item_idx)>& function);
 
+// Like ConcurrentForLoop, but supports an absl::Status returned by the workers.
+// If any worker does not return ok, this function returns the status returned
+// by the first non-ok worker.
+absl::Status ConcurrentForLoopWithStatus(
+    size_t num_blocks, ThreadPool* thread_pool, size_t num_items,
+    const std::function<absl::Status(size_t block_idx, size_t begin_item_idx,
+                                     size_t end_item_idx)>& function);
+
 // "ConcurrentForLoopWithWorker" applies "run" function over a range of elements
 // using multi-threading.
 //

@@ -180,6 +180,66 @@ TEST(Utils, ConcurrentForLoopFewItemsManyBlocks) {
   EXPECT_EQ(sum, items.size() * 2);
 }
 
+TEST(Utils, ConcurrentForLoopWithStatus) {
+  std::atomic<int> sum{0};
+  std::vector<int> items(500, 2);
+  {
+    ThreadPool pool(5, {.name_prefix = std::string("")});
+    ASSERT_OK(ConcurrentForLoopWithStatus(
+        4, &pool, items.size(),
+        [&sum, &items](size_t block_idx, size_t begin_idx, size_t end_idx) {
+          int a = 0;
+          for (int i = begin_idx; i < end_idx; i++) {
+            a += items[i];
+          }
+          sum += a;
+          return absl::OkStatus();
+        }));
+  }
+  EXPECT_EQ(sum, items.size() * 2);
+}
+
+TEST(Utils, ConcurrentForLoopWithStatusFewItemsManyBlocks) {
+  std::atomic<int> sum{0};
+  std::vector<int> items(5, 2);
+  {
+    ThreadPool pool(20, {.name_prefix = std::string("")});
+    ASSERT_OK(ConcurrentForLoopWithStatus(
+        pool.num_threads(), &pool, items.size(),
+        [&sum, &items](size_t block_idx, size_t begin_idx, size_t end_idx) {
+          int a = 0;
+          for (int i = begin_idx; i < end_idx; i++) {
+            a += items[i];
+          }
+          sum += a;
+          return absl::OkStatus();
+        }));
+  }
+  EXPECT_EQ(sum, items.size() * 2);
+}
+
+TEST(Utils, ConcurrentForLoopWithStatusFailure) {
+  std::atomic<int> sum{0};
+  std::vector<int> items(500, 2);
+  {
+    ThreadPool pool(5, {.name_prefix = std::string("")});
+    const auto status = ConcurrentForLoopWithStatus(
+        4, &pool, items.size(),
+        [&sum, &items](size_t block_idx, size_t begin_idx, size_t end_idx) {
+          int a = 0;
+          for (int i = begin_idx; i < end_idx; i++) {
+            a += items[i];
+          }
+          sum += a;
+          if (sum > 50) {
+            return absl::InternalError("Error");
+          }
+          return absl::OkStatus();
+        });
+    EXPECT_FALSE(status.ok());
+  }
+}
+
 struct ConcurrentForLoopWithWorkerTestCase {
   size_t max_num_threads;
 };
