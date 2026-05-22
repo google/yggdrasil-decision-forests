@@ -225,7 +225,7 @@ TEST_F(DatasetAdult, ManualValidation) {
 
   // Note: With early stopping, the non-distributed implementation of GBT has a
   // validation loss of 0.57404.
-  EXPECT_NEAR(gbt_model->validation_loss(), 0.5859, 0.04);
+  EXPECT_NEAR(gbt_model->validation_loss(), 0.2890, 0.02);
   // (currently) There is not any early stopping.
   EXPECT_EQ(gbt_model->training_logs().number_of_trees_in_final_model(), 300);
   // (currently) There is one evaluation for each iteration.

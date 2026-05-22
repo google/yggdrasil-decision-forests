@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -59,7 +60,7 @@ BinomialLogLikelihoodLoss::RegistrationCreate(const ConstructorArgs& args) {
     return absl::InvalidArgumentError(
         "Binomial log likelihood loss is only compatible with a BINARY "
         "classification task");
-  return absl::make_unique<BinomialLogLikelihoodLoss>(args);
+  return std::make_unique<BinomialLogLikelihoodLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>>
@@ -215,18 +216,19 @@ void BinomialLogLikelihoodLoss::TemplatedLossImp(
     const float label_for_loss = pos_label ? 1.f : 0.f;
     const float prediction = predictions[example_idx];
     const int predicted_label = prediction > 0.f ? 2 : 1;
+    const float loss_value = std::max(prediction, 0.f) -
+                             label_for_loss * prediction +
+                             std::log(1.f + std::exp(-std::abs(prediction)));
     if constexpr (use_weights) {
       const float weight = weights[example_idx];
       confusion_matrix->Add(labels[example_idx], predicted_label, weight);
-      local_sum_loss -=
-          2 * weight *
-          (label_for_loss * prediction - std::log(1.f + std::exp(prediction)));
+      local_sum_loss += weight * loss_value;
     } else {
       confusion_matrix->Add(labels[example_idx], predicted_label, 1.f);
       // Loss:
-      //   -2 * ( label * prediction - log(1+exp(prediction)))
-      local_sum_loss -= 2 * (label_for_loss * prediction -
-                             std::log(1.f + std::exp(prediction)));
+      //   max(prediction, 0) - label * prediction + log(1 +
+      //   exp(-abs(prediction)))
+      local_sum_loss += loss_value;
     }
     DCheckIsFinite(local_sum_loss);
   }

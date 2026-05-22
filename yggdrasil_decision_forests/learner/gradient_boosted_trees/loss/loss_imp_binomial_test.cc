@@ -15,13 +15,19 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_binomial.h"
 
+#include <cmath>
 #include <optional>
+#include <vector>
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "absl/status/statusor.h"
+#include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
@@ -156,7 +162,7 @@ TEST_P(BinomialLogLikelihoodLossTest, ComputeLoss) {
       loss_imp.Loss(dataset,
                     /* label_col_idx= */ 1, predictions, weights, nullptr));
   if (weighted) {
-    EXPECT_NEAR(loss_results.loss, 2 * std::log(2), kTestPrecision);
+    EXPECT_NEAR(loss_results.loss, std::log(2), kTestPrecision);
     EXPECT_THAT(loss_results.secondary_metrics,
                 ElementsAre(FloatNear(0.4f, kTestPrecision)));
     ASSERT_TRUE(loss_results.confusion_table.has_value());
@@ -164,7 +170,7 @@ TEST_P(BinomialLogLikelihoodLossTest, ComputeLoss) {
     EXPECT_EQ(loss_results.confusion_table->at(2, 1), 6);
     EXPECT_EQ(loss_results.confusion_table->sum(), 10);
   } else {
-    EXPECT_NEAR(loss_results.loss, 2 * std::log(2), kTestPrecision);
+    EXPECT_NEAR(loss_results.loss, std::log(2), kTestPrecision);
     EXPECT_THAT(loss_results.secondary_metrics,
                 ElementsAre(FloatNear(0.5f, kTestPrecision)));
     ASSERT_TRUE(loss_results.confusion_table.has_value());
@@ -201,6 +207,22 @@ TEST(BinomialLogLikelihoodLossTest, SecondaryMetricName) {
                                  model::proto::Task::CLASSIFICATION,
                                  dataset.data_spec().columns(1)});
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("accuracy"));
+}
+
+TEST(BinomialLogLikelihoodLossTest, NumericalStability) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  std::vector<float> weights;
+  std::vector<float> predictions = {-100.f, 100.f, -100.f, 100.f};
+  const auto loss_imp =
+      BinomialLogLikelihoodLoss({{},
+                                 {},
+                                 model::proto::Task::CLASSIFICATION,
+                                 dataset.data_spec().columns(1)});
+  ASSERT_OK_AND_ASSIGN(
+      LossResults loss_results,
+      loss_imp.Loss(dataset,
+                    /* label_col_idx= */ 1, predictions, weights, nullptr));
+  EXPECT_NEAR(loss_results.loss, 0.0f, kTestPrecision);
 }
 
 INSTANTIATE_TEST_SUITE_P(BinomialLogLikelihoodLossTestWithWeights,
