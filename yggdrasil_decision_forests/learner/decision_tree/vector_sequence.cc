@@ -79,8 +79,8 @@ absl::Status TryCloserThanCondition(
         const auto local_result_flag,
         EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                            selected_weights, selected_labels, local_projection,
-                           internal_config, attribute_idx, {}, 0, random, condition,
-                           cache));
+                           internal_config, attribute_idx, {}, 0, condition,
+                           cache, random));
 
     if (*result_flag == SplitSearchResult::kInvalidAttribute &&
         local_result_flag == SplitSearchResult::kNoBetterSplitFound) {
@@ -140,8 +140,8 @@ absl::Status TryProjectedMoreThanCondition(
         const auto local_result_flag,
         EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                            selected_weights, selected_labels, local_projection,
-                           internal_config, attribute_idx, {}, 0, random, condition,
-                           cache));
+                           internal_config, attribute_idx, {}, 0, condition,
+                           cache, random));
 
     if (*result_flag == SplitSearchResult::kInvalidAttribute &&
         local_result_flag == SplitSearchResult::kNoBetterSplitFound) {
