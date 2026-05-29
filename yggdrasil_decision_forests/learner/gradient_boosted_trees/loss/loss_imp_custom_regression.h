@@ -98,7 +98,7 @@ class CustomRegressionLoss : public AbstractLoss {
       GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
-  std::vector<std::string> SecondaryMetricNames() const override;
+  std::vector<std::string> InternalSecondaryMetricNames() const override;
 
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,

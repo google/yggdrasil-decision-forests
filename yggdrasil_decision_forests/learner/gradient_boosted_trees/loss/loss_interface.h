@@ -23,10 +23,12 @@
 
 #include <stdint.h>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -171,6 +173,25 @@ class AbstractLossCache {
   }
 };
 
+// Function signature for regression metrics (float labels).
+using CustomMetricFloat = std::function<absl::StatusOr<float>(
+    absl::Span<const float> predictions, absl::Span<const float> labels,
+    absl::Span<const float> weights)>;
+
+// Function signature for classification metrics (int labels).
+using CustomMetricInt = std::function<absl::StatusOr<float>(
+    absl::Span<const float> predictions, absl::Span<const int32_t> labels,
+    absl::Span<const float> weights)>;
+
+using CustomMetricFunction = std::variant<CustomMetricFloat, CustomMetricInt>;
+
+// A user-defined custom metric evaluated alongside standard secondary metrics.
+struct CustomMetric {
+  std::string name;
+
+  CustomMetricFunction evaluation_function;
+};
+
 // Loss to optimize during the training of a GBT.
 //
 // The life of a loss object is as follows:
@@ -290,8 +311,8 @@ class AbstractLoss {
       utils::concurrency::ThreadPool* thread_pool = nullptr) const;
 
   // Gets the name of the metrics returned in "secondary_metric" of the "Loss"
-  // method.
-  virtual std::vector<std::string> SecondaryMetricNames() const = 0;
+  // method and the custom metrics registered on the fly.
+  std::vector<std::string> SecondaryMetricNames() const;
 
   // The "Loss" methods compute the loss(es) for the currently accumulated
   // predictions. Like for "UpdateGradients", different version of "Loss" are
@@ -332,11 +353,19 @@ class AbstractLoss {
     return absl::InternalError("Loss not implemented");
   }
 
+  void RegisterCustomMetric(const CustomMetric& metric) {
+    custom_metrics_.push_back(metric);
+  }
+
  protected:
   const model::proto::TrainingConfigLinking train_config_link_;
   const proto::GradientBoostedTreesTrainingConfig gbt_config_;
   const model::proto::Task task_;
   const dataset::proto::Column& label_column_;
+  virtual std::vector<std::string> InternalSecondaryMetricNames() const = 0;
+
+ private:
+  std::vector<CustomMetric> custom_metrics_;
 };
 
 REGISTRATION_CREATE_POOL(AbstractLoss, const AbstractLoss::ConstructorArgs&);

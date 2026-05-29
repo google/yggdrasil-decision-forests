@@ -162,6 +162,10 @@ class GradientBoostedTreesLearner : public AbstractLearner {
       const proto::GradientBoostedTreesTrainingConfig& gbt_config,
       const model::proto::DeploymentConfig& deployment);
 
+  // Detects configuration errors and warnings for custom metrics.
+  static absl::Status CheckCustomMetric(const CustomMetric& custom_metric,
+                                        model::proto::Task task);
+
   static proto::LossConfiguration BuildLossConfiguration(
       const proto::GradientBoostedTreesTrainingConfig& gbt_config);
 
@@ -202,6 +206,13 @@ class GradientBoostedTreesLearner : public AbstractLearner {
     return custom_loss_functions_.index() > 0;
   }
 
+  // Sets the custom evaluation metrics.
+  void SetCustomMetrics(const std::vector<CustomMetric>& custom_metrics) {
+    custom_metrics_ = custom_metrics;
+  }
+
+  bool HasCustomMetrics() const { return !custom_metrics_.empty(); }
+
  private:
   // Initializes and returns a model.
   std::unique_ptr<GradientBoostedTreesModel> InitializeModel(
@@ -215,6 +226,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
       const std::optional<std::string>& typed_valid_path) const;
 
   CustomLossFunctions custom_loss_functions_;
+  std::vector<CustomMetric> custom_metrics_;
 };
 
 REGISTER_AbstractLearner(GradientBoostedTreesLearner,

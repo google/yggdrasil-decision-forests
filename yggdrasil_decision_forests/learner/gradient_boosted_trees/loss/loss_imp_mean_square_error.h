@@ -95,7 +95,7 @@ class MeanSquaredErrorLoss : public AbstractLoss {
       utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
-  std::vector<std::string> SecondaryMetricNames() const override;
+  std::vector<std::string> InternalSecondaryMetricNames() const override;
 
   absl::StatusOr<LossResults> Loss(
       absl::Span<const float> labels, absl::Span<const float> predictions,

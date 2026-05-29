@@ -95,7 +95,7 @@ class BinomialLogLikelihoodLoss : public AbstractLoss {
       GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
-  std::vector<std::string> SecondaryMetricNames() const override;
+  std::vector<std::string> InternalSecondaryMetricNames() const override;
 
   template <typename T>
   absl::StatusOr<LossResults> TemplatedLoss(

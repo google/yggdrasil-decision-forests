@@ -155,7 +155,8 @@ absl::Status MeanSquaredErrorLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-std::vector<std::string> MeanSquaredErrorLoss::SecondaryMetricNames() const {
+std::vector<std::string> MeanSquaredErrorLoss::InternalSecondaryMetricNames()
+    const {
   if (task_ == model::proto::Task::RANKING) {
     return {"rmse", "mse", "NDCG@5"};
   } else {

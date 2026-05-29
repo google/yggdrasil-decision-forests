@@ -90,7 +90,8 @@ absl::Status CustomRegressionLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-std::vector<std::string> CustomRegressionLoss::SecondaryMetricNames() const {
+std::vector<std::string> CustomRegressionLoss::InternalSecondaryMetricNames()
+    const {
   return {};
 }
 

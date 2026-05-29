@@ -103,7 +103,8 @@ class CoxProportionalHazardLoss : public AbstractLoss {
     return std::vector<float>{0.f};
   }
 
-  inline std::vector<std::string> SecondaryMetricNames() const override {
+  inline std::vector<std::string> InternalSecondaryMetricNames()
+      const override {
     return {};
   }
 

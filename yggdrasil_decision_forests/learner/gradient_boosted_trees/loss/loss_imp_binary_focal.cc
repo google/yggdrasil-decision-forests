@@ -218,7 +218,7 @@ void BinaryFocalLoss::TemplatedUpdateGradientsImp(
   }
 }
 
-std::vector<std::string> BinaryFocalLoss::SecondaryMetricNames() const {
+std::vector<std::string> BinaryFocalLoss::InternalSecondaryMetricNames() const {
   return {"accuracy"};
 }
 

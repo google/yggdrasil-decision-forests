@@ -30,6 +30,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
@@ -484,6 +485,29 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
   return absl::OkStatus();
 }
 
+absl::Status GradientBoostedTreesLearner::CheckCustomMetric(
+    const CustomMetric& custom_metric, model::proto::Task task) {
+  if (task == model::proto::Task::CLASSIFICATION) {
+    if (!std::holds_alternative<CustomMetricInt>(
+            custom_metric.evaluation_function)) {
+      return absl::InvalidArgumentError(
+          "Custom metric type not compatible with task=CLASSIFICATION.");
+    }
+  } else if (task == model::proto::Task::REGRESSION) {
+    if (!std::holds_alternative<CustomMetricFloat>(
+            custom_metric.evaluation_function)) {
+      return absl::InvalidArgumentError(
+          "Custom metric type not compatible with task=REGRESSION.");
+    }
+  } else {
+    return absl::InvalidArgumentError(
+        "Custom metric are not supported for any task other than "
+        "CLASSIFICATION or REGRESSION.");
+  }
+
+  return absl::OkStatus();
+}
+
 proto::LossConfiguration GradientBoostedTreesLearner::BuildLossConfiguration(
     const proto::GradientBoostedTreesTrainingConfig& gbt_config) {
   proto::LossConfiguration loss_config;
@@ -548,6 +572,14 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
                  data_spec.columns(all_config->train_config_link.label()),
                  *all_config->gbt_config, all_config->train_config_link,
                  custom_loss_functions_));
+
+  // TODO: b/505089842 - Add support for custom metrics in ranking/survival
+  // task.
+  for (const auto& custom_metric : custom_metrics_) {
+    RETURN_IF_ERROR(
+        CheckCustomMetric(custom_metric, all_config->train_config.task()));
+    all_config->loss->RegisterCustomMetric(custom_metric);
+  }
 
   if (all_config->loss->RequireGroupingAttribute()) {
     if (!all_config->gbt_config->validation_set_group_feature().empty()) {
@@ -1717,7 +1749,7 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
         (*mdl->mutable_decision_trees())[sub_iter_idx *
                                              mdl->num_trees_per_iter() +
                                          sub_tree_idx]
-            -> ScaleRegressorOutput(per_tree_weights[sub_iter_idx]);
+            ->ScaleRegressorOutput(per_tree_weights[sub_iter_idx]);
       }
     }
   }

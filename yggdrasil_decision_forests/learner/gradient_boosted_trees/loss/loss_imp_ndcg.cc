@@ -401,7 +401,7 @@ absl::Status NDCGLoss::UpdateGradients(
   }
 }
 
-std::vector<std::string> NDCGLoss::SecondaryMetricNames() const {
+std::vector<std::string> NDCGLoss::InternalSecondaryMetricNames() const {
   return {absl::StrCat("NDCG@", ndcg_truncation_)};
 }
 

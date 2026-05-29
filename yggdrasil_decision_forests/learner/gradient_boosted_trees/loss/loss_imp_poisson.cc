@@ -145,7 +145,7 @@ void PoissonLoss::UpdateGradientsImp(const absl::Span<const float> labels,
   }
 }
 
-std::vector<std::string> PoissonLoss::SecondaryMetricNames() const {
+std::vector<std::string> PoissonLoss::InternalSecondaryMetricNames() const {
   return {"RMSE"};
 }
 

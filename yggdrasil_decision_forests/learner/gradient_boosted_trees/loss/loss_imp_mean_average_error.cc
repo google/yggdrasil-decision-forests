@@ -164,7 +164,8 @@ absl::Status MeanAverageErrorLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-std::vector<std::string> MeanAverageErrorLoss::SecondaryMetricNames() const {
+std::vector<std::string> MeanAverageErrorLoss::InternalSecondaryMetricNames()
+    const {
   return {"mae", "rmse"};
 }
 

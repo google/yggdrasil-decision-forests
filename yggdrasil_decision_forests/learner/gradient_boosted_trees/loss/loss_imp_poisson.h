@@ -75,7 +75,7 @@ class PoissonLoss : public AbstractLoss {
                                  std::vector<float>* gradient_data,
                                  std::vector<float>* hessian_data);
 
-  std::vector<std::string> SecondaryMetricNames() const override;
+  std::vector<std::string> InternalSecondaryMetricNames() const override;
 
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,

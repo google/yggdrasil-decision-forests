@@ -93,8 +93,8 @@ absl::Status CustomBinaryClassificationLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-std::vector<std::string> CustomBinaryClassificationLoss::SecondaryMetricNames()
-    const {
+std::vector<std::string>
+CustomBinaryClassificationLoss::InternalSecondaryMetricNames() const {
   return {};
 }
 

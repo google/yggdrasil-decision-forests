@@ -197,8 +197,8 @@ absl::Status BinomialLogLikelihoodLoss::UpdateGradients(
                                   thread_pool);
 }
 
-std::vector<std::string> BinomialLogLikelihoodLoss::SecondaryMetricNames()
-    const {
+std::vector<std::string>
+BinomialLogLikelihoodLoss::InternalSecondaryMetricNames() const {
   return {"accuracy"};
 }
 

@@ -19,10 +19,13 @@
 
 #include <algorithm>
 #include <limits>
+#include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/functional/overload.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -36,6 +39,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -72,25 +76,75 @@ absl::Status AbstractLoss::UpdateGradients(
                        dataset.column(label_col_idx)->name(), label_col_idx));
 }
 
+std::vector<std::string> AbstractLoss::SecondaryMetricNames() const {
+  std::vector<std::string> names = InternalSecondaryMetricNames();
+
+  for (const auto& metric : custom_metrics_) {
+    names.push_back(metric.name);
+  }
+  return names;
+}
+
 absl::StatusOr<LossResults> AbstractLoss::Loss(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const absl::Span<const float> predictions,
     const absl::Span<const float> weights, const AbstractLossCache* cache,
     utils::concurrency::ThreadPool* thread_pool) const {
+  LossResults results;
+
   const auto* categorical_labels =
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::CategoricalColumn>(
           label_col_idx);
   if (categorical_labels) {
-    return Loss(categorical_labels->values(), predictions, weights, cache,
-                thread_pool);
+    ASSIGN_OR_RETURN(results, Loss(categorical_labels->values(), predictions,
+                                   weights, cache, thread_pool));
+    for (const auto& metric : custom_metrics_) {
+      absl::Status metric_status = absl::OkStatus();
+      std::visit(
+          absl::Overload{
+              [&](const CustomMetricInt& eval) {
+                auto metric_result =
+                    eval(predictions, categorical_labels->values(), weights);
+                if (!metric_result.ok()) {
+                  metric_status = metric_result.status();
+                  return;
+                }
+                results.secondary_metrics.push_back(metric_result.value());
+              },
+              [](const CustomMetricFloat& /*unused*/) {}},
+          metric.evaluation_function);
+      RETURN_IF_ERROR(metric_status);
+    }
+
+    return results;
   }
 
   const auto* numerical_labels =
       dataset.ColumnWithCastOrNull<dataset::VerticalDataset::NumericalColumn>(
           label_col_idx);
   if (numerical_labels) {
-    return Loss(numerical_labels->values(), predictions, weights, cache,
-                thread_pool);
+    ASSIGN_OR_RETURN(results, Loss(numerical_labels->values(), predictions,
+                                   weights, cache, thread_pool));
+
+    absl::Status metric_status = absl::OkStatus();
+    for (const auto& metric : custom_metrics_) {
+      std::visit(absl::Overload{[&](const CustomMetricFloat& eval) {
+                                  auto metric_result =
+                                      eval(predictions,
+                                           numerical_labels->values(), weights);
+                                  if (!metric_result.ok()) {
+                                    metric_status = metric_result.status();
+                                    return;
+                                  }
+                                  results.secondary_metrics.push_back(
+                                      metric_result.value());
+                                },
+                                [](const CustomMetricInt& /*unused*/) {}},
+                 metric.evaluation_function);
+      RETURN_IF_ERROR(metric_status);
+    }
+
+    return results;
   }
 
   return absl::InternalError("Unknown label type");

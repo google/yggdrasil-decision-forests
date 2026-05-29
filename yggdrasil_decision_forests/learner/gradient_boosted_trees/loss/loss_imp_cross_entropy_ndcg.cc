@@ -180,7 +180,8 @@ absl::Status CrossEntropyNDCGLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-std::vector<std::string> CrossEntropyNDCGLoss::SecondaryMetricNames() const {
+std::vector<std::string> CrossEntropyNDCGLoss::InternalSecondaryMetricNames()
+    const {
   return {};
 }
 

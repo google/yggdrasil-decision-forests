@@ -90,7 +90,7 @@ class MultinomialLogLikelihoodLoss : public AbstractLoss {
       GradientDataRef* gradients, utils::RandomEngine* random,
       utils::concurrency::ThreadPool* thread_pool) const override;
 
-  std::vector<std::string> SecondaryMetricNames() const override;
+  std::vector<std::string> InternalSecondaryMetricNames() const override;
 
   // Returns the loss of the given predictions.
   //

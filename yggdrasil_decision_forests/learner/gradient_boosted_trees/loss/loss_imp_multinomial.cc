@@ -215,8 +215,8 @@ absl::Status MultinomialLogLikelihoodLoss::UpdateGradients(
                                   thread_pool);
 }
 
-std::vector<std::string> MultinomialLogLikelihoodLoss::SecondaryMetricNames()
-    const {
+std::vector<std::string>
+MultinomialLogLikelihoodLoss::InternalSecondaryMetricNames() const {
   return {"accuracy"};
 }
 

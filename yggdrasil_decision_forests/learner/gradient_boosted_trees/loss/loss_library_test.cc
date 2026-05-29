@@ -15,14 +15,19 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 
+#include <cstdint>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_binary_classification.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_custom_regression.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -159,6 +164,66 @@ TEST(LossLibrary, CustomLosses) {
                           model::proto::Task::RANKING, numerical_label_column,
                           config, link_config, CustomRegressionLossFunctions{})
                    .ok());
+}
+
+TEST(LossLibrary, CustomMetricsIntegrationInt) {
+  model::proto::TrainingConfigLinking link_config;
+  proto::GradientBoostedTreesTrainingConfig config;
+  dataset::proto::Column binary_categorical_label_column =
+      PARSE_TEST_PROTO(R"pb(
+        type: CATEGORICAL
+        categorical { number_of_unique_values: 3 is_already_integerized: true }
+      )pb");
+
+  ASSERT_OK_AND_ASSIGN(
+      auto loss,
+      CreateLoss(proto::Loss::BINOMIAL_LOG_LIKELIHOOD,
+                 model::proto::Task::CLASSIFICATION,
+                 binary_categorical_label_column, config, link_config));
+
+  // Verify initial built-in secondary metric names
+  EXPECT_THAT(loss->SecondaryMetricNames(), ::testing::ElementsAre("accuracy"));
+
+  // Define and Register a custom metric
+  CustomMetric custom_metric;
+  custom_metric.name = "custom_metric";
+  custom_metric.evaluation_function =
+      [](absl::Span<const float> predictions, absl::Span<const int32_t> labels,
+         absl::Span<const float> weights) { return 0.85f; };
+
+  loss->RegisterCustomMetric(custom_metric);
+
+  // This checks the sorting of the metric names as well.
+  EXPECT_THAT(loss->SecondaryMetricNames(),
+              ::testing::ElementsAre("accuracy", "custom_metric"));
+}
+
+TEST(LossLibrary, CustomMetricsIntegrationFloat) {
+  model::proto::TrainingConfigLinking link_config;
+  proto::GradientBoostedTreesTrainingConfig config;
+  dataset::proto::Column numerical_label_column = PARSE_TEST_PROTO(R"pb(
+    type: NUMERICAL
+  )pb");
+
+  ASSERT_OK_AND_ASSIGN(
+      auto loss,
+      CreateLoss(proto::Loss::SQUARED_ERROR, model::proto::Task::REGRESSION,
+                 numerical_label_column, config, link_config));
+
+  EXPECT_THAT(loss->SecondaryMetricNames(),
+              ::testing::ElementsAre("rmse", "mse"));
+
+  CustomMetric custom_metric;
+  custom_metric.name = "custom_metric";
+  custom_metric.evaluation_function =
+      [](absl::Span<const float> predictions, absl::Span<const float> labels,
+         absl::Span<const float> weights) { return 0.85f; };
+
+  loss->RegisterCustomMetric(custom_metric);
+
+  // This checks the sorting of the metric names as well.
+  EXPECT_THAT(loss->SecondaryMetricNames(),
+              ::testing::ElementsAre("rmse", "mse", "custom_metric"));
 }
 
 }  // namespace

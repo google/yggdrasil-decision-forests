@@ -107,8 +107,8 @@ absl::Status CustomMultiClassificationLoss::UpdateGradients(
   return absl::OkStatus();
 }
 
-std::vector<std::string> CustomMultiClassificationLoss::SecondaryMetricNames()
-    const {
+std::vector<std::string>
+CustomMultiClassificationLoss::InternalSecondaryMetricNames() const {
   return {};
 }
 

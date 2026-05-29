@@ -84,6 +84,7 @@ namespace gradient_boosted_trees {
 namespace {
 
 using test::EqualsProto;
+using test::StatusIs;
 using ::testing::_;
 using ::testing::AnyNumber;
 using ::testing::ElementsAre;
@@ -2639,6 +2640,210 @@ TEST_F(GradientBoostedTreesOnSurvivalAnalysisWithLeftTruncation, Base) {
   // TODO: Test the test loss instead of the validation loss.
   CHECK_NEAR(gbt_model->validation_loss(), 0.354653, 0.001);
   // TODO: Test model structure.
+}
+
+CustomMetric CreateStaticMetric() {
+  CustomMetric metric;
+  metric.name = "static_metric";
+  metric.evaluation_function =
+      [](absl::Span<const float> predictions, absl::Span<const int32_t> labels,
+         absl::Span<const float> weights) { return 42.0f; };
+  return metric;
+}
+
+CustomMetric CreateF1ScoreMetric() {
+  CustomMetric metric;
+  metric.name = "f1_score";
+  metric.evaluation_function = [](absl::Span<const float> predictions,
+                                  absl::Span<const int32_t> labels,
+                                  absl::Span<const float> weights) {
+    double tp = 0, fp = 0, fn = 0;
+    for (size_t i = 0; i < predictions.size(); ++i) {
+      bool pred_pos = predictions[i] > 0.0f;
+      bool label_pos = labels[i] == 2;
+      if (pred_pos && label_pos)
+        tp += 1.0;
+      else if (pred_pos && !label_pos)
+        fp += 1.0;
+      else if (!pred_pos && label_pos)
+        fn += 1.0;
+    }
+    if (tp + fp == 0 || tp + fn == 0) return 0.0f;
+    double precision = tp / (tp + fp);
+    double recall = tp / (tp + fn);
+    if (precision + recall == 0) return 0.0f;
+    return static_cast<float>(2.0 * precision * recall / (precision + recall));
+  };
+  return metric;
+}
+
+CustomMetric CreateRmseMetric() {
+  CustomMetric metric;
+  metric.name = "rmse-custom";
+  metric.evaluation_function = [](absl::Span<const float> predictions,
+                                  absl::Span<const float> labels,
+                                  absl::Span<const float> weights) {
+    double sum_err = 0;
+    for (size_t i = 0; i < predictions.size(); ++i) {
+      double err = predictions[i] - labels[i];
+      sum_err += err * err;
+    }
+    return predictions.empty()
+               ? 0.0f
+               : static_cast<float>(std::sqrt(sum_err / predictions.size()));
+  };
+  return metric;
+}
+
+TEST_F(GradientBoostedTreesOnAdult, CustomMetricsBase) {
+  train_config_.set_task(model::proto::Task::CLASSIFICATION);
+  train_config_.set_label("income");
+  dataset_filename_ = "adult.csv";
+  pass_validation_dataset_ = false;
+
+  PrepareDataset();
+  CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
+
+  auto* gbt_learner =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+          learner_.get());
+
+  gbt_learner->SetCustomMetrics({CreateStaticMetric()});
+
+  ASSERT_OK_AND_ASSIGN(model_, gbt_learner->TrainWithStatus(train_dataset_));
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+
+  EXPECT_THAT(gbt_model->training_logs().secondary_metric_names(),
+              ::testing::Contains("static_metric"));
+
+  // By design, the custom metric is appended to the list of secondary metrics.
+  // As this is a binary classification, it uses by default the
+  // BINOMIAL_LOG_LIKELIHOOD loss, which has accuracy as secondary metric. Thus,
+  // the metric at index 1 is the custom metric.
+  EXPECT_EQ(gbt_model->training_logs().entries(0).training_secondary_metrics(1),
+            42.0f);
+}
+
+TEST_F(GradientBoostedTreesOnAdult, CustomMetricsF1Score) {
+  train_config_.set_task(model::proto::Task::CLASSIFICATION);
+  train_config_.set_label("income");
+  dataset_filename_ = "adult.csv";
+  pass_validation_dataset_ = false;
+
+  PrepareDataset();
+  CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
+
+  auto* gbt_learner =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+          learner_.get());
+
+  gbt_learner->SetCustomMetrics({CreateF1ScoreMetric()});
+
+  ASSERT_OK_AND_ASSIGN(model_, gbt_learner->TrainWithStatus(train_dataset_));
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+
+  EXPECT_THAT(gbt_model->training_logs().secondary_metric_names(),
+              ::testing::Contains("f1_score"));
+
+  const auto& last_entry = *gbt_model->training_logs().entries().rbegin();
+  // Since it's an actual F1 score on Adult income dataset, we expect a
+  // reasonable value > 0.5 and <= 1.0.
+  EXPECT_GT(last_entry.training_secondary_metrics(1), 0.5f);
+  EXPECT_LE(last_entry.training_secondary_metrics(1), 1.0f);
+}
+
+TEST_F(GradientBoostedTreesOnAbalone, CustomMetricsMSE) {
+  train_config_.set_task(model::proto::Task::REGRESSION);
+  train_config_.set_label("Rings");
+  dataset_filename_ = "abalone.csv";
+  pass_validation_dataset_ = false;
+
+  PrepareDataset();
+  CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
+
+  auto* gbt_learner =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+          learner_.get());
+
+  gbt_learner->SetCustomMetrics({CreateRmseMetric()});
+
+  ASSERT_OK_AND_ASSIGN(model_, gbt_learner->TrainWithStatus(train_dataset_));
+
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  ASSERT_NE(gbt_model, nullptr);
+
+  EXPECT_THAT(gbt_model->training_logs().secondary_metric_names(),
+              ::testing::Contains("rmse-custom"));
+
+  const auto& last_entry = *gbt_model->training_logs().entries().rbegin();
+  EXPECT_GT(last_entry.training_secondary_metrics(1), 0.0f);
+}
+
+TEST_F(GradientBoostedTreesOnAdult,
+       FailsOnCustomMetricMissingEvalIntForClassification) {
+  train_config_.set_task(model::proto::Task::CLASSIFICATION);
+  train_config_.set_label("income");
+  dataset_filename_ = "adult.csv";
+  pass_validation_dataset_ = false;
+
+  PrepareDataset();
+  CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
+
+  auto* gbt_learner =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+          learner_.get());
+
+  gbt_learner->SetCustomMetrics({CreateRmseMetric()});
+
+  EXPECT_THAT(
+      gbt_learner->TrainWithStatus(train_dataset_).status(),
+      StatusIs(
+          absl::StatusCode::kInvalidArgument,
+          "Custom metric type not compatible with task=CLASSIFICATION."));
+}
+
+TEST_F(GradientBoostedTreesOnAbalone,
+       FailsOnCustomMetricMissingEvalFloatForRegression) {
+  train_config_.set_task(model::proto::Task::REGRESSION);
+  train_config_.set_label("Rings");
+  dataset_filename_ = "abalone.csv";
+  pass_validation_dataset_ = false;
+
+  PrepareDataset();
+  CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
+
+  auto* gbt_learner =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+          learner_.get());
+
+  gbt_learner->SetCustomMetrics({CreateF1ScoreMetric()});
+
+  EXPECT_THAT(gbt_learner->TrainWithStatus(train_dataset_).status(),
+              StatusIs(
+                  absl::StatusCode::kInvalidArgument,
+                  "Custom metric type not compatible with task=REGRESSION."));
+}
+
+TEST_F(GradientBoostedTreesOnSyntheticRanking,
+       FailsOnCustomMetricForTasksOtherThanClassificationAndRegression) {
+  pass_validation_dataset_ = false;
+
+  PrepareDataset();
+  CHECK_OK(model::GetLearner(train_config_, &learner_, deployment_config_));
+
+  auto* gbt_learner =
+      dynamic_cast<model::gradient_boosted_trees::GradientBoostedTreesLearner*>(
+          learner_.get());
+
+  gbt_learner->SetCustomMetrics({CreateF1ScoreMetric()});
+
+  EXPECT_THAT(gbt_learner->TrainWithStatus(train_dataset_).status(),
+              StatusIs(
+                  absl::StatusCode::kInvalidArgument,
+                  "Custom metric are not supported for any task other than "
+                  "CLASSIFICATION or REGRESSION."));
 }
 
 }  // namespace
