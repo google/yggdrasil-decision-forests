@@ -241,7 +241,7 @@ def _(
       },
       verbose=0,
   )
-  sklearn_examples_per_tree: int = int(sklearn_model._max_samples)  # pylint: disable=protected-access
+  sklearn_examples_per_tree: int = int(sklearn_model._max_samples)  # pylint: disable=protected-access  # pytype: disable=attribute-error
   ydf_model._model.set_num_examples_per_tree(sklearn_examples_per_tree)  # pylint: disable=protected-access
   assert isinstance(ydf_model, isolation_forest_model.IsolationForestModel)
 
