@@ -342,13 +342,40 @@ class Evaluation:
 
   @property
   def loss(self) -> Optional[float]:
+    """Returns the loss for the task.
+
+    The loss is the average loss value on the evaluation dataset. The type of
+    loss depends on the task:
+      - Classification: Cross-entropy (LogLoss)
+      - Regression: Mean Squared Error
+      - Ranking: NDCG with the truncation given in the evaluation configuation.
+
+    Returns:
+      The loss value, or None if not available.
+    """
+
     if self._evaluation_proto.HasField("loss_value"):
       return self._evaluation_proto.loss_value
 
     if self._evaluation_proto.HasField("classification"):
       clas = self._evaluation_proto.classification
       if clas.HasField("sum_log_loss"):
-        return clas.sum_log_loss / self._evaluation_proto.count_predictions
+        return safe_div(
+            clas.sum_log_loss, self._evaluation_proto.count_predictions
+        )
+
+    if self._evaluation_proto.HasField("regression"):
+      regression = self._evaluation_proto.regression
+      if regression.HasField("sum_square_error"):
+        return safe_div(
+            regression.sum_square_error,
+            self._evaluation_proto.count_predictions,
+        )
+
+    if self._evaluation_proto.HasField("ranking"):
+      ranking = self._evaluation_proto.ranking
+      if ranking.HasField("ndcg") and ranking.ndcg.HasField("value"):
+        return ranking.ndcg.value
 
     return None
 
