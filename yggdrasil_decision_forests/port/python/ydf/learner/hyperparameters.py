@@ -22,10 +22,20 @@ from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.model import hyperparameter_pb2
 from ydf.cc import ydf
 from ydf.learner import custom_loss
-
+from ydf.learner import custom_metric
 
 HyperParameters = Dict[
-    str, Optional[Union[int, float, str, bool, custom_loss.AbstractCustomLoss]]
+    str,
+    Optional[
+        Union[
+            int,
+            float,
+            str,
+            bool,
+            custom_loss.AbstractCustomLoss,
+            custom_metric.AbstractCustomMetric,
+        ]
+    ],
 ]
 
 
@@ -39,6 +49,9 @@ def dict_to_generic_hyperparameter(
       # The value is not defined, use default.
       continue
     if key == "loss" and isinstance(value, custom_loss.AbstractCustomLoss):
+      # Custom Python fields must be treated separately.
+      continue
+    if key == "custom_metrics":
       # Custom Python fields must be treated separately.
       continue
     # Boolean has to come first, since it is a subtype of int.

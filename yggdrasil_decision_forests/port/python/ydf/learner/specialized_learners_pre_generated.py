@@ -40,6 +40,8 @@ from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
+from ydf.learner import custom_loss
+from ydf.learner import custom_metric
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters
 from ydf.learner import tuner as tuner_lib
@@ -684,6 +686,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         label=label,
         weights=weights,
         class_weights=class_weights,
+        custom_metrics=None,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec_args=data_spec_args,
@@ -753,6 +756,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         require_label=True,
         support_custom_loss=False,
         support_return_in_bag_example_indices=True,
+        support_custom_metrics=False,
     )
 
   @classmethod
@@ -1196,6 +1200,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
         label=label,
         weights=weights,
         class_weights=class_weights,
+        custom_metrics=None,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec_args=data_spec_args,
@@ -1265,6 +1270,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
         require_label=False,
         support_custom_loss=False,
         support_return_in_bag_example_indices=False,
+        support_custom_metrics=False,
     )
 
   @classmethod
@@ -1807,6 +1813,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
     resume_training_snapshot_interval_seconds: Indicative number of seconds in
       between snapshots when `resume_training=True`. Might be ignored by some
       learners.
+    custom_metrics: A list of custom metrics to compute during training.
     working_dir: Path to a directory available for the learning algorithm to
       store intermediate computation results. Depending on the learning
       algorithm and parameters, the working_dir might be optional, required, or
@@ -1884,7 +1891,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       l2_categorical_regularization: float = 1.0,
       l2_regularization: float = 0.0,
       lambda_loss: float = 1.0,
-      loss: str = "DEFAULT",
+      loss: Union[str, custom_loss.AbstractCustomLoss] = "DEFAULT",
       max_depth: int = 6,
       max_num_nodes: Optional[int] = None,
       maximum_model_size_in_memory_in_bytes: float = -1.0,
@@ -1929,6 +1936,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       workers: Optional[Sequence[str]] = None,
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
+      custom_metrics: Optional[List[custom_metric.AbstractCustomMetric]] = None,
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
@@ -2082,6 +2090,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         label=label,
         weights=weights,
         class_weights=class_weights,
+        custom_metrics=custom_metrics,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec_args=data_spec_args,
@@ -2151,6 +2160,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         require_label=True,
         support_custom_loss=True,
         support_return_in_bag_example_indices=False,
+        support_custom_metrics=True,
     )
 
   @classmethod
@@ -2532,6 +2542,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         label=label,
         weights=weights,
         class_weights=class_weights,
+        custom_metrics=None,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec_args=data_spec_args,
@@ -2601,6 +2612,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         require_label=True,
         support_custom_loss=False,
         support_return_in_bag_example_indices=False,
+        support_custom_metrics=False,
     )
 
   @classmethod
@@ -3191,6 +3203,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         label=label,
         weights=weights,
         class_weights=class_weights,
+        custom_metrics=None,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec_args=data_spec_args,
@@ -3260,6 +3273,7 @@ class CartLearner(generic_learner.GenericCCLearner):
         require_label=True,
         support_custom_loss=False,
         support_return_in_bag_example_indices=False,
+        support_custom_metrics=False,
     )
 
   @classmethod

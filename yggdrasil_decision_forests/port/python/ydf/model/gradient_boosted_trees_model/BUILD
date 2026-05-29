@@ -60,6 +60,7 @@ py_test(
         # pandas dep,
         "//ydf/dataset:dataspec",
         "//ydf/learner:custom_loss_py",
+        "//ydf/learner:custom_metric_py",
         "//ydf/learner:specialized_learners",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",

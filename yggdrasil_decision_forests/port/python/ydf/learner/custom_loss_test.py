@@ -35,6 +35,7 @@ from ydf.model import generic_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from ydf.utils import test_utils
 
+
 Column = dataspec.Column
 
 

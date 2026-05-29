@@ -188,6 +188,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
     capabilities.set_support_validation_dataset(true);
     capabilities.set_support_monotonic_constraints(true);
     capabilities.set_support_custom_loss(true);
+    capabilities.set_support_custom_metrics(true);
     return capabilities;
   }
 

@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace py = ::pybind11;
@@ -92,6 +93,21 @@ struct NPByteArray {
   const size_t _itemsize;
   const size_t _size;
 };
+
+// Returns a read-only Numpy array referencing the data in `data`.
+template <typename T>
+py::array_t<T> SpanToUnsafeNumpyArray(absl::Span<const T> data) {
+  // If the span is empty, return an empty array of the correct type.
+  if (data.empty()) {
+    return py::array_t<T>();
+  }
+  auto arr = py::array_t<T>(/*shape=*/{data.size()}, /*strides=*/{sizeof(T)},
+                            /*ptr=*/data.data(),
+                            py::capsule(data.data(), [](void* v) {}));
+  py::detail::array_proxy(arr.ptr())->flags &=
+      ~py::detail::npy_api::NPY_ARRAY_WRITEABLE_;
+  return arr;
+}
 
 }  // namespace yggdrasil_decision_forests::port::python
 

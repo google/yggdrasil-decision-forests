@@ -32,6 +32,7 @@ from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
 from ydf.learner import custom_loss
+from ydf.learner import custom_metric
 from ydf.learner import hyperparameters as hp_lib
 from ydf.learner import tuner as tuner_lib
 from ydf.metric import metric
@@ -69,6 +70,7 @@ class GenericLearner(abc.ABC):
           abstract_feature_selector_lib.AbstractFeatureSelector
       ],
       extra_training_config: Optional[abstract_learner_pb2.TrainingConfig],
+      custom_metrics: Optional[List[custom_metric.AbstractCustomMetric]],
   ):
     # TODO: Refactor to a single hyperparameter dictionary with edit
     # access to these options.
@@ -87,6 +89,7 @@ class GenericLearner(abc.ABC):
     self._feature_selector = feature_selector
     self._explicit_learner_arguments = explicit_learner_arguments
     self._extra_training_config = extra_training_config
+    self._custom_metrics = custom_metrics
 
     if self._label is not None and not isinstance(label, str):
       raise ValueError("The 'label' should be a string")
@@ -657,6 +660,14 @@ class GenericCCLearner(GenericLearner):
       else:
         self._hyperparameters["apply_link_function"] = True
 
+    cc_custom_metrics = []
+    if self._custom_metrics:
+      for py_custom_metric in self._custom_metrics:
+
+        if isinstance(py_custom_metric, custom_metric.AbstractCustomMetric):
+          py_custom_metric.check_is_compatible_task(training_config.task)
+          cc_custom_metrics.append(py_custom_metric._to_cc())  # pylint: disable=protected-access
+
     hp_proto = hp_lib.dict_to_generic_hyperparameter(self._hyperparameters)
     return ydf.GetLearner(
         training_config,
@@ -664,6 +675,7 @@ class GenericCCLearner(GenericLearner):
         hp_proto,
         self._deployment_config,
         cc_custom_loss,
+        cc_custom_metrics,
     )
 
   def _get_vertical_dataset(

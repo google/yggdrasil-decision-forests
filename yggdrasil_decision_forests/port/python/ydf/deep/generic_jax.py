@@ -696,6 +696,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
         tuner=tuner,
         feature_selector=feature_selector,
         extra_training_config=abstract_learner_pb2.TrainingConfig(),
+        custom_metrics=None,
     )
 
   @classmethod

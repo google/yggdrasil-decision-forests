@@ -1022,7 +1022,7 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
       evaluation.mutable_ranking()->set_ndcg_truncation(
           loss_config.lambda_mart_ndcg().ndcg_truncation());
     } else {
-      LOG(WARNING) << "Unknown metric name:" << metric_name;
+      (*evaluation.mutable_user_metrics())[metric_name] = metric_value;
     }
   }
   if (task == model::proto::Task::CLASSIFICATION &&

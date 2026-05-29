@@ -22,6 +22,7 @@ py_library(
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
         "//ydf/learner:custom_loss_py",
+        "//ydf/learner:custom_metric_py",
         "//ydf/learner:feature_selector",
         "//ydf/learner:generic_learner",
         "//ydf/learner:specialized_learners",

@@ -22,10 +22,12 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 import numpy.testing as npt
+import numpy.typing as nptt
 import pandas as pd
 
 from ydf.dataset import dataspec
 from ydf.learner import custom_loss
+from ydf.learner import custom_metric
 from ydf.learner import specialized_learners
 from ydf.model import generic_model
 from ydf.model import model_lib
@@ -49,6 +51,64 @@ def load_model(
 ) -> gradient_boosted_trees_model.GradientBoostedTreesModel:
   path = os.path.join(test_utils.ydf_test_data_path(), directory, name)
   return model_lib.load_model(path)
+
+
+def _evaluate_binary_threshold(
+    labels: nptt.NDArray[np.int32],
+    predictions: nptt.NDArray[np.float32],
+    weights: nptt.NDArray[np.float32],
+) -> np.float32:
+  predicted_positive = predictions > 0.0
+  actual_positive = labels == 2
+  is_correct = predicted_positive == actual_positive
+  if weights.size == 0:
+    return np.float32(np.sum(is_correct) / len(is_correct)) + 1.0
+  else:
+    weighted_correct = np.sum(weights * is_correct)
+    total_weight = np.sum(weights)
+    return np.float32(weighted_correct / total_weight)
+
+
+def _evaluate_binary_threshold_no_weight_check(
+    labels: nptt.NDArray[np.int32],
+    predictions: nptt.NDArray[np.float32],
+    weights: nptt.NDArray[np.float32],
+) -> np.float32:
+  predicted_positive = predictions > 0.0
+  actual_positive = labels == 2
+  is_correct = predicted_positive == actual_positive
+  weighted_correct = np.sum(weights * is_correct)
+  total_weight = np.sum(weights)
+  return np.float32(weighted_correct / total_weight)
+
+
+def _evaluate_multi_class_accuracy(
+    labels: nptt.NDArray[np.int32],
+    predictions: nptt.NDArray[np.float32],
+    weights: nptt.NDArray[np.float32],
+) -> np.float32:
+  predicted_classes = np.argmax(predictions, axis=1) + 1
+  is_correct = predicted_classes == labels
+
+  if weights.size == 0:
+    return np.float32(np.mean(is_correct))
+  else:
+    weighted_correct = np.sum(weights * is_correct)
+    total_weight = np.sum(weights)
+    return np.float32(weighted_correct / total_weight)
+
+
+def _evaluate_regression_rmse(
+    labels: nptt.NDArray[np.float32],
+    predictions: nptt.NDArray[np.float32],
+    weights: nptt.NDArray[np.float32],
+) -> np.float32:
+  squared_errors = (predictions - labels) ** 2
+  if weights.size == 0:
+    return np.float32(np.sqrt(np.mean(squared_errors)))
+  else:
+    weighted_mse = np.sum(weights * squared_errors) / np.sum(weights)
+    return np.float32(np.sqrt(weighted_mse))
 
 
 class GradientBoostedTreesTest(parameterized.TestCase):
@@ -377,6 +437,184 @@ class GradientBoostedTreesTest(parameterized.TestCase):
     )
     self.assertIsNotNone(model.early_stopping_triggered())
     self.assertTrue(model.early_stopping_triggered())
+
+  def test_custom_metrics_binary_classification_is_set_successfully(self):
+    custom_accuracy = custom_metric.BinaryClassificationMetric(
+        name="threshold_accuracy",
+        evaluation_func=_evaluate_binary_threshold,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([2, 1, 1, 2] * 25),
+    })
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=1,
+        max_depth=4,
+        min_examples=1,
+        custom_metrics=[custom_accuracy],
+    )
+
+    model = learner.train(df)
+    self.assertIn(
+        "threshold_accuracy", model.validation_evaluation().custom_metrics
+    )
+    self.assertIn(
+        "threshold_accuracy",
+        model.training_logs()[0].training_evaluation.custom_metrics,
+    )
+
+  def test_multiple_custom_metrics_binary_classification_are_set_successfully(
+      self,
+  ):
+    custom_accuracy = custom_metric.BinaryClassificationMetric(
+        name="threshold_accuracy",
+        evaluation_func=_evaluate_binary_threshold,
+    )
+    custom_accuracy_2 = custom_metric.BinaryClassificationMetric(
+        name="threshold_accuracy_2",
+        evaluation_func=_evaluate_binary_threshold,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([2, 1, 1, 2] * 25),
+    })
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=1,
+        max_depth=4,
+        min_examples=1,
+        custom_metrics=[custom_accuracy, custom_accuracy_2],
+    )
+
+    model = learner.train(df)
+    self.assertIn(
+        "threshold_accuracy", model.validation_evaluation().custom_metrics
+    )
+    self.assertIn(
+        "threshold_accuracy_2", model.validation_evaluation().custom_metrics
+    )
+    self.assertIn(
+        "threshold_accuracy",
+        model.training_logs()[0].training_evaluation.custom_metrics,
+    )
+    self.assertIn(
+        "threshold_accuracy_2",
+        model.training_logs()[0].training_evaluation.custom_metrics,
+    )
+
+  def test_custom_metrics_binary_classification_errors_on_no_weights(self):
+    """Tests that the custom metric raises an error and does not segfault.
+
+    This happens because the metric expects a weight argument. But that argument
+    is set to an empty array when YDF trains without weights.
+    """
+    custom_accuracy = custom_metric.BinaryClassificationMetric(
+        name="threshold_accuracy",
+        evaluation_func=_evaluate_binary_threshold_no_weight_check,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([2, 1, 1, 2] * 25),
+    })
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=1,
+        max_depth=4,
+        min_examples=1,
+        custom_metrics=[custom_accuracy],
+    )
+
+    with self.assertRaisesRegex(
+        RuntimeError,
+        "UNKNOWN: ValueError: operands could not be broadcast together with"
+        r" shapes \(0,\) \(94,\) ",
+    ):
+      learner.train(df)
+
+  def test_custom_metrics_binary_classification_no_validation_data_is_set_successfully(
+      self,
+  ):
+    custom_accuracy = custom_metric.BinaryClassificationMetric(
+        name="threshold_accuracy",
+        evaluation_func=_evaluate_binary_threshold,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([2, 1, 1, 2] * 25),
+    })
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=1,
+        max_depth=4,
+        min_examples=1,
+        validation_ratio=0.0,
+        custom_metrics=[custom_accuracy],
+    )
+
+    model = learner.train(df)
+    self.assertIsNone(model.validation_evaluation())
+    self.assertIn(
+        "threshold_accuracy",
+        model.training_logs()[0].training_evaluation.custom_metrics,
+    )
+
+  def test_custom_metrics_multi_classification_is_set_successfully(self):
+    custom_accuracy = custom_metric.MultiClassificationMetric(
+        name="threshold_accuracy",
+        evaluation_func=_evaluate_multi_class_accuracy,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([2, 1, 1, 3] * 25),
+    })
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=1,
+        max_depth=4,
+        min_examples=1,
+        custom_metrics=[custom_accuracy],
+    )
+
+    model = learner.train(df)
+    self.assertIn(
+        "threshold_accuracy", model.validation_evaluation().custom_metrics
+    )
+    self.assertIn(
+        "threshold_accuracy",
+        model.training_logs()[0].training_evaluation.custom_metrics,
+    )
+
+  def test_custom_metrics_regression_is_set_successfully(self):
+    custom_rmse = custom_metric.RegressionMetric(
+        name="rmse-2",
+        evaluation_func=_evaluate_regression_rmse,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([0.5, 1.5, 2.5, 3.5] * 25),
+    })
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=1,
+        max_depth=4,
+        min_examples=1,
+        task=generic_model.Task.REGRESSION,
+        custom_metrics=[custom_rmse],
+    )
+
+    model = learner.train(df)
+    self.assertIn("rmse-2", model.validation_evaluation().custom_metrics)
+    self.assertIn(
+        "rmse-2",
+        model.training_logs()[0].training_evaluation.custom_metrics,
+    )
 
   def test_set_output_logits_classification(self):
     dataset = pd.read_csv(

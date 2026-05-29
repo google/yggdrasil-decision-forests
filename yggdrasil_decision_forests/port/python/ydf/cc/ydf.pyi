@@ -302,6 +302,48 @@ def PredictionAnalysisCreateHtmlReport(
 # Learner bindings
 # ================
 
+class CCRegressionMetric:
+  def __init__(
+      self,
+      name: str,
+      metric: Callable[
+          [
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+          ],
+          np.float32,
+      ],
+  ): ...
+
+class CCBinaryClassificationMetric:
+  def __init__(
+      self,
+      name: str,
+      evaluation_func: Callable[
+          [
+              npt.NDArray[np.int32],
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+          ],
+          np.float32,
+      ],
+  ): ...
+
+class CCMultiClassificationMetric:
+  def __init__(
+      self,
+      name: str,
+      metric: Callable[
+          [
+              npt.NDArray[np.int32],
+              npt.NDArray[np.float32],
+              npt.NDArray[np.float32],
+          ],
+          np.float32,
+      ],
+  ): ...
+
 class CCRegressionLoss:
   def __init__(
       self,
@@ -403,7 +445,17 @@ def GetLearner(
     hyperparameters: hyperparameter_pb2.GenericHyperParameters,
     deployment_config: abstract_learner_pb2.DeploymentConfig,
     custom_loss: Optional[CCRegressionLoss],
+    custom_metrics: Optional[
+        List[
+            Union[
+                CCBinaryClassificationMetric,
+                CCRegressionMetric,
+                CCMultiClassificationMetric,
+            ]
+        ]
+    ],
 ) -> GenericCCLearner: ...
+
 def GetInvalidHyperparameters(
     hp_names: Set[str],
     explicit_hps: Set[str],

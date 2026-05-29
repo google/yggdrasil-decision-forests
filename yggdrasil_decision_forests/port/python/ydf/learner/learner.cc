@@ -52,6 +52,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
 #include "ydf/learner/custom_loss.h"
+#include "ydf/learner/custom_metric.h"
 #include "ydf/model/model.h"
 #include "ydf/model/model_wrapper.h"
 #include "ydf/utils/status_casters.h"
@@ -262,7 +263,8 @@ absl::StatusOr<std::unique_ptr<GenericCCLearner>> GetLearner(
     const std::optional<model::proto::TrainingConfig>& extra_training_config,
     const model::proto::GenericHyperParameters& hyperparameters,
     const model::proto::DeploymentConfig& deployment_config,
-    const CCCustomLoss& custom_loss = std::monostate()) {
+    const CCCustomLoss& custom_loss = std::monostate(),
+    const std::vector<CCCustomMetric>& custom_metrics = {}) {
   std::unique_ptr<model::AbstractLearner> learner_ptr;
   RETURN_IF_ERROR(
       model::GetLearner(train_config, &learner_ptr, deployment_config));
@@ -272,6 +274,7 @@ absl::StatusOr<std::unique_ptr<GenericCCLearner>> GetLearner(
         extra_training_config.value());
   }
   RETURN_IF_ERROR(ApplyCustomLoss(custom_loss, learner_ptr.get()));
+  RETURN_IF_ERROR(ApplyCustomMetric(custom_metrics, learner_ptr.get()));
 
   learner_ptr->set_stop_training_trigger(&stop_training);
   return std::make_unique<GenericCCLearner>(std::move(learner_ptr));
@@ -327,7 +330,8 @@ void init_learner(py::module_& m) {
   m.def("GetLearner", WithStatusOr(GetLearner), py::arg("train_config"),
         py::arg("extra_training_config"), py::arg("hyperparameters"),
         py::arg("deployment_config"),
-        py::arg("custom_loss").noconvert() = std::monostate());
+        py::arg("custom_loss").noconvert() = std::monostate(),
+        py::arg("custom_metrics") = std::vector<CCCustomMetric>());
   m.def("GetInvalidHyperparameters", WithStatusOr(GetInvalidHyperparameters),
         py::arg("hp_names"), py::arg("explicit_hp_names"),
         py::arg("train_config"), py::arg("deployment_config"));
@@ -345,6 +349,13 @@ void init_learner(py::module_& m) {
       .def(py::init<CCMultiClassificationLoss::InitFunc,
                     CCMultiClassificationLoss::LossFunc,
                     CCMultiClassificationLoss::GradFunc, bool>());
+  py::class_<CCBinaryClassificationMetric>(m, "CCBinaryClassificationMetric")
+      .def(py::init<std::string, CCBinaryClassificationMetric::MetricFunc>());
+  py::class_<CCMultiClassificationMetric>(m, "CCMultiClassificationMetric")
+      .def(py::init<std::string, CCMultiClassificationMetric::MetricFunc>());
+  py::class_<CCRegressionMetric>(m, "CCRegressionMetric")
+      .def(py::init<std::string, CCRegressionMetric::MetricFunc>());
+
   py::class_<GenericCCLearner>(m, "GenericCCLearner")
       .def("__repr__",
            [](const GenericCCLearner& a) {

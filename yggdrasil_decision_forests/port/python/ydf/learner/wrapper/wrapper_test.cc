@@ -320,6 +320,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       label=label,
       weights=weights,
       class_weights=class_weights,
+      custom_metrics=None,
       ranking_group=ranking_group,
       uplift_treatment=uplift_treatment,
       data_spec_args=data_spec_args,
@@ -389,6 +390,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
       require_label=False,
       support_custom_loss=False,
       support_return_in_bag_example_indices=False,
+      support_custom_metrics=False,
     )
 
   @classmethod

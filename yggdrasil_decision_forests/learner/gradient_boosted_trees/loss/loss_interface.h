@@ -187,6 +187,8 @@ using CustomMetricFunction = std::variant<CustomMetricFloat, CustomMetricInt>;
 
 // A user-defined custom metric evaluated alongside standard secondary metrics.
 struct CustomMetric {
+  // TODO: b/510419896 - Validate the name is not one of the hardcoded secondary
+  // metric names.
   std::string name;
 
   CustomMetricFunction evaluation_function;

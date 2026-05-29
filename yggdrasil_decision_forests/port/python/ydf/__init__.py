@@ -110,6 +110,10 @@ from ydf.learner.custom_loss import BinaryClassificationLoss
 from ydf.learner.custom_loss import MultiClassificationLoss
 from ydf.learner.custom_loss import Activation
 
+# Custom Metric
+from ydf.learner.custom_metric import RegressionMetric
+from ydf.learner.custom_metric import BinaryClassificationMetric
+from ydf.learner.custom_metric import MultiClassificationMetric
 
 # Tree
 from ydf.model import tree
