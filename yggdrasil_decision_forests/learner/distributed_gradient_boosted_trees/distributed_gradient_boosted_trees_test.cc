@@ -153,6 +153,24 @@ TEST_F(DatasetAdult, BaseWithFailure) {
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
 }
 
+TEST_F(DatasetAdult, CheckpointFailureTrigger) {
+#if (defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER) || \
+     defined(MEMORY_SANITIZER))
+  GTEST_SKIP() << "Skipping death tests in sanitized builds";
+#endif
+  SetNumWorkers(10);
+  auto* spe_config = train_config_.MutableExtension(
+      distributed_gradient_boosted_trees::proto::
+          distributed_gradient_boosted_trees_config);
+  spe_config->mutable_gbt()->set_num_trees(30);
+  spe_config->mutable_internal()->set_simulate_worker_failure(true);
+  spe_config->set_checkpoint_interval_trees(5);
+  TrainAndEvaluateModel();
+  // Note: This result does not take early stopping into account.
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
+  EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
+}
+
 // Train and test a model on the adult dataset with workers continuously
 // failing and requiring checkpoint restoration for both the training and
 // validation workers.

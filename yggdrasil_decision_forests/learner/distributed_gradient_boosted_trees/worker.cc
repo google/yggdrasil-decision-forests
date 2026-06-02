@@ -255,7 +255,7 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
   // [For unit testing only] Simulate failure of the workers.
   // Each message type (i.e. request.type_case()) will fail one on each worker.
   if (spe_config.internal().simulate_worker_failure()) {
-    MaybeSimulateFailure(request.type_case());
+    MaybeSimulateFailure(request);
   }
 
   // Determine if the worker is in the right state for this request. If not,
@@ -407,7 +407,8 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
 }
 
 void DistributedGradientBoostedTreesWorker::MaybeSimulateFailure(
-    const proto::WorkerRequest::TypeCase request_type) {
+    const proto::WorkerRequest& request) {
+  const auto request_type = request.type_case();
   const int num_iter_without_failure = 8;
   if (iter_idx_ < num_iter_without_failure) {
     return;
@@ -419,7 +420,17 @@ void DistributedGradientBoostedTreesWorker::MaybeSimulateFailure(
   const int target_request_type =
       possible_request_ids[(iter_idx_ * NumWorkers() + WorkerIdx()) %
                            possible_request_ids.size()];
+
   if (target_request_type == request_type) {
+    // If this is a CreateCheckpoint request, we only fail if it's NOT for
+    // shard 0. Shard 0 may work by accident, because shard_idx=0 matches the
+    // default shard_idx=0 returned when create_checkpoint() is missing from the
+    // response.
+    if (request_type == proto::WorkerRequest::kCreateCheckpoint &&
+        request.create_checkpoint().shard_idx() == 0) {
+      return;
+    }
+
     if (debug_forced_failure_.find(request_type) ==
         debug_forced_failure_.end()) {
       debug_forced_failure_.insert(request_type);

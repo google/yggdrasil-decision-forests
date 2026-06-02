@@ -1494,19 +1494,28 @@ absl::Status EmitCreateCheckpoint(
             std::min(num_examples, (shard_idx + 1) * num_example_per_shard)};
   };
 
-  // Send the checkpoint request to a subset of the training workers.
-  int num_requests = 0;
-  for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
+  const auto build_create_checkpoint_request =
+      [&](const int shard_idx, const int worker_idx) -> proto::WorkerRequest {
     proto::WorkerRequest generic_request;
     auto& request = *generic_request.mutable_create_checkpoint();
     const auto example_range = shard_idx_to_example_idx_range(shard_idx);
     request.set_begin_example_idx(example_range.first);
     request.set_end_example_idx(example_range.second);
     request.set_shard_idx(shard_idx);
+    // Note: For CreateCheckpoint, generic_request.request_id() is set
+    // exactly to shard_idx. If request_id and shard_idx are ever decoupled
+    // in the future, maintain an explicit map of request_id -> shard_idx.
     generic_request.set_request_id(shard_idx);
+    return generic_request;
+  };
+
+  // Send the checkpoint request to a subset of the training workers.
+  int num_requests = 0;
+  for (int shard_idx = 0; shard_idx < num_shards; shard_idx++) {
     const int worker_idx = shard_idx % load_balancer->NumWorkers();
-    RETURN_IF_ERROR(
-        distribute->AsynchronousProtoRequest(generic_request, worker_idx));
+    proto::WorkerRequest request =
+        build_create_checkpoint_request(shard_idx, worker_idx);
+    RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(request, worker_idx));
     num_requests++;
   }
 
@@ -1529,6 +1538,7 @@ absl::Status EmitCreateCheckpoint(
         const auto generic_result,
         distribute->NextAsynchronousProtoAnswer<proto::WorkerResult>());
 
+    STATUS_CHECK(generic_result.has_worker_idx());
     const bool is_training_worker =
         generic_result.worker_idx() < load_balancer->NumWorkers();
 
@@ -1560,16 +1570,12 @@ absl::Status EmitCreateCheckpoint(
         }
 
         // Send the request to another worker.
-        proto::WorkerRequest generic_request;
-        auto& request = *generic_request.mutable_create_checkpoint();
-        const auto example_range = shard_idx_to_example_idx_range(
-            generic_result.create_checkpoint().shard_idx());
-        request.set_begin_example_idx(example_range.first);
-        request.set_end_example_idx(example_range.second);
-        request.set_shard_idx(generic_result.request_id());
-        generic_request.set_request_id(generic_result.request_id());
-        RETURN_IF_ERROR(distribute->AsynchronousProtoRequest(generic_request,
-                                                             new_worker_idx));
+        STATUS_CHECK(generic_result.has_request_id());
+        const int failed_shard_idx = generic_result.request_id();
+        proto::WorkerRequest request =
+            build_create_checkpoint_request(failed_shard_idx, new_worker_idx);
+        RETURN_IF_ERROR(
+            distribute->AsynchronousProtoRequest(request, new_worker_idx));
         answer_idx--;
         continue;
       }
@@ -1581,6 +1587,8 @@ absl::Status EmitCreateCheckpoint(
             "Unexpected answer. Expecting CreateCheckpoint");
       }
       const auto& result = generic_result.create_checkpoint();
+      STATUS_CHECK(result.has_path());
+      STATUS_CHECK(result.has_shard_idx());
       RETURN_IF_ERROR(file::Rename(
           result.path(),
           file::JoinPath(
