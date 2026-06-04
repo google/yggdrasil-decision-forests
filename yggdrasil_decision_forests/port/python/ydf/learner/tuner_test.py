@@ -24,6 +24,8 @@ from yggdrasil_decision_forests.model import hyperparameter_pb2
 from ydf.learner import tuner as tuner_lib
 from ydf.utils import test_utils
 from yggdrasil_decision_forests.utils import fold_generator_pb2
+from ydf.learner import specialized_learners
+from ydf.dataset import dataspec
 
 DiscreteCandidates = hyperparameter_pb2.HyperParameterSpace.DiscreteCandidates
 Field = hyperparameter_pb2.HyperParameterSpace.Field
@@ -304,6 +306,48 @@ class TunerTest(parameterized.TestCase):
     ].CopyFrom(expected_optimizer)
 
     test_utils.assertProto2Equal(self, tuner.train_config, expected_proto)
+
+  def test_tuner_monotonic_gbt(self):
+    dataset = test_utils.load_datasets("adult")
+
+    tuner = tuner_lib.RandomSearchTuner(num_trials=5)
+    tuner.choice("num_candidate_attributes_ratio", [1.0, 0.8, 0.6])
+    tuner.choice("shrinkage", [0.05, 0.1, 0.2])
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        tuner=tuner,
+        num_trees=10,
+        use_hessian_gain=True,
+        features=[
+            dataspec.Column("age", monotonic=+1),
+            dataspec.Column("hours_per_week", monotonic=-1),
+            dataspec.Column("education_num", monotonic=+1),
+        ],
+        include_all_columns=True,
+    )
+
+    model = learner.train(dataset.train_pd)
+    self.assertIsNotNone(model)
+    self.assertIsNotNone(model.hyperparameter_optimizer_logs())
+    self.assertLen(model.hyperparameter_optimizer_logs().trials, 5)
+
+  def test_tuner_monotonic_rf_fail(self):
+    tuner = tuner_lib.RandomSearchTuner(num_trials=5)
+
+    with self.assertRaisesRegex(
+        test_utils.AbslInvalidArgumentError,
+        "does not support monotonic constraints",
+    ):
+      _ = specialized_learners.RandomForestLearner(
+          label="income",
+          tuner=tuner,
+          num_trees=10,
+          features=[
+              dataspec.Column("age", monotonic=+1),
+          ],
+          include_all_columns=True,
+      )
 
 
 if __name__ == "__main__":

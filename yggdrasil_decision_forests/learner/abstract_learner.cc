@@ -1128,6 +1128,31 @@ absl::Status CopyProblemDefinition(const proto::TrainingConfig& src,
     *dst->mutable_features() = src.features();
   }
 
+  if (src.monotonic_constraints_size() > 0) {
+    if (dst->monotonic_constraints_size() > 0) {
+      bool is_equal = true;
+      if (dst->monotonic_constraints_size() !=
+          src.monotonic_constraints_size()) {
+        is_equal = false;
+      } else {
+        for (int i = 0; i < src.monotonic_constraints_size(); ++i) {
+          if (dst->monotonic_constraints(i).feature() !=
+                  src.monotonic_constraints(i).feature() ||
+              dst->monotonic_constraints(i).direction() !=
+                  src.monotonic_constraints(i).direction()) {
+            is_equal = false;
+            break;
+          }
+        }
+      }
+      if (!is_equal) {
+        return absl::InvalidArgumentError("Invalid monotonic_constraints.");
+      }
+    } else {
+      *dst->mutable_monotonic_constraints() = src.monotonic_constraints();
+    }
+  }
+
   return absl::OkStatus();
 }
 

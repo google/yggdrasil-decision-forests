@@ -15,9 +15,15 @@
 
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.h"
 
+#include <memory>
+
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
+#include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -29,6 +35,8 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace hyperparameters_optimizer_v2 {
 namespace {
+
+using ::testing::HasSubstr;
 
 class OnAdult : public utils::TrainAndTestTester {
   void SetUp() override {
@@ -276,6 +284,79 @@ TEST_F(OnAdult, DefaultTargetMetric) {
 
   evaluation.set_loss_value(1);
   EXPECT_TRUE(internal::DefaultTargetMetric(evaluation).value().has_loss());
+}
+
+TEST_F(OnAdult, GBT_MonotonicConstraints) {
+  SetTrainConfig("RANDOM", "random", 5);
+
+  auto* constrain_1 = train_config_.add_monotonic_constraints();
+  constrain_1->set_feature("^age$");
+  constrain_1->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+
+  auto* gbt_config = spe_config->mutable_base_learner()->MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_use_hessian_gain(true);
+  gbt_config->mutable_decision_tree()
+      ->mutable_internal()
+      ->set_check_monotonic_constraints(true);
+
+  auto* search_space = spe_config->mutable_search_space();
+  model::proto::HyperParameterSpace new_space;
+  for (const auto& field : search_space->fields()) {
+    if (field.name() != "use_hessian_gain" &&
+        field.name() != "growing_strategy") {
+      *new_space.add_fields() = field;
+    }
+  }
+  *search_space = new_space;
+
+  auto* max_depth_field = search_space->add_fields();
+  max_depth_field->set_name("max_depth");
+  auto* candidates = max_depth_field->mutable_discrete_candidates();
+  candidates->add_possible_values()->set_integer(4);
+  candidates->add_possible_values()->set_integer(6);
+
+  SetLocalTraining();
+  TrainAndEvaluateModel();
+
+  EXPECT_GE(metric::Accuracy(evaluation_), 0.80);
+  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 5);
+  EXPECT_EQ(model_->name(), "GRADIENT_BOOSTED_TREES");
+}
+
+TEST_F(OnAdult, RF_MonotonicConstraints_Fail) {
+  SetTrainConfig("RANDOM", "random", 5);
+
+  auto* constrain_1 = train_config_.add_monotonic_constraints();
+  constrain_1->set_feature("^age$");
+  constrain_1->set_direction(model::proto::MonotonicConstraint::INCREASING);
+
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->mutable_base_learner()->set_learner("RANDOM_FOREST");
+  spe_config->mutable_base_learner()->ClearExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+
+  spe_config->mutable_search_space()->clear_fields();
+  auto* field = spe_config->mutable_search_space()->add_fields();
+  field->set_name("num_trees");
+  field->mutable_discrete_candidates()->add_possible_values()->set_integer(10);
+
+  SetLocalTraining();
+
+  PrepareDataset();
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config_, &learner, deployment_config_));
+
+  auto model_or = learner->TrainWithStatus(train_dataset_);
+  EXPECT_FALSE(model_or.ok());
+  EXPECT_EQ(model_or.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(model_or.status().message(),
+              HasSubstr("does not support monotonic constraints"));
 }
 
 }  // namespace

@@ -92,6 +92,8 @@ cc_test(
     ],
     deps = [
         ":hyperparameters_optimizer",
+        "//yggdrasil_decision_forests/learner:abstract_learner",
+        "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/learner/generic_worker",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees",
         "//yggdrasil_decision_forests/metric",
@@ -101,6 +103,7 @@ cc_test(
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],

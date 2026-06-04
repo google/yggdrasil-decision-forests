@@ -74,6 +74,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
   model::proto::LearnerCapabilities Capabilities() const override {
     model::proto::LearnerCapabilities capabilities;
     capabilities.set_support_max_training_duration(true);
+    capabilities.set_support_monotonic_constraints(true);
     return capabilities;
   }
 

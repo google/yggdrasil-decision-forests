@@ -478,9 +478,11 @@ py_test(
 py_test(
     name = "tuner_test",
     srcs = ["tuner_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     tags = [
     ],
     deps = [
+        ":specialized_learners",
         ":tuner",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
@@ -488,6 +490,7 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
+        "//ydf/dataset:dataspec",
         "//ydf/utils:test_utils",
         "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
     ],
