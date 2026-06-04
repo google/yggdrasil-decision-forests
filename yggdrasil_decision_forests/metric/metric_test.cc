@@ -48,8 +48,10 @@ namespace {
 using test::ApproximatelyEqualsProto;
 using test::EqualsProto;
 using test::StatusIs;
+using test::StatusIsOk;
 using ::testing::Bool;
 using ::testing::IsNan;
+using ::testing::Not;
 
 TEST(Metric, EvaluationOfClassification) {
   // Create a fake column specification.
@@ -1516,6 +1518,131 @@ TEST(Metric, RMSEThreaded) {
                    /*weights=*/std::vector<float>{}, &thread_pool)
                   .value(),
               0.8164966, 0.0001);
+}
+
+TEST(Metric, MSLE) {
+  const auto expected_unweighted =
+      (std::pow((std::log1p(2) - std::log1p(3)), 2) +
+       std::pow((std::log1p(3) - std::log1p(4)), 2)) /
+      3.;
+  ASSERT_OK_AND_ASSIGN(const auto msle_unitweighted,
+                       MSLE(/*labels=*/std::vector<float>{1, 2, 3},
+                            /*predictions=*/std::vector<float>{1, 3, 4},
+                            /*weights=*/std::vector<float>{1, 1, 1}));
+  EXPECT_NEAR(msle_unitweighted, expected_unweighted, 0.0001);
+  ASSERT_OK_AND_ASSIGN(const auto msle_unweighted,
+                       MSLE(/*labels=*/std::vector<float>{1, 2, 3},
+                            /*predictions=*/std::vector<float>{1, 3, 4},
+                            /*weights=*/std::vector<float>{}));
+  EXPECT_NEAR(msle_unweighted, expected_unweighted, 0.0001);
+
+  const auto expected_weighted =
+      (2. * std::pow((std::log1p(2) - std::log1p(3)), 2) +
+       3 * std::pow((std::log1p(3) - std::log1p(4)), 2)) /
+      6.;
+  ASSERT_OK_AND_ASSIGN(const auto msle_weighted,
+                       MSLE(/*labels=*/std::vector<float>{1, 2, 3},
+                            /*predictions=*/std::vector<float>{1, 3, 4},
+                            /*weights=*/std::vector<float>{1, 2, 3}));
+  EXPECT_NEAR(msle_weighted, expected_weighted, 0.0001);
+
+  const auto expected_with_zero =
+      (std::pow((std::log1p(0) - std::log1p(1)), 2) +
+       std::pow((std::log1p(2) - std::log1p(3)), 2)) /
+      2.;
+  ASSERT_OK_AND_ASSIGN(const auto msle_with_zero,
+                       MSLE(/*labels=*/std::vector<float>{0, 2},
+                            /*predictions=*/std::vector<float>{1, 3},
+                            /*weights=*/std::vector<float>{}));
+  EXPECT_NEAR(msle_with_zero, expected_with_zero, 0.0001);
+}
+
+TEST(Metric, RMSLE) {
+  const auto expected_unweighted =
+      std::sqrt((std::pow((std::log1p(2) - std::log1p(3)), 2) +
+                 std::pow((std::log1p(3) - std::log1p(4)), 2)) /
+                3.);
+  ASSERT_OK_AND_ASSIGN(const auto rmsle_unitweighted,
+                       RMSLE(/*labels=*/std::vector<float>{1, 2, 3},
+                             /*predictions=*/std::vector<float>{1, 3, 4},
+                             /*weights=*/std::vector<float>{1, 1, 1}));
+  EXPECT_NEAR(rmsle_unitweighted, expected_unweighted, 0.0001);
+  ASSERT_OK_AND_ASSIGN(const auto rmsle_unweighted,
+                       RMSLE(/*labels=*/std::vector<float>{1, 2, 3},
+                             /*predictions=*/std::vector<float>{1, 3, 4},
+                             /*weights=*/std::vector<float>{}));
+  EXPECT_NEAR(rmsle_unweighted, expected_unweighted, 0.0001);
+
+  const auto expected_weighted =
+      std::sqrt((2. * std::pow((std::log1p(2) - std::log1p(3)), 2) +
+                 3 * std::pow((std::log1p(3) - std::log1p(4)), 2)) /
+                6.);
+  ASSERT_OK_AND_ASSIGN(const auto rmsle_weighted,
+                       RMSLE(/*labels=*/std::vector<float>{1, 2, 3},
+                             /*predictions=*/std::vector<float>{1, 3, 4},
+                             /*weights=*/std::vector<float>{1, 2, 3}));
+  EXPECT_NEAR(rmsle_weighted, expected_weighted, 0.0001);
+}
+
+TEST(Metric, MSLEEvaluationResults) {
+  proto::EvaluationOptions options;
+  options.set_task(model::proto::Task::REGRESSION);
+  options.mutable_regression()->set_enable_msle(true);
+
+  dataset::proto::Column label_column;
+  label_column.set_type(dataset::proto::ColumnType::NUMERICAL);
+
+  proto::EvaluationResults eval;
+  ASSERT_OK(InitializeEvaluation(options, label_column, &eval));
+
+  utils::RandomEngine rnd;
+  model::proto::Prediction pred1;
+  pred1.mutable_regression()->set_value(1.0);
+  pred1.mutable_regression()->set_ground_truth(1.0);
+  ASSERT_OK(AddPrediction(options, pred1, &rnd, &eval));
+
+  model::proto::Prediction pred2;
+  pred2.mutable_regression()->set_value(3.0);
+  pred2.mutable_regression()->set_ground_truth(2.0);
+  ASSERT_OK(AddPrediction(options, pred2, &rnd, &eval));
+
+  model::proto::Prediction pred3;
+  pred3.mutable_regression()->set_value(4.0);
+  pred3.mutable_regression()->set_ground_truth(3.0);
+  ASSERT_OK(AddPrediction(options, pred3, &rnd, &eval));
+
+  const auto expected_msle = (std::pow((std::log1p(2) - std::log1p(3)), 2) +
+                              std::pow((std::log1p(3) - std::log1p(4)), 2)) /
+                             3.;
+  ASSERT_OK_AND_ASSIGN(const auto msle_eval, MSLE(eval));
+  EXPECT_NEAR(msle_eval, expected_msle, 0.0001);
+
+  const auto expected_rmsle = std::sqrt(expected_msle);
+  ASSERT_OK_AND_ASSIGN(const auto rmsle_eval, RMSLE(eval));
+  EXPECT_NEAR(rmsle_eval, expected_rmsle, 0.0001);
+
+  // Test negative label error in AddPrediction.
+  model::proto::Prediction pred_invalid;
+  pred_invalid.mutable_regression()->set_value(1.0);
+  pred_invalid.mutable_regression()->set_ground_truth(-1.0);
+  EXPECT_THAT(AddPrediction(options, pred_invalid, &rnd, &eval),
+              Not(StatusIsOk()));
+
+  // Test evaluation without enable_msle.
+  proto::EvaluationOptions options_no_msle;
+  options_no_msle.set_task(model::proto::Task::REGRESSION);
+  proto::EvaluationResults eval_no_msle;
+  ASSERT_OK(InitializeEvaluation(options_no_msle, label_column, &eval_no_msle));
+  ASSERT_OK(AddPrediction(options_no_msle, pred1, &rnd, &eval_no_msle));
+
+  EXPECT_THAT(MSLE(eval_no_msle), Not(StatusIsOk()));
+  EXPECT_THAT(RMSLE(eval_no_msle), Not(StatusIsOk()));
+
+  // Test standalone MSLE with negative label.
+  EXPECT_THAT(MSLE(/*labels=*/std::vector<float>{1, -1, 3},
+                   /*predictions=*/std::vector<float>{1, 3, 4},
+                   /*weights=*/std::vector<float>{1, 1, 1}),
+              Not(StatusIsOk()));
 }
 
 class MAETest : public testing::TestWithParam<bool> {};

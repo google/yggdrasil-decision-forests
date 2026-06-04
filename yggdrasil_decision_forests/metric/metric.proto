@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+// LINT: LEGACY_NAMES
 syntax = "proto2";
 
 package yggdrasil_decision_forests.metric.proto;
@@ -54,6 +55,10 @@ message EvaluationOptions {
     // Do compute the regression plots (histogram of ground truth, residual and
     // predictions, normality test of residual, conditional plots).
     optional bool enable_regression_plots = 1 [default = true];
+    // Enable computation of Mean Squared Logarithmic Error (MSLE) and Root
+    // Mean Squared Logarithmic Error (RMSLE). Requires all labels to be
+    // non-negative.
+    optional bool enable_msle = 2 [default = false];
   }
 
   message Ranking {
@@ -160,7 +165,9 @@ message EvaluationResults {
     optional double bootstrap_rmse_upper_bounds_95p = 5;
     // Sum of absolute value of the error.
     optional double sum_abs_error = 6 [default = 0];
-    // Next ID: 7
+    // Sum of squared logarithmic error.
+    optional double sum_square_log_error = 7 [default = 0];
+    // Next ID: 8
   }
 
   message Ranking {
@@ -334,9 +341,15 @@ message MetricAccessor {
     oneof Type {
       Rmse rmse = 1;
       Mae mae = 2;
+      Mse mse = 3;
+      Msle msle = 4;
+      Rmsle rmsle = 5;
     }
     message Rmse {}
     message Mae {}
+    message Mse {}
+    message Msle {}
+    message Rmsle {}
   }
 
   message Loss {}

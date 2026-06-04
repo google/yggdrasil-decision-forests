@@ -125,6 +125,8 @@ float Accuracy(const proto::EvaluationResults& eval);
 float LogLoss(const proto::EvaluationResults& eval);
 float MSE(const proto::EvaluationResults& eval);
 float RMSE(const proto::EvaluationResults& eval);
+absl::StatusOr<float> MSLE(const proto::EvaluationResults& eval);
+absl::StatusOr<float> RMSLE(const proto::EvaluationResults& eval);
 float MAE(const proto::EvaluationResults& eval);
 float ErrorRate(const proto::EvaluationResults& eval);
 
@@ -299,6 +301,20 @@ absl::StatusOr<double> MSE(
 // Computes the RMSE of a set of predictions. If `weights` is empty, unit
 // weights are assumed.
 absl::StatusOr<double> RMSE(
+    absl::Span<const float> labels, absl::Span<const float> predictions,
+    absl::Span<const float> weights,
+    utils::concurrency::ThreadPool* thread_pool = nullptr);
+
+// Computes the MSLE of a set of predictions. If `weights` is empty, unit
+// weights are assumed.
+absl::StatusOr<double> MSLE(
+    absl::Span<const float> labels, absl::Span<const float> predictions,
+    absl::Span<const float> weights,
+    utils::concurrency::ThreadPool* thread_pool = nullptr);
+
+// Computes the RMSLE of a set of predictions. If `weights` is empty, unit
+// weights are assumed.
+absl::StatusOr<double> RMSLE(
     absl::Span<const float> labels, absl::Span<const float> predictions,
     absl::Span<const float> weights,
     utils::concurrency::ThreadPool* thread_pool = nullptr);
