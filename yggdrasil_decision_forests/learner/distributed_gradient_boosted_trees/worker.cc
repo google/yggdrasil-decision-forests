@@ -46,18 +46,17 @@
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
-#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/utils/compatibility.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/concurrency_streamprocessor.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
+#include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
@@ -291,9 +290,16 @@ DistributedGradientBoostedTreesWorker::RunRequestImp(
   // Make sure the requested features are available.
   // Such change open append when the worker is restarted.
   if (request.has_owned_features()) {
+    absl::flat_hash_set<int> future_load_features;
+    if (request.has_future_owned_features()) {
+      future_load_features.insert(
+          request.future_owned_features().load_features().begin(),
+          request.future_owned_features().load_features().end());
+    }
     RETURN_IF_ERROR(
         UpdateOwnedFeatures({request.owned_features().features().begin(),
-                             request.owned_features().features().end()}));
+                             request.owned_features().features().end()},
+                            future_load_features));
   }
 
   // Non-blocking pre-loading of the features that will be required in the
@@ -765,7 +771,8 @@ absl::Status DistributedGradientBoostedTreesWorker::EvaluateSplits(
 }
 
 absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
-    std::vector<int> target_features) {
+    std::vector<int> target_features,
+    const absl::flat_hash_set<int>& future_load_features) {
   const auto& initial_features = dataset_->features();
   std::sort(target_features.begin(), target_features.end());
 
@@ -780,6 +787,14 @@ absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
   std::set_difference(initial_features.begin(), initial_features.end(),
                       target_features.begin(), target_features.end(),
                       std::back_inserter(features_to_unload));
+
+  std::vector<int> filtered_features_to_unload;
+  for (const int feature : features_to_unload) {
+    if (!future_load_features.contains(feature)) {
+      filtered_features_to_unload.push_back(feature);
+    }
+  }
+  features_to_unload = filtered_features_to_unload;
 
   if (features_to_load.empty() && features_to_unload.empty()) {
     return absl::OkStatus();
@@ -809,19 +824,22 @@ absl::Status DistributedGradientBoostedTreesWorker::UpdateOwnedFeatures(
 absl::StatusOr<bool>
 DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
     const proto::WorkerRequest::FutureOwnedFeatures& future_owned_features) {
-  const std::vector<int> load_features = {
-      future_owned_features.load_features().begin(),
-      future_owned_features.load_features().end(),
-  };
-  // We ignore the unloading instructions.
-  std::vector<int> unload_features;
+  std::vector<int> load_features;
+  for (const int feature : future_owned_features.load_features()) {
+    // Filter already loaded features for an early exit (instead of spawning a
+    // thread if no work needs to be done). This check is repeated right before
+    // loading the feature to avoid race conditions.
+    if (!dataset_->has_feature(feature)) {
+      load_features.push_back(feature);
+    } else {
+      LOG(INFO) << "Do not preload feature " << feature
+                << "as it has already been loaded.";
+    }
+  }
 
   // Is the request similar at the already running process?
   const bool requested_equals_running =
-      (dataset_->NonBlockingLoadingInProgressLoadedFeatures() ==
-       load_features) &&
-      (dataset_->NonBlockingLoadingInProgressUnloadedFeatures() ==
-       unload_features);
+      (dataset_->NonBlockingLoadingInProgressLoadedFeatures() == load_features);
 
   if (dataset_->IsNonBlockingLoadingInProgress()) {
     // Pre-loading is already running.
@@ -845,12 +863,10 @@ DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
         // Quickly start the pre-loading of the request (because it was
         // different from the execution).
         LOG(INFO) << "Immediate restart of non-blocking loading ("
-                  << load_features.size() << ") and unloading ("
-                  << unload_features.size()
+                  << load_features.size()
                   << ") of features for future work on worker " << WorkerIdx();
 
-        RETURN_IF_ERROR(dataset_->NonBlockingLoadingAndUnloadingFeatures(
-            load_features, unload_features, /*num_threads=*/5));
+        RETURN_IF_ERROR(dataset_->NonBlockingLoadingFeatures(load_features));
         return true;
       } else {
         return false;
@@ -861,11 +877,9 @@ DistributedGradientBoostedTreesWorker::PreloadFutureOwnedFeatures(
   } else {
     if (!requested_equals_running) {
       LOG(INFO) << "Non-blocking loading (" << load_features.size()
-                << ") and unloading (" << unload_features.size()
                 << ") of features for future work on worker " << WorkerIdx();
 
-      RETURN_IF_ERROR(dataset_->NonBlockingLoadingAndUnloadingFeatures(
-          load_features, unload_features));
+      RETURN_IF_ERROR(dataset_->NonBlockingLoadingFeatures(load_features));
       return true;
     } else {
       return false;
@@ -1181,7 +1195,7 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
   // Schedule the prediction updates.
   utils::concurrency::StreamProcessor<int, int> processor(
       "update predictions", num_threads,
-      [num_examples, this, num_prediction_dimensions, &caches, batch_size](
+      [num_examples, this, num_prediction_dimensions, &caches](
           const int batch_idx, const int thread_idx) -> int {
         auto& cache = caches[thread_idx];
 

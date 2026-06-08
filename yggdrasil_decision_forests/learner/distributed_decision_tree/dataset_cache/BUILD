@@ -75,8 +75,6 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_inference",
         "//yggdrasil_decision_forests/dataset:types",
-        "//yggdrasil_decision_forests/dataset:vertical_dataset",
-        "//yggdrasil_decision_forests/learner/decision_tree:preprocessing",
         "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",

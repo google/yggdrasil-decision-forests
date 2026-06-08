@@ -194,9 +194,8 @@ absl::Status DatasetCacheReader::release_ranking_groups() {
   return absl::OkStatus();
 }
 
-absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
-    const std::vector<int>& load_features,
-    const std::vector<int>& unload_features, const int num_threads) {
+absl::Status DatasetCacheReader::NonBlockingLoadingFeatures(
+    const std::vector<int>& load_features, const int num_threads) {
   if (!options_.load_cache_in_memory()) {
     return absl::OkStatus();
   }
@@ -209,7 +208,6 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
   non_blocking_.is_running = true;
   non_blocking_.status = {};  // Clear status
   non_blocking_.load_features = load_features;
-  non_blocking_.unload_features = unload_features;
 
   non_blocking_.loading_thread =
       std::make_unique<utils::concurrency::Thread>([this, num_threads]() {
@@ -221,6 +219,11 @@ absl::Status DatasetCacheReader::NonBlockingLoadingAndUnloadingFeatures(
               {.name_prefix = std::string("LoadFeatures")});
           for (const int column_idx : non_blocking_.load_features) {
             pool.Schedule([&, column_idx]() {
+              if (has_feature(column_idx)) {
+                LOG(INFO) << "Did not load feature " << column_idx
+                          << " since it has already been loaded.";
+                return;
+              }
               {
                 utils::concurrency::MutexLock l(non_blocking_.status_mutex);
                 if (!non_blocking_.status.ok()) {
@@ -254,11 +257,6 @@ DatasetCacheReader::NonBlockingLoadingInProgressLoadedFeatures() const {
   return non_blocking_.load_features;
 }
 
-const std::vector<int>&
-DatasetCacheReader::NonBlockingLoadingInProgressUnloadedFeatures() const {
-  return non_blocking_.unload_features;
-}
-
 absl::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
   utils::concurrency::MutexLock lock(non_blocking_.status_mutex);
   if (non_blocking_.is_running) {
@@ -282,13 +280,10 @@ absl::StatusOr<bool> DatasetCacheReader::CheckAndUpdateNonBlockingLoading() {
     return absl::Status(non_blocking_.status);
   }
 
-  for (const int column_idx : non_blocking_.unload_features) {
-    RETURN_IF_ERROR(UnloadInMemoryCacheColumn(column_idx));
-  }
-
   // Update the meta-data. After this, the changes are visible to the user.
   RETURN_IF_ERROR(ApplyLoadingAndUnloadingFeaturesToMetadata(
-      non_blocking_.load_features, non_blocking_.unload_features));
+      non_blocking_.load_features, {}));
+  non_blocking_.load_features.clear();
   return false;
 }
 

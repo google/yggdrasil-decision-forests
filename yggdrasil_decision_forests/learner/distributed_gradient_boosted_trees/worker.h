@@ -23,6 +23,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
@@ -173,7 +174,12 @@ class DistributedGradientBoostedTreesWorker
   // End of stage names.
 
   // Change the features owned by the worker.
-  absl::Status UpdateOwnedFeatures(std::vector<int> features);
+  //
+  // `future_load_features` are features that will be loaded on the worker in
+  // the future and that should not be loaded or unloaded
+  absl::Status UpdateOwnedFeatures(
+      std::vector<int> features,
+      const absl::flat_hash_set<int>& future_load_features = {});
 
   // Initiate the pre-loading of features for future usage.
   //

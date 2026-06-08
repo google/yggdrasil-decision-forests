@@ -32,8 +32,6 @@
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
-#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache_common.h"
@@ -157,8 +155,7 @@ class DatasetCacheReader {
       const std::vector<int>& load_features,
       const std::vector<int>& unload_features);
 
-  // Start loading and unloading a set of features asynchronously. Returns
-  // immediately.
+  // Start loading a set of features asynchronously. Returns immediately.
   //
   // Progresses can be checked regularly with
   // "CheckAndUpdateNonBlockingLoading()".
@@ -171,20 +168,20 @@ class DatasetCacheReader {
   // feature loading to be done. I.e. it is safe to destruct a
   // DatasetCacheReader that is loading features.
   //
+  // Filters already loaded features from load_features to avoid race
+  // conditions.
+  //
   // Usage example:
   //
   //   DatasetCacheReader reader(features={0,1});
-  //   reader.NonBlockingLoadingAndUnloadingFeatures(load_features={2,3},
-  //      unload_features={1})
+  //   reader.NonBlockingLoadingFeatures(load_features={2,3})
   //
   //   while(CheckAndUpdateNonBlockingLoading().value()) {
   //      // Use the features 0 and 1 in the reader.
   //   }
-  //   // Can use the features 0, 2 and 3 in the reader.
-  //
-  absl::Status NonBlockingLoadingAndUnloadingFeatures(
-      const std::vector<int>& load_features,
-      const std::vector<int>& unload_features, int num_threads = 10);
+  //   // Can use the features 0, 1, 2 and 3 in the reader.
+  absl::Status NonBlockingLoadingFeatures(const std::vector<int>& load_features,
+                                          int num_threads = 10);
 
   // Indicates if features are currently loaded with
   // "NonBlockingLoadingAndUnloadingFeatures". This value is updated by
@@ -203,7 +200,6 @@ class DatasetCacheReader {
   // Features being loaded. Empty if there are not features being pre-loaded at
   // this time.
   const std::vector<int>& NonBlockingLoadingInProgressLoadedFeatures() const;
-  const std::vector<int>& NonBlockingLoadingInProgressUnloadedFeatures() const;
 
   // Duration of the initial loading of features in memory i.e. duration of
   // "InitializeAndLoadInMemoryCache".
@@ -274,9 +270,10 @@ class DatasetCacheReader {
     absl::Status status;
     utils::concurrency::Mutex status_mutex;
 
-    // Features being loaded / unloaded.
+    // Features being loaded.
+    // Unloading features is currently not supported to facilitate reasoning
+    // over this code.
     std::vector<int> load_features;
-    std::vector<int> unload_features;
   };
   NonBlocking non_blocking_;
 
