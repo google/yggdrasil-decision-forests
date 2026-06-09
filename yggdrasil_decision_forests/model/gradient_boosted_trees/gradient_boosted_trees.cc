@@ -1015,7 +1015,8 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
     if (metric_name == "accuracy") {
       evaluation.mutable_classification()->set_accuracy(metric_value);
     } else if (metric_name == "rmse") {
-      evaluation.mutable_regression()->set_sum_square_error(metric_value);
+      evaluation.mutable_regression()->set_sum_square_error(metric_value *
+                                                            metric_value);
       evaluation.set_count_predictions(1.f);
     } else if (absl::StartsWith(metric_name, "NDCG@")) {
       evaluation.mutable_ranking()->mutable_ndcg()->set_value(metric_value);
