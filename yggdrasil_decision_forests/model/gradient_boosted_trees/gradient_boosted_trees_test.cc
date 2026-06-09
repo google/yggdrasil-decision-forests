@@ -27,6 +27,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
@@ -333,6 +334,33 @@ TEST(GradientBoostedTrees, GetLossName) {
 
   model.set_loss(proto::Loss::XE_NDCG_MART, loss_config);
   EXPECT_EQ(model.GetLossName(), "XE_NDCG_MART@10");
+}
+
+TEST(GradientBoostedTrees, TrainingLogToEvaluationResultsRmse) {
+  const float kRmseValue = 2.0f;
+  proto::TrainingLogs training_logs;
+  training_logs.add_secondary_metric_names("rmse");
+  proto::TrainingLogs::Entry entry;
+  entry.set_validation_loss(kRmseValue);
+  entry.add_validation_secondary_metrics(kRmseValue);
+  model::proto::Task task = model::proto::Task::REGRESSION;
+  dataset::proto::Column label_col_spec;
+  proto::LossConfiguration loss_config;
+
+  const auto evaluation = internal::TrainingLogToEvaluationResults(
+      entry, training_logs, task, label_col_spec, loss_config, "SQUARED_ERROR",
+      internal::TrainingLogEvaluationSet::kValidation);
+
+  ASSERT_TRUE(evaluation.has_regression());
+  ASSERT_TRUE(evaluation.regression().has_sum_square_error());
+  EXPECT_EQ(evaluation.count_predictions(), 1.f);
+  EXPECT_FLOAT_EQ(evaluation.regression().sum_square_error(),
+                  kRmseValue * kRmseValue);
+
+  const float recovered_rmse =
+      std::sqrt(evaluation.regression().sum_square_error() /
+                evaluation.count_predictions());
+  EXPECT_FLOAT_EQ(recovered_rmse, kRmseValue);
 }
 
 class OutputLogitsTest : public testing::TestWithParam<bool> {};
