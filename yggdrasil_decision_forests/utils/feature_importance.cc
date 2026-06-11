@@ -255,6 +255,7 @@ absl::Status ComputePermutationFeatureImportance(
 
   // Setup the evaluation configuration.
   metric::proto::EvaluationOptions eval_options;
+  eval_options.set_num_threads(options.num_threads);
   eval_options.set_bootstrapping_samples(0);
   metric::proto::EvaluationResults base_evaluation;
   int label_col_idx = model->label_col_idx();
