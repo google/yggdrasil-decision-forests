@@ -140,7 +140,7 @@ absl::Status ConcurrentForLoopWithWorker(
     const std::function<absl::Status(size_t block_idx, size_t begin_item_idx,
                                      size_t end_item_idx, Cache* cache)>
         run) {
-  if (max_num_threads == 1) {
+  if (max_num_threads <= 1) {
     // Execute all the runs sequentially.
     const auto block_size = std::min(max_block_size, num_items);
     auto cache = create_cache(0, 1, block_size);

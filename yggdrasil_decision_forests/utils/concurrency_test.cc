@@ -250,7 +250,7 @@ using ConcurrentForLoopWithWorkerTest =
 INSTANTIATE_TEST_SUITE_P(
     ConcurrentForLoopWithWorkerTestSuiteInstantiation,
     ConcurrentForLoopWithWorkerTest,
-    testing::ValuesIn<ConcurrentForLoopWithWorkerTestCase>({{10}, {1}}));
+    testing::ValuesIn<ConcurrentForLoopWithWorkerTestCase>({{10}, {1}, {0}}));
 
 TEST_P(ConcurrentForLoopWithWorkerTest, Base) {
   const ConcurrentForLoopWithWorkerTestCase& test_case = GetParam();
