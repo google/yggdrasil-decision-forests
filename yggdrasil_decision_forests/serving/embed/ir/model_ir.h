@@ -109,7 +109,7 @@ struct ModelIR {
 
   std::vector<Node> nodes;
   std::vector<NodeIdx> tree_start_offsets;
-  int32_t node_offset_bytes;
+  int32_t node_offset_bytes = 0;
 
   std::vector<ConditionType> active_condition_types;
 
