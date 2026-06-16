@@ -133,7 +133,7 @@ absl::Status Benchmark() {
   const utils::BenchmarkInferenceRunOptions options{
       /*.batch_size =*/absl::GetFlag(FLAGS_batch_size),
       /*.runs =*/num_runs_options,
-      /*.time =*/absl::nullopt};
+      /*.time =*/std::nullopt};
 
   LOG(INFO) << "Loading model";
   std::unique_ptr<model::AbstractModel> model;
