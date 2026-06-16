@@ -60,7 +60,7 @@ absl::Status AddBinaryClassificationPredictions(
   model::proto::Prediction prediction_proto;
   auto& prediction_distribution =
       *prediction_proto.mutable_classification()->mutable_distribution();
-  prediction_distribution.mutable_counts()->Resize(3, 0);
+  prediction_distribution.mutable_counts()->resize(3, 0);
   // TODO: Add multi-thread support.
   for (size_t i = 0; i < raw_predictions.size(); ++i) {
     const float prediction = raw_predictions[i];
@@ -102,7 +102,7 @@ absl::Status AddMulticlassClassificationPredictions(
   model::proto::Prediction prediction_proto;
   auto& prediction_distribution =
       *prediction_proto.mutable_classification()->mutable_distribution();
-  prediction_distribution.mutable_counts()->Resize(3, 0);
+  prediction_distribution.mutable_counts()->resize(3, 0);
   utils::IntegerDistributionFloat distribution;
   distribution.SetNumClasses(num_classes + 1);
   for (int i = 0; i < labels.size(); ++i) {
