@@ -34,11 +34,12 @@ struct FeatureInfo {
   std::string original_name;
 
   enum class Type {
+    kUndefined,
     kBoolean,
     kNumerical,
     kCategorical,
     kIntegerizedCategorical
-  } type;
+  } type = Type::kUndefined;
 
   bool is_float = false;
   bool is_label = false;
@@ -53,6 +54,7 @@ struct FeatureInfo {
 };
 
 enum class ConditionType {
+  UNDEFINED = -1,
   HIGHER_CONDITION = 0,
   CONTAINS_CONDITION_BUFFER_BITMAP = 1,
   OBLIQUE_CONDITION = 2,
@@ -63,7 +65,7 @@ enum class ConditionType {
 struct Node {
   enum class Type { kCondition, kLeaf } type = Type::kLeaf;
 
-  ConditionType condition_type;
+  ConditionType condition_type = ConditionType::UNDEFINED;
 
   FeatureIdx feature_idx = -1;
 
@@ -79,7 +81,11 @@ struct Node {
 };
 
 struct ModelIR {
-  enum class ModelType { kGradientBoostedTrees, kRandomForest } model_type;
+  enum class ModelType {
+    kUndefined,
+    kGradientBoostedTrees,
+    kRandomForest
+  } model_type = ModelType::kUndefined;
   NodeIdx num_trees = 0;
   NodeIdx num_leaves = 0;
   int32_t num_output_classes = 0;
@@ -91,10 +97,11 @@ struct ModelIR {
   std::vector<DoubleOrInt64> accumulator_initialization;
 
   enum class Task {
+    kUndefined,
     kRegression,
     kBinaryClassification,
     kMulticlassClassification,
-  } task;
+  } task = Task::kUndefined;
 
   enum class Activation {
     kEquality,
@@ -103,7 +110,7 @@ struct ModelIR {
   } activation = Activation::kEquality;
 
   std::vector<FeatureInfo> features;
-  FeatureIdx num_features;
+  FeatureIdx num_features = 0;
   // All features are currently stored with the same number of bytes.
   int32_t feature_value_bytes = 0;
 

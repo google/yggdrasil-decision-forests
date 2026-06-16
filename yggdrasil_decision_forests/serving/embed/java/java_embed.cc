@@ -243,6 +243,7 @@ absl::Status AddTreeToBank(const dataset::proto::DataSpecification& dataspec,
 absl::StatusOr<std::string> GetJavaFeatureType(
     const dataset::proto::Column& col,
     const JavaInternalOptions& internal_options) {
+  STATUS_CHECK_GT(internal_options.feature_value_bytes, 0);
   // TODO: Add support for default values.
   // TODO: For integer numericals, use the min/max to possibly reduce the
   // required precision.
@@ -272,6 +273,7 @@ absl::StatusOr<std::string> GenInstanceStruct(
     const model::AbstractModel& model, const proto::Options& options,
     const JavaInternalOptions& internal_options,
     const internal::ModelStatistics& stats) {
+  STATUS_CHECK_GT(internal_options.feature_value_bytes, 0);
   std::string content;
 
   std::string numerical_type;
@@ -1034,6 +1036,7 @@ absl::Status AddRoutingConditionsJava(
   for (int condition_idx = 0; condition_idx < conditions.size();
        condition_idx++) {
     const auto& condition = conditions[condition_idx];
+    STATUS_CHECK_NE(condition.type, RoutingConditionType::kUndefined);
     if (bank.num_conditions[static_cast<int>(condition.type)] == 0) {
       // The model uses this condition code.
       continue;
@@ -1102,6 +1105,9 @@ absl::Status GenerateTreeInferenceRoutingJava(
     const SpecializedConversion& specialized_conversion,
     const ModelStatistics& stats, const ModelDataBank& routing_bank,
     std::string* content) {
+  STATUS_CHECK_GT(internal_options.node_offset_bytes, 0);
+  STATUS_CHECK_GT(internal_options.tree_index_bytes, 0);
+  STATUS_CHECK_GT(internal_options.feature_value_bytes, 0);
   const std::string node_offset_type =
       JavaInteger(internal_options.node_offset_bytes);
   const std::string tree_index_type =

@@ -48,7 +48,7 @@ struct CppEnum {
   std::string name;
   struct Item {
     std::string name;      // e.g. "kRed"
-    int value;             // e.g. 0
+    int value = 0;             // e.g. 0
     std::string original;  // e.g. "Red"
   };
   std::vector<Item> items;
@@ -56,7 +56,7 @@ struct CppEnum {
 };
 
 struct CppNode {
-  bool is_leaf;
+  bool is_leaf = false;
   // --- If-Else specific fields ---
   // Formatted condition for if-else generation (e.g., "instance.age >= 40.5f").
   std::string if_else_condition;
@@ -64,7 +64,7 @@ struct CppNode {
   std::string if_else_leaf;
   // The offset to the False branch, necessary for the Emitter's recursive
   // tree reconstruction. (The True branch is implicitly offset 1).
-  NodeIdx jump_offset_false;
+  NodeIdx jump_offset_false = 0;
 
   // --- Routing specific fields ---
   // The pre-formatted struct initializer for the nodes[] array.

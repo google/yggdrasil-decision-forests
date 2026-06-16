@@ -453,6 +453,10 @@ absl::StatusOr<RoutingDataAssets> PrepareRoutingDataAssets(const ModelIR& ir) {
 absl::StatusOr<BaseTypes> BuildTypesStandard(
     const proto::Options& options, const ModelIR& model_ir,
     const std::string pseudo_namespace) {
+  STATUS_CHECK_GT(model_ir.node_offset_bytes, 0);
+  STATUS_CHECK_GT(model_ir.feature_value_bytes, 0);
+  STATUS_CHECK_GT(model_ir.num_trees, 0);
+  STATUS_CHECK_GT(model_ir.leaf_value_dims, 0);
   BaseTypes types;
 
   // Global
@@ -466,6 +470,7 @@ absl::StatusOr<BaseTypes> BuildTypesStandard(
           : UnsignedInteger(MaxUnsignedValueToNumBytes(model_ir.num_trees));
   types.eval = UnsignedInteger(model_ir.node_offset_bytes);
   types.boolean = "bool";
+  STATUS_CHECK_NE(model_ir.task, ModelIR::Task::kUndefined);
   if (model_ir.task == ModelIR::Task::kRegression) {
     types.output = "float";
   } else {
@@ -557,6 +562,10 @@ absl::StatusOr<BaseTypes> BuildTypesStandard(
 absl::StatusOr<BaseTypes> BuildTypesKernel(const proto::Options& options,
                                            const ModelIR& model_ir,
                                            const std::string pseudo_namespace) {
+  STATUS_CHECK_GT(model_ir.node_offset_bytes, 0);
+  STATUS_CHECK_GT(model_ir.feature_value_bytes, 0);
+  STATUS_CHECK_GT(model_ir.num_trees, 0);
+  STATUS_CHECK_GT(model_ir.leaf_value_dims, 0);
   BaseTypes types;
 
   // Global
@@ -573,6 +582,7 @@ absl::StatusOr<BaseTypes> BuildTypesKernel(const proto::Options& options,
   types.eval = KernelUnsignedInteger(model_ir.node_offset_bytes);
   types.boolean = "bool";
 
+  STATUS_CHECK_NE(model_ir.task, ModelIR::Task::kUndefined);
   if (model_ir.task == ModelIR::Task::kRegression) {
     types.output = "s32";
   } else {

@@ -248,6 +248,8 @@ absl::Status ModelIRBuilder::CompileBasicModelFeatures() {
           ir_.activation = ModelIR::Activation::kEquality;
         }
         break;
+      case ModelIR::Task::kUndefined:
+        return absl::InternalError("Undefined task");
     }
   } else if (random_forest_model_ != nullptr) {
     if (ir_.task != ModelIR::Task::kRegression &&
@@ -273,6 +275,7 @@ absl::Status ModelIRBuilder::CompileBasicModelFeatures() {
   } else {
     return absl::InvalidArgumentError("No specialized model found");
   }
+  STATUS_CHECK_NE(ir_.task, ModelIR::Task::kUndefined);
   return absl::OkStatus();
 }
 
@@ -354,6 +357,8 @@ absl::Status ModelIRBuilder::AnalyzeFeatures() {
 }
 
 absl::Status ModelIRBuilder::CompileTrees() {
+  STATUS_CHECK_NE(ir_.task, ModelIR::Task::kUndefined);
+
   ir_.num_trees = df_interface_->num_trees();
   ir_.tree_start_offsets.reserve(ir_.num_trees);
   absl::flat_hash_set<ConditionType> active_condition_types;
@@ -398,7 +403,9 @@ absl::StatusOr<int32_t> ModelIRBuilder::CompileNode(
     const model::decision_tree::NodeWithChildren& node,
     const std::optional<int> target_class_idx, const NodeIdx tree_idx,
     absl::flat_hash_set<ConditionType>& active_condition_types) {
+  STATUS_CHECK_NE(ir_.task, ModelIR::Task::kUndefined);
   STATUS_CHECK_GT(ir_.leaf_value_dims, 0);
+
   bool winner_takes_all = false;
   double scale = 1.0;
   if (random_forest_model_) {

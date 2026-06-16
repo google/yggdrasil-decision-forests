@@ -63,16 +63,16 @@ struct BaseInternalOptions {
   int feature_index_bytes = 0;
 
   // Number of bytes to encode a tree index.
-  int tree_index_bytes;
+  int tree_index_bytes = 0;
 
   // Number of bytes to encode a node index withing a tree.
-  int node_offset_bytes;
+  int node_offset_bytes = 0;
 
   // Number of bytes to encode an index in the categorical mask bank.
   // Note: This value is currently inferred from
   // "sum_size_categorical_bitmap_masks", which assume the bank is not
   // compressed / optimized in any way.
-  int categorical_idx_bytes;
+  int categorical_idx_bytes = 0;
 
   // The type returned by the prediction function.
   std::string output_type;
@@ -135,7 +135,7 @@ struct ModelStatistics {
 
   // True if "has_conditions" contains more than one true value i.e. the model
   // has more than one type of condition.
-  bool has_multiple_condition_types;
+  bool has_multiple_condition_types = false;
 
   bool is_classification() const {
     return task == model::proto::Task::CLASSIFICATION;
@@ -155,6 +155,7 @@ static constexpr int kReservedFeatureIndexes = 1;
 
 // Index of the condition types supported by the routing algorithm.
 enum class RoutingConditionType {
+  kUndefined = -1,
   HIGHER_CONDITION = 0,
   CONTAINS_CONDITION_BUFFER_BITMAP = 1,
   OBLIQUE_CONDITION = 2,
@@ -202,7 +203,7 @@ struct ValueBank {
 struct RoutingConditionCode {
   // Condition type. Used to determine if the code is needed for the model.
   // Also, used to define "cond" if not provided by the user.
-  RoutingConditionType type;
+  RoutingConditionType type = RoutingConditionType::kUndefined;
 
   // Code expression that tests if the condition should be evaluated e.g.
   // "node->cond.feat == 2".

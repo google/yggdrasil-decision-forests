@@ -210,6 +210,10 @@ absl::Status CppTargetLowering::LowerFeature(
       condition_types_bank.push_back(
           static_cast<int>(ConditionType::TRUE_CONDITION));
     } break;
+    case FeatureInfo::Type::kUndefined: {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "Unsupported feature type: $0", static_cast<int>(feature.type)));
+    }
   }
   cpp_ir_.features.push_back(cpp_feature);
   return absl::OkStatus();
@@ -218,6 +222,7 @@ absl::Status CppTargetLowering::LowerFeature(
 absl::Status CppTargetLowering::LowerEnum(
     const FeatureIdx feature_idx, const FeatureInfo& feature,
     absl::flat_hash_set<std::string>& sanitized_categorical_type_names) {
+  STATUS_CHECK_NE(feature.type, FeatureInfo::Type::kUndefined);
   if (feature.type != FeatureInfo::Type::kCategorical) {
     return absl::OkStatus();
   }
@@ -355,6 +360,7 @@ absl::Status CppTargetLowering::LowerAccumulator() {
 }
 
 absl::Status CppTargetLowering::LowerActivation() {
+  STATUS_CHECK_NE(model_ir_.model_type, ModelIR::ModelType::kUndefined);
   if (model_ir_.task == ModelIR::Task::kRegression) {
     cpp_ir_.activation_statement = "return accumulator;";
     return absl::OkStatus();
@@ -559,6 +565,7 @@ absl::Status CppTargetLowering::LowerLeafNode(const Node& ir_node,
 
 absl::Status CppTargetLowering::LowerConditionNode(const Node& ir_node,
                                                    CppNode* cpp_node) {
+  STATUS_CHECK_NE(ir_node.condition_type, ConditionType::UNDEFINED);
   STATUS_CHECK_GE(ir_node.feature_idx, 0);
 
   bool is_float = true;
@@ -659,6 +666,7 @@ absl::Status CppTargetLowering::LowerConditionNode(const Node& ir_node,
 
 absl::StatusOr<std::string> CppTargetLowering::FormatContainsCondition(
     const Node& ir_node, const FeatureInfo& feat, const std::string& var_name) {
+  STATUS_CHECK_NE(feat.type, FeatureInfo::Type::kUndefined);
   const int offset = AsInt(ir_node.threshold_or_offset);
 
   // Reconstruct the actual categorical subset from the dense boolean bank.

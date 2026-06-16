@@ -24,7 +24,12 @@ namespace yggdrasil_decision_forests::serving::embed::internal {
 namespace {
 
 TEST(CppTargetLoweringTest, Smoke) {
-  const ModelIR model_ir = {.num_trees = 5, .leaf_value_dims = 1};
+  const ModelIR model_ir = {.model_type = ModelIR::ModelType::kRandomForest,
+                            .num_trees = 5,
+                            .leaf_value_dims = 1,
+                            .task = ModelIR::Task::kBinaryClassification,
+                            .feature_value_bytes = 1,
+                            .node_offset_bytes = 1};
   proto::Options options;
   ASSERT_OK_AND_ASSIGN(const auto cpp_ir,
                        CppTargetLowering::Lower(model_ir, options));
@@ -32,21 +37,23 @@ TEST(CppTargetLoweringTest, Smoke) {
 }
 
 TEST(CppTargetLoweringTest, Enums) {
-  ModelIR model_ir;
-  model_ir.leaf_value_dims = 1;
+  ModelIR model_ir = {.model_type = ModelIR::ModelType::kRandomForest,
+                      .num_trees = 1,
+                      .leaf_value_dims = 1,
+                      .task = ModelIR::Task::kBinaryClassification,
+                      .feature_value_bytes = 1,
+                      .node_offset_bytes = 1};
   // Categorical feature
-  FeatureInfo feature;
-  feature.type = FeatureInfo::Type::kCategorical;
-  feature.original_name = "color";
-  feature.vocabulary = {"<OOV>", "Red", "Blue", "Green"};
+  FeatureInfo feature = {.original_name = "color",
+                         .type = FeatureInfo::Type::kCategorical,
+                         .vocabulary = {"<OOV>", "Red", "Blue", "Green"}};
   model_ir.features.push_back(feature);
 
   // Label feature
-  FeatureInfo label;
-  label.type = FeatureInfo::Type::kCategorical;
-  label.original_name = "output";
-  label.vocabulary = {"<OOV>", "No", "Yes"};
-  label.is_label = true;
+  FeatureInfo label = {.original_name = "output",
+                       .type = FeatureInfo::Type::kCategorical,
+                       .is_label = true,
+                       .vocabulary = {"<OOV>", "No", "Yes"}};
   model_ir.features.push_back(label);
 
   proto::Options options;
@@ -80,21 +87,23 @@ TEST(CppTargetLoweringTest, Enums) {
 }
 
 TEST(CppTargetLoweringTest, EnumsFromString) {
-  ModelIR model_ir;
-  model_ir.leaf_value_dims = 1;
+  ModelIR model_ir = {.model_type = ModelIR::ModelType::kRandomForest,
+                      .num_trees = 1,
+                      .leaf_value_dims = 1,
+                      .task = ModelIR::Task::kBinaryClassification,
+                      .feature_value_bytes = 1,
+                      .node_offset_bytes = 1};
   // Categorical feature
-  FeatureInfo feature;
-  feature.type = FeatureInfo::Type::kCategorical;
-  feature.original_name = "color";
-  feature.vocabulary = {"<OOV>", "Red", "Blue", "Green"};
+  FeatureInfo feature = {.original_name = "color",
+                         .type = FeatureInfo::Type::kCategorical,
+                         .vocabulary = {"<OOV>", "Red", "Blue", "Green"}};
   model_ir.features.push_back(feature);
 
   // Label feature
-  FeatureInfo label;
-  label.type = FeatureInfo::Type::kCategorical;
-  label.original_name = "output";
-  label.vocabulary = {"<OOV>", "No", "Yes"};
-  label.is_label = true;
+  FeatureInfo label = {.original_name = "output",
+                       .type = FeatureInfo::Type::kCategorical,
+                       .is_label = true,
+                       .vocabulary = {"<OOV>", "No", "Yes"}};
   model_ir.features.push_back(label);
 
   proto::Options options;
@@ -116,12 +125,13 @@ TEST(CppTargetLoweringTest, EnumsFromString) {
 }
 
 TEST(CppTargetLoweringTest, Regression) {
-  ModelIR model_ir;
-  model_ir.leaf_value_dims = 1;
-  model_ir.task = ModelIR::Task::kRegression;
-  model_ir.num_output_classes = 1;
-  model_ir.num_trees = 10;
-  model_ir.accumulator_initialization = {0.0};
+  ModelIR model_ir = {.model_type = ModelIR::ModelType::kRandomForest,
+                      .num_trees = 10,
+                      .leaf_value_dims = 1,
+                      .accumulator_initialization = {0.0},
+                      .task = ModelIR::Task::kRegression,
+                      .feature_value_bytes = 1,
+                      .node_offset_bytes = 1};
 
   proto::Options options;
   ASSERT_OK_AND_ASSIGN(const auto cpp_ir,
@@ -129,12 +139,14 @@ TEST(CppTargetLoweringTest, Regression) {
 }
 
 TEST(CppTargetLoweringTest, Multiclass) {
-  ModelIR model_ir;
-  model_ir.leaf_value_dims = 1;
-  model_ir.task = ModelIR::Task::kMulticlassClassification;
-  model_ir.num_output_classes = 3;
-  model_ir.num_trees = 10;
-  model_ir.accumulator_initialization = {0.0, 0.0, 0.0};
+  ModelIR model_ir = {.model_type = ModelIR::ModelType::kRandomForest,
+                      .num_trees = 10,
+                      .num_output_classes = 3,
+                      .leaf_value_dims = 1,
+                      .accumulator_initialization = {0.0, 0.0, 0.0},
+                      .task = ModelIR::Task::kMulticlassClassification,
+                      .feature_value_bytes = 1,
+                      .node_offset_bytes = 1};
 
   proto::Options options;
   options.set_classification_output(proto::ClassificationOutput::PROBABILITY);
