@@ -215,7 +215,7 @@ absl::StatusOr<bool> AvroExampleReader::Implementation::NextInShard(
           ASSIGN_OR_RETURN(value, reader_->ReadNextFieldDouble(field));
         }
         if (value.has_value() && std::isnan(*value)) {
-          value = absl::nullopt;
+          value = std::nullopt;
         }
         const int col_idx = univariate_field_idx_to_column_idx_[field_idx];
         if (col_idx == -1) {
@@ -512,7 +512,7 @@ absl::StatusOr<dataset::proto::DataSpecification> CreateDataspecImpl(
             ASSIGN_OR_RETURN(value, reader->ReadNextFieldDouble(field));
           }
           if (value.has_value() && std::isnan(*value)) {
-            value = absl::nullopt;
+            value = std::nullopt;
           }
 
           const int col_idx = univariate_field_idx_to_column_idx[field_idx];
