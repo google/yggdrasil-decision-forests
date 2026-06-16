@@ -2092,7 +2092,7 @@ TEST(GradientBoostedTrees, PredefinedHyperParametersRanking) {
   model::proto::TrainingConfig train_config;
   train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
   utils::TestPredefinedHyperParametersRankingDataset(train_config, 2,
-                                                     absl::nullopt);
+                                                     std::nullopt);
 }
 
 TEST(GradientBoostedTrees, RankingDeprecatedLoss) {
@@ -2102,7 +2102,7 @@ TEST(GradientBoostedTrees, RankingDeprecatedLoss) {
       train_config.MutableExtension(proto::gradient_boosted_trees_config);
   gbt_config->set_loss(proto::LAMBDA_MART_NDCG5);
   utils::TestPredefinedHyperParametersRankingDataset(train_config, 2,
-                                                     absl::nullopt);
+                                                     std::nullopt);
 }
 
 TEST(GradientBoostedTrees, RankingConfigureNDCG) {
@@ -2115,7 +2115,7 @@ TEST(GradientBoostedTrees, RankingConfigureNDCG) {
   gbt_config->set_num_trees(2);
 
   utils::TestPredefinedHyperParametersRankingDataset(train_config, 2,
-                                                     absl::nullopt);
+                                                     std::nullopt);
   const auto base_ds_path = absl::StrCat(
       "csv:", file::JoinPath(
                   test::DataRootDirectory(),
