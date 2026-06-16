@@ -196,7 +196,7 @@ TEST(BinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
 
   EXPECT_THAT(loss_results.loss, IsNan());
   EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
-  EXPECT_EQ(loss_results.confusion_table, absl::nullopt);
+  EXPECT_EQ(loss_results.confusion_table, std::nullopt);
 }
 
 TEST(BinomialLogLikelihoodLossTest, SecondaryMetricName) {
