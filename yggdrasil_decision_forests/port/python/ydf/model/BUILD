@@ -379,6 +379,9 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
+    env = {
+        "XLA_FLAGS": "--xla_backend_extra_options=-vectorize-loops=false",
+    },
     deps = [
         ":export_jax",
         ":generic_model",
