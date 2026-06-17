@@ -185,7 +185,8 @@ line: {
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: 'num trees',
+        title: { text: 'num trees' },
+        automargin: true,
         },
       font: {
         size: 10,
@@ -195,13 +196,13 @@ line: {
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: 'accuracy',
+        title: { text: 'accuracy' },
+        automargin: true,
         },
       margin: {
-        l: 50,
-        r: 50,
-        b: 50,
-        t: 50,
+        t: 30,
+        b: 30,
+        l: 30,
       },
     },
     {

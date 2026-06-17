@@ -472,7 +472,8 @@ $2
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: '$3',$5
+        title: { text: '$3' },
+        automargin: true,$5
         },
       font: {
         size: 10,
@@ -482,13 +483,13 @@ $2
         showgrid: true,
         zeroline: false,
         showline: true,
-        title: '$4',$6
+        title: { text: '$4' },
+        automargin: true,$6
         },
       margin: {
-        l: 50,
-        r: 50,
-        b: 50,
-        t: 50,
+        t: 30,
+        b: 30,
+        l: 30,
       },
     },
     {
