@@ -36,7 +36,6 @@ from typing import Dict, List, Optional, Sequence, Set, Union
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
-from ydf.cc import ydf
 from ydf.dataset import dataset
 from ydf.dataset import dataspec
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib

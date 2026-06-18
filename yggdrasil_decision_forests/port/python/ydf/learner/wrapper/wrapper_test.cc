@@ -50,14 +50,14 @@ class FakeLearner1 : public model::AbstractLearner {
     model::proto::GenericHyperParameterSpecification spec;
     auto& a = (*spec.mutable_fields())["a"];
     a.mutable_real()->set_minimum(1);
-    a.mutable_real()->set_minimum(2);
+    a.mutable_real()->set_maximum(2);
     a.mutable_real()->set_default_value(1);
     a.mutable_documentation()->set_description("Documentation for a");
     a.mutable_documentation()->set_proto_field("a_proto");
 
     auto& b = (*spec.mutable_fields())["b"];
     b.mutable_real()->set_minimum(3);
-    b.mutable_real()->set_minimum(5);
+    b.mutable_real()->set_maximum(5);
     b.mutable_real()->set_default_value(4);
     b.mutable_documentation()->set_description("Documentation for b");
     b.mutable_documentation()->set_proto_field("b_proto");
@@ -66,7 +66,7 @@ class FakeLearner1 : public model::AbstractLearner {
 
     auto& c = (*spec.mutable_fields())["c"];
     c.mutable_real()->set_minimum(6);
-    c.mutable_real()->set_minimum(8);
+    c.mutable_real()->set_maximum(8);
     c.mutable_real()->set_default_value(7);
     c.mutable_documentation()->set_description("Documentation for c");
     c.mutable_documentation()->set_proto_field("c_proto");

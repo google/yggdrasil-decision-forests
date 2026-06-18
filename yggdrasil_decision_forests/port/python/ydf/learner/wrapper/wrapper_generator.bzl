@@ -71,7 +71,6 @@ def py_wrap_yggdrasil_learners(
         deps = [
             "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
             "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
-            "//ydf/cc:ydf",
             "//ydf/dataset:dataset",
             "//ydf/dataset:dataspec",
             "//ydf/learner:custom_metric_py",

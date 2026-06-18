@@ -278,7 +278,6 @@ from $1model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from $1model.isolation_forest_model import isolation_forest_model
 from $1model.random_forest_model import random_forest_model
 from $1utils import func_helpers
-from $1cc import ydf
 )",
                                          prefix, pydf_prefix);
 
