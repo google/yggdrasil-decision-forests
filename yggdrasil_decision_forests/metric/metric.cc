@@ -2020,7 +2020,26 @@ absl::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric) {
         case proto::MetricAccessor::Classification::kLogloss:
           return false;
         case proto::MetricAccessor::Classification::kOneVsOther:
-          return true;
+          switch (metric.classification().one_vs_other().Type_case()) {
+            case proto::MetricAccessor::Classification::OneVsOther::kAuc:
+            case proto::MetricAccessor::Classification::OneVsOther::kPrAuc:
+            case proto::MetricAccessor::Classification::OneVsOther::kAp:
+            case proto::MetricAccessor::Classification::OneVsOther::
+                kPrecisionAtRecall:
+            case proto::MetricAccessor::Classification::OneVsOther::
+                kRecallAtPrecision:
+            case proto::MetricAccessor::Classification::OneVsOther::
+                kPrecisionAtVolume:
+            case proto::MetricAccessor::Classification::OneVsOther::
+                kRecallAtFalsePositiveRate:
+              return true;
+            case proto::MetricAccessor::Classification::OneVsOther::
+                kFalsePositiveRateAtRecall:
+              return false;
+            default:
+              break;
+          }
+          break;
         default:
           break;
       }
@@ -2029,6 +2048,10 @@ absl::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric) {
     case proto::MetricAccessor::kRegression:
       switch (metric.regression().Type_case()) {
         case proto::MetricAccessor::Regression::kRmse:
+        case proto::MetricAccessor::Regression::kMae:
+        case proto::MetricAccessor::Regression::kMse:
+        case proto::MetricAccessor::Regression::kMsle:
+        case proto::MetricAccessor::Regression::kRmsle:
           return false;
         default:
           break;
@@ -2039,12 +2062,22 @@ absl::StatusOr<bool> HigherIsBetter(const proto::MetricAccessor& metric) {
       return false;
 
     case proto::MetricAccessor::kRanking:
-      return true;
+      switch (metric.ranking().Type_case()) {
+        case proto::MetricAccessor::Ranking::kNdcg:
+        case proto::MetricAccessor::Ranking::kMrr:
+        case proto::MetricAccessor::Ranking::kMap:
+          return true;
+        default:
+          break;
+      }
+      break;
 
     case proto::MetricAccessor::kUplift:
       switch (metric.uplift().type_case()) {
         case proto::MetricAccessor::Uplift::kQini:
           return true;
+        case proto::MetricAccessor::Uplift::kCateCalibration:
+          return false;
         default:
           break;
       }

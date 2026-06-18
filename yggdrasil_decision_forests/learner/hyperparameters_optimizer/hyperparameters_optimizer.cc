@@ -55,8 +55,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace hyperparameters_optimizer_v2 {
 
-constexpr char HyperParameterOptimizerLearner::kRegisteredName[];
-
 namespace {
 using row_t = dataset::VerticalDataset::row_t;
 
