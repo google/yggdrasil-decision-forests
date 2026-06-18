@@ -246,6 +246,9 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
   // Build the effective space to optimize.
   ASSIGN_OR_RETURN(const auto search_space,
                    BuildSearchSpace(spe_config, *base_learner));
+  if (search_space.fields().empty()) {
+    return absl::InvalidArgumentError("The search space is empty.");
+  }
   LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
 
   // Select the best hyperparameters.
@@ -285,6 +288,24 @@ absl::Status HyperParameterOptimizerLearner::GetEffectiveConfiguration(
 
   // Apply the default values.
   RETURN_IF_ERROR(SetTrainConfigDefaultValues(effective_config));
+
+  const auto& spe_config =
+      effective_config->GetExtension(proto::hyperparameters_optimizer_config);
+  if (!spe_config.has_base_learner() ||
+      !spe_config.base_learner().has_learner()) {
+    return absl::InvalidArgumentError(
+        "The base_learner config or learner name is missing.");
+  }
+  if (!spe_config.has_optimizer() ||
+      spe_config.optimizer().optimizer_key().empty()) {
+    return absl::InvalidArgumentError(
+        "The optimizer config or optimizer_key is missing.");
+  }
+  if (spe_config.optimizer().parallel_trials() <= 0) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("parallel_trials must be at least 1. Got: ",
+                     spe_config.optimizer().parallel_trials()));
+  }
 
   // Solve the symbols in the configuration.
   RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
@@ -340,6 +361,9 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
   // Build the effective space to optimize.
   ASSIGN_OR_RETURN(const auto search_space,
                    BuildSearchSpace(spe_config, *base_learner));
+  if (search_space.fields().empty()) {
+    return absl::InvalidArgumentError("The search space is empty.");
+  }
   LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
 
   // Select the best hyperparameters.

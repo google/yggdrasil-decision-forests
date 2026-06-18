@@ -359,6 +359,62 @@ TEST_F(OnAdult, RF_MonotonicConstraints_Fail) {
               HasSubstr("does not support monotonic constraints"));
 }
 
+TEST_F(OnAdult, EmptyBaseLearner_Fail) {
+  SetTrainConfig("RANDOM", "random", 5);
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->clear_base_learner();
+
+  SetLocalTraining();
+  PrepareDataset();
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config_, &learner, deployment_config_));
+
+  auto model_or = learner->TrainWithStatus(train_dataset_);
+  EXPECT_FALSE(model_or.ok());
+  EXPECT_EQ(model_or.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(model_or.status().message(),
+              HasSubstr("base_learner config or learner name is missing"));
+}
+
+TEST_F(OnAdult, InvalidParallelTrials_Fail) {
+  SetTrainConfig("RANDOM", "random", 5);
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->mutable_optimizer()->set_parallel_trials(0);
+
+  SetLocalTraining();
+  PrepareDataset();
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config_, &learner, deployment_config_));
+
+  auto model_or = learner->TrainWithStatus(train_dataset_);
+  EXPECT_FALSE(model_or.ok());
+  EXPECT_EQ(model_or.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(model_or.status().message(),
+              HasSubstr("parallel_trials must be at least 1"));
+}
+
+TEST_F(OnAdult, EmptySearchSpace_Fail) {
+  SetTrainConfig("RANDOM", "random", 5);
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->mutable_search_space()->clear_fields();
+
+  SetLocalTraining();
+  PrepareDataset();
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config_, &learner, deployment_config_));
+
+  auto model_or = learner->TrainWithStatus(train_dataset_);
+  EXPECT_FALSE(model_or.ok());
+  EXPECT_EQ(model_or.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(model_or.status().message(), HasSubstr("search space is empty"));
+}
+
 }  // namespace
 }  // namespace hyperparameters_optimizer_v2
 }  // namespace model

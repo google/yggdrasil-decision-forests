@@ -45,6 +45,11 @@ RandomOptimizer::RandomOptimizer(
     const model::proto::GenericHyperParameterSpecification& space_spec)
     : OptimizerInterface(config, space, space_spec), space_(space) {
   config_ = config.GetExtension(proto::random);
+  if (config_.num_trials() <= 0) {
+    constructor_status_ = absl::InvalidArgumentError(absl::StrCat(
+        "num_trials must be positive. Got: ", config_.num_trials()));
+    return;
+  }
   constructor_status_ = internal::UpdateWeights(&space_);
 }
 
@@ -103,6 +108,7 @@ absl::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
   }
 
   int tries_left = num_tries_per_candidates_;
+  std::string candidate_textproto;
 
   while (tries_left > 0) {
     candidate->Clear();
@@ -111,7 +117,7 @@ absl::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
       RETURN_IF_ERROR(BuildRandomSet(field, candidate));
     }
 
-    ASSIGN_OR_RETURN(std::string candidate_textproto,
+    ASSIGN_OR_RETURN(candidate_textproto,
                      utils::SerializeTextProto(*candidate, true));
     if (already_proposed_candidates_.find(candidate_textproto) ==
         already_proposed_candidates_.end()) {
@@ -128,8 +134,6 @@ absl::StatusOr<NextCandidateStatus> RandomOptimizer::NextCandidate(
     }
   }
 
-  ASSIGN_OR_RETURN(std::string candidate_textproto,
-                     utils::SerializeTextProto(*candidate, true));
   already_proposed_candidates_.insert(candidate_textproto);
   pending_evaluations_++;
   return NextCandidateStatus::kNewCandidateAvailable;
@@ -172,6 +176,12 @@ absl::StatusOr<double> UpdateWeights(
     model::proto::HyperParameterSpace::Field* field) {
   if (!field->has_discrete_candidates()) {
     return absl::InvalidArgumentError("Discrete candidate missing");
+  }
+
+  if (field->discrete_candidates().possible_values_size() == 0) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "At least one candidate value should be given for hyper-parameter ",
+        field->name()));
   }
 
   const bool has_weights = field->discrete_candidates().weights_size() != 0;

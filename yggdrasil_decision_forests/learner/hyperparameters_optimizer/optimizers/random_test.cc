@@ -222,9 +222,36 @@ TEST(Benchmark, Sample) {
 
   std::vector<float> weights_2{1.0, 1.0, 1.0, 1.0};
   for (int i = 0; i < 100; i++) {
-    int sample_2 = internal::Sample(weights, &random).value();
-    EXPECT_TRUE(sample_2 == 1 || sample_2 == 3);
+    int sample_2 = internal::Sample(weights_2, &random).value();
+    EXPECT_TRUE(sample_2 >= 0 && sample_2 < 4);
   }
+}
+
+TEST(Random, EmptyCandidates) {
+  model::proto::HyperParameterSpace space = PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "a"
+      discrete_candidates {}
+    }
+  )pb");
+  EXPECT_FALSE(internal::UpdateWeights(&space).ok());
+}
+
+TEST(Random, InvalidNumTrials) {
+  model::proto::HyperParameterSpace search_space = PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "a"
+      discrete_candidates { possible_values { integer: 1 } }
+    }
+  )pb");
+
+  proto::Optimizer optimizer_config;
+  auto& spe_config = *optimizer_config.MutableExtension(proto::random);
+  spe_config.set_num_trials(0);
+
+  RandomOptimizer optimizer(optimizer_config, search_space, {});
+  model::proto::GenericHyperParameters candidate;
+  EXPECT_FALSE(optimizer.NextCandidate(&candidate).ok());
 }
 
 }  // namespace
