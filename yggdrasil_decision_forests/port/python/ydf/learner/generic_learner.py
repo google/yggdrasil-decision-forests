@@ -20,8 +20,6 @@ import datetime
 import re
 from typing import Dict, List, Optional, Sequence, Set, Union
 
-from absl import logging
-
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.dataset import weight_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
@@ -121,13 +119,14 @@ class GenericLearner(abc.ABC):
     if weights is not None and class_weights is not None:
       raise ValueError("Cannot specify both `weights` and `class_weights`.")
     if data_spec is not None:
-      logging.info(
+      log.info(
           "Data spec was provided explicitly, so any other dataspec"
           " configuration options will be ignored."
       )
     if tuner:
-      tuner.set_base_learner(learner_name)
-      tuner.set_base_learner_num_threads(self._deployment_config.num_threads)
+      tuner._set_base_learner(learner_name)  # pylint:disable=protected-access
+      tuner._set_base_learner_num_threads(self._deployment_config.num_threads)  # pylint:disable=protected-access
+      tuner._set_task(self._task)  # pylint:disable=protected-access
 
     self._post_init()
 
@@ -548,6 +547,8 @@ class GenericCCLearner(GenericLearner):
           distributed=True,
           discretize_numerical_columns=self._data_spec_args.discretize_numerical_columns,
       )
+      if self._tuner:
+        self._tuner._validate_data_spec(self._label, model.data_spec(), raise_error=False)  # pylint:disable=protected-access
       return model
 
   def _train_from_dataset(
@@ -561,6 +562,8 @@ class GenericCCLearner(GenericLearner):
       train_ds = self._get_vertical_dataset(ds)._dataset  # pylint: disable=protected-access
 
       dataspec.print_common_dataspec_issues_for_training(train_ds.data_spec())
+      if self._tuner:
+        self._tuner._validate_data_spec(self._label, train_ds.data_spec(), raise_error=True)  # pylint:disable=protected-access
 
       train_args = {"dataset": train_ds}
 

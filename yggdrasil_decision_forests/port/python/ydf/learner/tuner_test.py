@@ -17,15 +17,17 @@
 from absl.testing import absltest
 from absl.testing import parameterized
 
+from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.learner.hyperparameters_optimizer import hyperparameters_optimizer_pb2
 from yggdrasil_decision_forests.learner.hyperparameters_optimizer.optimizers import random_pb2
 from yggdrasil_decision_forests.model import hyperparameter_pb2
+from ydf.dataset import dataspec
+from ydf.learner import specialized_learners
 from ydf.learner import tuner as tuner_lib
+from ydf.model import generic_model
 from ydf.utils import test_utils
 from yggdrasil_decision_forests.utils import fold_generator_pb2
-from ydf.learner import specialized_learners
-from ydf.dataset import dataspec
 
 DiscreteCandidates = hyperparameter_pb2.HyperParameterSpace.DiscreteCandidates
 Field = hyperparameter_pb2.HyperParameterSpace.Field
@@ -349,6 +351,42 @@ class TunerTest(parameterized.TestCase):
           include_all_columns=True,
       )
 
+  def test_optimize_metric(self):
+    tuner = tuner_lib.RandomSearchTuner(optimize_metric="accuracy")
+    tuner._set_task(generic_model.Task.CLASSIFICATION)
+    self.assertTrue(tuner.train_config.Extensions[
+        hyperparameters_optimizer_pb2.hyperparameters_optimizer_config
+    ].evaluation.metric.classification.HasField("accuracy"))
+
+  def test_optimize_metric_invalid_task(self):
+    tuner = tuner_lib.RandomSearchTuner(optimize_metric="ACCURACY")
+    with self.assertRaisesRegex(
+        ValueError, "Metric ACCURACY is not compatible with task REGRESSION"
+    ):
+      tuner._set_task(generic_model.Task.REGRESSION)
+
+  def test_optimize_metric_invalid(self):
+    with self.assertRaisesRegex(
+        ValueError, "Unknown metric 'invalid'. Supported metrics are:"
+    ):
+      tuner_lib.RandomSearchTuner(optimize_metric="invalid")
+
+  def test_optimize_metric_binary_only(self):
+    tuner = tuner_lib.RandomSearchTuner(optimize_metric="auc")
+    tuner._set_task(generic_model.Task.CLASSIFICATION)
+    data_spec = data_spec_pb2.DataSpecification()
+    col = data_spec.columns.add()
+    col.name = "label"
+    col.categorical.number_of_unique_values = 4
+    with self.assertRaisesRegex(
+        ValueError, "only compatible with binary classification"
+    ):
+      tuner._validate_data_spec("label", data_spec, raise_error=True)
+
+    col.categorical.number_of_unique_values = 3
+    tuner._validate_data_spec(
+        "label", data_spec, raise_error=True
+    )  # Should not raise
 
 if __name__ == "__main__":
   absltest.main()

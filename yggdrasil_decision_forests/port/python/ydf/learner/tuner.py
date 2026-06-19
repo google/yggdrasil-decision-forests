@@ -36,14 +36,18 @@ learner = ydf.RandomForestLearner(tuner=tuner)
 ```
 """
 
+import dataclasses
+import enum
 from typing import Optional, Sequence, Union
 
 from google.protobuf.internal import containers
+from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.learner import abstract_learner_pb2
 from yggdrasil_decision_forests.learner.hyperparameters_optimizer import hyperparameters_optimizer_pb2
 from yggdrasil_decision_forests.learner.hyperparameters_optimizer.optimizers import random_pb2
 from yggdrasil_decision_forests.model import hyperparameter_pb2
-
+from ydf.model import generic_model
+from ydf.utils import log
 
 # Single hyperparameter value
 HyperParameterValue = Union[int, float, str, bool]
@@ -63,6 +67,86 @@ Field = hyperparameter_pb2.HyperParameterSpace.Field
 Value = hyperparameter_pb2.GenericHyperParameters.Value
 
 
+@enum.unique
+class OptimizeMetric(enum.Enum):
+  """Metrics that can be optimized by the hyper-parameter tuner."""
+
+  LOSS = "loss"
+  ACCURACY = "accuracy"
+  AUC = "auc"
+  PR_AUC = "pr-auc"
+  RMSE = "rmse"
+  MAE = "mae"
+  MSE = "mse"
+  NDCG_5 = "ndcg@5"
+  MRR_10 = "mrr@10"
+  QINI = "qini"
+  CATE_CALIBRATION = "cate_calibration"
+
+
+@dataclasses.dataclass
+class _MetricConfig:
+  protobuf_path: Sequence[str]
+  compatible_tasks: Sequence[generic_model.Task]
+  requires_binary_classification: bool = False
+
+
+_METRIC_CONFIGS = {
+    OptimizeMetric.LOSS: _MetricConfig(
+        ["loss"],
+        [
+            generic_model.Task.CLASSIFICATION,
+            generic_model.Task.REGRESSION,
+            generic_model.Task.RANKING,
+            generic_model.Task.CATEGORICAL_UPLIFT,
+            generic_model.Task.NUMERICAL_UPLIFT,
+        ],
+    ),
+    OptimizeMetric.ACCURACY: _MetricConfig(
+        ["classification", "accuracy"], [generic_model.Task.CLASSIFICATION]
+    ),
+    OptimizeMetric.AUC: _MetricConfig(
+        ["classification", "one_vs_other", "auc"],
+        [generic_model.Task.CLASSIFICATION],
+        requires_binary_classification=True,
+    ),
+    OptimizeMetric.PR_AUC: _MetricConfig(
+        ["classification", "one_vs_other", "pr_auc"],
+        [generic_model.Task.CLASSIFICATION],
+        requires_binary_classification=True,
+    ),
+    OptimizeMetric.RMSE: _MetricConfig(
+        ["regression", "rmse"], [generic_model.Task.REGRESSION]
+    ),
+    OptimizeMetric.MAE: _MetricConfig(
+        ["regression", "mae"], [generic_model.Task.REGRESSION]
+    ),
+    OptimizeMetric.MSE: _MetricConfig(
+        ["regression", "mse"], [generic_model.Task.REGRESSION]
+    ),
+    OptimizeMetric.NDCG_5: _MetricConfig(
+        ["ranking", "ndcg"], [generic_model.Task.RANKING]
+    ),
+    OptimizeMetric.MRR_10: _MetricConfig(
+        ["ranking", "mrr"], [generic_model.Task.RANKING]
+    ),
+    OptimizeMetric.QINI: _MetricConfig(
+        ["uplift", "qini"],
+        [
+            generic_model.Task.CATEGORICAL_UPLIFT,
+            generic_model.Task.NUMERICAL_UPLIFT,
+        ],
+    ),
+    OptimizeMetric.CATE_CALIBRATION: _MetricConfig(
+        ["uplift", "cate_calibration"],
+        [
+            generic_model.Task.CATEGORICAL_UPLIFT,
+            generic_model.Task.NUMERICAL_UPLIFT,
+        ],
+    ),
+}
+
+
 class AbstractTuner:
   """Base class for tuners."""
 
@@ -74,6 +158,7 @@ class AbstractTuner:
       max_trial_duration: Optional[float] = None,
       cross_validation: bool = False,
       cross_validation_num_folds: Optional[int] = None,
+      optimize_metric: Optional[str] = None,
   ):
     """Initializes tuner.
 
@@ -100,6 +185,10 @@ class AbstractTuner:
         is much slower.
       cross_validation_num_folds: Number of folds to use for cross-validation.
         Defaults to 10 if not set.
+      optimize_metric: Metric to optimize. If not set, the default metric is
+        chosen (loss > auc (binary classification only) > accuracy > rmse > ndcg
+        > qini). Supported metrics are: loss, accuracy, auc, pr-auc, rmse, mae,
+        mse, ndcg@5, mrr@10, qini, cate_calibration (case-insensitive).
     """
 
     self._automatic_search_space = automatic_search_space
@@ -133,6 +222,18 @@ class AbstractTuner:
           max_trial_duration
       )
 
+    if optimize_metric is not None:
+      try:
+        self._optimize_metric = OptimizeMetric(optimize_metric.lower())
+      except ValueError:
+        supported = ", ".join(v.value for v in OptimizeMetric)
+        raise ValueError(  # pylint:disable=raise-missing-from
+            f"Unknown metric '{optimize_metric}'. Supported metrics are:"
+            f" {supported}"
+        )
+    else:
+      self._optimize_metric = None
+
   @property
   def parallel_trials(self) -> int:
     return self._parallel_trials
@@ -148,11 +249,56 @@ class AbstractTuner:
         hyperparameters_optimizer_pb2.hyperparameters_optimizer_config
     ]
 
-  def set_base_learner(self, learner: str) -> None:
+  def _set_base_learner(self, learner: str) -> None:
     """Sets the base learner key."""
     self._optimizer_config().base_learner.learner = learner
 
-  def set_base_learner_num_threads(self, num_threads: int) -> None:
+  def _set_task(self, task: generic_model.Task) -> None:
+    """Validates and sets the task for the metric optimization."""
+    if self._optimize_metric is None:
+      return
+
+    config = _METRIC_CONFIGS[self._optimize_metric]
+    if (
+        config.compatible_tasks is not None
+        and task not in config.compatible_tasks
+    ):
+      raise ValueError(
+          f"Metric {self._optimize_metric.name} is not compatible with task"
+          f" {task.name}"
+      )
+
+    current = getattr(self._optimizer_config().evaluation, "metric")
+    for step in config.protobuf_path:
+      current = getattr(current, step)
+    current.SetInParent()
+
+  def _validate_data_spec(
+      self,
+      label: str,
+      data_spec: data_spec_pb2.DataSpecification,
+      raise_error: bool,
+  ) -> None:
+    """Validates the metric against the data specification."""
+    if self._optimize_metric is None:
+      return
+
+    config = _METRIC_CONFIGS[self._optimize_metric]
+    if config.requires_binary_classification:
+      label_col = next(c for c in data_spec.columns if c.name == label)
+      if label_col.categorical.number_of_unique_values != 3:
+        if raise_error:
+          raise ValueError(
+              f"Metric {self._optimize_metric.name} is only compatible with"
+              " binary classification."
+          )
+        else:
+          log.warning(
+              f"Metric {self._optimize_metric.name} is only compatible with"
+              " binary classification."
+          )
+
+  def _set_base_learner_num_threads(self, num_threads: int) -> None:
     """Sets the number of threads in the base learner."""
     self._optimizer_config().base_learner_deployment.num_threads = num_threads
 
@@ -206,6 +352,10 @@ class RandomSearchTuner(AbstractTuner):
       much slower.
     cross_validation_num_folds: Number of folds to use for cross-validation.
       Defaults to 10 if not set.
+    optimize_metric: Metric to optimize. If not set, the default metric is
+      chosen (loss > auc (binary classification only) > accuracy > rmse > ndcg >
+      qini). Supported metrics are: loss, accuracy, auc, pr-auc, rmse, mae, mse,
+      ndcg@5, mrr@10, qini, cate_calibration (case-insensitive).
   """
 
   def __init__(
@@ -217,6 +367,7 @@ class RandomSearchTuner(AbstractTuner):
       *,
       cross_validation: bool = False,
       cross_validation_num_folds: Optional[int] = None,
+      optimize_metric: Optional[str] = None,
   ):
     super().__init__(
         optimizer_key="RANDOM",
@@ -225,6 +376,7 @@ class RandomSearchTuner(AbstractTuner):
         max_trial_duration=max_trial_duration,
         cross_validation=cross_validation,
         cross_validation_num_folds=cross_validation_num_folds,
+        optimize_metric=optimize_metric,
     )
     self._random_optimizer_config().num_trials = num_trials
 
@@ -256,6 +408,10 @@ class VizierTuner(AbstractTuner):
       much slower.
     cross_validation_num_folds: Number of folds to use for cross-validation.
       Defaults to 5 if not set.
+    optimize_metric: Metric to optimize. If not set, the default metric is
+      chosen (loss > auc (binary classification only) > accuracy > rmse > ndcg >
+      qini). Supported metrics are: loss, accuracy, auc, pr-auc, rmse, mae, mse,
+      ndcg@5, mrr@10, qini, cate_calibration (case-insensitive).
   """
 
   def __init__(
@@ -267,6 +423,7 @@ class VizierTuner(AbstractTuner):
       *,
       cross_validation: bool = False,
       cross_validation_num_folds: Optional[int] = None,
+      optimize_metric: Optional[str] = None,
   ):
     super().__init__(
         optimizer_key="VIZIER",
@@ -275,6 +432,7 @@ class VizierTuner(AbstractTuner):
         max_trial_duration=max_trial_duration,
         cross_validation=cross_validation,
         cross_validation_num_folds=cross_validation_num_folds,
+        optimize_metric=optimize_metric,
     )
 
 
