@@ -28,7 +28,7 @@ from ydf.utils import html
 from ydf.utils import string_lib
 
 
-class _UnescappedString(minidom.Text):
+class _UnescapedString(minidom.Text):
   """Html element able to print unescaped string."""
 
   def set_data(self, data: str) -> None:
@@ -53,8 +53,6 @@ def js_functionality(doc: html.Doc) -> html.Elem:
   raw_js = textwrap.dedent("""\
   function ydfShowTab(block_id, item) {
     const block = document.getElementById(block_id);
-    console.log("HIDE first of:",block.getElementsByClassName("tab selected"));
-    console.log("HIDE first of:",block.getElementsByClassName("tab_content selected"));
     block.getElementsByClassName("tab selected")[0].classList.remove("selected");
     block.getElementsByClassName("tab_content selected")[0].classList.remove("selected");
     document.getElementById(block_id + "_" + item).classList.add("selected");
@@ -63,7 +61,7 @@ def js_functionality(doc: html.Doc) -> html.Elem:
   """)
 
   js = doc.createElement("script")
-  raw_node = _UnescappedString()
+  raw_node = _UnescapedString()
   raw_node.set_data(raw_js)
   js.appendChild(raw_node)
   return js
@@ -72,7 +70,7 @@ def js_functionality(doc: html.Doc) -> html.Elem:
 def glossary(doc: html.Doc, e: metric.Evaluation) -> html.Elem:
   """Glossary for evaluations."""
 
-  raw_glossary = _UnescappedString()
+  raw_glossary = _UnescapedString()
   if e._evaluation_proto.task == abstract_model_pb2.CLASSIFICATION:
     raw_glossary.set_data(textwrap.dedent("""\
 <h2>Evaluation of classification models</h2>
@@ -285,7 +283,7 @@ def css_style(doc: html.Doc, add_glossary_style: bool) -> html.Elem:
   """)
 
   style = doc.createElement("style")
-  raw_node = _UnescappedString()
+  raw_node = _UnescapedString()
   raw_node.set_data(raw_style)
   style.appendChild(raw_node)
   return style
@@ -359,7 +357,7 @@ def evaluation_to_html_str(e: metric.Evaluation, add_style: bool = True) -> str:
     eval_link.setIdAttribute("id")
     eval_link.setAttribute("class", "tab selected")
     eval_link.setAttribute("onclick", f"ydfShowTab('{tab_id}', 'eval')")
-    eval_link.appendChild(doc.createTextNode("Evalution"))
+    eval_link.appendChild(doc.createTextNode("Evaluation"))
 
     glossary_link = doc.createElement("a")
     glossary_link.setAttribute("id", f"{tab_id}_glossary")
@@ -490,20 +488,20 @@ def confusion_matrix_to_html_str(
   tr.appendChild(th)
   th.appendChild(doc.createTextNode("Label \\ Pred"))
 
-  for label in confusion.classes:
+  for prediction in confusion.classes:
     th = doc.createElement("th")
     tr.appendChild(th)
-    th.appendChild(doc.createTextNode(label))
+    th.appendChild(doc.createTextNode(prediction))
 
-  for prediction_idx, prediction in enumerate(confusion.classes):
+  for label_idx, label in enumerate(confusion.classes):
     tr = doc.createElement("tr")
     html_table.appendChild(tr)
 
     th = doc.createElement("th")
     tr.appendChild(th)
-    th.appendChild(doc.createTextNode(prediction))
+    th.appendChild(doc.createTextNode(label))
 
-    for label_idx in range(len(confusion.classes)):
+    for prediction_idx in range(len(confusion.classes)):
       value = confusion.value(
           label_idx=label_idx, prediction_idx=prediction_idx
       )

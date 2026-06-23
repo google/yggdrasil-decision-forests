@@ -59,8 +59,8 @@ class ConfusionMatrix:
         column_labels=self.classes,
     )
 
-  def value(self, prediction_idx: int, label_idx: int) -> float:
-    return self.matrix[prediction_idx, label_idx]
+  def value(self, label_idx: int, prediction_idx: int) -> float:
+    return self.matrix[label_idx, prediction_idx]
 
 
 @dataclasses.dataclass
@@ -87,7 +87,7 @@ class CharacteristicPerThreshold:
   def recall(self) -> float:
     """Recall."""
 
-    return _safe_div(
+    return safe_div(
         self.true_positive, self.true_positive + self.false_negative
     )
 
@@ -95,15 +95,15 @@ class CharacteristicPerThreshold:
   def specificity(self) -> float:
     """Specificity."""
 
-    return _safe_div(
+    return safe_div(
         self.true_negative, self.true_negative + self.false_positive
     )
 
   @property
   def false_positive_rate(self) -> float:
-    """False positie rate."""
+    """False positive rate."""
 
-    return _safe_div(
+    return safe_div(
         self.false_positive, self.false_positive + self.true_negative
     )
 
@@ -111,7 +111,7 @@ class CharacteristicPerThreshold:
   def precision(self) -> float:
     """Precision."""
 
-    return _safe_div(
+    return safe_div(
         self.true_positive, self.true_positive + self.false_positive
     )
 
@@ -119,26 +119,13 @@ class CharacteristicPerThreshold:
   def accuracy(self) -> float:
     """Accuracy."""
 
-    return _safe_div(
+    return safe_div(
         self.true_positive + self.true_negative,
         self.true_positive
         + self.false_positive
         + self.true_negative
         + self.false_negative,
     )
-
-
-def _safe_div(a: float, b: float) -> float:
-  """Returns a/b. If a==b==0, returns 0."""
-
-  if b == 0:
-    assert a == 0
-    if a != 0:
-      raise ValueError(
-          f"Cannot divide a={a} by b={b}. If b==0, then a should be zero."
-      )
-    return 0
-  return a / b
 
 
 @dataclasses.dataclass
@@ -157,7 +144,7 @@ class Characteristic:
     false_positives: List of false positives.
     true_negatives: List of true negatives.
     false_negatives: List of false negatives.
-    thresholds: List of threhsolds.
+    thresholds: List of thresholds.
   """
 
   name: str
@@ -200,7 +187,7 @@ Num thresholds: {len(self.per_threshold)}
 
   @property
   def false_negatives(self) -> npt.NDArray[np.float32]:
-    """List of true negatives."""
+    """List of false negatives."""
 
     return np.array([t.false_negative for t in self.per_threshold], np.float32)
 
@@ -291,9 +278,12 @@ class Evaluation:
     loss: Model loss. The loss definition is model dependent.
     num_examples: Number of examples (non weighted).
     num_examples_weighted: Number of examples (with weight).
-    accuracy:
-    confusion_matrix:
-    characteristics:
+    accuracy: Proportion of correctly predicted examples. Only for
+      classification.
+    confusion_matrix: Count of test examples per label class and predicted
+      class. Only for classification.
+    characteristics: Model characteristics (e.g. precision, recall) per
+      threshold values. Only for classification.
     rmse: Root Mean Square Error. Only available for regression task.
     rmse_ci95_bootstrap: 95% confidence interval of the RMSE computed using
       bootstrapping. Only available for regression task.
