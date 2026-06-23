@@ -218,16 +218,13 @@ utils::html::Html TuningLogs(const model::AbstractModel& model) {
   h::Html content;
 
   const auto help =
-      h::P("A ",
-           h::A(h::Target("_blank"),
-                h::HRef(utils::documentation::GlossaryTuner()), "tuner"),
-           " automatically selects the hyper-parameters of a learner.");
+      h::P("A tuner automatically selects the hyper-parameters of a learner.");
   content.Append(help);
 
-  content.Append(h::P(h::B("Note:"),
-                      "The hyper-parameters tuning logs are accessible "
-                      "programmatically in python with "
-                      "`model.hyperparameter_optimizer_logs()`."));
+  content.Append(
+      h::P("The hyper-parameters tuning logs are accessible "
+           "programmatically in python with "
+           "`model.hyperparameter_optimizer_logs()`."));
 
   const auto& logs = *model.hyperparameter_optimizer_logs();
 
@@ -261,9 +258,9 @@ utils::html::Html TuningLogs(const model::AbstractModel& model) {
   h::Html rows;
   {
     h::Html row;
-    row.Append(h::Th("trial"));
-    row.Append(h::Th("score"));
-    row.Append(h::Th("duration"));
+    row.Append(h::Th("Trial"));
+    row.Append(h::Th("Score"));
+    row.Append(h::Th("Full duration"));
     for (const auto& name : filed_names) {
       row.Append(h::Th(name));
     }

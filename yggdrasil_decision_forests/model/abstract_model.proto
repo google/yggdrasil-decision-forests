@@ -171,14 +171,14 @@ message HyperparametersOptimizerLogs {
 
   message Step {
     // Time, in seconds, relative to the start of the hyper-parameter tuning, of
-    // the consuption of the hyperparameters evaluation.
+    // the evaluation of the hyperparameters.
     optional double evaluation_time = 1;
 
     // Tested hyperparameters.
     optional GenericHyperParameters hyperparameters = 2;
 
     // Score (the higher, the better) of the hyperparameters.
-    // A NaN value indicates that the hyperparameters are unfeasible.
+    // A NaN value indicates that the hyperparameters are infeasible.
     optional float score = 3;
   }
 }

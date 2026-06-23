@@ -350,7 +350,7 @@ T = TypeVar("T")
 
 
 def maybe_tqdm(iterable: Iterator[T], *args, **kwargs) -> Iterator[T]:
-  """Shows a tqdm progress bar if tqdm is installed and loggin level>=1."""
+  """Shows a tqdm progress bar if tqdm is installed and logging level>=1."""
 
   if _VERBOSE_LEVEL == 0:
     return iterable

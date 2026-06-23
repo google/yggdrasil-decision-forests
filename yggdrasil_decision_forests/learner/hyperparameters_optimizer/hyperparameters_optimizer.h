@@ -34,10 +34,9 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/generic_worker/generic_worker.pb.h"
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.pb.h"
-#include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizer_interface.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
-#include "yggdrasil_decision_forests/utils/distribute/distribute.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 
 namespace yggdrasil_decision_forests {
@@ -66,7 +65,7 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
   absl::Status SetHyperParametersImpl(
       utils::GenericHyperParameterConsumer* generic_hyper_params) override;
 
-  // Gets the available generic hparams.
+  // Gets the available generic hyperparameters.
   absl::StatusOr<model::proto::GenericHyperParameterSpecification>
   GetGenericHyperParameterSpecification() const override;
 
@@ -102,6 +101,23 @@ class HyperParameterOptimizerLearner : public AbstractLearner {
   absl::StatusOr<std::unique_ptr<AbstractLearner>> BuildBaseLearner(
       const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
       const bool for_tuning) const;
+
+  struct EvaluationResult {
+    model::proto::GenericHyperParameters candidate;
+    double score;
+  };
+
+  // Shared loop for both in-process and distributed hyperparameter search.
+  absl::StatusOr<model::proto::GenericHyperParameters>
+  SearchBestHyperparameterLoop(
+      const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
+      const model::proto::GenericHyperParameterSpecification& search_space_spec,
+      const model::proto::HyperParameterSpace& search_space,
+      model::proto::HyperparametersOptimizerLogs* logs,
+      const std::function<absl::Status(
+          const model::proto::GenericHyperParameters&)>& submit_candidate,
+      const std::function<absl::StatusOr<EvaluationResult>()>& get_next_result)
+      const;
 
   // Searches for the best hyperparameter in process from a dataset loaded in
   // memory. The dataset object is shared among the trials.

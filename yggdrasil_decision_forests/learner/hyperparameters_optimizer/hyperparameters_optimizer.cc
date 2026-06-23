@@ -330,7 +330,7 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
 
   if (!deployment().has_distribute()) {
     return absl::InvalidArgumentError(
-        "The HyperParameterOptimizerLearner only support local or distributed "
+        "The HyperParameterOptimizerLearner only supports local or distributed "
         "deployment configs.");
   }
 
@@ -472,10 +472,9 @@ HyperParameterOptimizerLearner::CreateDistributeManager(
 }
 
 absl::StatusOr<std::unique_ptr<AbstractLearner>>
-HyperParameterOptimizerLearner::HyperParameterOptimizerLearner::
-    BuildBaseLearner(
-        const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
-        const bool for_tuning) const {
+HyperParameterOptimizerLearner::BuildBaseLearner(
+    const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
+    const bool for_tuning) const {
   std::unique_ptr<AbstractLearner> base_learner;
   RETURN_IF_ERROR(GetLearner(spe_config.base_learner(), &base_learner,
                              spe_config.base_learner_deployment()));
@@ -504,16 +503,15 @@ absl::StatusOr<bool> HyperParameterOptimizerLearner::IsMaximization(
 }
 
 absl::StatusOr<model::proto::GenericHyperParameters>
-HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
+HyperParameterOptimizerLearner::SearchBestHyperparameterLoop(
     const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
-    const model::proto::TrainingConfigLinking& config_link,
     const model::proto::GenericHyperParameterSpecification& search_space_spec,
     const model::proto::HyperParameterSpace& search_space,
-    const dataset::VerticalDataset& train_dataset,
-    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-        valid_dataset,
-    std::unique_ptr<AbstractModel>* best_model,
-    model::proto::HyperparametersOptimizerLogs* logs) const {
+    model::proto::HyperparametersOptimizerLogs* logs,
+    const std::function<absl::Status(
+        const model::proto::GenericHyperParameters&)>& submit_candidate,
+    const std::function<absl::StatusOr<EvaluationResult>()>& get_next_result)
+    const {
   const auto begin_optimization = absl::Now();
 
   // Initialize the hyperparameter logs.
@@ -527,6 +525,102 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
                                        spe_config.optimizer(), search_space,
                                        search_space_spec));
 
+  int pending_evaluation = 0;
+  int round_idx = 0;
+
+  // True iff. the optimizer is done generating new candidates.
+  bool exploration_is_done = false;
+
+  double logging_best_score = std::numeric_limits<double>::quiet_NaN();
+
+  while (true) {
+    if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
+      LOG(INFO) << "Training interrupted per the user";
+      break;
+    }
+
+    // Generate as many candidates as possible.
+    while (true) {
+      model::proto::GenericHyperParameters candidate;
+      ASSIGN_OR_RETURN(const auto optimizer_status,
+                       optimizer->NextCandidate(&candidate));
+      if (optimizer_status == NextCandidateStatus::kExplorationIsDone) {
+        // The optimization can stop.
+        exploration_is_done = true;
+        break;
+      } else if (optimizer_status == NextCandidateStatus::kWaitForEvaluation) {
+        // Wait for some evaluation to finish.
+        if (pending_evaluation == 0) {
+          return absl::InternalError(
+              "The optimizer requested an evaluation while no evaluation is "
+              "currently pending.");
+        }
+        break;
+      } else if (optimizer_status ==
+                 NextCandidateStatus::kNewCandidateAvailable) {
+        // Start evaluating this new candidate.
+        pending_evaluation++;
+        RETURN_IF_ERROR(submit_candidate(candidate));
+      }
+    }
+
+    if (exploration_is_done && pending_evaluation == 0) {
+      break;
+    }
+
+    ASSIGN_OR_RETURN(auto result, get_next_result());
+    pending_evaluation--;
+
+    RETURN_IF_ERROR(
+        optimizer->ConsumeEvaluation(result.candidate, result.score));
+
+    // Record the hyperparameter + evaluation.
+    auto& log_entry = *logs->add_steps();
+    log_entry.set_evaluation_time(
+        absl::ToDoubleSeconds(absl::Now() - begin_optimization));
+    *log_entry.mutable_hyperparameters() = result.candidate;
+    log_entry.set_score(result.score);
+
+    if (std::isnan(logging_best_score) || result.score > logging_best_score) {
+      logging_best_score = result.score;
+    }
+    LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
+              << "] Score: " << result.score << " / " << logging_best_score
+              << " HParams: " << result.candidate.ShortDebugString();
+
+    if (training_config().has_maximum_training_duration_seconds() &&
+        (absl::Now() - begin_optimization) >
+            absl::Seconds(
+                training_config().maximum_training_duration_seconds())) {
+      LOG(INFO)
+          << "Stop optimization because of the maximum training duration.";
+      break;
+    }
+    round_idx++;
+  }
+
+  model::proto::GenericHyperParameters best_params;
+  double best_score;
+  std::tie(best_params, best_score) = optimizer->BestParameters();
+
+  logs->set_best_score(best_score);
+  *logs->mutable_best_hyperparameters() = best_params;
+
+  return best_params;
+}
+
+absl::StatusOr<model::proto::GenericHyperParameters>
+HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
+
+    const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config,
+    const model::proto::TrainingConfigLinking& config_link,
+    const model::proto::GenericHyperParameterSpecification& search_space_spec,
+    const model::proto::HyperParameterSpace& search_space,
+    const dataset::VerticalDataset& train_dataset,
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset,
+    std::unique_ptr<AbstractModel>* best_model,
+    model::proto::HyperparametersOptimizerLogs* logs) const {
   // The "async_evaluator" evaluates candidates in parallel using
   // multi-threading.
   struct Output {
@@ -558,106 +652,35 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
             << " thread(s)";
   async_evaluator.StartWorkers();
 
-  // Number of candidate being evaluated.
-  int pending_evaluation = 0;
+  auto submit_candidate =
+      [&async_evaluator](const model::proto::GenericHyperParameters& candidate)
+      -> absl::Status {
+    async_evaluator.Submit(candidate);
+    return absl::OkStatus();
+  };
 
-  // Number of evaluated and processed candidates.
-  int round_idx = 0;
-
-  // True iff. the optimizer is done generating new candidates.
-  bool exploration_is_done = false;
-
-  double logging_best_score = std::numeric_limits<double>::quiet_NaN();
-
-  while (true) {
-    if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
-      LOG(INFO) << "Training interrupted per the user";
-      break;
-    }
-
-    // Generate as many candidates as possible.
-    while (true) {
-      model::proto::GenericHyperParameters candidate;
-      ASSIGN_OR_RETURN(const auto optimizer_status,
-                       optimizer->NextCandidate(&candidate));
-      if (optimizer_status == NextCandidateStatus::kExplorationIsDone) {
-        // The optimization can stop.
-        exploration_is_done = true;
-        if (pending_evaluation > 0) {
-          return absl::InternalError(
-              "The optimizer stopped the optimization while some evaluations "
-              "are still running.");
-        }
-        async_evaluator.CloseSubmits();
-        break;
-      } else if (optimizer_status == NextCandidateStatus::kWaitForEvaluation) {
-        // Wait for some evaluation to finish.
-        if (pending_evaluation == 0) {
-          return absl::InternalError(
-              "The optimizer requested an evaluation while not evaluation is "
-              "currently pending.");
-        }
-        break;
-      } else if (optimizer_status ==
-                 NextCandidateStatus::kNewCandidateAvailable) {
-        // Start evaluating this new candidate.
-        pending_evaluation++;
-        async_evaluator.Submit(candidate);
-      }
-    }
-
+  double best_score_so_far = std::numeric_limits<double>::quiet_NaN();
+  auto get_next_result =
+      [&async_evaluator, best_model,
+       &best_score_so_far]() -> absl::StatusOr<EvaluationResult> {
     auto maybe_output = async_evaluator.GetResult();
     if (!maybe_output.has_value()) {
-      // Stop the optimization.
-      if (!exploration_is_done) {
-        return absl::InternalError(
-            "No more evaluation results while the exploration is not marked as "
-            "done");
-      }
-      break;
+      return absl::InternalError("No more evaluation results");
     }
     if (!maybe_output.value().ok()) {
       return maybe_output.value().status();
     }
     auto& output = maybe_output.value().value();
-    pending_evaluation--;
-
-    RETURN_IF_ERROR(
-        optimizer->ConsumeEvaluation(output.candidate, output.score));
-
-    // Record the hyperparameter + evaluation.
-    auto& log_entry = *logs->add_steps();
-    log_entry.set_evaluation_time(
-        absl::ToDoubleSeconds(absl::Now() - begin_optimization));
-    *log_entry.mutable_hyperparameters() = output.candidate;
-    log_entry.set_score(output.score);
-
-    if (std::isnan(logging_best_score) || output.score > logging_best_score) {
-      logging_best_score = output.score;
+    if (std::isnan(best_score_so_far) || output.score > best_score_so_far) {
+      best_score_so_far = output.score;
       *best_model = std::move(output.model);
     }
-    LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
-              << "] Score: " << output.score << " / " << logging_best_score
-              << " HParams: " << output.candidate.ShortDebugString();
+    return EvaluationResult{output.candidate, output.score};
+  };
 
-    if (training_config().has_maximum_training_duration_seconds() &&
-        (absl::Now() - begin_optimization) >
-            absl::Seconds(
-                training_config().maximum_training_duration_seconds())) {
-      LOG(INFO)
-          << "Stop optimization because of the maximum training duration.";
-      break;
-    }
-    round_idx++;
-  }
-  async_evaluator.JoinAllAndStopThreads();
-
-  model::proto::GenericHyperParameters best_params;
-  double best_score;
-  std::tie(best_params, best_score) = optimizer->BestParameters();
-
-  logs->set_best_score(best_score);
-  *logs->mutable_best_hyperparameters() = best_params;
+  auto best_params =
+      SearchBestHyperparameterLoop(spe_config, search_space_spec, search_space,
+                                   logs, submit_candidate, get_next_result);
 
   return best_params;
 }
@@ -674,99 +697,47 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
     std::unique_ptr<AbstractModel>* best_model,
     distribute::AbstractManager* manager,
     model::proto::HyperparametersOptimizerLogs* logs) const {
-  const auto begin_optimization = absl::Now();
-
-  // Initializer the hyperparameter logs.
-  *logs->mutable_space() = search_space;
-  logs->set_hyperparameter_optimizer_key(
-      spe_config.optimizer().optimizer_key());
-
-  // Instantiate the optimizer.
-  ASSIGN_OR_RETURN(auto optimizer, OptimizerInterfaceRegisterer::Create(
-                                       spe_config.optimizer().optimizer_key(),
-                                       spe_config.optimizer(), search_space,
-                                       search_space_spec));
-
   // Mapping between request_id and hyperparameter of the currently running
   // evaluations.
   absl::flat_hash_map<std::string, model::proto::GenericHyperParameters>
       pending_hyperparameters;
 
-  // Number of evaluated and processed candidates.
-  int round_idx = 0;
-
   // Id of the next request.
   int next_request_id = 0;
 
-  // True iff. the optimizer is done generating new candidates.
-  bool exploration_is_done = false;
-
-  double logging_best_score = std::numeric_limits<double>::quiet_NaN();
-
   // Path to the best model so far.
   std::string best_model_path;
+  double best_score_so_far = std::numeric_limits<double>::quiet_NaN();
 
-  while (true) {
-    if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
-      LOG(INFO) << "Training interrupted per the user";
-      break;
+  auto submit_candidate =
+      [&](const model::proto::GenericHyperParameters& candidate)
+      -> absl::Status {
+    generic_worker::proto::Request generic_request;
+    auto& train_request = *generic_request.mutable_train_model();
+    train_request.set_return_model_validation(true);
+
+    *train_request.mutable_train_config() = spe_config.base_learner();
+    *train_request.mutable_deployment_config() =
+        spe_config.base_learner_deployment();
+    *train_request.mutable_generic_hyper_parameters() = candidate;
+
+    train_request.set_dataset_path(std::string(typed_train_path));
+    if (typed_valid_path.has_value()) {
+      train_request.set_valid_dataset_path(typed_valid_path.value());
     }
 
-    // Generate as many candidates as possible.
-    while (true) {
-      model::proto::GenericHyperParameters candidate;
-      ASSIGN_OR_RETURN(const auto optimizer_status,
-                       optimizer->NextCandidate(&candidate));
-      if (optimizer_status == NextCandidateStatus::kExplorationIsDone) {
-        // The optimization can stop.
-        exploration_is_done = true;
-        if (!pending_hyperparameters.empty()) {
-          return absl::InternalError(
-              "The optimizer stopped the optimization while some evaluations "
-              "are still running.");
-        }
-        break;
-      } else if (optimizer_status == NextCandidateStatus::kWaitForEvaluation) {
-        // Wait for some evaluation to finish.
-        if (pending_hyperparameters.empty()) {
-          return absl::InternalError(
-              "The optimizer requested an evaluation while not evaluation is "
-              "currently pending.");
-        }
-        break;
-      } else if (optimizer_status ==
-                 NextCandidateStatus::kNewCandidateAvailable) {
-        // Start evaluating this new candidate.
-        generic_worker::proto::Request generic_request;
-        auto& train_request = *generic_request.mutable_train_model();
-        train_request.set_return_model_validation(true);
+    *train_request.mutable_dataspec() = data_spec;
+    train_request.set_model_base_path(
+        file::JoinPath(deployment().cache_path(), "models"));
 
-        *train_request.mutable_train_config() = spe_config.base_learner();
-        *train_request.mutable_deployment_config() =
-            spe_config.base_learner_deployment();
-        *train_request.mutable_generic_hyper_parameters() = candidate;
+    std::string request_id = absl::StrCat(next_request_id++);
+    generic_request.set_request_id(request_id);
+    pending_hyperparameters[request_id] = candidate;
 
-        train_request.set_dataset_path(std::string(typed_train_path));
-        if (typed_valid_path.has_value()) {
-          train_request.set_valid_dataset_path(typed_valid_path.value());
-        }
+    return manager->AsynchronousProtoRequest(generic_request);
+  };
 
-        *train_request.mutable_dataspec() = data_spec;
-        train_request.set_model_base_path(
-            file::JoinPath(deployment().cache_path(), "models"));
-
-        std::string request_id = absl::StrCat(next_request_id++);
-        generic_request.set_request_id(request_id);
-        pending_hyperparameters[request_id] = std::move(candidate);
-
-        RETURN_IF_ERROR(manager->AsynchronousProtoRequest(generic_request));
-      }
-    }
-
-    if (exploration_is_done && pending_hyperparameters.empty()) {
-      break;
-    }
-
+  auto get_next_result = [&]() -> absl::StatusOr<EvaluationResult> {
     ASSIGN_OR_RETURN(
         auto evaluator_result,
         manager->NextAsynchronousProtoAnswer<generic_worker::proto::Result>());
@@ -785,42 +756,18 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterDistributed(
     const auto candidate = std::move(it_hyperparameter->second);
     pending_hyperparameters.erase(it_hyperparameter);
 
-    RETURN_IF_ERROR(optimizer->ConsumeEvaluation(candidate, score));
-
-    // Record the hyperparameter + evaluation.
-    auto& log_entry = *logs->add_steps();
-    log_entry.set_evaluation_time(
-        absl::ToDoubleSeconds(absl::Now() - begin_optimization));
-    *log_entry.mutable_hyperparameters() = candidate;
-    log_entry.set_score(score);
-
-    if (std::isnan(logging_best_score) || score > logging_best_score) {
-      logging_best_score = score;
+    if (std::isnan(best_score_so_far) || score > best_score_so_far) {
+      best_score_so_far = score;
       best_model_path = evaluator_result.train_model().model_path();
     }
-    LOG(INFO) << "[" << round_idx + 1 << "/" << optimizer->NumExpectedRounds()
-              << "] Score: " << score << " / " << logging_best_score
-              << " HParams: " << candidate.ShortDebugString();
+    return EvaluationResult{candidate, score};
+  };
 
-    if (training_config().has_maximum_training_duration_seconds() &&
-        (absl::Now() - begin_optimization) >
-            absl::Seconds(
-                training_config().maximum_training_duration_seconds())) {
-      LOG(INFO)
-          << "Stop optimization because of the maximum training duration.";
-      break;
-    }
-    round_idx++;
-  }
+  auto best_params =
+      SearchBestHyperparameterLoop(spe_config, search_space_spec, search_space,
+                                   logs, submit_candidate, get_next_result);
 
-  model::proto::GenericHyperParameters best_params;
-  double best_score;
-  std::tie(best_params, best_score) = optimizer->BestParameters();
-
-  logs->set_best_score(best_score);
-  *logs->mutable_best_hyperparameters() = best_params;
-
-  if (!spe_config.retrain_final_model()) {
+  if (best_params.ok() && !spe_config.retrain_final_model()) {
     // If the best model is needed, load it.
     RETURN_IF_ERROR(model::LoadModel(best_model_path, best_model));
   }
