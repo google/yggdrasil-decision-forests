@@ -47,6 +47,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETERS_OPTIMIZER_OPTIMIZER_INTERFACE_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETERS_OPTIMIZER_OPTIMIZER_INTERFACE_H_
 
+#include <string>
 #include <utility>
 
 #include "absl/status/status.h"
@@ -103,6 +104,9 @@ class OptimizerInterface {
   // Total expected number of candidates to evaluate before the exploration is
   // done. This value is non-contractual and can change.
   virtual int NumExpectedRounds() = 0;
+
+  // Returns a UI link if available.
+  virtual std::string UILink() const { return ""; }
 };
 
 REGISTRATION_CREATE_POOL(

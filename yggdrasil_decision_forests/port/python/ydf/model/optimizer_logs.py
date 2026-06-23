@@ -43,17 +43,24 @@ class OptimizerLogs:
 
   Attributes:
     trials: Collection of trials.
+    tuner_link: Link to the user interface of the tuner.
   """
 
   trials: Sequence[Trial]
+  tuner_link: Optional[str] = None
 
 
 def proto_optimizer_logs_to_optimizer_logs(
-    proto: abstract_model_pb2.HyperparametersOptimizerLogs,
+    proto_logs: abstract_model_pb2.HyperparametersOptimizerLogs,
 ) -> OptimizerLogs:
   """Converts proto optimizer logs into user-facing optimizer logs."""
 
-  return OptimizerLogs(trials=[_trial_from_proto(step) for step in proto.steps])
+  return OptimizerLogs(
+      trials=[_trial_from_proto(step) for step in proto_logs.steps],
+      tuner_link=proto_logs.tuner_link
+      if proto_logs.HasField("tuner_link")
+      else None,
+  )
 
 
 def _trial_from_proto(

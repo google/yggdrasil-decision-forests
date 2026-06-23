@@ -51,6 +51,30 @@ TEST(Html, OnClick) {
   EXPECT_EQ(page.content(), "<a onclick=\"f('hello');\">world</a>");
 }
 
+TEST(Html, HRefSanitization) {
+  auto page_safe = A(HRef("https://my.corp.url/123"), "study");
+  EXPECT_EQ(page_safe.content(),
+            "<a href=\"https://my.corp.url/123\">study</a>");
+
+  auto go_link = A(HRef("go/mylink"), "study");
+  EXPECT_EQ(go_link.content(), "<a href=\"go/mylink\">study</a>");
+
+  auto page_js = A(HRef("javascript:alert(1)"), "alert");
+  EXPECT_EQ(page_js.content(), "<a href=\"#\">alert</a>");
+
+  auto page_js_spaced = A(HRef(" j a v a s c r i p t : alert(1)"), "alert");
+  EXPECT_EQ(page_js_spaced.content(), "<a href=\"#\">alert</a>");
+
+  auto page_js_mixed = A(HRef("JaVaScRiPt:alert(1)"), "alert");
+  EXPECT_EQ(page_js_mixed.content(), "<a href=\"#\">alert</a>");
+
+  auto page_vb = A(HRef("vbscript:msgbox(1)"), "alert");
+  EXPECT_EQ(page_vb.content(), "<a href=\"#\">alert</a>");
+
+  auto page_data = A(HRef("data:text/html,<script>alert(1)</script>"), "data");
+  EXPECT_EQ(page_data.content(), "<a href=\"#\">data</a>");
+}
+
 }  // namespace
 }  // namespace html
 }  // namespace utils

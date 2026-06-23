@@ -15,6 +15,10 @@
 
 #include "yggdrasil_decision_forests/utils/html.h"
 
+#include <cstddef>
+#include <string>
+
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
@@ -30,6 +34,44 @@ std::string Escape(absl::string_view text) {
                                     {"\"", "&quot;"},
                                     {"'", "&#39;"}});
 }
+
+namespace internal {
+
+std::string SanitizeUrl(absl::string_view url) {
+  size_t start = 0;
+  while (start < url.size() &&
+         (absl::ascii_isspace(url[start]) || absl::ascii_iscntrl(url[start]))) {
+    start++;
+  }
+
+  absl::string_view trimmed_url = url.substr(start);
+
+  size_t colon_pos = trimmed_url.find(':');
+
+  // Relative URLs are allowed.
+  if (colon_pos == absl::string_view::npos) {
+    return std::string(url);
+  }
+
+  absl::string_view scheme_view = trimmed_url.substr(0, colon_pos);
+  std::string scheme;
+  scheme.reserve(scheme_view.size());
+
+  for (char c : scheme_view) {
+    if (!absl::ascii_isspace(c) && !absl::ascii_iscntrl(c)) {
+      scheme += absl::ascii_tolower(c);
+    }
+  }
+
+  if (scheme == "http" || scheme == "https" || scheme == "mailto") {
+    return std::string(url);
+  }
+
+  // If it has a scheme but isn't explicitly allowed, nuke it.
+  return "#";
+}
+
+}  // namespace internal
 
 std::string Style::content() const { return std::string(content_); }
 

@@ -162,6 +162,9 @@ message HyperparametersOptimizerLogs {
   //  Registered key for the hyperparameter optimizer.
   optional string hyperparameter_optimizer_key = 3;
 
+  // Link to the user interface of the tuner.
+  optional string tuner_link = 6;
+
   // The selected hyperparameters and its score.
   //
   // Note: It is possible that the best hyperparameters are not part of the

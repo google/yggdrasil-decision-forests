@@ -228,6 +228,11 @@ utils::html::Html TuningLogs(const model::AbstractModel& model) {
 
   const auto& logs = *model.hyperparameter_optimizer_logs();
 
+  if (!logs.tuner_link().empty()) {
+    content.Append(h::P("Tuner UI: ",
+                        h::A(h::HRef(logs.tuner_link()), logs.tuner_link())));
+  }
+
   // Index the possible fields and scores.
   absl::flat_hash_map<std::string, int> field_to_idx;
   std::vector<std::string> filed_names;

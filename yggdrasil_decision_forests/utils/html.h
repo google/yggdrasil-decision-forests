@@ -41,6 +41,10 @@ std::string Escape(absl::string_view text);
 
 namespace internal {
 
+// Returns "#" if the url contains an unsafe scheme (like javascript:).
+// Otherwise, returns the original url.
+std::string SanitizeUrl(absl::string_view url);
+
 // Chunk of html.
 class Html {
  public:
@@ -318,7 +322,7 @@ inline internal::Attr Style(Style value) {
 }
 
 inline internal::Attr HRef(absl::string_view value) {
-  return internal::Attr("href", value);
+  return internal::Attr("href", internal::SanitizeUrl(value));
 }
 
 inline internal::Attr Value(absl::string_view value) {

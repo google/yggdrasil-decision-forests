@@ -525,6 +525,10 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterLoop(
                                        spe_config.optimizer(), search_space,
                                        search_space_spec));
 
+  if (auto ui_link = optimizer->UILink(); !ui_link.empty()) {
+    logs->set_tuner_link(ui_link);
+  }
+
   int pending_evaluation = 0;
   int round_idx = 0;
 
