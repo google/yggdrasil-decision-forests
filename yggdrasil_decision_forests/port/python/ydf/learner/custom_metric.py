@@ -48,29 +48,12 @@ class AbstractCustomMetric:
 class RegressionMetric(AbstractCustomMetric):
   """A user-provided secondary metric for regression problems.
 
-  Evaluation functions may never reference their arguments outside after
-  returning:
-  Bad:
-  ```
-  mylabels = None
-  def evaluation_func(labels, predictions, weights):
-    nonlocal mylabels
-    mylabels = labels  # labels is now referenced outside the function
-  ```
-  Good:
-  ```
-  mylabels = None
-  def evaluation_func(labels, predictions, weights):
-    nonlocal mylabels
-    mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
-  ```
-
   Attributes:
     name: The name of the custom metric. This will be displayed in the training
       logs and made available as secondary metric in the model.
-    evaluation_func: The evaluation function receives the predictions (without
-      activation function), labels, and weights, and must output the metric
-      value as a float.
+    evaluation_func: The evaluation function receives the labels, predictions
+      (without activation function), and weights in that order, and must output
+      the metric value as a float.
   """
 
   evaluation_func: Callable[
@@ -101,29 +84,12 @@ class BinaryClassificationMetric(AbstractCustomMetric):
   Note that the labels are binary but 1-based, i.e. the positive class is 2, the
   negative class is 1.
 
-  Evaluation functions may never reference their arguments outside after
-  returning:
-  Bad:
-  ```
-  mylabels = None
-  def evaluation_func(labels, predictions, weights):
-    nonlocal mylabels
-    mylabels = labels  # labels is now referenced outside the function
-  ```
-  Good:
-  ```
-  mylabels = None
-  def evaluation_func(labels, predictions, weights):
-    nonlocal mylabels
-    mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
-  ```
-
   Attributes:
     name: The name of the custom metric. This will be displayed in the training
       logs and made available as secondary metric in the model.
-    evaluation_func: The evaluation function receives the predictions (without
-      activation function), binary labels, and weights, and must output the
-      metric value as a float.
+    evaluation_func: The evaluation function receives the binary labels,
+      predictions (without activation function), and weights, and must output
+      the metric value as a float.
   """
 
   evaluation_func: Callable[
@@ -154,28 +120,11 @@ class MultiClassificationMetric(AbstractCustomMetric):
   Note that the labels are 1-based. Predictions are given in an 2D
   array with one row per example.
 
-  Evaluation functions may never reference their arguments outside after
-  returning:
-  Bad:
-  ```
-  mylabels = None
-  def evaluation_func(labels, predictions, weights):
-    nonlocal mylabels
-    mylabels = labels  # labels is now referenced outside the function
-  ```
-  Good:
-  ```
-  mylabels = None
-  def evaluation_func(labels, predictions, weights):
-    nonlocal mylabels
-    mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
-  ```
-
   Attributes:
     name: The name of the custom metric. This will be displayed in the training
       logs and made available as secondary metric in the model.
-    evaluation_func: The evaluation function receives the predictions (2D array,
-      without activation function), labels (1-based), and weights, and must
+    evaluation_func: The evaluation function receives the labels (1-based),
+      predictions (2D array, without activation function), and weights, and must
       output the metric value as a float.
   """
 

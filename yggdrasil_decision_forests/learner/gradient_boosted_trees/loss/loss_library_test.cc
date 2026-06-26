@@ -188,7 +188,7 @@ TEST(LossLibrary, CustomMetricsIntegrationInt) {
   CustomMetric custom_metric;
   custom_metric.name = "custom_metric";
   custom_metric.evaluation_function =
-      [](absl::Span<const float> predictions, absl::Span<const int32_t> labels,
+      [](absl::Span<const int32_t> labels, absl::Span<const float> predictions,
          absl::Span<const float> weights) { return 0.85f; };
 
   loss->RegisterCustomMetric(custom_metric);
@@ -216,7 +216,7 @@ TEST(LossLibrary, CustomMetricsIntegrationFloat) {
   CustomMetric custom_metric;
   custom_metric.name = "custom_metric";
   custom_metric.evaluation_function =
-      [](absl::Span<const float> predictions, absl::Span<const float> labels,
+      [](absl::Span<const float> labels, absl::Span<const float> predictions,
          absl::Span<const float> weights) { return 0.85f; };
 
   loss->RegisterCustomMetric(custom_metric);

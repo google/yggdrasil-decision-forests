@@ -340,15 +340,15 @@ void init_learner(py::module_& m) {
         py::arg("deployment_config"));
   py::class_<CCRegressionLoss>(m, "CCRegressionLoss")
       .def(py::init<CCRegressionLoss::InitFunc, CCRegressionLoss::LossFunc,
-                    CCRegressionLoss::GradFunc, bool>());
+                    CCRegressionLoss::GradFunc>());
   py::class_<CCBinaryClassificationLoss>(m, "CCBinaryClassificationLoss")
       .def(py::init<CCBinaryClassificationLoss::InitFunc,
                     CCBinaryClassificationLoss::LossFunc,
-                    CCBinaryClassificationLoss::GradFunc, bool>());
+                    CCBinaryClassificationLoss::GradFunc>());
   py::class_<CCMultiClassificationLoss>(m, "CCMultiClassificationLoss")
       .def(py::init<CCMultiClassificationLoss::InitFunc,
                     CCMultiClassificationLoss::LossFunc,
-                    CCMultiClassificationLoss::GradFunc, bool>());
+                    CCMultiClassificationLoss::GradFunc>());
   py::class_<CCBinaryClassificationMetric>(m, "CCBinaryClassificationMetric")
       .def(py::init<std::string, CCBinaryClassificationMetric::MetricFunc>());
   py::class_<CCMultiClassificationMetric>(m, "CCMultiClassificationMetric")

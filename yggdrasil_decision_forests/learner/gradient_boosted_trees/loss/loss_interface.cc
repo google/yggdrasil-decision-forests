@@ -100,19 +100,19 @@ absl::StatusOr<LossResults> AbstractLoss::Loss(
                                    weights, cache, thread_pool));
     for (const auto& metric : custom_metrics_) {
       absl::Status metric_status = absl::OkStatus();
-      std::visit(
-          absl::Overload{
-              [&](const CustomMetricInt& eval) {
-                auto metric_result =
-                    eval(predictions, categorical_labels->values(), weights);
-                if (!metric_result.ok()) {
-                  metric_status = metric_result.status();
-                  return;
-                }
-                results.secondary_metrics.push_back(metric_result.value());
-              },
-              [](const CustomMetricFloat& /*unused*/) {}},
-          metric.evaluation_function);
+      std::visit(absl::Overload{[&](const CustomMetricInt& eval) {
+                                  auto metric_result =
+                                      eval(categorical_labels->values(),
+                                           predictions, weights);
+                                  if (!metric_result.ok()) {
+                                    metric_status = metric_result.status();
+                                    return;
+                                  }
+                                  results.secondary_metrics.push_back(
+                                      metric_result.value());
+                                },
+                                [](const CustomMetricFloat& /*unused*/) {}},
+                 metric.evaluation_function);
       RETURN_IF_ERROR(metric_status);
     }
 
@@ -130,8 +130,8 @@ absl::StatusOr<LossResults> AbstractLoss::Loss(
     for (const auto& metric : custom_metrics_) {
       std::visit(absl::Overload{[&](const CustomMetricFloat& eval) {
                                   auto metric_result =
-                                      eval(predictions,
-                                           numerical_labels->values(), weights);
+                                      eval(numerical_labels->values(),
+                                           predictions, weights);
                                   if (!metric_result.ok()) {
                                     metric_status = metric_result.status();
                                     return;

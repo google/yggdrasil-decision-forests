@@ -60,8 +60,6 @@ class AbstractCustomLoss:
       Tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]],
   ]
 
-  may_trigger_gc: bool = True
-
   def check_is_compatible_task(self, task: abstract_model_pb2.Task) -> None:
     raise NotImplementedError("Not implemented")
 
@@ -72,22 +70,6 @@ class AbstractCustomLoss:
 @dataclasses.dataclass(frozen=True)
 class RegressionLoss(AbstractCustomLoss):
   """A user-provided loss function for regression problems.
-
-  Loss functions may never reference their arguments outside after returning:
-  Bad:
-  ```
-  mylabels = None
-  def initial_predictions(labels, weights):
-    nonlocal mylabels
-    mylabels = labels  # labels is now referenced outside the function
-  ```
-  Good:
-  ```
-  mylabels = None
-  def initial_predictions(labels, weights):
-    nonlocal mylabels
-    mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
-  ```
 
   Attributes:
     initial_predictions: The bias / initial predictions of the GBT model.
@@ -104,13 +86,6 @@ class RegressionLoss(AbstractCustomLoss):
     activation: Activation function to be applied to the model. Regression
       models are expected to return a value in the same space as the labels
       after applying the activation function.
-    may_trigger_gc: If True (default), YDF may trigger Python's garbage
-      collection to determine if a Numpy array that is backed by YDF-internal
-      data is used after its lifetime has ended. If False, checks for illegal
-      memory accesses are disabled. This can be useful when training many small
-      models or if the observed impact of triggering GC is large. If
-      `may_trigger_gc=False`, it is very important that the user validate
-      manually that no memory leakage occurs.
   """
 
   initial_predictions: Callable[
@@ -151,7 +126,6 @@ class RegressionLoss(AbstractCustomLoss):
         self.initial_predictions,
         self.loss,
         self.gradient_and_hessian,
-        self.may_trigger_gc,
     )
 
 
@@ -159,24 +133,8 @@ class RegressionLoss(AbstractCustomLoss):
 class BinaryClassificationLoss(AbstractCustomLoss):
   """A user-provided loss function for binary classification problems.
 
-  Note that the labels are binary but 1-based, i.e. the positive class is 2, the
+  Note that the labels are 1-based binary, i.e. the positive class is 2, the
   negative class is 1.
-
-  Loss functions may never reference their arguments outside after returning:
-  Bad:
-  ```
-  mylabels = None
-  def initial_predictions(labels, weights):
-    nonlocal mylabels
-    mylabels = labels  # labels is now referenced outside the function
-  ```
-  Good:
-  ```
-  mylabels = None
-  def initial_predictions(labels, weights):
-    nonlocal mylabels
-    mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
-  ```
 
   Attributes:
     initial_predictions: The bias / initial predictions of the GBT model.
@@ -193,11 +151,6 @@ class BinaryClassificationLoss(AbstractCustomLoss):
     activation: Activation function to be applied to the model. Binary
       classification models are expected to return a probability after applying
       the activation function.
-    may_trigger_gc: If True (default), YDF may trigger Python's garbage
-      collection to determine if an Numpy array that is backed by YDF-internal
-      data is used after its lifetime has ended. If False, checks for illegal
-      memory accesses are disabled. Setting this parameter to False is
-      dangerous, since illegal memory accesses will no longer be detected.
   """
 
   initial_predictions: Callable[
@@ -239,7 +192,6 @@ class BinaryClassificationLoss(AbstractCustomLoss):
         self.initial_predictions,
         self.loss,
         self.gradient_and_hessian,
-        self.may_trigger_gc,
     )
 
 
@@ -251,22 +203,6 @@ class MultiClassificationLoss(AbstractCustomLoss):
   array with one row per example. Initial predictions, gradient and
   hessian are expected for each class, e.g. for a 3-class classification
   problem, output 3 gradients and hessians per class.
-
-  Loss functions may never reference their arguments outside after returning:
-  Bad:
-  ```
-  mylabels = None
-  def initial_predictions(labels, weights):
-    nonlocal mylabels
-    mylabels = labels  # labels is now referenced outside the function
-  ```
-  Good:
-  ```
-  mylabels = None
-  def initial_predictions(labels, weights):
-    nonlocal mylabels
-    mylabels = np.copy(labels)  # mylabels is a copy, not a reference.
-  ```
 
   Attributes:
     initial_predictions: The bias / initial predictions of the GBT model.
@@ -285,11 +221,6 @@ class MultiClassificationLoss(AbstractCustomLoss):
     activation: Activation function to be applied to the model. Multi-class
       classification models are expected to return a probability distribution
       over the classes after applying the activation function.
-    may_trigger_gc: If True (default), YDF may trigger Python's garbage
-      collection to determine if an Numpy array that is backed by YDF-internal
-      data is used after its lifetime has ended. If False, checks for illegal
-      memory accesses are disabled. Setting this parameter to False is
-      dangerous, since illegal memory accesses will no longer be detected.
   """
 
   initial_predictions: Callable[
@@ -334,5 +265,4 @@ class MultiClassificationLoss(AbstractCustomLoss):
         self.initial_predictions,
         self.loss,
         self.gradient_and_hessian,
-        self.may_trigger_gc,
     )

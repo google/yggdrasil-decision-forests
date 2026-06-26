@@ -22,6 +22,7 @@
 #include <pybind11/stl.h>
 
 #include <cstddef>
+#include <cstring>
 #include <string_view>
 #include <vector>
 
@@ -94,18 +95,12 @@ struct NPByteArray {
   const size_t _size;
 };
 
-// Returns a read-only Numpy array referencing the data in `data`.
 template <typename T>
-py::array_t<T> SpanToUnsafeNumpyArray(absl::Span<const T> data) {
-  // If the span is empty, return an empty array of the correct type.
-  if (data.empty()) {
-    return py::array_t<T>();
+py::array_t<T> SpanToSafeCopy(absl::Span<const T> span) {
+  py::array_t<T> arr({static_cast<py::ssize_t>(span.size())});
+  if (!span.empty()) {
+    std::memcpy(arr.mutable_data(), span.data(), span.size() * sizeof(T));
   }
-  auto arr = py::array_t<T>(/*shape=*/{data.size()}, /*strides=*/{sizeof(T)},
-                            /*ptr=*/data.data(),
-                            py::capsule(data.data(), [](void* v) {}));
-  py::detail::array_proxy(arr.ptr())->flags &=
-      ~py::detail::npy_api::NPY_ARRAY_WRITEABLE_;
   return arr;
 }
 

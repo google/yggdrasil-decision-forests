@@ -2646,7 +2646,7 @@ CustomMetric CreateStaticMetric() {
   CustomMetric metric;
   metric.name = "static_metric";
   metric.evaluation_function =
-      [](absl::Span<const float> predictions, absl::Span<const int32_t> labels,
+      [](absl::Span<const int32_t> labels, absl::Span<const float> predictions,
          absl::Span<const float> weights) { return 42.0f; };
   return metric;
 }
@@ -2654,8 +2654,8 @@ CustomMetric CreateStaticMetric() {
 CustomMetric CreateF1ScoreMetric() {
   CustomMetric metric;
   metric.name = "f1_score";
-  metric.evaluation_function = [](absl::Span<const float> predictions,
-                                  absl::Span<const int32_t> labels,
+  metric.evaluation_function = [](absl::Span<const int32_t> labels,
+                                  absl::Span<const float> predictions,
                                   absl::Span<const float> weights) {
     double tp = 0, fp = 0, fn = 0;
     for (size_t i = 0; i < predictions.size(); ++i) {
@@ -2680,8 +2680,8 @@ CustomMetric CreateF1ScoreMetric() {
 CustomMetric CreateMseMetric() {
   CustomMetric metric;
   metric.name = "mse-custom";
-  metric.evaluation_function = [](absl::Span<const float> predictions,
-                                  absl::Span<const float> labels,
+  metric.evaluation_function = [](absl::Span<const float> labels,
+                                  absl::Span<const float> predictions,
                                   absl::Span<const float> weights) {
     double sum_err = 0;
     for (size_t i = 0; i < predictions.size(); ++i) {

@@ -111,6 +111,19 @@ def _evaluate_regression_rmse(
     return np.float32(np.sqrt(weighted_mse))
 
 
+def _evaluate_regression_mean_difference(
+    labels: nptt.NDArray[np.float32],
+    predictions: nptt.NDArray[np.float32],
+    weights: nptt.NDArray[np.float32],
+) -> np.float32:
+  if weights.size == 0:
+    return np.float32(np.mean(predictions - labels))
+  else:
+    return np.float32(
+        np.sum(weights * (predictions - labels)) / np.sum(weights)
+    )
+
+
 class GradientBoostedTreesTest(parameterized.TestCase):
 
   def setUp(self):
@@ -530,8 +543,8 @@ class GradientBoostedTreesTest(parameterized.TestCase):
 
     with self.assertRaisesRegex(
         RuntimeError,
-        "UNKNOWN: ValueError: operands could not be broadcast together with"
-        r" shapes \(0,\) \(94,\) ",
+        "UNKNOWN: Python function 'evaluation_func' raised: ValueError: "
+        r"operands could not be broadcast together with shapes \(0,\) \(94,\)",
     ):
       learner.train(df)
 
@@ -615,6 +628,39 @@ class GradientBoostedTreesTest(parameterized.TestCase):
         "rmse-2",
         model.training_logs()[0].training_evaluation.custom_metrics,
     )
+
+  def test_custom_metrics_regression_non_symmetric(self):
+    custom_diff = custom_metric.RegressionMetric(
+        name="mean_diff",
+        evaluation_func=_evaluate_regression_mean_difference,
+    )
+    # Train data: labels mean = 2.0
+    train_df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([0.5, 1.5, 2.5, 3.5] * 25),
+    })
+    # Valid data: labels mean = 10.0
+    valid_df = pd.DataFrame({
+        "x": np.array([0, 0, 1, 1] * 25),
+        "y": np.array([8.5, 9.5, 10.5, 11.5] * 25),
+    })
+
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        num_trees=1,
+        max_depth=1,
+        min_examples=1,
+        task=generic_model.Task.REGRESSION,
+        custom_metrics=[custom_diff],
+        validation_ratio=0.0,
+    )
+
+    model = learner.train(train_df, valid=valid_df)
+    val_metrics = model.validation_evaluation().custom_metrics
+    self.assertIn("mean_diff", val_metrics)
+    val_diff = val_metrics["mean_diff"]
+    self.assertLess(val_diff, 0.0, f"Expected negative diff, got {val_diff}")
+    self.assertAlmostEqual(val_diff, -8.0, delta=1.0)
 
   def test_set_output_logits_classification(self):
     dataset = pd.read_csv(

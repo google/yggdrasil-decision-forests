@@ -1,4 +1,4 @@
-load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
 load("@rules_python//python:py_library.bzl", "py_library")
 load("@rules_python//python:py_test.bzl", "py_test")
 
@@ -51,7 +51,6 @@ py_library(
     srcs = ["log.py"],
     deps = [
         # absl/logging dep,
-        # tqdm dep,
         "//ydf/cc:ydf",
     ],
 )
@@ -96,6 +95,15 @@ pybind_library(
     deps = [
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+pybind_library(
+    name = "pybind",
+    hdrs = ["pybind.h"],
+    deps = [
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -174,5 +182,26 @@ py_test(
         ":test_utils",
         # absl/testing:absltest dep,
         # numpy dep,
+    ],
+)
+
+pybind_extension(
+    name = "pybind_test_helper",
+    testonly = True,
+    srcs = ["pybind_test_helper.cc"],
+    deps = [
+        ":pybind",
+        ":status_casters",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+py_test(
+    name = "pybind_test",
+    srcs = ["pybind_test.py"],
+    deps = [
+        ":pybind_test_helper",
+        # absl/testing:absltest dep,
     ],
 )

@@ -1,5 +1,16 @@
 # Changelog
 
+## API Changes
+
+-   Removed the `may_trigger_gc` parameter of the losses. Losses no longer
+    trigger the Python GC.
+
+## Head
+
+-   Refactored C++ to Python custom loss and metric evaluation to perform safe
+    memory copies instead of zero-copy array sharing. This simplifies memory
+    management and avoids use-after-free bugs.
+
 ## 0.16.1 - 2026-03-24
 
 ### Fix

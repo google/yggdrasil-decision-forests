@@ -175,12 +175,12 @@ class AbstractLossCache {
 
 // Function signature for regression metrics (float labels).
 using CustomMetricFloat = std::function<absl::StatusOr<float>(
-    absl::Span<const float> predictions, absl::Span<const float> labels,
+    absl::Span<const float> labels, absl::Span<const float> predictions,
     absl::Span<const float> weights)>;
 
 // Function signature for classification metrics (int labels).
 using CustomMetricInt = std::function<absl::StatusOr<float>(
-    absl::Span<const float> predictions, absl::Span<const int32_t> labels,
+    absl::Span<const int32_t> labels, absl::Span<const float> predictions,
     absl::Span<const float> weights)>;
 
 using CustomMetricFunction = std::variant<CustomMetricFloat, CustomMetricInt>;
