@@ -711,6 +711,16 @@ TEST(RandomForest, SetHyperParameters) {
             decision_tree::proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION);
 }
 
+TEST(RandomForest, SetHyperParametersWinnerTakeAllConflict) {
+  RandomForestLearner learner{model::proto::TrainingConfig()};
+  EXPECT_THAT(
+      learner.SetHyperParameters(PARSE_TEST_PROTO(
+          "fields { name: \"winner_take_all\" value { categorical: \"true\" } }"
+          "fields { name: \"winner_takes_all\" value { "
+          "categorical: \"false\" } }")),
+      test::StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
 TEST(RandomForest, OOBPredictions) {
   const model::proto::TrainingConfig config = PARSE_TEST_PROTO(R"pb(
     task: CLASSIFICATION
