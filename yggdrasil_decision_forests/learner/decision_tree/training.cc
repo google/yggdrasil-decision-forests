@@ -4423,6 +4423,27 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
     }
   }
 
+  // Mirror the histogram num_candidates default for the oblique projection
+  // split (sparse_oblique_split.projection_split).
+  if (config->has_sparse_oblique_split() &&
+      config->sparse_oblique_split().has_projection_split() &&
+      !config->sparse_oblique_split()
+           .projection_split()
+           .has_num_candidates()) {
+    auto* ps = config->mutable_sparse_oblique_split()
+                   ->mutable_projection_split();
+    switch (ps->type()) {
+      case proto::NumericalSplit::HISTOGRAM_RANDOM:
+        ps->set_num_candidates(1);
+        break;
+      case proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH:
+        ps->set_num_candidates(255);
+        break;
+      default:
+        break;
+    }
+  }
+
   // By default, use axis aligned splits.
   if (config->split_axis_case() ==
       proto::DecisionTreeTrainingConfig::SPLIT_AXIS_NOT_SET) {
