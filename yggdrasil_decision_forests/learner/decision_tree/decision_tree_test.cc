@@ -1769,6 +1769,7 @@ TEST(DecisionTree,
   }
 
   utils::RandomEngine rnd(1234);
+  SplitterPerThreadCache cache;
   proto::NodeCondition best_condition;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
@@ -1777,7 +1778,7 @@ TEST(DecisionTree,
       FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
           selected, weights, attributes_bad, labels, num_attribute_classes,
           num_label_classes, min_num_obs, dt_config, label_distribution, -1,
-          &best_condition, &rnd)
+          &best_condition, &cache, &rnd)
           .value(),
       SplitSearchResult::kNoBetterSplitFound);
 
@@ -1785,7 +1786,7 @@ TEST(DecisionTree,
       FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
           selected, weights, attributes_non_valid, labels,
           num_attribute_classes, num_label_classes, min_num_obs, dt_config,
-          label_distribution, -1, &best_condition, &rnd)
+          label_distribution, -1, &best_condition, &cache, &rnd)
           .value(),
       SplitSearchResult::kInvalidAttribute);
 
@@ -1793,7 +1794,7 @@ TEST(DecisionTree,
       FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
           selected, weights, attributes_perfect, labels, num_attribute_classes,
           num_label_classes, min_num_obs, dt_config, label_distribution, -1,
-          &best_condition, &rnd)
+          &best_condition, &cache, &rnd)
           .value(),
       SplitSearchResult::kBetterSplitFound);
 
@@ -1843,6 +1844,7 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
   }
 
   utils::RandomEngine rnd(1234);
+  SplitterPerThreadCache cache;
   proto::NodeCondition best_condition;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
@@ -1851,7 +1853,7 @@ TEST(DecisionTree, FindBestCategoricalSetSplitCartWithNA) {
       FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
           selected, weights, attributes, labels, num_attribute_classes,
           num_label_classes, min_num_obs, dt_config, label_distribution, -1,
-          &best_condition, &rnd)
+          &best_condition, &cache, &rnd)
           .value(),
       SplitSearchResult::kBetterSplitFound);
 
@@ -1903,6 +1905,7 @@ TEST(
   }
 
   utils::RandomEngine rnd(1234);
+  SplitterPerThreadCache cache;
   proto::NodeCondition best_condition;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
@@ -1912,7 +1915,7 @@ TEST(
       FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<false>(
           selected, weights, attributes_perfect, labels, num_attribute_classes,
           num_label_classes, min_num_obs, dt_config, label_distribution, -1,
-          &best_condition, &rnd)
+          &best_condition, &cache, &rnd)
           .value(),
       SplitSearchResult::kBetterSplitFound);
 
@@ -1962,6 +1965,7 @@ TEST(DecisionTree,
   }
 
   utils::RandomEngine rnd(1234);
+  SplitterPerThreadCache cache;
   proto::NodeCondition best_condition;
   proto::DecisionTreeTrainingConfig dt_config;
   dt_config.mutable_categorical_set_greedy_forward()->set_sampling(1.f);
@@ -1970,7 +1974,7 @@ TEST(DecisionTree,
       FindSplitLabelClassificationFeatureCategoricalSetGreedyForward<true>(
           selected, weights, attributes_perfect, labels, num_attribute_classes,
           num_label_classes, min_num_obs, dt_config, label_distribution, -1,
-          &best_condition, &rnd)
+          &best_condition, &cache, &rnd)
           .value(),
       SplitSearchResult::kBetterSplitFound);
 
