@@ -67,8 +67,27 @@ namespace model {
 namespace random_forest {
 namespace {
 
+using test::StatusIsOk;
+using ::testing::Not;
+
 using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
     DecisionTreeTrainingConfig::Internal;
+
+absl::StatusOr<dataset::VerticalDataset> CreateSingletonLabelDataset() {
+  const int num_examples = 1000;
+  dataset::VerticalDataset dataset;
+  auto* label_col = dataset.mutable_data_spec()->add_columns();
+  label_col->set_name("label");
+  label_col->set_type(dataset::proto::CATEGORICAL);
+  label_col->mutable_categorical()->set_is_already_integerized(true);
+  label_col->mutable_categorical()->set_number_of_unique_values(2);
+
+  RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
+  for (int i = 0; i < num_examples; i++) {
+    RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"label", "1"}}));
+  }
+  return dataset;
+}
 
 void SetExpectedSortingStrategy(Internal::SortingStrategy expected,
                                 model::proto::TrainingConfig* train_config) {
@@ -1561,6 +1580,25 @@ TEST(RandomForest, Honest) {
   ASSERT_NE(rf_model, nullptr);
   // Make sure the model doesn't actually separate all examples.
   EXPECT_LT(rf_model->NumNodes(), 11);
+}
+
+TEST(RandomForestOnConstantLabel, EvaluationDoesNotCrash) {
+  model::proto::DeploymentConfig deployment_config;
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(RandomForestLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::CLASSIFICATION);
+  train_config.set_label("label");
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateSingletonLabelDataset());
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config, &learner, deployment_config));
+  ASSERT_OK_AND_ASSIGN(const std::unique_ptr<model::AbstractModel> model,
+                       learner->TrainWithStatus(dataset));
+
+  utils::RandomEngine rnd;
+  metric::proto::EvaluationOptions eval_options;
+  EXPECT_THAT(model->EvaluateWithStatus(dataset, eval_options, &rnd),
+              Not(StatusIsOk()));
 }
 
 }  // namespace

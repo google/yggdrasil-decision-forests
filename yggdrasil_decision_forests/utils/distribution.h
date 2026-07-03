@@ -456,10 +456,18 @@ void InitializeConfusionMatrixProto(
     int32_t nr, int32_t nc, proto::IntegersConfusionMatrixDouble* confusion);
 
 // Increment the value in one cell of a confusion matrix.
+//
+// The caller must make sure that:
+// - 0 <= r < confusion->nrow()
+// - 0 <= c < confusion->ncol()
 void AddToConfusionMatrixProto(int32_t r, int32_t c, double value,
                                proto::IntegersConfusionMatrixDouble* confusion);
 
 // Add two initialized confusion matrices.
+//
+// The caller must make sure that:
+// - confusion->nrow() == src->nrow()
+// - confusion->ncol() == src->ncol()
 void AddToConfusionMatrixProto(const proto::IntegersConfusionMatrixDouble& src,
                                proto::IntegersConfusionMatrixDouble* dst);
 

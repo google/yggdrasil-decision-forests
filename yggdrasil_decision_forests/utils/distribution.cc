@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/distribution.h"
 
+#include <cstdint>
+
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 

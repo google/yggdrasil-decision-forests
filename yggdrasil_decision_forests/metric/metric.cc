@@ -989,10 +989,17 @@ absl::Status AddPrediction(const proto::EvaluationOptions& option,
       auto* eval_cls = eval->mutable_classification();
       const auto& pred_cls = pred.classification();
       STATUS_CHECK(pred_cls.has_ground_truth());
+      auto* confusion_matrix = eval_cls->mutable_confusion();
+      const auto& ground_truth = pred_cls.ground_truth();
+      STATUS_CHECK(ground_truth < confusion_matrix->nrow());
+      STATUS_CHECK(ground_truth >= 0);
+      const auto& pred_value = pred_cls.value();
+      STATUS_CHECK(pred_value < confusion_matrix->ncol());
+      STATUS_CHECK(pred_value >= 0);
+
       // Confusion matrix.
-      utils::AddToConfusionMatrixProto(pred_cls.ground_truth(),
-                                       pred_cls.value(), pred.weight(),
-                                       eval_cls->mutable_confusion());
+      utils::AddToConfusionMatrixProto(ground_truth, pred_value, pred.weight(),
+                                       confusion_matrix);
       // Log-Loss
       if (pred_cls.has_distribution()) {
         auto pred_prob_true_class =
