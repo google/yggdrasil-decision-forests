@@ -42,7 +42,6 @@
 #include "yggdrasil_decision_forests/learner/cart/cart.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
@@ -172,22 +171,24 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
         valid_dataset) const {
   const auto begin_training = absl::Now();
 
-  if (training_config().task() != model::proto::Task::CLASSIFICATION &&
-      training_config().task() != model::proto::Task::REGRESSION &&
-      training_config().task() != model::proto::Task::CATEGORICAL_UPLIFT) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("The CART learner does not support the task ",
-                     model::proto::Task_Name(training_config().task()), "."));
-  }
-
   // Assemble and check the training configuration.
   auto config = training_config();
   auto& cart_config = *config.MutableExtension(cart::proto::cart_config);
+  const auto task = config.task();
+  const auto& data_spec = train_dataset.data_spec();
+
+  if (task != model::proto::Task::CLASSIFICATION &&
+      task != model::proto::Task::REGRESSION &&
+      task != model::proto::Task::CATEGORICAL_UPLIFT) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("The CART learner does not support the task ",
+                     model::proto::Task_Name(task), "."));
+  }
 
   RETURN_IF_ERROR(SetDefaultHyperParameters(&cart_config));
 
-  if ((training_config().task() == model::proto::Task::NUMERICAL_UPLIFT ||
-       training_config().task() == model::proto::Task::CATEGORICAL_UPLIFT) &&
+  if ((task == model::proto::Task::NUMERICAL_UPLIFT ||
+       task == model::proto::Task::CATEGORICAL_UPLIFT) &&
       cart_config.decision_tree().has_honest()) {
     // TODO: b/2439527146 - Re-enable honest trees with uplift.
     return absl::InvalidArgumentError(
@@ -195,17 +196,30 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
   }
 
   model::proto::TrainingConfigLinking config_link;
-  RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
-      config, train_dataset.data_spec(), &config_link));
+  RETURN_IF_ERROR(
+      AbstractLearner::LinkTrainingConfig(config, data_spec, &config_link));
   decision_tree::SetInternalDefaultHyperParameters(
-      config, config_link, train_dataset.data_spec(),
-      cart_config.mutable_decision_tree());
-  RETURN_IF_ERROR(CheckConfiguration(train_dataset.data_spec(), config,
-                                     config_link, deployment()));
+      config, config_link, data_spec, cart_config.mutable_decision_tree());
+  RETURN_IF_ERROR(
+      CheckConfiguration(data_spec, config, config_link, deployment()));
+
+  // TODO: Consider re-enabling training of constant models.
+  if (task == model::proto::Task::CLASSIFICATION) {
+    if (config_link.num_label_classes() < 3) {
+      return absl::InvalidArgumentError(
+          "The training dataset only contains a single label class. Make sure "
+          "to train on at least two classes. Note that the Out-of-Vocabulary "
+          "(OOV) class is not a valid label class, meaning the data spec must "
+          "record at least 3 classes in the label vocabulary. This issue might "
+          "also occur if the entire dataset was not scanned to infer the label "
+          "classes. If you suspect this is the case, try setting "
+          "max_num_scanned_rows_to_compute_statistics=-1.");
+    }
+  }
 
   // Initialize the model.
   auto mdl = std::make_unique<model::random_forest::RandomForestModel>();
-  mdl->set_data_spec(train_dataset.data_spec());
+  mdl->set_data_spec(data_spec);
   InitializeModelWithAbstractTrainingConfig(config, config_link, mdl.get());
 
   // Outputs probabilities.

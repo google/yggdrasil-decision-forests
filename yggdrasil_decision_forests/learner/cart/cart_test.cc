@@ -17,16 +17,26 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
+#include "absl/status/status.h"
+#include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
+#include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
-#include "yggdrasil_decision_forests/utils/filesystem.h"
+#include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -35,6 +45,23 @@ namespace {
 
 using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
     DecisionTreeTrainingConfig::Internal;
+using test::StatusIs;
+
+absl::StatusOr<dataset::VerticalDataset> CreateConstantLabelDataset() {
+  const int num_examples = 100;
+  dataset::VerticalDataset dataset;
+  auto* label_col = dataset.mutable_data_spec()->add_columns();
+  label_col->set_name("label");
+  label_col->set_type(dataset::proto::CATEGORICAL);
+  label_col->mutable_categorical()->set_is_already_integerized(true);
+  label_col->mutable_categorical()->set_number_of_unique_values(2);
+
+  RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
+  for (int i = 0; i < num_examples; i++) {
+    RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"label", "1"}}));
+  }
+  return dataset;
+}
 
 void SetExpectedSortingStrategy(Internal::SortingStrategy expected,
                                 model::proto::TrainingConfig* train_config) {
@@ -304,6 +331,22 @@ TEST_F(CartOnSimPTE, DISABLED_Honest) {
 
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Qini(evaluation_), 0.044, 0.0521, 0.01871);
+}
+
+TEST(CartOnConstantLabelDS, Fails) {
+  model::proto::DeploymentConfig deployment_config;
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(CartLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::CLASSIFICATION);
+  train_config.set_label("label");
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateConstantLabelDataset());
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config, &learner, deployment_config));
+  EXPECT_THAT(
+      learner->TrainWithStatus(dataset).status(),
+      StatusIs(absl::StatusCode::kInvalidArgument,
+               "The training dataset only contains a single label class."));
 }
 
 }  // namespace
