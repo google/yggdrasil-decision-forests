@@ -51,6 +51,8 @@
 namespace yggdrasil_decision_forests::model::decision_tree {
 
 namespace internal {
+class ProjectionEvaluatorCache;
+
 struct NodeAndExamples {
   // The current node
   NodeWithChildren* node;
@@ -139,6 +141,8 @@ struct SplitterPerThreadCache {
 
   std::vector<int> numerical_features;
   std::vector<float> projection_values;
+  std::shared_ptr<internal::ProjectionEvaluatorCache>
+      projection_evaluator_cache;
 
   std::vector<int> catset_candidate_attributes_list;
   std::vector<std::vector<UnsignedExampleIdx>> catset_examples_by_candidate;
