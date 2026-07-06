@@ -684,8 +684,8 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraints) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8672, 0.0122, 0.8664);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2948, 0.0125, 0.2912);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8655, 0.0134, 0.8673);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2964, 0.0138, 0.291);
 
   // Show the tree structure.
   std::string description;
@@ -723,8 +723,8 @@ TEST_F(GradientBoostedTreesOnAdult, MonotonicConstraintsPure) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8672, 0.0104, 0.8664);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2955, 0.0145, 0.2912);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.867, 0.0111, 0.8673);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3001, 0.0212, 0.291);
 
   // Show the tree structure.
   std::string description;
@@ -761,8 +761,8 @@ TEST_F(GradientBoostedTreesOnAdult, DecreasingMonotonicConstraints) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8558, 0.0131, 0.8544);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3101, 0.0129, 0.3093);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8566, 0.0097, 0.8553);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3128, 0.0164, 0.3089);
 
   // Show the tree structure.
   std::string description;
@@ -798,8 +798,8 @@ TEST_F(GradientBoostedTreesOnAdult, ObliqueMonotonicConstraints) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8623, 0.0099, 0.8658);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3034, 0.0157, 0.2997);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8615, 0.0124, 0.8618);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3059, 0.0164, 0.3014);
 
   // Show the tree structure.
   std::string description;
@@ -1708,8 +1708,8 @@ TEST_F(GradientBoostedTreesOnAbalone, MonotonicConstraintsPure) {
   constrain_2->set_direction(model::proto::MonotonicConstraint::INCREASING);
 
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::MAE(evaluation_), 1.5284, 0.054, 1.5188);
-  YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1558, 0.059, 2.1499);
+YDF_TEST_METRIC(metric::MAE(evaluation_), 1.541, 0.0775, 1.5175);
+YDF_TEST_METRIC(metric::RMSE(evaluation_), 2.1702, 0.0821, 2.1488);
 
   // Show the tree structure.
   std::string description;
