@@ -311,22 +311,16 @@ struct InternalTrainConfig {
   CreateSetLeafValueFunctor set_leaf_value_functor = SetLabelDistribution;
 
   // If true, the split score relies on a hessian: ~gradient^2/hessian (+
-  // regularization). This is only possible for regression. Require
-  // hessian_leaf=true.
+  // regularization). This is only possible for regression.
   //
   // If false, the split score is a classical decision tree score. e.g.,
   // reduction of variance in the case of regression.
   bool hessian_score = false;
 
-  // If true, the leaf relies on the hessian. This is only possible for
-  // regression.
-  bool hessian_leaf = false;
-
-  // Index of the hessian column in the dataset. Only used if hessian_leaf=true.
+  // Index of the hessian column in the dataset.
   int hessian_col_idx = -1;
 
-  // Index of the gradient column in the dataset.  Only used if
-  // hessian_leaf=true.
+  // Index of the gradient column in the dataset.
   int gradient_col_idx = -1;
 
   // Regularization terms for hessian_score=true.

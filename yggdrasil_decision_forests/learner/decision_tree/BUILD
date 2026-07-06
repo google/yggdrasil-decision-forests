@@ -268,6 +268,7 @@ cc_test(
         ":generic_parameters",
         ":label",
         ":preprocessing",
+        ":splitter",
         ":training",
         ":uplift",
         ":utils",

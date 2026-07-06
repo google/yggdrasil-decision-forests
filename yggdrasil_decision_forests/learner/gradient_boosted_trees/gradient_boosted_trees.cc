@@ -2657,7 +2657,6 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
                                                gradients[grad_idx]);
 
   internal_config.hessian_score = config.gbt_config->use_hessian_gain();
-  internal_config.hessian_leaf = true;
   internal_config.gradient_col_idx = gradients[grad_idx].gradient_col_idx;
   internal_config.hessian_col_idx = gradients[grad_idx].hessian_col_idx;
   internal_config.hessian_l1 = config.gbt_config->l1_regularization();

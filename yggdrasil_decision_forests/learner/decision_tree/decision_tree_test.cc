@@ -46,6 +46,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/generic_parameters.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/preprocessing.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/uplift.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
@@ -3131,7 +3132,7 @@ TEST(Monotonic,
   EXPECT_EQ(best_condition.na_value(), false);
   EXPECT_EQ(best_condition.num_training_examples_with_weight(), 4);
   EXPECT_EQ(best_condition.num_pos_training_examples_with_weight(), 2);
-  EXPECT_NEAR(best_condition.split_score(), 5 * 20 / 2 * 2, TEST_PRECISION);
+  EXPECT_NEAR(best_condition.split_score(), 300.0, TEST_PRECISION);
 }
 
 TEST(
@@ -3212,6 +3213,27 @@ INSTANTIATE_TEST_SUITE_P(
             "fields{name:'mhld_oblique_sample_attributes' value {categorical: "
             "'true'}}",
             "mhld_oblique_split { sample_attributes: true}"}));
+
+TEST(DecisionTree, LabelHessianNumericalBucketFillerFinalizeClamping) {
+  std::vector<float> empty_gradients;
+  std::vector<float> empty_hessians;
+  std::vector<float> empty_weights;
+
+  LabelHessianNumericalBucket</*weighted=*/false>::Filler filler(
+      empty_gradients, empty_hessians, empty_weights, /*hessian_l1=*/0.0,
+      /*hessian_l2=*/0.0);
+
+  LabelHessianNumericalBucket</*weighted=*/false> bucket;
+  bucket.content.sum_gradient = 1.0f;
+  bucket.content.sum_hessian = 0.0001f;
+
+  filler.Finalize(&bucket);
+
+  // Expected priority:
+  // clamped_hessian = max(0.0001, 0.001) = 0.001
+  // priority = 1.0 / 0.001 = 1000.0
+  EXPECT_NEAR(bucket.priority, 1000.0f, 1e-5f);
+}
 
 }  // namespace
 }  // namespace decision_tree

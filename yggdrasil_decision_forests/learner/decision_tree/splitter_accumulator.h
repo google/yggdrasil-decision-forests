@@ -752,7 +752,9 @@ struct LabelHessianNumericalScoreAccumulator {
   // Minimum hessian value when computing hessian scores and leaf values.
   static constexpr double kMinHessianForNewtonStep = 0.001;
 
-  double Score() const {
+  static double ComputeScore(double sum_gradient, double sum_hessian,
+                             double hessian_l1, double hessian_l2,
+                             const NodeConstraints& constraints) {
     const double numerator = l1_threshold(sum_gradient, hessian_l1);
     const double denominator =
         std::max(sum_hessian, kMinHessianForNewtonStep) + hessian_l2;
@@ -762,14 +764,21 @@ struct LabelHessianNumericalScoreAccumulator {
       const auto constraint_min = constraints.min_max_output.value().min;
       const auto constraint_max = constraints.min_max_output.value().max;
       if (leaf < constraint_min) {
-        return std::abs(constraint_min * numerator) / denominator;
+        return 2.0 * constraint_min * numerator -
+               constraint_min * constraint_min * denominator;
       } else if (leaf > constraint_max) {
-        return std::abs(constraint_max * numerator) / denominator;
+        return 2.0 * constraint_max * numerator -
+               constraint_max * constraint_max * denominator;
       }
     }
 
     // grad^2 / hessian
     return numerator * numerator / denominator;
+  }
+
+  double Score() const {
+    return ComputeScore(sum_gradient, sum_hessian, hessian_l1, hessian_l2,
+                        constraints);
   }
 
   // Leaf value without any constraint applied.
@@ -1044,9 +1053,8 @@ struct LabelHessianNumericalOneValueBucket {
           hessian_l2_(hessian_l2),
           monotonic_direction_(monotonic_direction),
           constraints_(constraints) {
-      const double sum_gradient_l1 = l1_threshold(sum_gradient, hessian_l1);
-      const auto parent_score =
-          (sum_gradient_l1 * sum_gradient_l1) / (sum_hessian + hessian_l2);
+      const auto parent_score = LabelHessianNumericalScoreAccumulator::ComputeScore(
+          sum_gradient, sum_hessian, hessian_l1, hessian_l2, constraints);
       if (hessian_split_score_subtract_parent) {
         parent_score_ = parent_score;
         min_score_ = 0;
@@ -1710,9 +1718,8 @@ struct LabelHessianNumericalBucket {
           hessian_l2_(hessian_l2),
           monotonic_direction_(monotonic_direction),
           constraints_(constraints) {
-      const double sum_gradient_l1 = l1_threshold(sum_gradient, hessian_l1);
-      const auto parent_score =
-          (sum_gradient_l1 * sum_gradient_l1) / (sum_hessian + hessian_l2);
+      const auto parent_score = LabelHessianNumericalScoreAccumulator::ComputeScore(
+          sum_gradient, sum_hessian, hessian_l1, hessian_l2, constraints);
       if (hessian_split_score_subtract_parent) {
         parent_score_ = parent_score;
         min_score_ = 0;
@@ -1796,8 +1803,11 @@ struct LabelHessianNumericalBucket {
 
     void Finalize(LabelHessianNumericalBucket* acc) const {
       if (acc->content.sum_hessian > 0) {
+        const double clamped_hessian = std::max(
+            static_cast<double>(acc->content.sum_hessian),
+            LabelHessianNumericalScoreAccumulator::kMinHessianForNewtonStep);
         acc->priority = l1_threshold(acc->content.sum_gradient, hessian_l1_) /
-                        (acc->content.sum_hessian + hessian_l2_);
+                        (clamped_hessian + hessian_l2_);
       } else {
         acc->priority = 0.;
       }
