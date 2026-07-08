@@ -153,8 +153,9 @@ absl::StatusOr<int64_t> CountNumberOfExamples(absl::string_view typed_path);
 
 // Generate the column guide of a given column (by merging the default column
 // guide and the specific [matched using a regex on the column name]
-// column guides (if any)). Returns true if a column name specific definition
-// was found. Returns false otherwise.
+// column guides (if any)). Any existing information in col_guide is destroyed.
+// Returns true if a column name specific definition was found. Returns false
+// otherwise.
 absl::StatusOr<bool> BuildColumnGuide(
     absl::string_view col_name, const proto::DataSpecificationGuide& guide,
     proto::ColumnGuide* col_guide);
