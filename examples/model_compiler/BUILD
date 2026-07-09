@@ -1,7 +1,7 @@
 load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
 
 package(
-    default_visibility = ["//visibility:public"],
+    default_visibility = ["//yggdrasil_decision_forests:users"],
     licenses = ["notice"],
 )
 

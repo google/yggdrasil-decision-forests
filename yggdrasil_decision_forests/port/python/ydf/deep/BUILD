@@ -1,8 +1,7 @@
-load("@rules_python//python:py_library.bzl", "py_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
 
 # Dataset bindings for PYDF
-load("@rules_python//python:py_test.bzl", "py_test")
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("//devtools/python/bazel:pytype.bzl", "py_library", "py_test")
 
 package(
     default_visibility = ["//visibility:public"],

@@ -1,5 +1,5 @@
 # Learner bindings for PYDF
-load("@rules_python//python:py_binary.bzl", "py_binary")
+load("//devtools/python/bazel:pytype.bzl", "py_binary")
 
 package(licenses = ["notice"])
 

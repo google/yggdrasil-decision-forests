@@ -3,7 +3,7 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
 
 package(
-    default_visibility = ["//visibility:public"],
+    default_visibility = ["//yggdrasil_decision_forests:users"],
     licenses = ["notice"],
 )
 

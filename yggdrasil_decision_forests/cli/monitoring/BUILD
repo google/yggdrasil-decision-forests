@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary")
+load("//devtools/python/blaze:pytype.bzl", "py_binary")
 load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf")
 
 package(

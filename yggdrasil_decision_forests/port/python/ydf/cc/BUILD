@@ -1,4 +1,5 @@
-load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
+load("//devtools/python/bazel:pytype.bzl", "pybind_extension")
 
 package(
     default_visibility = ["//visibility:public"],

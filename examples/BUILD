@@ -1,7 +1,7 @@
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 
 package(
-    default_visibility = ["//visibility:public"],
+    default_visibility = ["//yggdrasil_decision_forests:users"],
     licenses = ["notice"],
 )
 
