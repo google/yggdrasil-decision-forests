@@ -65,11 +65,10 @@ namespace internal {
 
 // Per-thread reusable ProjectionEvaluator. The evaluator only depends on
 // (dataset, numerical_features); under GLOBAL_IMPUTATION both are constant
-// across every node of every tree, so rebuilding its per-attribute pointer
-// tables per node is pure setup waste. RANDOM_LOCAL_IMPUTATION trains each node
-// on a fresh per-node dataset whose address could alias a freed one -> never
-// cache there (reusable_dataset=false always rebuilds and clears the identity
-// keys).
+// across every node of every tree.
+// RANDOM_LOCAL_IMPUTATION trains each node on a fresh per-node dataset whose address
+// could alias a freed one -> can't cache there (reusable_dataset=false always 
+// rebuilds and clears the identity keys).
 class ProjectionEvaluatorCache {
  public:
   ProjectionEvaluator& Get(
@@ -103,7 +102,7 @@ class ProjectionEvaluatorCache {
  private:
   std::optional<ProjectionEvaluator> evaluator_;
   const dataset::VerticalDataset* train_dataset_ = nullptr;
-  int64_t nrow_ = -1;
+  SignedExampleIdx nrow_ = -1;
   std::vector<int32_t> numerical_features_;
 };
 
