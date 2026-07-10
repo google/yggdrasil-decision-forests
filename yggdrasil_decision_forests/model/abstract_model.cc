@@ -1479,8 +1479,7 @@ AbstractModel::BuildFastEngine(
   } else {
     if (sorted_compatible_engines.empty()) {
       return absl::NotFoundError(absl::Substitute(
-          "No compatible engine available for model $0. 1)interresting Make "
-          "sure the "
+          "No compatible engine available for model $0. 1) Make sure the "
           "corresponding engine is added as a dependency, 2) use the (slow) "
           "generic engine (i.e. \"model.Predict()\") or 3) use one of the fast "
           "non-generic engines available in ../serving.",
