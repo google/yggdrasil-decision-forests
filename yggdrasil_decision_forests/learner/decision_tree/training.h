@@ -141,6 +141,13 @@ struct SplitterPerThreadCache {
 
   std::vector<int> numerical_features;
   std::vector<float> projection_values;
+  // Ownership is not shared: each SplitterPerThreadCache owns its own
+  // instance. A shared_ptr is used because ProjectionEvaluatorCache is only
+  // forward-declared here: it's defined in oblique.cc and cannot live in
+  // oblique.h, which includes this header.
+  // shared_ptr's deleter is type-erased at make_shared() time,
+  // so translation units that destroy this struct without seeing the 
+  // definition still compile, which unique_ptr's default deleter would not allow.
   std::shared_ptr<internal::ProjectionEvaluatorCache>
       projection_evaluator_cache;
 
