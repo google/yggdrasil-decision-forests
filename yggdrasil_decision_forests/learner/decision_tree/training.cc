@@ -1386,12 +1386,16 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
       break;
   }
 
-  // Get the indices of the attributes to test.
-  int remaining_attributes_to_test;
+  // Get test attributes indices. Unlike "GetCandidateAttributes", the candidate
+  //  list is not shuffled up front: the random ordering is produced lazily with
+  //  one Fisher-Yates step per read.
+  // Fewer RNG draws are consumed, so trees differ from the eager-shuffle 
+  // implementation at a fixed seed.
   std::vector<int32_t>& candidate_attributes = cache->candidate_attributes;
-  GetCandidateAttributes(config, config_link, dt_config,
-                         &remaining_attributes_to_test, &candidate_attributes,
-                         random);
+  candidate_attributes.assign(config_link.features().begin(),
+                              config_link.features().end());
+  int remaining_attributes_to_test = NumAttributesToTest(
+      dt_config, candidate_attributes.size(), config.task());
 
   // Index of the next attribute to be tested in "candidate_attributes".
   int candidate_attribute_idx_in_candidate_list = 0;
@@ -1399,6 +1403,14 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
   while (remaining_attributes_to_test >= 0 &&
          candidate_attribute_idx_in_candidate_list <
              candidate_attributes.size()) {
+    // Lazy Fisher-Yates step for the position about to be read. Each position
+    // is read at most once, so the resulting prefix is a uniform draw.
+    const size_t pos = candidate_attribute_idx_in_candidate_list;
+    std::uniform_int_distribution<size_t> swap_with(
+        pos, candidate_attributes.size() - 1);
+    std::swap(candidate_attributes[pos],
+              candidate_attributes[swap_with(*random)]);
+
     // Get the attribute data.
     const int32_t attribute_idx =
         candidate_attributes[candidate_attribute_idx_in_candidate_list++];
