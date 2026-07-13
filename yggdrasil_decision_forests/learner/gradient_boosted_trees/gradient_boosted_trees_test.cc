@@ -2545,6 +2545,25 @@ TEST_F(GradientBoostedTreesOnAdult, Determinism) {
   EXPECT_TRUE(model_1->DebugCompare(*model_2).empty());
 }
 
+// Same as "Determinism", but with a small "num_candidate_attributes" so that
+// only a subset of the features is tested per node. This exercises the
+// early-exit path of the concurrent split finder (where the number of
+// *scheduled* jobs is timing-dependent), which the default
+// "num_candidate_attributes = -1" (test all attributes) never triggers.
+TEST_F(GradientBoostedTreesOnAdult, DeterminismWithFeatureSubsampling) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_decision_tree()->set_num_candidate_attributes(4);
+
+  TrainAndEvaluateModel();
+  auto model_1 = std::move(model_);
+
+  TrainAndEvaluateModel();
+  auto model_2 = std::move(model_);
+
+  EXPECT_TRUE(model_1->DebugCompare(*model_2).empty());
+}
+
 TEST_F(GradientBoostedTreesOnAdult, Nondeterminism) {
   TrainAndEvaluateModel();
   auto model_1 = std::move(model_);

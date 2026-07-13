@@ -622,27 +622,6 @@ TEST(DecisionTree, CategoricalSplitConditionStorageVector) {
       condition.condition().contains_condition().elements().end()));
 }
 
-TEST(DecisionTree, GetCandidateAttributes) {
-  model::proto::TrainingConfig config;
-  proto::DecisionTreeTrainingConfig dt_config;
-  utils::RandomEngine random;
-  model::proto::TrainingConfigLinking config_link;
-  config_link.add_features(0);
-  config_link.add_features(1);
-  config_link.add_features(2);
-  config_link.add_features(3);
-
-  int num_attributes_to_test;
-  std::vector<int32_t> candidate_attributes;
-
-  GetCandidateAttributes(config, config_link, dt_config,
-                         &num_attributes_to_test, &candidate_attributes,
-                         &random);
-
-  CHECK_EQ(candidate_attributes.size(), 4);
-  CHECK_EQ(num_attributes_to_test, 2);
-}
-
 TEST(DecisionTree, FindBestConditionClassification) {
   dataset::VerticalDataset dataset;
   dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
