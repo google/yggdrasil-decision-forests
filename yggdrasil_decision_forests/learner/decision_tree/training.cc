@@ -1222,7 +1222,7 @@ absl::StatusOr<SplitterWorkResponse> FindBestConditionFromSplitterWorkRequest(
   response.manager_data = request.manager_data;
   request.splitter_cache->random.seed(request.seed);
 
-  response.condition = absl::make_unique<proto::NodeCondition>();
+  response.condition = std::make_unique<proto::NodeCondition>();
   response.condition->set_split_score(request.best_score);
 
   if (request.num_oblique_projections_to_run != -1) {

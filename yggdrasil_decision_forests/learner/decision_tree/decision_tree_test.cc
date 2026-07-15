@@ -92,7 +92,7 @@ SplitterWorkResponse FakeFindBestConditionConcurrentConsumerMultiplicative(
     SplitterWorkRequest request) {
   SplitterWorkResponse response(request.manager_data,
                                 SplitSearchResult::kBetterSplitFound,
-                                absl::make_unique<proto::NodeCondition>());
+                                std::make_unique<proto::NodeCondition>());
   response.condition->set_split_score(request.attribute_idx * 10.f);
   return response;
 }
@@ -103,7 +103,7 @@ SplitterWorkResponse FakeFindBestConditionConcurrentConsumerAlternate(
     SplitterWorkRequest request) {
   auto response = SplitterWorkResponse(
       request.manager_data, SplitSearchResult::kBetterSplitFound,
-      absl::make_unique<proto::NodeCondition>());
+      std::make_unique<proto::NodeCondition>());
   if (request.attribute_idx % 2 == 0) {
     response.status = SplitSearchResult::kInvalidAttribute;
   }
