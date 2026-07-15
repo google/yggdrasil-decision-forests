@@ -960,6 +960,17 @@ struct LabelNumericalOneValueBucket {
     }
 
     template <typename ExampleIdx>
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void AddDirectToScoreAcc(
+        const ExampleIdx example_idx,
+        LabelNumericalScoreAccumulator* acc) const {
+      if constexpr (weighted) {
+        acc->label.Add(label_[example_idx], weights_[example_idx]);
+      } else {
+        acc->label.Add(label_[example_idx]);
+      }
+    }
+
+    template <typename ExampleIdx>
     ABSL_ATTRIBUTE_ALWAYS_INLINE void MoveDirectFromPosToNegScoreAcc(
         const ExampleIdx example_idx, LabelNumericalScoreAccumulator* pos,
         LabelNumericalScoreAccumulator* neg) const {
@@ -1136,8 +1147,7 @@ struct LabelHessianNumericalOneValueBucket {
     }
 
     template <typename ExampleIdx>
-    ABSL_ATTRIBUTE_ALWAYS_INLINE void
-    MoveDirectFromPosToNegScoreAcc(
+    ABSL_ATTRIBUTE_ALWAYS_INLINE void MoveDirectFromPosToNegScoreAcc(
         const ExampleIdx example_idx,
         LabelHessianNumericalScoreAccumulator* pos,
         LabelHessianNumericalScoreAccumulator* neg) const {

@@ -1055,6 +1055,15 @@ void SplitHonestExamples(
     std::vector<UnsignedExampleIdx>& leaf_examples,
     std::vector<UnsignedExampleIdx>& working_selected_examples);
 
+// Evaluates the score of a condition Attribute >= threshold, where threshold
+// is given.
+absl::StatusOr<SplitStats> EvaluateGreaterThanSplitOnLabelRegression(
+    UnsignedExampleIdx num_examples, absl::Span<const float> attributes,
+    const std::vector<float>& labels, const std::vector<float>& weights,
+    const utils::NormalDistributionDouble& label_distribution,
+    UnsignedExampleIdx min_num_obs, float threshold,
+    SplitterPerThreadCache* cache);
+
 }  // namespace yggdrasil_decision_forests::model::decision_tree
 
 #endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_TRAINING_H_
