@@ -94,7 +94,7 @@ class SubClassC1 : public BaseClassC {
   SubClassC1(int p1, int p2) {}
 
   static absl::StatusOr<std::unique_ptr<BaseClassC>> RegistrationCreate() {
-    return absl::make_unique<SubClassC1>(1, 2);
+    return std::make_unique<SubClassC1>(1, 2);
   }
 
   std::string Result() override { return "SubClassC1"; }
