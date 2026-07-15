@@ -43,7 +43,7 @@ CustomRegressionLoss::RegistrationCreate(
     return absl::InvalidArgumentError(
         "This custom loss is only compatible with a regression task.");
   }
-  return absl::make_unique<CustomRegressionLoss>(args, custom_loss_functions);
+  return std::make_unique<CustomRegressionLoss>(args, custom_loss_functions);
 }
 
 absl::StatusOr<std::vector<float>> CustomRegressionLoss::InitialPredictions(

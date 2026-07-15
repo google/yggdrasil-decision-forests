@@ -320,7 +320,7 @@ absl::StatusOr<std::unique_ptr<AbstractLoss>> NDCGLoss::RegistrationCreate(
                      "currently found: ",
                      ndcg_truncation));
   }
-  return absl::make_unique<NDCGLoss>(args, ndcg_truncation);
+  return std::make_unique<NDCGLoss>(args, ndcg_truncation);
 }
 
 absl::StatusOr<std::vector<float>> NDCGLoss::InitialPredictions(
@@ -420,7 +420,7 @@ absl::StatusOr<LossResults> NDCGLoss::Loss(
 
 absl::StatusOr<std::unique_ptr<AbstractLossCache>> NDCGLoss::CreateLossCache(
     const dataset::VerticalDataset& dataset) const {
-  auto cache = absl::make_unique<NDCGLoss::Cache>();
+  auto cache = std::make_unique<NDCGLoss::Cache>();
   RETURN_IF_ERROR(cache->ranking_index.Initialize(
       dataset, train_config_link_.label(), train_config_link_.ranking_group()));
   return cache;
@@ -429,7 +429,7 @@ absl::StatusOr<std::unique_ptr<AbstractLossCache>> NDCGLoss::CreateLossCache(
 absl::StatusOr<std::unique_ptr<AbstractLossCache>>
 NDCGLoss::CreateRankingLossCache(absl::Span<const float> labels,
                                  absl::Span<const uint64_t> groups) const {
-  auto cache = absl::make_unique<NDCGLoss::Cache>();
+  auto cache = std::make_unique<NDCGLoss::Cache>();
   RETURN_IF_ERROR(cache->ranking_index.Initialize(labels, groups));
   return cache;
 }

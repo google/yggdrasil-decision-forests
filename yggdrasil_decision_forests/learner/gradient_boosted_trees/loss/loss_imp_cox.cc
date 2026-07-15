@@ -47,7 +47,7 @@ CoxProportionalHazardLoss::RegistrationCreate(const ConstructorArgs& args) {
         "Cox proportional hazard loss is only compatible with survival a "
         "analysis task.");
   }
-  return absl::make_unique<CoxProportionalHazardLoss>(args);
+  return std::make_unique<CoxProportionalHazardLoss>(args);
 }
 
 absl::StatusOr<std::unique_ptr<AbstractLossCache>>
@@ -81,7 +81,7 @@ CoxProportionalHazardLoss::CreateLossCache(
         ->values();
   }
 
-  auto cache = absl::make_unique<CoxProportionalHazardLoss::Cache>();
+  auto cache = std::make_unique<CoxProportionalHazardLoss::Cache>();
   LOG(INFO) << "Precomputing Cox Proportional Hazard Cache";
 
   cache->updates.reserve(dataset.nrow() * 2);

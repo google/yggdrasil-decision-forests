@@ -56,7 +56,7 @@ BinaryFocalLoss::RegistrationCreate(const ConstructorArgs& args) {
   if (args.label_column.categorical().number_of_unique_values() != 3)
     return absl::InvalidArgumentError(
         "Focal loss is only compatible with a BINARY classification task");
-  return absl::make_unique<BinaryFocalLoss>(args);
+  return std::make_unique<BinaryFocalLoss>(args);
 }
 
 // Calculate log(pt) for formula (5) from page 3 and other reusable stuff from

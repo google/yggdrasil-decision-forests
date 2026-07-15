@@ -71,7 +71,7 @@ MeanAverageErrorLoss::RegistrationCreate(const ConstructorArgs& args) {
     return absl::InvalidArgumentError(
         "Mean average error loss is only compatible with regression");
   }
-  return absl::make_unique<MeanAverageErrorLoss>(args);
+  return std::make_unique<MeanAverageErrorLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(

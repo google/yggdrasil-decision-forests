@@ -73,7 +73,7 @@ MeanSquaredErrorLoss::RegistrationCreate(const ConstructorArgs& args) {
         "Mean squared error loss is only compatible with a "
         "regression or ranking task");
   }
-  return absl::make_unique<MeanSquaredErrorLoss>(args);
+  return std::make_unique<MeanSquaredErrorLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>> MeanSquaredErrorLoss::InitialPredictions(
@@ -193,8 +193,8 @@ MeanSquaredErrorLoss::CreateLossCache(
     return std::unique_ptr<AbstractLossCache>();
   }
   // Only create a ranking index if the model is a ranker.
-  auto cache = absl::make_unique<MeanSquaredErrorLoss::Cache>();
-  cache->ranking_index = absl::make_unique<RankingGroupsIndices>();
+  auto cache = std::make_unique<MeanSquaredErrorLoss::Cache>();
+  cache->ranking_index = std::make_unique<RankingGroupsIndices>();
   RETURN_IF_ERROR(cache->ranking_index->Initialize(
       dataset, train_config_link_.label(), train_config_link_.ranking_group()));
   return cache;
@@ -207,8 +207,8 @@ MeanSquaredErrorLoss::CreateRankingLossCache(
     return std::unique_ptr<AbstractLossCache>();
   }
   // Only create a ranking index if the model is a ranker.
-  auto cache = absl::make_unique<MeanSquaredErrorLoss::Cache>();
-  cache->ranking_index = absl::make_unique<RankingGroupsIndices>();
+  auto cache = std::make_unique<MeanSquaredErrorLoss::Cache>();
+  cache->ranking_index = std::make_unique<RankingGroupsIndices>();
   RETURN_IF_ERROR(cache->ranking_index->Initialize(labels, groups));
   return cache;
 }

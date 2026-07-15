@@ -45,7 +45,7 @@ CustomBinaryClassificationLoss::RegistrationCreate(
     return absl::InvalidArgumentError(
         "This custom loss is only compatible with a classification task.");
   }
-  return absl::make_unique<CustomBinaryClassificationLoss>(
+  return std::make_unique<CustomBinaryClassificationLoss>(
       args, custom_loss_functions);
 }
 

@@ -55,7 +55,7 @@ CrossEntropyNDCGLoss::RegistrationCreate(const ConstructorArgs& args) {
                      "currently found: ",
                      args.gbt_config.xe_ndcg().ndcg_truncation()));
   }
-  return absl::make_unique<CrossEntropyNDCGLoss>(args);
+  return std::make_unique<CrossEntropyNDCGLoss>(args);
 }
 
 absl::StatusOr<std::vector<float>> CrossEntropyNDCGLoss::InitialPredictions(
@@ -200,7 +200,7 @@ absl::StatusOr<LossResults> CrossEntropyNDCGLoss::Loss(
 absl::StatusOr<std::unique_ptr<AbstractLossCache>>
 CrossEntropyNDCGLoss::CreateLossCache(
     const dataset::VerticalDataset& dataset) const {
-  auto cache = absl::make_unique<CrossEntropyNDCGLoss::Cache>();
+  auto cache = std::make_unique<CrossEntropyNDCGLoss::Cache>();
   RETURN_IF_ERROR(cache->ranking_index.Initialize(
       dataset, train_config_link_.label(), train_config_link_.ranking_group()));
   return cache;
@@ -209,7 +209,7 @@ CrossEntropyNDCGLoss::CreateLossCache(
 absl::StatusOr<std::unique_ptr<AbstractLossCache>>
 CrossEntropyNDCGLoss::CreateRankingLossCache(
     absl::Span<const float> labels, absl::Span<const uint64_t> groups) const {
-  auto cache = absl::make_unique<CrossEntropyNDCGLoss::Cache>();
+  auto cache = std::make_unique<CrossEntropyNDCGLoss::Cache>();
   RETURN_IF_ERROR(cache->ranking_index.Initialize(labels, groups));
   return cache;
 }

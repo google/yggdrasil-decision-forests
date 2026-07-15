@@ -93,7 +93,7 @@ absl::StatusOr<std::unique_ptr<AbstractLoss>> PoissonLoss::RegistrationCreate(
     return absl::InvalidArgumentError(
         "Poisson loss is only compatible with a regression task");
   }
-  return absl::make_unique<PoissonLoss>(args);
+  return std::make_unique<PoissonLoss>(args);
 }
 
 absl::Status PoissonLoss::UpdateGradients(
