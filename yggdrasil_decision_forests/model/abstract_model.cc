@@ -49,6 +49,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
+#include "yggdrasil_decision_forests/model/postprocessor/postprocessor_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
@@ -121,6 +122,13 @@ void AbstractModel::ExportProto(const AbstractModel& model,
     *proto->mutable_feature_selection_logs() =
         model.feature_selection_logs_.value();
   }
+
+  if (!model.postprocessors_.empty()) {
+    proto->mutable_postprocessors()->Clear();
+    for (const auto& postprocessor : model.postprocessors_) {
+      postprocessor->ExportProto(proto->add_postprocessors());
+    }
+  }
 }
 
 void AbstractModel::ImportProto(const proto::AbstractModel& proto,
@@ -152,6 +160,20 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
   }
   if (proto.has_feature_selection_logs()) {
     model->feature_selection_logs_ = proto.feature_selection_logs();
+  }
+
+  if (!proto.postprocessors().empty()) {
+    model->postprocessors_.clear();
+    model->postprocessors_.resize(proto.postprocessors_size());
+    for (int i = 0; i < proto.postprocessors_size(); ++i) {
+      auto postprocessor_or =
+          postprocessor::CreatePostprocessor(proto.postprocessors(i));
+      if (!postprocessor_or.ok()) {
+        LOG(FATAL) << "Failed to create postprocessor: "
+                   << postprocessor_or.status().message();
+      }
+      model->postprocessors_[i] = std::move(*postprocessor_or);
+    }
   }
 }
 
@@ -334,11 +356,17 @@ void AbstractModel::Predict(const dataset::VerticalDataset& dataset,
                             dataset::VerticalDataset::row_t row_idx,
                             proto::Prediction* prediction) const {
   PredictImpl(dataset, row_idx, prediction);
+  for (const auto& postprocessor : postprocessors_) {
+    postprocessor->Process(dataset, row_idx, prediction);
+  }
 }
 
 void AbstractModel::Predict(const dataset::proto::Example& example,
                             proto::Prediction* prediction) const {
   PredictImpl(example, prediction);
+  for (const auto& postprocessor : postprocessors_) {
+    postprocessor->Process(example, prediction);
+  }
 }
 
 void FloatToProtoPrediction(const std::vector<float>& src_prediction,
