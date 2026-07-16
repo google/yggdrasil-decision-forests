@@ -41,12 +41,12 @@
 //
 //   // ... from here use smoothed_pav_calibration_inference.h
 //   // Precompute a lookup table at a specified grid resolution.
-//   auto lookup_table = yggdrasil_decision_forests::utils::build_lookup_table(
-//       *curve_or, n_grid);
+//   auto lookup_table = yggdrasil_decision_forests::utils
+//       ::CalibrationLookupTable::Create(*curve_or, n_grid);
 //
-//   std::vector<double> eval_points{0.0, /*...,*/ 1.0};
+//   std::vector<float> eval_points{0.0, /*...,*/ 1.0};
 //   // Allocate the output vector.
-//   std::vector<double> calibrated_points(eval_points.size());
+//   std::vector<float> calibrated_points(eval_points.size());
 //   lookup_table.apply_batch(eval_points, calibrated_points);
 //
 // Example distribution matching usage with chunked data (preferred API):
@@ -78,12 +78,12 @@
 //
 //   // ... from here use smoothed_pav_calibration_inference.h
 //   // Precompute lookup tables at a specified grid resolution.
-//   auto tables = yggdrasil_decision_forests::utils::build_lookup_table(
-//       *curves_or, n_grid);
+//   auto tables = yggdrasil_decision_forests::utils
+//       ::DistributionMatchingTables::Create(*curves_or, n_grid);
 //
-//   std::vector<double> eval_points{0.0, /*...,*/ 1.0};
+//   std::vector<float> eval_points{0.0, /*...,*/ 1.0};
 //   // Allocate the output vector.
-//   std::vector<double> matched_points(eval_points.size());
+//   std::vector<float> matched_points(eval_points.size());
 //   tables.apply_batch(eval_points, matched_points);
 
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_SMOOTHED_PAV_CALIBRATION_FIT_H_
@@ -91,6 +91,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <type_traits>
 #include <vector>
 
 #include "absl/log/check.h"
@@ -103,31 +104,38 @@ namespace yggdrasil_decision_forests::utils {
 // score-distribution fitting. Array-of-structs layout: PAV's merge step
 // combines one whole (sum_pred, sum_true, count) tuple at a time.
 // TODO: Add support for differently weighted samples.
-struct BinAccumulator {
+template <typename A,
+          std::enable_if_t<std::is_floating_point<A>::value, bool> = true>
+struct BinAccumulatorTemplate {
+  typedef A AccumulatorType;
+
   // Sum of raw predicted probabilities falling in this bin.
-  double sum_pred = 0.0;
+  AccumulatorType sum_pred = 0;
   // Sum of observed 0/1 labels falling in this bin (unused for
   // score-only/distribution fitting).
-  double sum_true = 0.0;
+  AccumulatorType sum_true = 0;
   // Number of samples falling in this bin.
-  double count = 0.0;
+  AccumulatorType count = 0;
 
   // Mean predicted probability in this bin. sum_pred / count.
-  constexpr double prob_pred() const { return sum_pred / count; }
+  constexpr AccumulatorType prob_pred() const { return sum_pred / count; }
 
   // Mean observed label (empirical positive rate) in this bin.
-  // sum_true / count.
-  constexpr double prob_true() const { return sum_true / count; }
+  constexpr AccumulatorType prob_true() const { return sum_true / count; }
 
   // Merges another bin's statistics into this one (element-wise sum).
   // o: The bin to merge into this one.
-  constexpr BinAccumulator& operator+=(const BinAccumulator& o) {
+  template <typename OtherAccumulatorType>
+  constexpr BinAccumulatorTemplate& operator+=(
+      const BinAccumulatorTemplate<OtherAccumulatorType>& o) {
     sum_pred += o.sum_pred;
     sum_true += o.sum_true;
     count += o.count;
     return *this;
   }
 };
+
+using BinAccumulator = BinAccumulatorTemplate<float>;
 
 // Bins one chunk of labeled (p, y) data into an existing, pre-sized
 // accumulator array. Safe to call repeatedly across chunks when the full
@@ -140,9 +148,10 @@ struct BinAccumulator {
 // y:       Observed 0/1 labels for this chunk, same length as p.
 // n_bins:  Total number of equal-width bins partitioning [0,1]; must match
 //          bins.size().
-absl::Status accumulate_bins(std::vector<BinAccumulator>& bins,
-                             const std::vector<double>& p,
-                             const std::vector<double>& y, std::size_t n_bins);
+absl::Status accumulate_bins(
+    std::vector<BinAccumulator>& bins,
+    const std::vector<BinAccumulator::AccumulatorType>& p,
+    const std::vector<BinAccumulator::AccumulatorType>& y, std::size_t n_bins);
 
 // Score-only (unlabeled) variant of accumulate_bins, for fitting a score
 // distribution (see fit_score_distribution /
@@ -153,8 +162,9 @@ absl::Status accumulate_bins(std::vector<BinAccumulator>& bins,
 // p:       Raw scores for this chunk.
 // n_bins:  Total number of equal-width bins partitioning [0,1]; must match
 //          bins.size().
-absl::Status accumulate_bins(std::vector<BinAccumulator>& bins,
-                             const std::vector<double>& p, std::size_t n_bins);
+absl::Status accumulate_bins(
+    std::vector<BinAccumulator>& bins,
+    const std::vector<BinAccumulator::AccumulatorType>& p, std::size_t n_bins);
 
 // Single-pass convenience wrapper: bins all of (p, y) in one call and
 // finalizes the result. Use accumulate_bins()/finalize_bins() directly
@@ -164,15 +174,15 @@ absl::Status accumulate_bins(std::vector<BinAccumulator>& bins,
 // n_bins:  Number of equal-width bins partitioning [0,1].
 // Returns: Non-empty bins only, ordered by predicted probability.
 absl::StatusOr<std::vector<BinAccumulator>> aggregate_bins(
-    const std::vector<double>& p, const std::vector<double>& y,
-    std::size_t n_bins);
+    const std::vector<BinAccumulator::AccumulatorType>& p,
+    const std::vector<BinAccumulator::AccumulatorType>& y, std::size_t n_bins);
 
 // Single-pass convenience wrapper for the score-only case.
 // p:       Raw scores.
 // n_bins:  Number of equal-width bins partitioning [0,1].
 // Returns: Non-empty bins only, ordered by score.
 absl::StatusOr<std::vector<BinAccumulator>> aggregate_bins(
-    const std::vector<double>& p, std::size_t n_bins);
+    const std::vector<BinAccumulator::AccumulatorType>& p, std::size_t n_bins);
 
 // Drops empty (count == 0) bins. Idempotent: calling this on an
 // already-finalized vector removes nothing, so it's safe to call
@@ -193,13 +203,14 @@ std::vector<BinAccumulator> finalize_bins(std::vector<BinAccumulator> bins);
 //               is exactly plain PAV (never merges non-violating pairs).
 // Returns:      Merged pools, non-decreasing in prob_true().
 std::vector<BinAccumulator> merge_bins_for_monotonicity(
-    const std::vector<BinAccumulator>& bins, double z_threshold = 0.0);
+    const std::vector<BinAccumulator>& bins,
+    BinAccumulator::AccumulatorType z_threshold = 0.0);
 
 // Plain (x, y) point-sequence pair, used as the return type for
 // anchor_endpoints().
 struct MonotoneCurvePoints {
-  std::vector<double> x;
-  std::vector<double> y;
+  std::vector<BinAccumulator::AccumulatorType> x;
+  std::vector<BinAccumulator::AccumulatorType> y;
 };
 
 // Prepends (0,0) and appends (1,1) to a point sequence, making the
@@ -207,8 +218,9 @@ struct MonotoneCurvePoints {
 // x: Interior x-values (e.g. pool/bin representative predicted probabilities).
 // y: Interior y-values, same length as x.
 // Returns: x and y each with the two anchors added.
-MonotoneCurvePoints anchor_endpoints(const std::vector<double>& x,
-                                     const std::vector<double>& y);
+MonotoneCurvePoints anchor_endpoints(
+    const std::vector<BinAccumulator::AccumulatorType>& x,
+    const std::vector<BinAccumulator::AccumulatorType>& y);
 
 // Inverse-variance confidence per point: n / max(p(1-p), eps), the exact
 // precision of a binomial proportion estimate. Also exactly correct (not
@@ -220,9 +232,10 @@ MonotoneCurvePoints anchor_endpoints(const std::vector<double>& x,
 // eps:       Variance floor, keeps confidence finite at p=0 or p=1 (e.g. the
 //            anchored endpoints) without needing any special-casing.
 // Returns:   Confidence weight per point, same length as prob_true.
-absl::StatusOr<std::vector<double>> confidence_weight(
-    const std::vector<double>& prob_true, const std::vector<double>& count,
-    double eps = 1e-6);
+absl::StatusOr<std::vector<BinAccumulator::AccumulatorType>> confidence_weight(
+    const std::vector<BinAccumulator::AccumulatorType>& prob_true,
+    const std::vector<BinAccumulator::AccumulatorType>& count,
+    BinAccumulator::AccumulatorType eps = 1e-6);
 
 // Original (unweighted) Fritsch-Carlson derivative formula. Kept only as
 // a reference for cross-checking against scipy/an unweighted
@@ -231,8 +244,9 @@ absl::StatusOr<std::vector<double>> confidence_weight(
 // x: Strictly increasing knot positions.
 // y: Non-decreasing values at each knot, same length as x.
 // Returns: PCHIP derivative at each knot.
-absl::StatusOr<std::vector<double>> pchip_slopes_unweighted(
-    const std::vector<double>& x, const std::vector<double>& y);
+absl::StatusOr<std::vector<BinAccumulator::AccumulatorType>>
+pchip_slopes_unweighted(const std::vector<BinAccumulator::AccumulatorType>& x,
+                        const std::vector<BinAccumulator::AccumulatorType>& y);
 
 // Box-safe, confidence-weighted Fritsch-Carlson derivatives. Each
 // interior derivative is min(confidence-weighted harmonic mean of the two
@@ -245,19 +259,20 @@ absl::StatusOr<std::vector<double>> pchip_slopes_unweighted(
 //         as x.
 // Returns: Derivative at each knot, safe for monotone cubic Hermite
 //          interpolation.
-absl::StatusOr<std::vector<double>> pchip_slopes(
-    const std::vector<double>& x, const std::vector<double>& y,
-    const std::vector<double>& weight);
+absl::StatusOr<std::vector<BinAccumulator::AccumulatorType>> pchip_slopes(
+    const std::vector<BinAccumulator::AccumulatorType>& x,
+    const std::vector<BinAccumulator::AccumulatorType>& y,
+    const std::vector<BinAccumulator::AccumulatorType>& weight);
 
 // A fitted monotone curve, ready for evaluation via pchip_eval_single or for
 // building a fast lookup table via build_lookup_table.
 struct FittedCalibrationCurve {
   // Strictly increasing knot positions; x[0]=0, x.back()=1.
-  std::vector<double> x;
+  std::vector<BinAccumulator::AccumulatorType> x;
   // Non-decreasing values; y[0]=0, y.back()=1.
-  std::vector<double> y;
+  std::vector<BinAccumulator::AccumulatorType> y;
   // PCHIP derivative at each knot.
-  std::vector<double> d;
+  std::vector<BinAccumulator::AccumulatorType> d;
 };
 
 // Shared tail of the fitting pipeline (anchor -> fix endpoint ties ->
@@ -266,7 +281,9 @@ struct FittedCalibrationCurve {
 // x, y, w: Interior points and per-point weights, not yet anchored.
 // Returns: The fully fitted, anchored curve.
 absl::StatusOr<FittedCalibrationCurve> fit_monotone_curve(
-    std::vector<double> x, std::vector<double> y, std::vector<double> w);
+    std::vector<BinAccumulator::AccumulatorType> x,
+    std::vector<BinAccumulator::AccumulatorType> y,
+    std::vector<BinAccumulator::AccumulatorType> w);
 
 // Fits a calibration curve from already-accumulated bins. Takes bins by
 // const reference and copies internally, so the same accumulated bins
@@ -277,7 +294,8 @@ absl::StatusOr<FittedCalibrationCurve> fit_monotone_curve(
 // z_threshold: Passed through to merge_bins_for_monotonicity.
 // Returns:     The fitted calibration curve.
 absl::StatusOr<FittedCalibrationCurve> fit_calibration(
-    const std::vector<BinAccumulator>& bins, double z_threshold = 0.0);
+    const std::vector<BinAccumulator>& bins,
+    BinAccumulator::AccumulatorType z_threshold = 0.0);
 
 // Convenience wrapper: aggregates raw (p, y) in one call, then fits.
 // p, y:         Raw predicted probabilities and labels.
@@ -285,8 +303,9 @@ absl::StatusOr<FittedCalibrationCurve> fit_calibration(
 // z_threshold:  Passed through to merge_bins_for_monotonicity.
 // Returns:      The fitted calibration curve.
 absl::StatusOr<FittedCalibrationCurve> fit_calibration(
-    const std::vector<double>& p, const std::vector<double>& y_raw,
-    std::size_t n_bins, double z_threshold = 0.0);
+    const std::vector<BinAccumulator::AccumulatorType>& p,
+    const std::vector<BinAccumulator::AccumulatorType>& y_raw,
+    std::size_t n_bins, BinAccumulator::AccumulatorType z_threshold = 0.0);
 
 // Builds (score, cumulative fraction) pairs from finalized, score-sorted
 // bins, using the midpoint plotting-position convention: y_i =
@@ -297,8 +316,9 @@ absl::StatusOr<FittedCalibrationCurve> fit_calibration(
 // x, y, w: Output parameters, cleared and filled with score, cumulative
 //          fraction, and count respectively, one entry per bin.
 void cumulative_from_bins(const std::vector<BinAccumulator>& bins,
-                          std::vector<double>& x, std::vector<double>& y,
-                          std::vector<double>& w);
+                          std::vector<BinAccumulator::AccumulatorType>& x,
+                          std::vector<BinAccumulator::AccumulatorType>& y,
+                          std::vector<BinAccumulator::AccumulatorType>& w);
 
 // Fits F(x), the empirical score CDF, from already-accumulated score-only
 // bins. Does not use PAV (a cumulative sum is monotone by construction).
@@ -312,7 +332,8 @@ absl::StatusOr<FittedCalibrationCurve> fit_score_distribution(
 // n_bins: Number of equal-width bins.
 // Returns: The fitted CDF.
 absl::StatusOr<FittedCalibrationCurve> fit_score_distribution(
-    const std::vector<double>& scores, std::size_t n_bins);
+    const std::vector<BinAccumulator::AccumulatorType>& scores,
+    std::size_t n_bins);
 
 // Fits F^{-1}(u), the score quantile function, built directly (x and y
 // swapped at construction time) rather than by numerically inverting F.
@@ -326,7 +347,8 @@ absl::StatusOr<FittedCalibrationCurve> fit_score_quantile_function(
 // n_bins: Number of equal-width bins.
 // Returns: The fitted quantile function.
 absl::StatusOr<FittedCalibrationCurve> fit_score_quantile_function(
-    const std::vector<double>& scores, std::size_t n_bins);
+    const std::vector<BinAccumulator::AccumulatorType>& scores,
+    std::size_t n_bins);
 
 // The two curves needed to remap one model's score distribution onto
 // another's (quantile/histogram matching), grouped together.
@@ -354,8 +376,9 @@ absl::StatusOr<DistributionMatchingCurves> fit_distribution_matching(
 // n_bins: Number of equal-width bins, used for both.
 // Returns: Both fitted curves, grouped.
 absl::StatusOr<DistributionMatchingCurves> fit_distribution_matching(
-    const std::vector<double>& source_scores,
-    const std::vector<double>& target_scores, std::size_t n_bins);
+    const std::vector<BinAccumulator::AccumulatorType>& source_scores,
+    const std::vector<BinAccumulator::AccumulatorType>& target_scores,
+    std::size_t n_bins);
 
 }  // namespace yggdrasil_decision_forests::utils
 

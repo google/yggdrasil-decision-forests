@@ -72,9 +72,11 @@ constexpr std::size_t kDefaultNGrid = 20'000;
 // x, y, d: A fitted curve's knot positions, values, and PCHIP derivatives.
 // xq:      Query point; clamped into [x.front(), x.back()] if outside.
 // Returns: The interpolated value at xq.
-double pchip_eval_single(const std::vector<double>& x,
-                         const std::vector<double>& y,
-                         const std::vector<double>& d, double xq);
+BinAccumulator::AccumulatorType pchip_eval_single(
+    const std::vector<BinAccumulator::AccumulatorType>& x,
+    const std::vector<BinAccumulator::AccumulatorType>& y,
+    const std::vector<BinAccumulator::AccumulatorType>& d,
+    BinAccumulator::AccumulatorType xq);
 
 }  // namespace internal
 
@@ -110,34 +112,40 @@ class CalibrationLookupTable {
   // Constructs the table directly from a precomputed delta grid.
   // Prefer Create() over calling this directly.
   // delta_grid: Uniform-grid delta values; must have at least 2 points.
-  explicit CalibrationLookupTable(std::vector<double> delta_grid)
+  explicit CalibrationLookupTable(
+      std::vector<BinAccumulator::AccumulatorType> delta_grid)
       : delta_(std::move(delta_grid)),
-        inv_step_(static_cast<double>(delta_.size() - 1)) {
+        inv_step_(
+            static_cast<BinAccumulator::AccumulatorType>(delta_.size() - 1)) {
     DCHECK_GE(delta_.size(), 2);
   }
 
   // Hot path: O(1), no allocation, no search. Returns p + delta(p), clamped to
   // [0,1]. Out-of-range p is clamped before lookup.
   // p: Query point.
-  double apply(double p) const;
+  BinAccumulator::AccumulatorType apply(
+      BinAccumulator::AccumulatorType p) const;
 
   // Batch application; equivalent to calling apply() for each element, laid out
   // as a plain loop for straightforward auto-vectorization.
   // p:   Input query points.
   // out: Output buffer, same length as p; must not alias p.
-  void apply_batch(const std::vector<double>& p,
-                   std::vector<double>& out) const;
+  void apply_batch(const std::vector<BinAccumulator::AccumulatorType>& p,
+                   std::vector<BinAccumulator::AccumulatorType>& out) const;
 
   // Number of points in the stored uniform grid.
   std::size_t grid_size() const { return delta_.size(); }
 
   // Direct access to the underlying stored delta grid.
-  const std::vector<double>& raw_grid() const { return delta_; }
+  const std::vector<BinAccumulator::AccumulatorType>& raw_grid() const {
+    return delta_;
+  }
 
  private:
-  std::vector<double> delta_;
-  double inv_step_;  // = n_grid - 1; multiplying by p directly gives the
-                     // fractional index
+  std::vector<BinAccumulator::AccumulatorType> delta_;
+  BinAccumulator::AccumulatorType
+      inv_step_;  // = n_grid - 1; multiplying by p directly gives the
+                  // fractional index
 };
 
 // Inference-side counterpart to DistributionMatchingCurves. apply()/
@@ -166,15 +174,16 @@ class DistributionMatchingTables {
   // Maps one source-model score onto the target model's distribution.
   // p: Raw score from the source model.
   // Returns: The distribution-matched score.
-  double apply(double p) const {
+  BinAccumulator::AccumulatorType apply(
+      BinAccumulator::AccumulatorType p) const {
     return target_quantile_table_.apply(source_distribution_table_.apply(p));
   }
 
   // Batch version of apply().
   // p:   Input source-model scores.
   // out: Output buffer, same length as p; must not alias p.
-  void apply_batch(const std::vector<double>& p,
-                   std::vector<double>& out) const {
+  void apply_batch(const std::vector<BinAccumulator::AccumulatorType>& p,
+                   std::vector<BinAccumulator::AccumulatorType>& out) const {
     DCHECK_EQ(p.size(), out.size());
     for (std::size_t i = 0; i < p.size(); ++i) {
       out[i] = apply(p[i]);
