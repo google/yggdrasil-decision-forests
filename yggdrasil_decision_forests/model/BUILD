@@ -48,6 +48,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
         "//yggdrasil_decision_forests/metric:report",
+        "//yggdrasil_decision_forests/model/postprocessor:abstract_postprocessor",
+        "//yggdrasil_decision_forests/model/postprocessor:postprocessor_library",
         "//yggdrasil_decision_forests/serving:example_set",
         "//yggdrasil_decision_forests/serving:fast_engine",
         "//yggdrasil_decision_forests/utils:concurrency",
@@ -181,6 +183,7 @@ all_proto_library(
         ":hyperparameter_proto",
         "//yggdrasil_decision_forests/dataset:data_spec_proto",
         "//yggdrasil_decision_forests/dataset:weight_proto",
+        "//yggdrasil_decision_forests/model/postprocessor:abstract_postprocessor_proto",
     ],
 )
 
