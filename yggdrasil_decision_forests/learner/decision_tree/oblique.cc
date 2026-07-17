@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -59,6 +60,73 @@ using std::is_same;
 using Projection = internal::Projection;
 using ProjectionEvaluator = internal::ProjectionEvaluator;
 using LDACache = internal::LDACache;
+
+}  // namespace
+
+namespace internal {
+
+// Per-thread reusable ProjectionEvaluator. The evaluator only depends on
+// (dataset, numerical_features); under GLOBAL_IMPUTATION both are constant
+// across every node of every tree.
+// RANDOM_LOCAL_IMPUTATION trains each node on a fresh per-node dataset whose address
+// could alias a freed one -> can't cache there (reusable_dataset=false always 
+// rebuilds and clears the identity keys).
+class ProjectionEvaluatorCache {
+ public:
+  ProjectionEvaluator& Get(
+      const dataset::VerticalDataset& train_dataset,
+      const google::protobuf::RepeatedField<int32_t>& numerical_features,
+      const bool reusable_dataset) {
+    const bool cache_hit =
+        reusable_dataset && evaluator_.has_value() &&
+        train_dataset_ == &train_dataset &&
+        nrow_ == static_cast<int64_t>(train_dataset.nrow()) &&
+        numerical_features_.size() ==
+            static_cast<size_t>(numerical_features.size()) &&
+        std::equal(numerical_features_.begin(), numerical_features_.end(),
+                   numerical_features.begin());
+    if (!cache_hit) {
+      evaluator_.emplace(train_dataset, numerical_features);
+      if (reusable_dataset) {
+        train_dataset_ = &train_dataset;
+        nrow_ = static_cast<int64_t>(train_dataset.nrow());
+        numerical_features_.assign(numerical_features.begin(),
+                                   numerical_features.end());
+      } else {
+        train_dataset_ = nullptr;
+        nrow_ = -1;
+        numerical_features_.clear();
+      }
+    }
+    return *evaluator_;
+  }
+
+ private:
+  std::optional<ProjectionEvaluator> evaluator_;
+  const dataset::VerticalDataset* train_dataset_ = nullptr;
+  SignedExampleIdx nrow_ = -1;
+  std::vector<int32_t> numerical_features_;
+};
+
+}  // namespace internal
+
+namespace {
+
+ProjectionEvaluator& GetProjectionEvaluator(
+    const dataset::VerticalDataset& train_dataset,
+    const model::proto::TrainingConfigLinking& config_link,
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    SplitterPerThreadCache* cache) {
+  if (cache->projection_evaluator_cache == nullptr) {
+    cache->projection_evaluator_cache =
+        std::make_shared<internal::ProjectionEvaluatorCache>();
+  }
+  const bool reusable_dataset =
+      dt_config.missing_value_policy() ==
+      proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION;
+  return cache->projection_evaluator_cache->Get(
+      train_dataset, config_link.numerical_features(), reusable_dataset);
+}
 
 }  // namespace
 
@@ -190,8 +258,8 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   Projection current_projection;
   auto& projection_values = cache->projection_values;
 
-  ProjectionEvaluator projection_evaluator(train_dataset,
-                                           config_link.numerical_features());
+  ProjectionEvaluator& projection_evaluator =
+      GetProjectionEvaluator(train_dataset, config_link, dt_config, cache);
 
   // TODO: Cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
@@ -754,8 +822,8 @@ absl::StatusOr<bool> FindBestConditionMHLDObliqueTemplate(
     return false;
   }
 
-  ProjectionEvaluator projection_evaluator(train_dataset,
-                                           config_link.numerical_features());
+  ProjectionEvaluator& projection_evaluator =
+      GetProjectionEvaluator(train_dataset, config_link, dt_config, cache);
 
   // TODO: Cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
