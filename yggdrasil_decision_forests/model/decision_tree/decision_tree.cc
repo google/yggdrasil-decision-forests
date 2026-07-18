@@ -170,51 +170,7 @@ std::vector<int> GetAttributes(const decision_tree::NodeWithChildren& node) {
   }
 }
 
-// For each path "p" and for each feature "i", adds to
-// "min_depth_per_feature[i]" the minimum depth of feature "i" along the path
-// "p".
-//
-// For a given path, "stack[j] = i" with "j \in [0, depth)" indicates that the
-// "j-th" node along the path is the "i-th" feature.
-//
-// "min_depth_per_feature" should be already initialized (its size should be
-// set).
-//
-// If a feature is effectively seen in the tree, set feature_used[feature_idx]
-// to be true.
-void AddMinimumDepthPerPath(const NodeWithChildren& node, const int depth,
-                            std::vector<std::vector<int>>* stack,
-                            std::vector<int>* min_depth_per_feature,
-                            std::vector<bool>* feature_used) {
-  if (node.IsLeaf()) {
-    for (int feature_idx = 0; feature_idx < min_depth_per_feature->size();
-         feature_idx++) {
-      int min_depth = 0;
-      while (min_depth < stack->size()) {
-        const std::vector<int>& current_depth_features = (*stack)[min_depth];
-        if (std::find(current_depth_features.begin(),
-                      current_depth_features.end(),
-                      feature_idx) == current_depth_features.end()) {
-          min_depth++;
-        } else {
-          break;
-        }
-      }
 
-      if (min_depth < stack->size()) {
-        (*feature_used)[feature_idx] = true;
-      }
-      (*min_depth_per_feature)[feature_idx] += min_depth;
-    }
-  } else {
-    stack->push_back(GetAttributes(node));
-    AddMinimumDepthPerPath(*node.pos_child(), depth + 1, stack,
-                           min_depth_per_feature, feature_used);
-    AddMinimumDepthPerPath(*node.neg_child(), depth + 1, stack,
-                           min_depth_per_feature, feature_used);
-    stack->pop_back();
-  }
-}
 
 // Returns a human readable representation of the anchor. "max_items" is the
 // maximum number of anchor values to print. If more values are available,
@@ -2022,29 +1978,81 @@ std::vector<model::proto::VariableImportance> StructureMeanMinDepth(
     const std::vector<std::unique_ptr<decision_tree::DecisionTree>>&
         decision_trees,
     const int num_features) {
-  struct Importance {
-    double mean_min_depth = 0;
-    bool used = false;
-  };
-  std::vector<Importance> importance_per_feature(num_features);
+  if (decision_trees.empty()) return {};
 
-  for (auto& tree : decision_trees) {
-    const auto num_nodes = tree->NumLeafs();
-    std::vector<std::vector<int>> stack;
-    std::vector<int> min_depth_per_feature(num_features, 0);
-    std::vector<bool> feature_used(num_features, false);
+  double mean_leaf_depth = 0.;
+  std::vector<bool> global_feature_used(num_features, false);
 
-    AddMinimumDepthPerPath(tree->root(), 0, &stack, &min_depth_per_feature,
-                           &feature_used);
+  // Store the minimum depth of each feature on the current path.
+  std::vector<int> path_feature_min_depth(num_features, -1);
+  std::vector<int> active_features_on_path;
+  // For each feature f and leaf, record the distance between the leaf and the
+  // first occurrence of f, summed over all leaves.
+  std::vector<int64_t> tree_feature_distance_to_leaves(num_features, 0);
+  std::vector<int> active_features_in_tree;
+  std::vector<bool> tree_feature_used(num_features, false);
 
-    for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
-      importance_per_feature[feature_idx].mean_min_depth +=
-          static_cast<double>(min_depth_per_feature[feature_idx]) /
-          (num_nodes * decision_trees.size());
-      if (feature_used[feature_idx]) {
-        importance_per_feature[feature_idx].used = true;
+  const int64_t num_trees = decision_trees.size();
+
+  auto populate_tree_feature_arrays_dfs =
+      [&](auto& self, const NodeWithChildren& node, const int depth,
+          int64_t& sum_leaf_depths, int64_t& num_leaves) -> void {
+    if (node.IsLeaf()) {
+      num_leaves++;
+      sum_leaf_depths += depth;
+      for (const int f : active_features_on_path) {
+        tree_feature_distance_to_leaves[f] += depth - path_feature_min_depth[f];
+        if (!tree_feature_used[f]) {
+          tree_feature_used[f] = true;
+          active_features_in_tree.push_back(f);
+          global_feature_used[f] = true;
+        }
+      }
+    } else {
+      int num_first_seen_in_node = 0;
+      for (const int f : GetAttributes(node)) {
+        if (path_feature_min_depth[f] == -1) {
+          path_feature_min_depth[f] = depth;
+          active_features_on_path.push_back(f);
+          num_first_seen_in_node++;
+        }
+      }
+
+      self(self, *node.pos_child(), depth + 1, sum_leaf_depths, num_leaves);
+      self(self, *node.neg_child(), depth + 1, sum_leaf_depths, num_leaves);
+
+      // Before moving to the parent, remove all min_depths added in this node.
+      for (int i = 0; i < num_first_seen_in_node; ++i) {
+        path_feature_min_depth[active_features_on_path.back()] = -1;
+        active_features_on_path.pop_back();
       }
     }
+  };
+
+  // For each feature, this is the average distance from the feature to the
+  // leaf, summed over all leaves (not just those whose path contains the
+  // feature).
+  std::vector<double> feature_mean_distance_to_leaves(num_features, 0.0);
+  for (const auto& tree : decision_trees) {
+    int64_t sum_leaf_depths = 0;
+    int64_t num_leaves = 0;
+    populate_tree_feature_arrays_dfs(populate_tree_feature_arrays_dfs,
+                                     tree->root(), 0, sum_leaf_depths,
+                                     num_leaves);
+    if (num_leaves == 0) {
+      continue;
+    }
+
+    mean_leaf_depth += static_cast<double>(sum_leaf_depths) / num_leaves;
+
+    for (const int f : active_features_in_tree) {
+      feature_mean_distance_to_leaves[f] +=
+          static_cast<double>(tree_feature_distance_to_leaves[f]) / num_leaves;
+      // Reset for next tree
+      tree_feature_distance_to_leaves[f] = 0;
+      tree_feature_used[f] = false;
+    }
+    active_features_in_tree.clear();
   }
 
   // Do the three following operations:
@@ -2053,12 +2061,20 @@ std::vector<model::proto::VariableImportance> StructureMeanMinDepth(
   //   - Skip non used features.
   absl::flat_hash_map<int, double> importance_map;
   for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
-    const auto& importance = importance_per_feature[feature_idx];
-
-    if (!importance.used) {
+    // If a feature is not used at all, it has VI 0.
+    if (!global_feature_used[feature_idx]) {
       continue;
     }
-    const auto inv_mean_min_depth = 1. / (1. + importance.mean_min_depth);
+    // For each tree, mean_leaf_depth contributes sum_depths/num_leaves and
+    // feature_mean_distance_to_leaves[feature_idx] contributes
+    // -sum_distance_feature_to_leaf / num_leaves; so the contribution per tree
+    // is the min distance from the root to the feature / num_leaves. If a
+    // feature appears in a tree but not on the path, the entire path is
+    // counted.
+    const double mean_min_depth =
+        (mean_leaf_depth - feature_mean_distance_to_leaves[feature_idx]) /
+        num_trees;
+    const auto inv_mean_min_depth = 1. / (1. + mean_min_depth);
     importance_map[feature_idx] = inv_mean_min_depth;
   }
 
