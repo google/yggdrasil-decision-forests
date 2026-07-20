@@ -25,6 +25,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <random>
 #include <string>
@@ -46,6 +47,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
+#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
@@ -485,7 +487,7 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithGoss) {
   internal::SampleTrainingExamplesWithGoss(gradients, num_rows, /*alpha=*/1.,
                                            /*beta=*/0., &random,
                                            &selected_examples, &weights);
-  EXPECT_THAT(selected_examples, ElementsAre(3, 1, 0, 2));
+  EXPECT_THAT(selected_examples, ElementsAre(0, 1, 2, 3));
   EXPECT_THAT(weights, ElementsAre(1, 1, 1, 1));
 
   selected_examples.clear();
@@ -501,7 +503,7 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithGoss) {
   internal::SampleTrainingExamplesWithGoss(gradients, num_rows, /*alpha=*/0.5,
                                            /*beta=*/0.2, &random,
                                            &selected_examples, &weights);
-  EXPECT_THAT(selected_examples, ElementsAre(3, 1, 0));
+  EXPECT_THAT(selected_examples, ElementsAre(0, 1, 3));
   EXPECT_THAT(weights, ElementsAre(2.5, 1, 1, 1));
 }
 
@@ -540,13 +542,13 @@ TEST(GradientBoostedTrees, SampleTrainingExamplesWithSelGB) {
   CHECK_OK(internal::SampleTrainingExamplesWithSelGB(
       model::proto::Task::RANKING, dataset.nrow(), &index, predictions,
       /*ratio=*/0., &selected_examples));
-  EXPECT_THAT(selected_examples, ElementsAre(3, 0, 5, 1));
+  EXPECT_THAT(selected_examples, ElementsAre(0, 1, 3, 5));
 
   selected_examples.clear();
   CHECK_OK(internal::SampleTrainingExamplesWithSelGB(
       model::proto::Task::RANKING, dataset.nrow(), &index, predictions,
       /*ratio=*/0.1, &selected_examples));
-  EXPECT_THAT(selected_examples, ElementsAre(3, 0, 5, 1, 4));
+  EXPECT_THAT(selected_examples, ElementsAre(0, 1, 3, 4, 5));
 }
 
 // Helper for the training and testing on two non-overlapping samples from the
@@ -1195,7 +1197,7 @@ TEST_F(GradientBoostedTreesOnAdult, GossDeprecated) {
   TrainAndEvaluateModel();
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.29422, 0.0138, 0.29422);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.30907, 0.0138, 0.30907);
 }
 
 // Train and test a model on the adult dataset with Goss sampling.
@@ -1209,7 +1211,7 @@ TEST_F(GradientBoostedTreesOnAdult, Goss) {
   TrainAndEvaluateModel();
 
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.29422, 0.0138, 0.29422);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.30907, 0.0138, 0.30907);
 }
 
 // Train and test a model on the adult dataset.

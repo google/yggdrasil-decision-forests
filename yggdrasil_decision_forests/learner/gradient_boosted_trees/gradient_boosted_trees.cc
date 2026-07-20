@@ -3018,11 +3018,14 @@ void SampleTrainingExamplesWithGoss(
   }
 
   // From the remaining examples, randomly select a subset and adjust weights.
-  if (beta > 0) {
+  if (beta > 0. && alpha < 1.) {
+    // Paper and reference implementation both impose that a beta fraction of
+    // the ENTIRE data are used, so we must scale the probability accordingly.
+    const float sampling_rate = beta / (1.f - alpha);
     const float amplification_factor = (1.f - alpha) / beta;
     std::uniform_real_distribution<float> unif_dist_unit;
     for (UnsignedExampleIdx idx = cutoff; idx < num_rows; idx++) {
-      if (unif_dist_unit(*random) < beta) {
+      if (unif_dist_unit(*random) < sampling_rate) {
         const UnsignedExampleIdx example_idx = l1_norm[idx].first;
         selected_examples->push_back(example_idx);
         (*weights)[example_idx] *= amplification_factor;
@@ -3036,6 +3039,10 @@ void SampleTrainingExamplesWithGoss(
         std::uniform_int_distribution<UnsignedExampleIdx>(num_rows -
                                                           1)(*random));
   }
+
+  // Sort selected examples by example index, since downstream users of selected
+  // examples assume this array to be sorted.
+  std::sort(selected_examples->begin(), selected_examples->end());
 }
 
 absl::Status SampleTrainingExamplesWithSelGB(
@@ -3084,6 +3091,10 @@ absl::Status SampleTrainingExamplesWithSelGB(
       selected_examples->push_back(negative_predictions[idx].first);
     }
   }
+
+  // Sort selected examples by example index, since downstream users of selected
+  // examples assume this array to be sorted.
+  std::sort(selected_examples->begin(), selected_examples->end());
   return absl::OkStatus();
 }
 
@@ -3338,7 +3349,10 @@ absl::Status SetDefaultHyperParameters(
     gbt_config->clear_subsample();
   } else {
     // No sub-sampling.
-    gbt_config->mutable_stochastic_gradient_boosting();
+    if (gbt_config->sampling_methods_case() ==
+        proto::GradientBoostedTreesTrainingConfig::SAMPLING_METHODS_NOT_SET) {
+      gbt_config->mutable_stochastic_gradient_boosting();
+    }
   }
 
   if (gbt_config->early_stopping() !=
