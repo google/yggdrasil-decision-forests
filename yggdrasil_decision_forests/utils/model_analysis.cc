@@ -901,15 +901,15 @@ absl::StatusOr<std::string> CreateHtmlReport(
     const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
     const absl::string_view model_path, const absl::string_view dataset_path,
     const proto::AnalysisResult& analysis, const proto::Options& options) {
-  const auto standalone = CreateStandaloneAnalysis(model, dataset, model_path,
-                                                   dataset_path, analysis);
+  const auto standalone = CreateStandaloneAnalysis(
+      model, dataset, model_path, dataset_path, analysis, true);
   return CreateHtmlReport(standalone, options);
 }
 
 proto::StandaloneAnalysisResult CreateStandaloneAnalysis(
     const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
     const absl::string_view model_path, const absl::string_view dataset_path,
-    const proto::AnalysisResult& analysis) {
+    const proto::AnalysisResult& analysis, const bool include_description) {
   proto::StandaloneAnalysisResult standalone;
   *standalone.mutable_core_analysis() = analysis;
   standalone.set_dataset_path(std::string(model_path));
@@ -917,7 +917,9 @@ proto::StandaloneAnalysisResult CreateStandaloneAnalysis(
   *standalone.mutable_data_spec() = model.data_spec();
   standalone.set_label_col_idx(model.label_col_idx());
   standalone.set_task(model.task());
-  standalone.set_model_description(model.DescriptionAndStatistics(false));
+  if (include_description) {
+    standalone.set_model_description(model.DescriptionAndStatistics(false));
+  }
   return standalone;
 }
 

@@ -366,7 +366,7 @@ GenericCCModel::Analyze(const dataset::VerticalDataset& dataset,
   ASSIGN_OR_RETURN(const auto analysis,
                    utils::model_analysis::Analyse(*model_, dataset, options));
   return utils::model_analysis::CreateStandaloneAnalysis(*model_, dataset, "",
-                                                         "", analysis);
+                                                         "", analysis, false);
 }
 
 absl::StatusOr<utils::model_analysis::proto::PredictionAnalysisResult>

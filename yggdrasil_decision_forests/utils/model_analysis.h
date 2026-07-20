@@ -73,7 +73,7 @@ absl::StatusOr<std::string> CreateHtmlReport(
 proto::StandaloneAnalysisResult CreateStandaloneAnalysis(
     const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
     absl::string_view model_path, absl::string_view dataset_path,
-    const proto::AnalysisResult& analysis);
+    const proto::AnalysisResult& analysis, bool include_description);
 
 // Combines the model analysis and html creation i.e. Analyse +
 // CreateHtmlReport.
