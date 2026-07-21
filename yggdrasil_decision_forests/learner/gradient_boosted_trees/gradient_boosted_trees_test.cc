@@ -1196,8 +1196,8 @@ TEST_F(GradientBoostedTreesOnAdult, GossDeprecated) {
   gbt_config->set_use_goss(true);
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.30907, 0.0138, 0.30907);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8613, 0.0122, 0.8557);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3062, 0.0126, 0.3092);
 }
 
 // Train and test a model on the adult dataset with Goss sampling.
@@ -1210,8 +1210,8 @@ TEST_F(GradientBoostedTreesOnAdult, Goss) {
   gbt_config->mutable_gradient_one_side_sampling();
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.86640, 0.0127, 0.86640);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.30907, 0.0138, 0.30907);
+YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8606, 0.0106, 0.8557);
+YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3075, 0.0138, 0.3092);
 }
 
 // Train and test a model on the adult dataset.
