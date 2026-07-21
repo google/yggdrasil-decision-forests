@@ -344,6 +344,22 @@ cc_library_ydf(
 )
 
 cc_library_ydf(
+    name = "smoothed_pav_calibration_fit",
+    srcs = [
+        "smoothed_pav_calibration_fit.cc",
+    ],
+    hdrs = [
+        "smoothed_pav_calibration_fit.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library_ydf(
     name = "bytestream",
     srcs = [
         "bytestream.cc",
@@ -1142,6 +1158,16 @@ cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "smoothed_pav_calibration_fit_test",
+    srcs = ["smoothed_pav_calibration_fit_test.cc"],
+    deps = [
+        ":random",
+        ":smoothed_pav_calibration_fit",
         "@com_google_googletest//:gtest_main",
     ],
 )
