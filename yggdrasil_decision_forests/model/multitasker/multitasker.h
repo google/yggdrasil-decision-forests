@@ -26,7 +26,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
@@ -57,6 +56,15 @@ class MultitaskerModel : public AbstractModel {
 
   absl::Status Validate() const override;
 
+  // Generate a predictions with the first model. To make predictions with the
+  // other models, use "models(model_idx)->Predict(...)".
+  void Predict(const dataset::VerticalDataset& dataset,
+               dataset::VerticalDataset::row_t row_idx,
+               model::proto::Prediction* prediction) const override;
+
+  void Predict(const dataset::proto::Example& example,
+               model::proto::Prediction* prediction) const override;
+
   void AppendDescriptionAndStatistics(bool full_definition,
                                       std::string* description) const override;
 
@@ -68,16 +76,6 @@ class MultitaskerModel : public AbstractModel {
   std::vector<std::unique_ptr<AbstractModel>>* mutable_models() {
     return &models_;
   }
-
- protected:
-  // Generate a predictions with the first model. To make predictions with the
-  // other models, use "models(model_idx)->Predict(...)".
-  void PredictImpl(const dataset::VerticalDataset& dataset,
-                   dataset::VerticalDataset::row_t row_idx,
-                   model::proto::Prediction* prediction) const override;
-
-  void PredictImpl(const dataset::proto::Example& example,
-                   model::proto::Prediction* prediction) const override;
 
  private:
   std::vector<std::unique_ptr<AbstractModel>> models_;

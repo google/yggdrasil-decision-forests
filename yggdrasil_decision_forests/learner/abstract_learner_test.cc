@@ -278,10 +278,9 @@ TEST(AbstractLearner, EvaluateLearner) {
    public:
     FakeClassificationModel() : FakeModel() {}
 
-   protected:
-    void PredictImpl(const dataset::VerticalDataset& dataset,
-                     dataset::VerticalDataset::row_t row_idx,
-                     model::proto::Prediction* prediction) const override {
+    void Predict(const dataset::VerticalDataset& dataset,
+                 dataset::VerticalDataset::row_t row_idx,
+                 model::proto::Prediction* prediction) const override {
       *prediction = PARSE_TEST_PROTO(R"pb(
         classification {
           value: 1

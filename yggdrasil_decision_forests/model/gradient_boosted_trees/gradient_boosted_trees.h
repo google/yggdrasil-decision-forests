@@ -20,7 +20,6 @@
 
 #include <stddef.h>
 
-#include <cstdint>
 #include <functional>
 #include <limits>
 #include <memory>
@@ -75,6 +74,13 @@ class GradientBoostedTreesModel : public AbstractModel,
   absl::Status PredictGetLeaves(const dataset::VerticalDataset& dataset,
                                 dataset::VerticalDataset::row_t row_idx,
                                 absl::Span<int32_t> leaves) const override;
+
+  void Predict(const dataset::VerticalDataset& dataset,
+               dataset::VerticalDataset::row_t row_idx,
+               model::proto::Prediction* prediction) const override;
+
+  void Predict(const dataset::proto::Example& example,
+               model::proto::Prediction* prediction) const override;
 
   // Number of nodes in the model.
   int64_t NumNodes() const;
@@ -191,14 +197,6 @@ class GradientBoostedTreesModel : public AbstractModel,
   void set_early_stopping_triggered(bool early_stopping_triggered) {
     early_stopping_triggered_ = early_stopping_triggered;
   }
-
- protected:
-  void PredictImpl(const dataset::VerticalDataset& dataset,
-                   dataset::VerticalDataset::row_t row_idx,
-                   model::proto::Prediction* prediction) const override;
-
-  void PredictImpl(const dataset::proto::Example& example,
-                   model::proto::Prediction* prediction) const override;
 
  private:
   void PredictClassification(const dataset::VerticalDataset& dataset,

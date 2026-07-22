@@ -495,10 +495,9 @@ void IsolationForestModel::PredictLambda(
   prediction->mutable_anomaly_detection()->set_value(p);
 }
 
-void IsolationForestModel::PredictImpl(
-    const dataset::VerticalDataset& dataset,
-    dataset::VerticalDataset::row_t row_idx,
-    model::proto::Prediction* prediction) const {
+void IsolationForestModel::Predict(const dataset::VerticalDataset& dataset,
+                                   dataset::VerticalDataset::row_t row_idx,
+                                   model::proto::Prediction* prediction) const {
   PredictLambda(
       [&](const decision_tree::DecisionTree& tree)
           -> const decision_tree::NodeWithChildren& {
@@ -507,9 +506,8 @@ void IsolationForestModel::PredictImpl(
       prediction);
 }
 
-void IsolationForestModel::PredictImpl(
-    const dataset::proto::Example& example,
-    model::proto::Prediction* prediction) const {
+void IsolationForestModel::Predict(const dataset::proto::Example& example,
+                                   model::proto::Prediction* prediction) const {
   PredictLambda(
       [&](const decision_tree::DecisionTree& tree)
           -> const decision_tree::NodeWithChildren& {

@@ -15,13 +15,10 @@
 
 #include "yggdrasil_decision_forests/model/multitasker/multitasker.h"
 
-#include <string>
-
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
@@ -99,14 +96,14 @@ absl::Status MultitaskerModel::Validate() const {
   return absl::OkStatus();
 }
 
-void MultitaskerModel::PredictImpl(const dataset::VerticalDataset& dataset,
-                                   dataset::VerticalDataset::row_t row_idx,
-                                   model::proto::Prediction* prediction) const {
+void MultitaskerModel::Predict(const dataset::VerticalDataset& dataset,
+                               dataset::VerticalDataset::row_t row_idx,
+                               model::proto::Prediction* prediction) const {
   models_.front()->Predict(dataset, row_idx, prediction);
 }
 
-void MultitaskerModel::PredictImpl(const dataset::proto::Example& example,
-                                   model::proto::Prediction* prediction) const {
+void MultitaskerModel::Predict(const dataset::proto::Example& example,
+                               model::proto::Prediction* prediction) const {
   models_.front()->Predict(example, prediction);
 }
 

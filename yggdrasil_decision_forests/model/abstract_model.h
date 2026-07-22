@@ -291,12 +291,33 @@ class AbstractModel {
       const dataset::VerticalDataset& dataset, const bool add_ground_truth,
       std::vector<model::proto::Prediction>* predictions) const;
 
-  void Predict(const dataset::VerticalDataset& dataset,
-               dataset::VerticalDataset::row_t row_idx,
-               proto::Prediction* prediction) const;
+  // Apply the model on an example defined as a VerticalDataset and a row
+  // index. Requires for the dataset to have the same structure as the training
+  // dataset. The model representation is expected to be generic and the
+  // inference code is expected to be slower than the optimized serving code
+  // available in "serving:all".
+  //
+  // Does not set the ground truth and the weight fields in "prediction".
+  //
+  // TODO: Add status.
+  virtual void Predict(const dataset::VerticalDataset& dataset,
+                       dataset::VerticalDataset::row_t row_idx,
+                       proto::Prediction* prediction) const = 0;
 
-  void Predict(const dataset::proto::Example& example,
-               proto::Prediction* prediction) const;
+  // Apply the model on a proto::Example. The model representation is expected
+  // to be generic and the inference code is expected to be slower than the
+  // optimized serving code available in "serving:all".
+  //
+  // "proto::Example" is the native generic example format for YDF. This
+  // is different from the "tensorflow::Example". Conversion from
+  // "tensorflow::Example" to "proto::Example" can be done with the function
+  // "TfExampleToExample".
+  //
+  // Does not set the ground truth and the weight fields in "prediction".
+  //
+  // TODO: Add status.
+  virtual void Predict(const dataset::proto::Example& example,
+                       proto::Prediction* prediction) const = 0;
 
   // Set the ground truth values in a Prediction proto. Ground truth values
   // can be defined by fields like label or example weight. This depends on the
@@ -488,34 +509,6 @@ class AbstractModel {
       metric::proto::EvaluationResults* eval) const;
 
  protected:
-  // Apply the model on an example defined as a VerticalDataset and a row
-  // index. Requires for the dataset to have the same structure as the training
-  // dataset. The model representation is expected to be generic and the
-  // inference code is expected to be slower than the optimized serving code
-  // available in "serving:all".
-  //
-  // Does not set the ground truth and the weight fields in "prediction".
-  //
-  // TODO: Add status.
-  virtual void PredictImpl(const dataset::VerticalDataset& dataset,
-                           dataset::VerticalDataset::row_t row_idx,
-                           proto::Prediction* prediction) const = 0;
-
-  // Apply the model on a proto::Example. The model representation is expected
-  // to be generic and the inference code is expected to be slower than the
-  // optimized serving code available in "serving:all".
-  //
-  // "proto::Example" is the native generic example format for YDF. This
-  // is different from the "tensorflow::Example". Conversion from
-  // "tensorflow::Example" to "proto::Example" can be done with the function
-  // "TfExampleToExample".
-  //
-  // Does not set the ground truth and the weight fields in "prediction".
-  //
-  // TODO: Add status.
-  virtual void PredictImpl(const dataset::proto::Example& example,
-                           proto::Prediction* prediction) const = 0;
-
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 
   // Prints information about the hyper-parameter optimizer logs.
