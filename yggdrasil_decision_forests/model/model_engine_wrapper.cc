@@ -31,9 +31,10 @@ namespace model {
 
 constexpr char EngineWrapperModel::kRegisteredName[];
 
-void EngineWrapperModel::Predict(const dataset::VerticalDataset& dataset,
-                                 dataset::VerticalDataset::row_t row_idx,
-                                 model::proto::Prediction* prediction) const {
+void EngineWrapperModel::PredictImpl(
+    const dataset::VerticalDataset& dataset,
+    dataset::VerticalDataset::row_t row_idx,
+    model::proto::Prediction* prediction) const {
   const auto fast_example = engine_->AllocateExamples(1);
   CHECK_OK(CopyVerticalDatasetToAbstractExampleSet(
       dataset, row_idx, row_idx + 1, engine_->features(), fast_example.get()));
@@ -43,8 +44,9 @@ void EngineWrapperModel::Predict(const dataset::VerticalDataset& dataset,
                          engine_->NumPredictionDimension(), prediction);
 }
 
-void EngineWrapperModel::Predict(const dataset::proto::Example& example,
-                                 model::proto::Prediction* prediction) const {
+void EngineWrapperModel::PredictImpl(
+    const dataset::proto::Example& example,
+    model::proto::Prediction* prediction) const {
   const auto fast_example = engine_->AllocateExamples(1);
   CHECK_OK(fast_example->FromProtoExample(example, 0, engine_->features()));
   std::vector<float> fast_predictions;

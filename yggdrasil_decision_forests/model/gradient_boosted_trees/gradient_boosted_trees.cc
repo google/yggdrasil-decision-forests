@@ -296,7 +296,7 @@ absl::Status GradientBoostedTreesModel::PredictGetLeaves(
   return absl::OkStatus();
 }
 
-void GradientBoostedTreesModel::Predict(
+void GradientBoostedTreesModel::PredictImpl(
     const dataset::VerticalDataset& dataset,
     dataset::VerticalDataset::row_t row_idx,
     model::proto::Prediction* prediction) const {
@@ -460,7 +460,7 @@ void GradientBoostedTreesModel::Predict(
   }
 }
 
-void GradientBoostedTreesModel::Predict(
+void GradientBoostedTreesModel::PredictImpl(
     const dataset::proto::Example& example,
     model::proto::Prediction* prediction) const {
   utils::usage::OnInference(1, metadata());

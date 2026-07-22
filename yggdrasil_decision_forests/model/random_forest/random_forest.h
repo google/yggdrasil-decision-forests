@@ -69,12 +69,6 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
 
   absl::Status Validate() const override;
 
-  // Compute a single prediction of a model on a VerticalDataset. See the
-  // documentation of "AbstractModel" for mode details.
-  void Predict(const dataset::VerticalDataset& dataset,
-               dataset::VerticalDataset::row_t row_idx,
-               model::proto::Prediction* prediction) const override;
-
   // Compute a single prediction for a classification random forest.
   void PredictClassification(const dataset::VerticalDataset& dataset,
                              dataset::VerticalDataset::row_t row_idx,
@@ -89,9 +83,6 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   void PredictUplift(const dataset::VerticalDataset& dataset,
                      dataset::VerticalDataset::row_t row_idx,
                      model::proto::Prediction* prediction) const;
-
-  void Predict(const dataset::proto::Example& example,
-               model::proto::Prediction* prediction) const override;
 
   // Compute a single prediction for a classification random forest.
   void PredictClassification(const dataset::proto::Example& example,
@@ -244,6 +235,16 @@ class RandomForestModel : public AbstractModel, public DecisionForestInterface {
   absl::StatusOr<utils::plot::MultiPlot> PlotTrainingLogs() const override;
 
   std::string DebugCompare(const AbstractModel& other) const override;
+
+ protected:
+  // Compute a single prediction of a model on a VerticalDataset. See the
+  // documentation of "AbstractModel" for mode details.
+  void PredictImpl(const dataset::VerticalDataset& dataset,
+                   dataset::VerticalDataset::row_t row_idx,
+                   model::proto::Prediction* prediction) const override;
+
+  void PredictImpl(const dataset::proto::Example& example,
+                   model::proto::Prediction* prediction) const override;
 
  private:
   // The decision trees.
