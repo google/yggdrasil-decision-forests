@@ -246,16 +246,16 @@ TEST(ModelAnalysis, PDPPlot) {
   }
 
   class FakeModel : public model::FakeModel {
-   protected:
-    void PredictImpl(const dataset::proto::Example& example,
-                     model::proto::Prediction* prediction) const override {
+   public:
+    void Predict(const dataset::proto::Example& example,
+                 model::proto::Prediction* prediction) const override {
       prediction->mutable_regression()->set_value(
           Prediction(example.attributes(0).numerical()));
     }
 
-    void PredictImpl(const dataset::VerticalDataset& dataset,
-                     dataset::VerticalDataset::row_t row_idx,
-                     model::proto::Prediction* prediction) const override {
+    void Predict(const dataset::VerticalDataset& dataset,
+                 dataset::VerticalDataset::row_t row_idx,
+                 model::proto::Prediction* prediction) const override {
       const float feature_value =
           dataset
               .ColumnWithCastWithStatus<

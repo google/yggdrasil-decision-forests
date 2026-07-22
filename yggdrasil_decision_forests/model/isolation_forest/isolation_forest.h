@@ -55,6 +55,13 @@ class IsolationForestModel : public AbstractModel,
 
   IsolationForestModel() : AbstractModel(kRegisteredName) {}
 
+  void Predict(const dataset::VerticalDataset& dataset,
+               dataset::VerticalDataset::row_t row_idx,
+               model::proto::Prediction* prediction) const override;
+
+  void Predict(const dataset::proto::Example& example,
+               model::proto::Prediction* prediction) const override;
+
   absl::Status PredictGetLeaves(const dataset::VerticalDataset& dataset,
                                 dataset::VerticalDataset::row_t row_idx,
                                 absl::Span<int32_t> leaves) const override;
@@ -121,14 +128,6 @@ class IsolationForestModel : public AbstractModel,
   // List the variable importances that can be computed from the model
   // structure.
   std::vector<std::string> AvailableStructuralVariableImportances() const;
-
- protected:
-  void PredictImpl(const dataset::VerticalDataset& dataset,
-                   dataset::VerticalDataset::row_t row_idx,
-                   model::proto::Prediction* prediction) const override;
-
-  void PredictImpl(const dataset::proto::Example& example,
-                   model::proto::Prediction* prediction) const override;
 
  private:
   void PredictLambda(std::function<const decision_tree::NodeWithChildren&(

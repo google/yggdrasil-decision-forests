@@ -42,15 +42,14 @@ class FakeModel : public AbstractModel {
     return absl::UnimplementedError("Load");
   }
 
- protected:
-  void PredictImpl(const dataset::proto::Example& example,
-                   proto::Prediction* prediction) const override {
+  void Predict(const dataset::proto::Example& example,
+               proto::Prediction* prediction) const override {
     LOG(FATAL) << "Unimplemented: Predict Example";
   }
 
-  void PredictImpl(const dataset::VerticalDataset& dataset,
-                   dataset::VerticalDataset::row_t row_idx,
-                   proto::Prediction* prediction) const override {
+  void Predict(const dataset::VerticalDataset& dataset,
+               dataset::VerticalDataset::row_t row_idx,
+               proto::Prediction* prediction) const override {
     LOG(FATAL) << "Unimplemented: Predict Dataset";
   }
 };

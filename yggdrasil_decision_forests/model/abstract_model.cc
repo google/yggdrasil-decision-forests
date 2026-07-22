@@ -330,17 +330,6 @@ absl::Status AbstractModel::AppendPredictions(
   return absl::OkStatus();
 }
 
-void AbstractModel::Predict(const dataset::VerticalDataset& dataset,
-                            dataset::VerticalDataset::row_t row_idx,
-                            proto::Prediction* prediction) const {
-  PredictImpl(dataset, row_idx, prediction);
-}
-
-void AbstractModel::Predict(const dataset::proto::Example& example,
-                            proto::Prediction* prediction) const {
-  PredictImpl(example, prediction);
-}
-
 void FloatToProtoPrediction(const std::vector<float>& src_prediction,
                             const int example_idx, const proto::Task task,
                             const int num_prediction_dimensions,
