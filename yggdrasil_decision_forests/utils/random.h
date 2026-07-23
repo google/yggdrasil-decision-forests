@@ -35,6 +35,11 @@ inline float RandomUniformFloat(RandomEngine* random) {
   return std::uniform_real_distribution<float>()(*random);
 }
 
+// Returns a random float in the range [0.0, +inf).
+inline float RandomGammaFloat(float alpha, float beta, RandomEngine* random) {
+  return std::gamma_distribution<float>(alpha, beta)(*random);
+}
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 

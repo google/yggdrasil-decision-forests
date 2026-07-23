@@ -360,6 +360,21 @@ cc_library_ydf(
 )
 
 cc_library_ydf(
+    name = "smoothed_pav_calibration_inference",
+    srcs = [
+        "smoothed_pav_calibration_inference.cc",
+    ],
+    hdrs = [
+        "smoothed_pav_calibration_inference.h",
+    ],
+    deps = [
+        ":smoothed_pav_calibration_fit",
+        ":status_macros",
+        "@com_google_absl//absl/log:check",
+    ],
+)
+
+cc_library_ydf(
     name = "bytestream",
     srcs = [
         "bytestream.cc",
@@ -1168,6 +1183,19 @@ cc_test(
     deps = [
         ":random",
         ":smoothed_pav_calibration_fit",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "smoothed_pav_calibration_inference_test",
+    srcs = ["smoothed_pav_calibration_inference_test.cc"],
+    deps = [
+        ":random",
+        ":smoothed_pav_calibration_fit",
+        ":smoothed_pav_calibration_inference",
+        "@com_google_absl//absl/status:status_matchers",
+        "@com_google_absl//absl/time",
         "@com_google_googletest//:gtest_main",
     ],
 )
