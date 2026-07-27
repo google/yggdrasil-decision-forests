@@ -5837,6 +5837,9 @@ Input Features (14):
 
 No weights
 
+No postprocessors
+
+
 Variable Importance: INV_MEAN_MIN_DEPTH:
     1.   &quot;capital_gain&quot;  0.348634 ################
     2.            &quot;age&quot;  0.285433 ############
