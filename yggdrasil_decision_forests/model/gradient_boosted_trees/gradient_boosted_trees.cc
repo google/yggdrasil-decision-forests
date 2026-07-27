@@ -533,6 +533,8 @@ void GradientBoostedTreesModel::PredictImpl(
       auto* dist = prediction->mutable_classification()->mutable_distribution();
       dist->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
 
+      // TODO: Use a more numerically stable method for the softmax.
+      // https://www.deeplearningbook.org/contents/numerical.html
       float sum_exp = 0;
       float highest_cell_value = 0;
       int highest_cell_idx = 0;

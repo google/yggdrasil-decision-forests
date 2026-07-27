@@ -149,7 +149,7 @@ absl::Status LoadModel(absl::string_view directory,
           absl::StrCat(io_options.file_prefix.value(), kModelHeaderFileName)),
       &header, file::Defaults()));
   RETURN_IF_ERROR(CreateEmptyModel(header.name(), model));
-  AbstractModel::ImportProto(header, model->get());
+  RETURN_IF_ERROR(AbstractModel::ImportProto(header, model->get()));
   RETURN_IF_ERROR(file::GetBinaryProto(
       file::JoinPath(
           effective_directory,
@@ -248,7 +248,8 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> DeserializeModel(
   // Instantiate model.
   std::unique_ptr<AbstractModel> model;
   RETURN_IF_ERROR(CreateEmptyModel(proto.abstract_model().name(), &model));
-  AbstractModel::ImportProto(proto.abstract_model(), model.get());
+  RETURN_IF_ERROR(
+      AbstractModel::ImportProto(proto.abstract_model(), model.get()));
 
   // Read dataspec.
   ASSIGN_OR_RETURN(has_data, reader.Read(&tmp));
