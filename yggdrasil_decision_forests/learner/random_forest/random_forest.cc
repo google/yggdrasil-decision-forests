@@ -16,7 +16,9 @@
 #include "yggdrasil_decision_forests/learner/random_forest/random_forest.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -27,6 +29,7 @@
 #include <utility>
 #include <vector>
 
+#include "absl/cleanup/cleanup.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -37,6 +40,7 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example_writer.h"
@@ -180,7 +184,13 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
       rf_config->set_compute_oob_variable_importances(
           hparam.value().value().categorical() == "true");
       if (rf_config->compute_oob_variable_importances()) {
-        rf_config->set_compute_oob_performances(true);
+        if (!rf_config->compute_oob_performances()) {
+          return absl::InvalidArgumentError(
+              "The OOB metric computation should be enabled to compute the "
+              "Variable Importance i.e. "
+              "\"compute_oob_variable_importances=true\" "
+              "requires \"compute_oob_performances=true\".");
+        }
       }
     }
   }
@@ -536,20 +546,9 @@ RandomForestLearner::TrainWithStatusImpl(
     mdl->AddTree(std::make_unique<decision_tree::DecisionTree>());
   }
 
-  // OOB (out-of-bag) predictions.
-  utils::concurrency::Mutex
-      oob_metrics_mutex;  // Protects all the "oob_*" fields.
-
   // Prediction accumulator for each example in the training dataset
   // (oob_predictions.size()==training_dataset.nrow()).
   std::vector<internal::PredictionAccumulator> oob_predictions;
-
-  // Time of the last display of OOB metrics in the console. Expressed in
-  // seconds from an arbitrary referential. Protected by "oob_metrics_mutex".
-  absl::Time last_oob_computation_time = absl::InfinitePast();
-  // Number of trees the last time the OOB metrics was computed and displayed in
-  // the console.
-  int last_oob_computation_num_trees = 0;
 
   // Prediction accumulator for each example in the training dataset and
   // shuffled according to each input feature:
@@ -561,6 +560,39 @@ RandomForestLearner::TrainWithStatusImpl(
   // sampled in [0, dataset.nrow()[.
   std::vector<std::vector<internal::PredictionAccumulator>>
       oob_predictions_per_input_features;
+
+  // OOB Predictions are divided into stripes, each stripe is locked by a
+  // different mutex. The number of stripes is currently a hand-written,
+  // untuned heuristic. The goal is to avoid having very few strips, but also
+  // limit the number of stripes to bound memory usage.
+  const int oob_num_stripes_locks = std::max(
+      1, std::min({10 * deployment().num_threads(),
+                   static_cast<int>(train_dataset.nrow() / 10), 1024}));
+  auto oob_stripe_locks =
+      std::make_unique<internal::PaddedMutex[]>(oob_num_stripes_locks);
+
+  // OOB Gate. Controls the number of threads concurrently updating the OOB
+  // accumulators. This guarantees that the intervals for oob computation are
+  // respected.
+  struct {
+    utils::concurrency::Mutex mutex;
+    utils::concurrency::CondVar cond_var;  // When the gate is ready.
+
+    // Counts the number of threads currently updating the OOB accumulators.
+    int active_updaters GUARDED_BY(mutex) = 0;
+    // Counts the number of threads admitted through the OOB gate since the last
+    // evaluation. This is different from `active_updaters` as it includes the
+    // ones that have already finished the update.
+    int threads_admitted_this_wave GUARDED_BY(mutex) = 0;
+    // If an evaluation is necessary. The evaluation may not have started yet:
+    // evaluating is only permissible if active_updaters=0.
+    bool pending_evaluation GUARDED_BY(mutex) = false;
+
+    // Count the number of trees whose predictions have bee added (fully) to the
+    // prediction accumulators.
+    int num_trees_in_accumulator GUARDED_BY(mutex) = 0;
+    absl::Time last_eval_time GUARDED_BY(mutex) = absl::InfinitePast();
+  } oob_gate;
 
   // OOB Performance and variable importance are only computed when training is
   // bootstrapped.
@@ -805,10 +837,10 @@ RandomForestLearner::TrainWithStatusImpl(
         }
 
         // General logging
-        const auto build_common_snippet = [&]() -> std::string {
-          std::string snippet =
-              absl::StrFormat("Train tree %d/%d", current_num_trained_trees,
-                              rf_config.num_trees());
+        const auto build_common_snippet =
+            [&](int current_num_trees) -> std::string {
+          std::string snippet = absl::StrFormat(
+              "Train tree %d/%d", current_num_trees, rf_config.num_trees());
           return snippet;
         };
 
@@ -835,62 +867,76 @@ RandomForestLearner::TrainWithStatusImpl(
 
         // OOB Metrics.
         if (compute_oob_performances) {
-          utils::concurrency::MutexLock lock(oob_metrics_mutex);
-          // Update the prediction accumulator.
-          auto update_oob_status = internal::UpdateOOBPredictionsWithNewTree(
-              train_dataset, config_with_default, selected_examples,
-              rf_config.winner_take_all_inference(), *decision_tree, {},
-              &random, &oob_predictions);
-          if (!update_oob_status.ok()) {
-            utils::concurrency::MutexLock lock(concurrent_fields.mutex);
-            concurrent_fields.status.Update(update_oob_status);
-            return;
-          }
+          auto is_training_ok = [&]() -> bool {
+            if (training_stopped_early) return false;
+            utils::concurrency::MutexLock c_lock(concurrent_fields.mutex);
+            return concurrent_fields.status.ok();
+          };
 
-          // Evaluate the accumulated predictions.
-          // Compute OOB if one of the condition is true:
-          //   - This is the last tree of the model.
-          //   - The last OOB was computed more than
-          //     "oob_evaluation_interval_in_seconds" ago.
-          //   - This last OOB was computed more than
-          //     "oob_evaluation_interval_in_trees" trees ago.
-          const bool compute_oob =
-              ((absl::Now() - last_oob_computation_time) >=
-               absl::Seconds(rf_config.oob_evaluation_interval_in_seconds())) ||
-              (current_num_trained_trees == rf_config.num_trees()) ||
-              ((current_num_trained_trees - last_oob_computation_num_trees) >=
-               rf_config.oob_evaluation_interval_in_trees());
+          bool is_inside_oob_gate = false;
+          const auto gate_cleanup = absl::MakeCleanup([&]() {
+            if (is_inside_oob_gate) {
+              utils::concurrency::MutexLock lock(oob_gate.mutex);
+              oob_gate.active_updaters--;
+              // Always signal on early exit so the evaluator doesn't hang
+              // waiting for this thread
+              oob_gate.cond_var.SignalAll();
+            }
+          });
+          {
+            utils::concurrency::MutexLock lock(oob_gate.mutex);
 
-          if (compute_oob) {
-            last_oob_computation_time = absl::Now();
-            last_oob_computation_num_trees = current_num_trained_trees;
-            proto::OutOfBagTrainingEvaluations evaluation;
-            evaluation.set_number_of_trees(current_num_trained_trees);
-            auto evaluation_or = internal::EvaluateOOBPredictions(
-                train_dataset, mdl->task(), mdl->label_col_idx(),
-                mdl->uplift_treatment_col_idx(), mdl->weights(),
-                oob_predictions,
-                /*for_permutation_importance=*/false);
-            if (!evaluation_or.ok()) {
-              utils::concurrency::MutexLock lock(concurrent_fields.mutex);
-              concurrent_fields.status.Update(evaluation_or.status());
+            int oob_evaluation_interval_in_trees = std::max(
+                1,
+                static_cast<int>(rf_config.oob_evaluation_interval_in_trees()));
+
+            // This loop implements the OOB gate. At most
+            // `oob_evaluation_interval_in_trees` can pass through the gate
+            // before it closes. After the OOB performance has been evaluated,
+            // the gate re-opens for the next wave.
+            while (true) {
+              // Always create an OOB evaluation after the first tree, use the
+              // interval afterwards.
+              int max_updaters = (oob_gate.num_trees_in_accumulator > 0)
+                                     ? oob_evaluation_interval_in_trees
+                                     : 1;
+              // Check if the gate is open.
+              if (!oob_gate.pending_evaluation &&
+                  oob_gate.threads_admitted_this_wave < max_updaters) {
+                break;
+              }
+
+              // Check if training is still active.
+              if (!is_training_ok()) {
+                break;
+              }
+              // Timeout used for safety since the code below might not
+              // perfectly clean up on failure.
+              oob_gate.cond_var.WaitWithTimeout(&oob_gate.mutex, &lock, 1.0);
+            }
+            // Passed the gate.
+            if (!is_training_ok()) {
               return;
             }
 
-            *evaluation.mutable_evaluation() = evaluation_or.value();
-
-            mdl->mutable_out_of_bag_evaluations()->push_back(evaluation);
-
-            // Print progress in the console.
-            auto snippet = build_common_snippet();
-            absl::StrAppend(
-                &snippet, " ",
-                internal::EvaluationSnippet(evaluation.evaluation()));
-            absl::StrAppend(&snippet, build_common_snippet_extra());
-            LOG(INFO) << snippet;
+            oob_gate.active_updaters++;
+            oob_gate.threads_admitted_this_wave++;
+            is_inside_oob_gate = true;
           }
 
-          // Variable importance.
+          const auto update_oob_status =
+              internal::UpdateOOBPredictionsWithNewTree(
+                  train_dataset, config_with_default, selected_examples,
+                  rf_config.winner_take_all_inference(), *decision_tree, {},
+                  &random,
+                  absl::MakeSpan(oob_stripe_locks.get(), oob_num_stripes_locks),
+                  &oob_predictions);
+          if (!update_oob_status.ok()) {
+            utils::concurrency::MutexLock lock(concurrent_fields.mutex);
+            concurrent_fields.status.Update(update_oob_status);
+            return;  // Runs cleanup
+          }
+
           if (compute_oob_variable_importances) {
             for (const int feature_idx : config_link.features()) {
               for (int permutation_idx = 0;
@@ -902,18 +948,93 @@ RandomForestLearner::TrainWithStatusImpl(
                         train_dataset, config_with_default, selected_examples,
                         rf_config.winner_take_all_inference(), *decision_tree,
                         feature_idx, &random,
+                        absl::MakeSpan(oob_stripe_locks.get(),
+                                       oob_num_stripes_locks),
                         &oob_predictions_per_input_features[feature_idx]);
                 if (!update_oob_status.ok()) {
                   utils::concurrency::MutexLock lock(concurrent_fields.mutex);
                   concurrent_fields.status.Update(update_oob_status);
-                  return;
+                  return;  // Runs cleanup
                 }
               }
             }
           }
+
+          bool is_evaluator = false;
+          int num_trees_in_evaluation = -1;
+
+          // Leave the gate and schedule an evaluation if necessary.
+          {
+            utils::concurrency::MutexLock lock(oob_gate.mutex);
+            oob_gate.active_updaters--;
+            is_inside_oob_gate = false;
+            oob_gate.num_trees_in_accumulator++;
+
+            // Check if an evaluation is in order.
+            //
+            // Evaluations either happen if the tree interval has happened, and
+            // if  enough time has passed, and for the first and last tree.
+            if (oob_gate.num_trees_in_accumulator == rf_config.num_trees() ||
+                oob_gate.threads_admitted_this_wave >=
+                    rf_config.oob_evaluation_interval_in_trees() ||
+                (absl::Now() - oob_gate.last_eval_time) >=
+                    absl::Seconds(
+                        rf_config.oob_evaluation_interval_in_seconds())) {
+              oob_gate.pending_evaluation = true;
+            }
+
+            // If evaluation is necessary AND this is the last updater to
+            // finish, evaluate with this thread.
+            if (oob_gate.pending_evaluation && oob_gate.active_updaters == 0) {
+              is_evaluator = true;
+              num_trees_in_evaluation = oob_gate.num_trees_in_accumulator;
+            }
+          }
+
+          if (is_evaluator) {
+            DCHECK_GE(num_trees_in_evaluation, 0);
+            // The gate is closed and an evaluation has been requested.
+            const auto evaluation_results = internal::EvaluateOOBPredictions(
+                train_dataset, mdl->task(), mdl->label_col_idx(),
+                mdl->uplift_treatment_col_idx(), mdl->weights(),
+                oob_predictions,
+                /*for_permutation_importance=*/false);
+            if (!evaluation_results.ok()) {
+              utils::concurrency::MutexLock lock(concurrent_fields.mutex);
+              concurrent_fields.status.Update(evaluation_results.status());
+              // This does not perform a cleanup; it relies on WaitWithTimeout
+              // to eventually get out of the deadlock.
+              return;
+            }
+            proto::OutOfBagTrainingEvaluations evaluation;
+            evaluation.set_number_of_trees(num_trees_in_evaluation);
+            *evaluation.mutable_evaluation() = evaluation_results.value();
+            {
+              utils::concurrency::MutexLock lock(concurrent_fields.mutex);
+              mdl->mutable_out_of_bag_evaluations()->push_back(evaluation);
+            }
+
+            // Print progress in the console.
+            auto snippet = build_common_snippet(num_trees_in_evaluation);
+            absl::StrAppend(
+                &snippet, " ",
+                internal::EvaluationSnippet(evaluation.evaluation()));
+            absl::StrAppend(&snippet, build_common_snippet_extra());
+            LOG(INFO) << snippet;
+
+            // Evaluation is done. Reset the gate and release waiting threads.
+            {
+              utils::concurrency::MutexLock lock(oob_gate.mutex);
+              oob_gate.pending_evaluation = false;
+              oob_gate.threads_admitted_this_wave = 0;
+              oob_gate.last_eval_time = absl::Now();
+              oob_gate.cond_var.SignalAll();
+            }
+          }
         } else {
           LOG_EVERY_N_SEC(INFO, 20)
-              << build_common_snippet() << build_common_snippet_extra();
+              << build_common_snippet(current_num_trained_trees)
+              << build_common_snippet_extra();
         }
       });
     }
@@ -1082,65 +1203,101 @@ void InitializeOOBPredictionAccumulators(
 absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
-    std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
+    const std::vector<UnsignedExampleIdx>& sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
     const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
+    absl::Span<internal::PaddedMutex> oob_stripe_locks,
     std::vector<PredictionAccumulator>* oob_predictions) {
-  // "next_non_oob_example_idx" is the index in "sorted_non_oob_example_indices"
-  // of the example, with the smallest index which is greater or equal to the
-  // index of the example being iterator on in the following "for loop".
-  UnsignedExampleIdx next_non_oob_example_idx = 0;
+  // Update prediction accumulators in chunks. Each example belongs to exactly
+  // one chunk and each chunk is protected by a unique mutex.
+  constexpr UnsignedExampleIdx kChunkSize = 2048;
+  const UnsignedExampleIdx num_examples = train_dataset.nrow();
+  const size_t num_stripes = oob_stripe_locks.size();
+
+  // Stack-allocated buffers.
+  std::array<const decision_tree::proto::Node*, kChunkSize> local_leaves;
+  std::array<UnsignedExampleIdx, kChunkSize> local_indices;
+
+  size_t local_count = 0;
+
+  auto non_oob_it = sorted_non_oob_example_indices.begin();
 
   std::uniform_int_distribution<UnsignedExampleIdx> row_distribution(
-      0, train_dataset.nrow() - 1);
+      0, num_examples - 1);
 
-  for (UnsignedExampleIdx example_idx = 0; example_idx < train_dataset.nrow();
-       example_idx++) {
-    // Skip the example_idx in "sorted_non_oob_example_indices".
-    while (next_non_oob_example_idx < sorted_non_oob_example_indices.size() &&
-           sorted_non_oob_example_indices[next_non_oob_example_idx] <
-               example_idx) {
-      next_non_oob_example_idx++;
+  for (UnsignedExampleIdx chunk_start = 0; chunk_start < num_examples;
+       chunk_start += kChunkSize) {
+    const UnsignedExampleIdx chunk_end =
+        std::min(chunk_start + kChunkSize, num_examples);
+    local_count = 0;
+    for (UnsignedExampleIdx example_idx = chunk_start; example_idx < chunk_end;
+         example_idx++) {
+      // Fast-forward OOB exclusion iterator.
+      while (non_oob_it != sorted_non_oob_example_indices.end() &&
+             *non_oob_it < example_idx) {
+        non_oob_it++;
+      }
+      if (non_oob_it != sorted_non_oob_example_indices.end() &&
+          *non_oob_it == example_idx) {
+        continue;
+      }
+      const decision_tree::proto::Node* leaf;
+      if (shuffled_attribute_idx.has_value()) {
+        const auto random_example_idx = row_distribution(*rnd);
+        leaf = &new_decision_tree.GetLeafWithSwappedAttribute(
+            train_dataset, example_idx, shuffled_attribute_idx.value(),
+            random_example_idx);
+      } else {
+        leaf = &new_decision_tree.GetLeaf(train_dataset, example_idx);
+      }
+
+      local_leaves[local_count] = leaf;
+      local_indices[local_count] = example_idx;
+      local_count++;
     }
-    if (next_non_oob_example_idx < sorted_non_oob_example_indices.size() &&
-        sorted_non_oob_example_indices[next_non_oob_example_idx] ==
-            example_idx) {
+
+    if (local_count == 0) {
       continue;
     }
 
-    // Apply the decision tree.
-    const decision_tree::proto::Node* leaf;
-    if (shuffled_attribute_idx.has_value()) {
-      const auto random_example_idx = row_distribution(*rnd);
-      leaf = &new_decision_tree.GetLeafWithSwappedAttribute(
-          train_dataset, example_idx, shuffled_attribute_idx.value(),
-          random_example_idx);
-    } else {
-      leaf = &new_decision_tree.GetLeaf(train_dataset, example_idx);
-    }
+    const size_t lock_idx = (chunk_start / kChunkSize) % num_stripes;
 
-    // Accumulate the decision prediction to the oob accumulator.
-    auto& accumulator = (*oob_predictions)[example_idx];
-    accumulator.num_trees++;
-    switch (config.task()) {
-      case model::proto::Task::CLASSIFICATION:
-        AddClassificationLeafToAccumulator(winner_take_all_inference, *leaf,
-                                           &accumulator.classification);
-        break;
-      case model::proto::Task::REGRESSION:
-        AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
-        break;
-      case model::proto::Task::RANKING:
-        return absl::InvalidArgumentError("OOB not implemented for Uplift.");
-        break;
-      case model::proto::Task::CATEGORICAL_UPLIFT:
-        AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
-        break;
-      default:
-        LOG(WARNING) << "Not implemented";
+    {
+      // Update the accumulator for the examples in the current chunk.
+      utils::concurrency::MutexLock lock(oob_stripe_locks[lock_idx].m);
+
+      for (size_t i = 0; i < local_count; ++i) {
+        const UnsignedExampleIdx idx = local_indices[i];
+        const decision_tree::proto::Node* leaf = local_leaves[i];
+
+        auto& accumulator = (*oob_predictions)[idx];
+        accumulator.num_trees++;
+
+        switch (config.task()) {
+          case model::proto::Task::CLASSIFICATION:
+            AddClassificationLeafToAccumulator(winner_take_all_inference, *leaf,
+                                               &accumulator.classification);
+            break;
+          case model::proto::Task::REGRESSION:
+            AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
+            break;
+          case model::proto::Task::CATEGORICAL_UPLIFT:
+            AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
+            break;
+          case model::proto::Task::UNDEFINED:
+          case model::proto::Task::RANKING:
+          case model::proto::Task::ANOMALY_DETECTION:
+          case model::proto::Task::SURVIVAL_ANALYSIS:
+          case model::proto::Task::NUMERICAL_UPLIFT:
+            return absl::InvalidArgumentError(
+                absl::Substitute("OOB not implemented for $0.",
+                                 model::proto::Task_Name(config.task())));
+        }
+      }
     }
   }
+
   return absl::OkStatus();
 }
 
