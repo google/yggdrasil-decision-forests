@@ -180,7 +180,13 @@ absl::Status RandomForestLearner::SetHyperParametersImpl(
       rf_config->set_compute_oob_variable_importances(
           hparam.value().value().categorical() == "true");
       if (rf_config->compute_oob_variable_importances()) {
-        rf_config->set_compute_oob_performances(true);
+        if (!rf_config->compute_oob_performances()) {
+          return absl::InvalidArgumentError(
+              "The OOB metric computation must be enabled to compute the "
+              "OOB Variable Importances i.e. "
+              "\"compute_oob_variable_importances=true\" "
+              "requires \"compute_oob_performances=true\".");
+        }
       }
     }
   }
@@ -1131,14 +1137,17 @@ absl::Status UpdateOOBPredictionsWithNewTree(
       case model::proto::Task::REGRESSION:
         AddRegressionLeafToAccumulator(*leaf, &accumulator.regression);
         break;
-      case model::proto::Task::RANKING:
-        return absl::InvalidArgumentError("OOB not implemented for Uplift.");
-        break;
       case model::proto::Task::CATEGORICAL_UPLIFT:
         AddUpliftLeafToAccumulator(*leaf, &accumulator.uplift);
         break;
-      default:
-        LOG(WARNING) << "Not implemented";
+      case model::proto::Task::UNDEFINED:
+      case model::proto::Task::RANKING:
+      case model::proto::Task::ANOMALY_DETECTION:
+      case model::proto::Task::SURVIVAL_ANALYSIS:
+      case model::proto::Task::NUMERICAL_UPLIFT:
+        return absl::InvalidArgumentError(
+            absl::Substitute("OOB not implemented for $0.",
+                             model::proto::Task_Name(config.task())));
     }
   }
   return absl::OkStatus();
