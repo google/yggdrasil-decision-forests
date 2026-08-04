@@ -134,6 +134,7 @@ class CondVar {
 #define LOCKS_EXCLUDED(x) ABSL_LOCKS_EXCLUDED(x)
 #define GUARDED_BY(x) ABSL_GUARDED_BY(x)
 #define EXCLUSIVE_LOCKS_REQUIRED(x) ABSL_EXCLUSIVE_LOCKS_REQUIRED(x)
+#define SHARED_LOCKS_REQUIRED(x) ABSL_SHARED_LOCKS_REQUIRED(x)
 #endif
 
 #define GLOBAL_MUTEX(x) \
@@ -171,6 +172,7 @@ class Notification {
 #define LOCKS_EXCLUDED(x)
 #define GUARDED_BY(x)
 #define EXCLUSIVE_LOCKS_REQUIRED(x)
+#define SHARED_LOCKS_REQUIRED(x)
 #define GLOBAL_MUTEX(x) utils::concurrency::Mutex x
 #else
 using BlockingCounter = absl::BlockingCounter;

@@ -24,11 +24,14 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
+#include "absl/functional/function_ref.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -44,6 +47,7 @@
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -129,24 +133,77 @@ void InitializeModelWithTrainingConfig(
     const model::proto::TrainingConfigLinking& training_config_linking,
     RandomForestModel* model);
 
-// Accumulator of individual tree predictions. Can then be combined to compute
-// the random forest predictions.
-struct PredictionAccumulator {
-  utils::IntegerDistribution<float> classification;
-  double regression = 0;
-  internal::UplifLeafAccumulator uplift;
-  // Number of tree predictions being accumulated.
-  int num_trees = 0;
-};
+// Encapsulates Out-Of-Bag (OOB) prediction accumulation, variable importance
+// calculation, and periodic metric evaluation during Random Forest training.
+class OOBEvaluator {
+ public:
+  // Accumulator of individual tree predictions. Can then be combined to compute
+  // the random forest predictions.
+  struct PredictionAccumulator {
+    utils::IntegerDistribution<float> classification;
+    double regression = 0;
+    internal::UplifLeafAccumulator uplift;
+    // Number of tree predictions being accumulated.
+    int num_trees = 0;
+  };
 
-// Initialize a vector of accumulators to support the task specified in
-// "config*".
-void InitializeOOBPredictionAccumulators(
-    const UnsignedExampleIdx num_predictions,
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const dataset::proto::DataSpecification& data_spec,
-    std::vector<PredictionAccumulator>* predictions);
+  static void InitializeAccumulators(
+      UnsignedExampleIdx num_predictions,
+      const model::proto::TrainingConfig& config,
+      const model::proto::TrainingConfigLinking& config_link,
+      const dataset::proto::DataSpecification& data_spec,
+      std::vector<PredictionAccumulator>* predictions);
+
+  static absl::StatusOr<std::unique_ptr<OOBEvaluator>> Create(
+      bool compute_oob_performances, bool compute_oob_variable_importances,
+      const dataset::VerticalDataset& train_dataset,
+      const model::proto::TrainingConfig& config,
+      const model::proto::TrainingConfigLinking& config_link,
+      RandomForestModel* model);
+
+  // Called by a worker thread immediately after training a decision tree.
+  // Updates OOB accumulators and checks if a periodic OOB evaluation should
+  // be computed and recorded.
+  absl::Status UpdateAndMaybeEvaluate(
+      const dataset::VerticalDataset& train_dataset,
+      const std::vector<UnsignedExampleIdx>& selected_examples,
+      const decision_tree::DecisionTree& new_tree, utils::RandomEngine* random,
+      int current_num_trained_trees,
+      absl::FunctionRef<std::string()> build_common_snippet,
+      absl::FunctionRef<std::string()> build_common_snippet_extra);
+
+  // Called after all trees have been trained to compute variable importances,
+  // export predictions if requested, and log final OOB metrics.
+  absl::Status FinalizeTraining(const dataset::VerticalDataset& train_dataset,
+                                int num_threads);
+
+ private:
+  OOBEvaluator(
+      bool compute_oob_performances, bool compute_oob_variable_importances,
+      const model::proto::TrainingConfig& config,
+      const model::proto::TrainingConfigLinking& config_link,
+      const random_forest::proto::RandomForestTrainingConfig& rf_config,
+      RandomForestModel* model);
+
+  absl::Status ExportPredictions(
+      const dataset::proto::DataSpecification& dataspec,
+      absl::string_view typed_path) const SHARED_LOCKS_REQUIRED(mutex_);
+
+  const bool compute_oob_performances_;
+  const bool compute_oob_variable_importances_;
+  const model::proto::TrainingConfig& config_;
+  const model::proto::TrainingConfigLinking& config_link_;
+  const random_forest::proto::RandomForestTrainingConfig& rf_config_;
+  RandomForestModel* model_;
+
+  utils::concurrency::Mutex mutex_;
+  std::vector<PredictionAccumulator> oob_predictions_ GUARDED_BY(mutex_);
+  std::vector<std::vector<PredictionAccumulator>>
+      oob_predictions_per_input_features_ GUARDED_BY(mutex_);
+  absl::Time last_oob_computation_time_ GUARDED_BY(mutex_) =
+      absl::InfinitePast();
+  int last_oob_computation_num_trees_ GUARDED_BY(mutex_) = 0;
+};
 
 // Add the predictions of a decision tree to a set of predictor accumulators.
 // The tree is applied only on the example indices NOT contained in
@@ -162,7 +219,7 @@ absl::Status UpdateOOBPredictionsWithNewTree(
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
     const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
-    std::vector<PredictionAccumulator>* oob_predictions);
+    std::vector<OOBEvaluator::PredictionAccumulator>* oob_predictions);
 
 // Evaluates the OOB predictions. Examples without any tree predictions are
 // skipped.
@@ -171,13 +228,13 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const model::proto::Task task, const int label_col_idx,
     int uplift_treatment_col_idx,
     const std::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
-    const std::vector<PredictionAccumulator>& oob_predictions,
+    const std::vector<OOBEvaluator::PredictionAccumulator>& oob_predictions,
     bool for_permutation_importance = false);
 
 // Update the variable importance of the model with set of oob predictions.
 absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
-    const std::vector<internal::PredictionAccumulator>& oob_predictions,
-    const std::vector<std::vector<internal::PredictionAccumulator>>&
+    const std::vector<OOBEvaluator::PredictionAccumulator>& oob_predictions,
+    const std::vector<std::vector<OOBEvaluator::PredictionAccumulator>>&
         oob_predictions_per_input_features,
     const dataset::VerticalDataset& dataset, const int num_threads,
     RandomForestModel* model);
@@ -192,14 +249,6 @@ absl::Status SampleTrainingExamples(
     const proto::RandomForestTrainingConfig& rf_config,
     std::optional<double> bootstrap_size_ratio_factor,
     utils::RandomEngine* random, std::vector<UnsignedExampleIdx>* selected);
-
-// Exports the Out-of-bag predictions of a model to disk.
-absl::Status ExportOOBPredictions(
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const dataset::proto::DataSpecification& dataspec,
-    const std::vector<PredictionAccumulator>& oob_predictions,
-    absl::string_view typed_path);
 
 absl::Status SetDefaultHyperParameters(
     random_forest::proto::RandomForestTrainingConfig* rf_config);

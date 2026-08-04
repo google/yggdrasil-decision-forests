@@ -67,7 +67,9 @@ namespace model {
 namespace random_forest {
 namespace {
 
+using test::StatusIs;
 using test::StatusIsOk;
+using ::testing::ElementsAre;
 using ::testing::Not;
 
 using Internal = ::yggdrasil_decision_forests::model::decision_tree::proto::
@@ -745,8 +747,9 @@ TEST(RandomForest, OOBPredictions) {
   BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION, &model,
                              &dataset);
 
-  std::vector<internal::PredictionAccumulator> predictions;
-  internal::InitializeOOBPredictionAccumulators(
+  std::vector<internal::OOBEvaluator::PredictionAccumulator> predictions;
+
+  internal::OOBEvaluator::InitializeAccumulators(
       dataset.nrow(), config, config_link, dataset.data_spec(), &predictions);
   EXPECT_EQ(predictions.size(), dataset.nrow());
 
@@ -807,14 +810,14 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
   BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION, &model,
                              &dataset);
 
-  std::vector<internal::PredictionAccumulator> oob_predictions;
-  std::vector<std::vector<internal::PredictionAccumulator>>
+  std::vector<internal::OOBEvaluator::PredictionAccumulator> oob_predictions;
+  std::vector<std::vector<internal::OOBEvaluator::PredictionAccumulator>>
       oob_predictions_per_input_features(2);
 
-  internal::InitializeOOBPredictionAccumulators(
+  internal::OOBEvaluator::InitializeAccumulators(
       dataset.nrow(), config, config_link, dataset.data_spec(),
       &oob_predictions);
-  internal::InitializeOOBPredictionAccumulators(
+  internal::OOBEvaluator::InitializeAccumulators(
       dataset.nrow(), config, config_link, dataset.data_spec(),
       &oob_predictions_per_input_features[0]);
 
@@ -855,6 +858,87 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
   EXPECT_EQ(importance.size(), 1);
   EXPECT_EQ(importance[0].attribute_idx(), 0);
   EXPECT_EQ(importance[0].importance(), -0.5);
+}
+
+TEST_F(RandomForestOnAdult, OOBEvaluationTrajectoryIsAccurateAndMonotonic) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_num_trees(50);
+  rf_config->set_compute_oob_performances(true);
+
+  TrainAndEvaluateModel();
+
+  auto* rf_model = dynamic_cast<const RandomForestModel*>(model_.get());
+  ASSERT_NE(rf_model, nullptr);
+  const auto& oob_evals = rf_model->out_of_bag_evaluations();
+  ASSERT_FALSE(oob_evals.empty());
+  EXPECT_GT(metric::Accuracy(oob_evals.back().evaluation()), 0.80f);
+  EXPECT_GT(metric::Accuracy(oob_evals.back().evaluation()),
+            metric::Accuracy(oob_evals.front().evaluation()));
+}
+
+TEST_F(RandomForestOnAdult, OOBEvaluationIntervalInTreesIsRespected) {
+  deployment_config_.set_num_threads(1);
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_num_trees(20);
+  rf_config->set_oob_evaluation_interval_in_trees(5);
+  rf_config->set_oob_evaluation_interval_in_seconds(10000);
+  rf_config->set_compute_oob_performances(true);
+
+  TrainAndEvaluateModel();
+
+  auto* rf_model = dynamic_cast<const RandomForestModel*>(model_.get());
+  ASSERT_NE(rf_model, nullptr);
+  std::vector<int> eval_tree_numbers;
+  for (const auto& eval : rf_model->out_of_bag_evaluations()) {
+    eval_tree_numbers.push_back(eval.number_of_trees());
+  }
+  EXPECT_THAT(eval_tree_numbers, ElementsAre(1, 6, 11, 16, 20));
+}
+
+TEST(OOBEvaluatorTest, RejectsInvalidVariableImportanceConfig) {
+  dataset::VerticalDataset dataset;
+  model::proto::TrainingConfig config;
+  auto* rf_config =
+      config.MutableExtension(random_forest::proto::random_forest_config);
+  rf_config->set_compute_oob_performances(false);
+  rf_config->set_compute_oob_variable_importances(true);
+  model::proto::TrainingConfigLinking config_link;
+  RandomForestModel model;
+
+  const auto status_or = internal::OOBEvaluator::Create(
+      /*compute_oob_performances=*/false,
+      /*compute_oob_variable_importances=*/true, dataset, config, config_link,
+      &model);
+  EXPECT_THAT(status_or.status(), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(RandomForestOnAdult, MultithreadedOOBMatchesSequentialOOB) {
+  train_config_.set_random_seed(1234);
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_compute_oob_performances(true);
+
+  deployment_config_.set_num_threads(1);
+  TrainAndEvaluateModel();
+
+  auto* rf_model_seq = dynamic_cast<const RandomForestModel*>(model_.get());
+  ASSERT_NE(rf_model_seq, nullptr);
+  ASSERT_FALSE(rf_model_seq->out_of_bag_evaluations().empty());
+  const float seq_oob_accuracy = metric::Accuracy(
+      rf_model_seq->out_of_bag_evaluations().back().evaluation());
+
+  deployment_config_.set_num_threads(8);
+  TrainAndEvaluateModel();
+
+  auto* rf_model_mt = dynamic_cast<const RandomForestModel*>(model_.get());
+  ASSERT_NE(rf_model_mt, nullptr);
+  ASSERT_FALSE(rf_model_mt->out_of_bag_evaluations().empty());
+  const float mt_oob_accuracy = metric::Accuracy(
+      rf_model_mt->out_of_bag_evaluations().back().evaluation());
+
+  EXPECT_FLOAT_EQ(seq_oob_accuracy, mt_oob_accuracy);
 }
 
 // We train a 100-trees regressive RF and ERT on 20 examples. The RF predictions
