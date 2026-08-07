@@ -1,0 +1,34 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.postprocessor.smoothed_pav_calibrator.proto;
+
+option java_multiple_files = true;
+option java_outer_classname = "SmoothedPavCalibratorOuterClass";
+
+message SmoothedPavCalibrator {
+  // This is all the information from the FittedCalibrationCurve.
+  repeated float x = 1 [packed = true];
+  repeated float y = 2 [packed = true];
+  repeated float slope = 3 [packed = true];
+
+  // Number of points to evaluate the smoothed, monotonic calibration curve used
+  // for linear interpolation of the curve during inference. The grid is evenly
+  // spaced, so lookups are O(1) and, therefore, using a fine grid here costs
+  // memory, not CPU cycles.
+  optional int32 n_grid = 4 [default = 20000];
+}

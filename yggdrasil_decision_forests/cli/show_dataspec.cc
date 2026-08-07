@@ -18,6 +18,9 @@
 // Usage example:
 //   bazel run -c opt :show_dataspec --dataspec=spec.pb
 //
+#include <iostream>
+#include <string>
+
 #include "absl/flags/flag.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"

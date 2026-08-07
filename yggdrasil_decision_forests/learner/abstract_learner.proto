@@ -20,6 +20,7 @@ package yggdrasil_decision_forests.model.proto;
 import public "yggdrasil_decision_forests/model/hyperparameter.proto";
 
 import "yggdrasil_decision_forests/dataset/weight.proto";
+import "yggdrasil_decision_forests/learner/postprocessor/abstract_postprocessor.proto";
 import "yggdrasil_decision_forests/model/abstract_model.proto";
 import "yggdrasil_decision_forests/utils/distribute/distribute.proto";
 
@@ -87,7 +88,7 @@ message DeploymentConfig {
 // Contains all the configuration for the training of a model e.g. label, input
 // features, hyper-parameters.
 message TrainingConfig {
-  // Next ID: 13
+  // Next ID: 19
 
   // Identifier of the learner e.g. "RANDOM_FOREST".
   // The learner should be registered i.e. injected as a dependency to the
@@ -172,6 +173,9 @@ message TrainingConfig {
 
   // Set of monotonic constraints between the model's input features and output.
   repeated MonotonicConstraint monotonic_constraints = 15;
+
+  repeated yggdrasil_decision_forests.model.postprocessor.proto
+      .AbstractPostprocessorTrainingConfig postprocessors = 18;
 
   // Learner specific configuration/hyper-parameters.
   // The message/extension is dependent on the "learner". For example, see
