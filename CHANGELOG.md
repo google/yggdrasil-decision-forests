@@ -5,6 +5,16 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
 ## HEAD
 
+### Breaking changes
+
+-   Replace std::regex by Google's RE2 during inference. Models using Regex
+    expressions for tokenization must now follow the RE2 syntax. See
+    https://github.com/google/re2/wiki/Syntax for the a detailed breakdown of
+    this syntax. Note that other regexes (notably for the data spec columns)
+    can still use the more permissive std::regex syntax.
+
+## HEAD
+
 ### Features
 
 -   "True" and "False" are now recognized as boolean in CSV files. This change
