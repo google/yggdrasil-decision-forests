@@ -87,7 +87,7 @@ def load_datasets(
   train_pd = pd.read_csv(train_path)
   test_pd = pd.read_csv(test_path)
   train_vds = dataset.create_vertical_dataset(
-      train_pd, columns=column_args, include_all_columns=True
+      train_pd, columns=column_args, include_all_columns=True  # pyrefly: ignore[bad-argument-type]
   )
   test_vds = dataset.create_vertical_dataset(
       test_pd, data_spec=train_vds.data_spec()

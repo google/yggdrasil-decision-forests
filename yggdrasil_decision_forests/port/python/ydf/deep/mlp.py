@@ -70,7 +70,7 @@ class MultiLayerPerceptronModel(generic_jax.GenericJAXModel):
     self.config = MultiLayerPerceptronImpl.Config._from_proto(config_proto)
 
   def make_jax_module(self):
-    return MultiLayerPerceptronImpl(model=self, config=self.config)
+    return MultiLayerPerceptronImpl(model=self, config=self.config)  # pyrefly: ignore[bad-argument-type]
 
 
 class MultiLayerPerceptronImpl(nn.Module):
@@ -107,14 +107,14 @@ class MultiLayerPerceptronImpl(nn.Module):
 
   @nn.compact
   def __call__(self, x: generic_jax.Batch, training: bool) -> jax.Array:
-    x = self.model._preprocessor.apply_inmodel(x)
-    x = layer_lib.StandardFeatureFlattener()(x)
+    x = self.model._preprocessor.apply_inmodel(x)  # pyrefly: ignore[bad-assignment]
+    x = layer_lib.StandardFeatureFlattener()(x)  # pyrefly: ignore[bad-argument-type, bad-assignment]
     for i in range(self.config.num_layers - 1):
-      x = nn.Dense(features=self.config.layer_size, name=f"layer_{i}")(x)
-      x = nn.relu(x)
+      x = nn.Dense(features=self.config.layer_size, name=f"layer_{i}")(x)  # pyrefly: ignore[bad-assignment]
+      x = nn.relu(x)  # pyrefly: ignore[bad-argument-type, bad-assignment]
       x = nn.Dropout(rate=self.config.drop_out, deterministic=not training)(x)
-    x = nn.Dense(features=self.model._output_dim(), name="final_layer")(x)
-    return x
+    x = nn.Dense(features=self.model._output_dim(), name="final_layer")(x)  # pyrefly: ignore[bad-assignment]
+    return x  # pyrefly: ignore[bad-return]
 
 
 class MultiLayerPerceptronLearner(generic_jax.GenericJaxLearner):
@@ -210,7 +210,7 @@ class MultiLayerPerceptronLearner(generic_jax.GenericJaxLearner):
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
         working_dir=working_dir,
         num_threads=num_threads,
-        hyper_parameters=hyper_parameters,
+        hyper_parameters=hyper_parameters,  # pyrefly: ignore[bad-argument-type]
         explicit_learner_arguments=explicit_args,
         tuner=tuner,
         feature_selector=feature_selector,

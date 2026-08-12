@@ -52,7 +52,7 @@ def create_doc() -> Tuple[Doc, Elem]:
   impl = minidom.getDOMImplementation()
   assert impl is not None
   doc = impl.createDocument(None, "div", None)
-  return doc, doc.documentElement
+  return doc, doc.documentElement  # pyrefly: ignore[bad-return]
 
 
 def with_style(doc: Doc, item: Union[Elem, str], style: Dict[str, Any]) -> Elem:

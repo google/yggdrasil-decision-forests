@@ -307,7 +307,7 @@ def build_batched_example_generator(
   if pandas_io.is_pandas_dataframe(data):
     return pandas_io.PandasBatchedExampleGenerator(data)
   elif isinstance(data, dict):
-    return numpy_io.NumpyDictBatchedExampleGenerator(data)
+    return numpy_io.NumpyDictBatchedExampleGenerator(data)  # pyrefly: ignore[bad-argument-type]
   else:
     # TODO: Add support for other YDF dataset formats.
     raise ValueError(

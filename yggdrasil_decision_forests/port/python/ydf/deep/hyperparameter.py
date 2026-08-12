@@ -85,7 +85,7 @@ class HyperparameterConsumer:
           f" Instead, got {value!r} of type {type(value)}"
       )
     self._consumed.add(name)
-    return value
+    return value  # pyrefly: ignore[bad-return]
 
   def get_str(self, name: str) -> str:
     """Gets a string value."""

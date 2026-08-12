@@ -368,9 +368,9 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     self.assertEqual(age_spec.name, "age")
     self.assertEqual(age_spec.type, ds_pb.ColumnType.DISCRETIZED_NUMERICAL)
 
-    self.assertLess(evaluation.accuracy, 0.8746)
-    self.assertGreater(evaluation.loss, 0.28042)
-    self.assertLess(evaluation.loss, 0.30802)
+    self.assertLess(evaluation.accuracy, 0.8746)  # pyrefly: ignore[no-matching-overload]
+    self.assertGreater(evaluation.loss, 0.28042)  # pyrefly: ignore[no-matching-overload]
+    self.assertLess(evaluation.loss, 0.30802)  # pyrefly: ignore[no-matching-overload]
 
   @parameterized.parameters(
       (np.array([0, 0, 0, 1, 1]),),
@@ -521,7 +521,7 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     logs = model.hyperparameter_optimizer_logs()
     self.assertIsNotNone(logs)
     self.assertLen(logs.trials, 5)
-    self.assertGreater(logs.trials[0].score, 0)
+    self.assertGreater(logs.trials[0].score, 0)  # pyrefly: ignore[no-matching-overload]
 
   def test_label_type_error_message(self):
     with self.assertRaisesRegex(

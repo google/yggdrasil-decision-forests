@@ -58,7 +58,7 @@ def create_in_process_workers(num_workers: int) -> Workers:
   # To stop all workers
   def stop():
     for stop_worker in stop_worker_list:
-      stop_worker()
+      stop_worker()  # pyrefly: ignore[not-callable]
 
   ips = [f"localhost:{port}" for port in ports]
   logging.info("ips: %s", ips)

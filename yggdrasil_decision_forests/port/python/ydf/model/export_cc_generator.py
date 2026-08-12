@@ -45,7 +45,7 @@ def process(input_model: str, output_code: str) -> None:
 def main(argv: Sequence[str]) -> None:
   if len(argv) > 1:
     raise app.UsageError("Too many command-line arguments.")
-  process(_INPUT_MODEL.value, _OUTPUT_CODE.value)
+  process(_INPUT_MODEL.value, _OUTPUT_CODE.value)  # pyrefly: ignore[bad-argument-type]
 
 
 if __name__ == "__main__":

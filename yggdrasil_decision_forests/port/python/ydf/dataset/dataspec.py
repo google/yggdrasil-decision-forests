@@ -90,7 +90,7 @@ def np_dtype_to_ydf_dtype(np_dtype: np.dtype) -> Optional["ds_pb.DType"]:
   if hasattr(np_dtype, "type"):
     ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype.type)
   else:
-    ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype)
+    ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype)  # pyrefly: ignore[bad-argument-type]
 
   if ydf_dtype is None:
     raise ValueError(f"ydf_dtype: {ydf_dtype!r} {np_dtype!r}")
@@ -587,7 +587,7 @@ def categorical_column_dictionary_to_list(
         )
         shown_unicode_warning = True
       decoded_key = key.decode(encoding="utf-8", errors="ignore")
-    items[value.index] = decoded_key
+    items[value.index] = decoded_key  # pyrefly: ignore[unsupported-operation]
 
   for index, value in enumerate(items):
     if value is None:

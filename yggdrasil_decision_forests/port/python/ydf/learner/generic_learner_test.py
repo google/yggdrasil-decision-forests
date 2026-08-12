@@ -163,7 +163,7 @@ class DatasetFormatsTest(parameterized.TestCase):
         record["f2"] = np.random.rand()
       if np.random.rand() < 0.8:
         record["cs2"] = [
-            np.random.choice(["x", "y", None])
+            np.random.choice(["x", "y", None])  # pyrefly: ignore[no-matching-overload]
             for _ in range(np.random.randint(3))
         ]
       records.append(record)

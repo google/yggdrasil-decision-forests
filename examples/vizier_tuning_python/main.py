@@ -154,7 +154,7 @@ def main(argv) -> None:
       num_threads=20,
       # The working directory contains the model checkpoints. Change the working
       # directory when training a new model.
-      working_dir=os.path.join(_PROJECT_DIR.value, "work_dir"),
+      working_dir=os.path.join(_PROJECT_DIR.value, "work_dir"),  # pyrefly: ignore[no-matching-overload]
       # Non optimized hyper-parameters can be set here.
       num_trees=200,
       # Give the tuner.
@@ -173,7 +173,7 @@ def main(argv) -> None:
   )
 
   # Save the model to disk.
-  model.save(os.path.join(_PROJECT_DIR.value, "model"))
+  model.save(os.path.join(_PROJECT_DIR.value, "model"))  # pyrefly: ignore[no-matching-overload]
 
   # Evaluate the model.
   # Note: The model evaluation is not distributed.

@@ -219,9 +219,9 @@ class CustomLossTest(parameterized.TestCase):
       sum_weights_positive = np.sum((labels == 2) * weights)
       ratio_positive = sum_weights_positive / sum_weights
       if ratio_positive == 0.0:
-        return -np.iinfo(np.float32).max
+        return -np.iinfo(np.float32).max  # pyrefly: ignore[bad-return, no-matching-overload]
       elif ratio_positive == 1.0:
-        return np.iinfo(np.float32).max
+        return np.iinfo(np.float32).max  # pyrefly: ignore[bad-return, no-matching-overload]
       return np.log(ratio_positive / (1 - ratio_positive))
 
     def binomial_gradient(
@@ -229,7 +229,7 @@ class CustomLossTest(parameterized.TestCase):
     ) -> Tuple[npty.NDArray[np.float32], npty.NDArray[np.float32]]:
       pred_probability = 1.0 / (1.0 + np.exp(-predictions))
       binary_labels = labels == 2
-      return (
+      return (  # pyrefly: ignore[bad-return]
           pred_probability - binary_labels,
           pred_probability * (pred_probability - 1),
       )
@@ -381,11 +381,11 @@ class CustomLossTest(parameterized.TestCase):
         labels: npty.NDArray[np.int32], _: npty.NDArray[np.float32]
     ) -> npty.NDArray[np.float32]:
       dimension = np.max(labels)
-      return np.arange(1, dimension + 1)
+      return np.arange(1, dimension + 1)  # pyrefly: ignore[bad-return]
 
     multiclass_custom_loss = custom_loss.MultiClassificationLoss(
         initial_predictions=multiclass_initial_prediction,
-        gradient_and_hessian=lambda x, y: (
+        gradient_and_hessian=lambda x, y: (  # pyrefly: ignore[bad-argument-type]
             np.ones([3, len(x)]),
             np.ones([3, len(x)]),
         ),
@@ -409,11 +409,11 @@ class CustomLossTest(parameterized.TestCase):
         labels: npty.NDArray[np.int32], _: npty.NDArray[np.float32]
     ) -> npty.NDArray[np.float32]:
       dimension = np.max(labels)
-      return np.arange(1, dimension)
+      return np.arange(1, dimension)  # pyrefly: ignore[bad-return]
 
     multiclass_custom_loss = custom_loss.MultiClassificationLoss(
         initial_predictions=multiclass_initial_prediction,
-        gradient_and_hessian=lambda x, y: (
+        gradient_and_hessian=lambda x, y: (  # pyrefly: ignore[bad-argument-type]
             np.ones([3, len(x)]),
             np.ones([3, len(x)]),
         ),
@@ -662,7 +662,7 @@ class CustomLossTest(parameterized.TestCase):
   def test_cross_validation_no_parallel_evaluations(self):
     toy_custom_loss = custom_loss.RegressionLoss(
         initial_predictions=lambda x, y: np.float32(0),
-        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
+        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),  # pyrefly: ignore[bad-argument-type]
         loss=lambda x, y, z: np.float32(0),
         activation=custom_loss.Activation.IDENTITY,
     )
@@ -730,7 +730,7 @@ class CustomLossTest(parameterized.TestCase):
 
     toy_custom_loss = custom_loss.RegressionLoss(
         initial_predictions=lambda x, y: np.float32(0),
-        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),
+        gradient_and_hessian=lambda x, y: (np.ones(len(x)), np.ones(len(x))),  # pyrefly: ignore[bad-argument-type]
         loss=lambda x, y, z: np.float32(0),
         activation=custom_loss.Activation.IDENTITY,
     )

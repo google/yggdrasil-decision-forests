@@ -38,14 +38,14 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
     loss = self._model.validation_loss()
     return loss if not math.isnan(loss) else None
 
-  def initial_predictions(self) -> npt.NDArray[float]:
+  def initial_predictions(self) -> npt.NDArray[float]:  # pyrefly: ignore[bad-specialization]
     """Returns the model's initial predictions (i.e. the model bias)."""
     return self._model.initial_predictions()
 
   def set_initial_predictions(self, initial_predictions: Sequence[float]):
     """Sets the model's initial predictions (i.e. the model bias)."""
     self._model.set_initial_predictions(
-        np.asarray(initial_predictions, np.float32)
+        np.asarray(initial_predictions, np.float32)  # pyrefly: ignore[bad-argument-type]
     )
 
   def output_logits(self) -> bool:
@@ -156,7 +156,7 @@ class GradientBoostedTreesModel(decision_forest_model.DecisionForestModel):
       return None
     return metric.Evaluation(self._model.validation_evaluation())
 
-  def self_evaluation(self) -> Optional[metric.Evaluation]:
+  def self_evaluation(self) -> Optional[metric.Evaluation]:  # pyrefly: ignore[bad-override]
     """Returns the model's self-evaluation.
 
     For Gradient Boosted Trees models, the self-evaluation is the evaluation on

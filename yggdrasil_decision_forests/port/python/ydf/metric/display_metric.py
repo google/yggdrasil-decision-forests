@@ -678,7 +678,7 @@ def _object_to_html(
   else:
     if raw_html:
       node = _RawXMLNode(value, doc)
-      html_value.appendChild(node)
+      html_value.appendChild(node)  # pyrefly: ignore[bad-specialization]
     else:
       html_pre_value = doc.createElement("pre")
       html_value.appendChild(html_pre_value)

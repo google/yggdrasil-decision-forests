@@ -467,7 +467,7 @@ class NodeIdx:
       return self.non_leaf_node - begin_node_idx.non_leaf_node
     else:
       # This is a leaf
-      return -(self.leaf_node - begin_node_idx.leaf_node) - 1
+      return -(self.leaf_node - begin_node_idx.leaf_node) - 1  # pyrefly: ignore[unsupported-operation]
 
 
 def _categorical_list_to_bitmap(
@@ -744,8 +744,8 @@ class InternalForest:
     self.negative_children.append(-1)
 
     # Populate child nodes
-    neg_child_node = self._add_node(node.neg_child, begin_node_idx, depth + 1)
-    pos_child_node = self._add_node(node.pos_child, begin_node_idx, depth + 1)
+    neg_child_node = self._add_node(node.neg_child, begin_node_idx, depth + 1)  # pyrefly: ignore[bad-argument-type]
+    pos_child_node = self._add_node(node.pos_child, begin_node_idx, depth + 1)  # pyrefly: ignore[bad-argument-type]
 
     # Index the children
     self.negative_children[node_idx] = neg_child_node.offset(begin_node_idx)
@@ -1032,7 +1032,7 @@ def _predict_fn(
       assert value_idx.dtype == jax_arrays.arithmetic_int_dtype
 
       if jax_arrays.leaf_outputs is None:
-        leaf_outputs = params[_PARAM_LEAF_VALUES]
+        leaf_outputs = params[_PARAM_LEAF_VALUES]  # pyrefly: ignore[unsupported-operation]
       else:
         leaf_outputs = jax_arrays.leaf_outputs
       return leaf_outputs[value_idx]
@@ -1045,7 +1045,7 @@ def _predict_fn(
 
     if len(forest.initial_predictions) == 1:
       if jax_arrays.initial_predictions is None:
-        initial_predictions = params[_PARAM_INITIAL_PREDICTIONS]
+        initial_predictions = params[_PARAM_INITIAL_PREDICTIONS]  # pyrefly: ignore[unsupported-operation]
       else:
         initial_predictions = jax_arrays.initial_predictions
 
@@ -1124,14 +1124,14 @@ def _route_example(
         jax_arrays.split_parameters[node_idx], jnp.int32
     )
     bias_offset = offset + jnp.int32(num_weights)
-    bias = jax_arrays.oblique_weights[bias_offset]
+    bias = jax_arrays.oblique_weights[bias_offset]  # pyrefly: ignore[unsupported-operation]
     numerical_features = intern_feature_values["numerical"]
 
     def sum_iter(i, a):
       return (
           a
-          + numerical_features[jax_arrays.oblique_attributes[i]]
-          * jax_arrays.oblique_weights[i]
+          + numerical_features[jax_arrays.oblique_attributes[i]]  # pyrefly: ignore[unsupported-operation]
+          * jax_arrays.oblique_weights[i]  # pyrefly: ignore[unsupported-operation]
       )
 
     weighted_sum = jax.lax.fori_loop(offset, bias_offset, sum_iter, -bias)
@@ -1140,15 +1140,15 @@ def _route_example(
   # Assemble the condition map.
   condition_fns = [None] * len(jax_arrays.dense_condition_mapping)
   if ConditionType.GREATER_THAN in jax_arrays.dense_condition_mapping:
-    condition_fns[
+    condition_fns[  # pyrefly: ignore[unsupported-operation]
         jax_arrays.dense_condition_mapping[ConditionType.GREATER_THAN]
     ] = condition_greater_than
   if ConditionType.IS_IN in jax_arrays.dense_condition_mapping:
-    condition_fns[jax_arrays.dense_condition_mapping[ConditionType.IS_IN]] = (
+    condition_fns[jax_arrays.dense_condition_mapping[ConditionType.IS_IN]] = (  # pyrefly: ignore[unsupported-operation]
         condition_is_in
     )
   if ConditionType.SPARSE_OBLIQUE in jax_arrays.dense_condition_mapping:
-    condition_fns[
+    condition_fns[  # pyrefly: ignore[unsupported-operation]
         jax_arrays.dense_condition_mapping[ConditionType.SPARSE_OBLIQUE]
     ] = condition_sparse_oblique
 
@@ -1156,14 +1156,14 @@ def _route_example(
     # Since there is only one type of conditions, there is not need for a
     # condition switch.
     assert jax_arrays.dense_condition_types is None
-    condition_value = condition_fns[0](node_idx)
+    condition_value = condition_fns[0](node_idx)  # pyrefly: ignore[not-callable]
 
   else:
     # Condition switch on the type of conditions.
     assert jax_arrays.dense_condition_types is not None
     condition_value = jax.lax.switch(
         jax_arrays.dense_condition_types[node_idx],
-        condition_fns,
+        condition_fns,  # pyrefly: ignore[bad-argument-type]
         node_idx,
     )
 
@@ -1260,13 +1260,13 @@ def _update_node_with_jax_param(
           "The YDF Jax exporter does not support this leaf value:"
           f" {node.value!r}"
       )
-    node.value.value = leaf_values[cur_node.leaf_node]
+    node.value.value = leaf_values[cur_node.leaf_node]  # pyrefly: ignore[bad-assignment, unsupported-operation]
     cur_node.leaf_node += 1
   else:
     cur_node.non_leaf_node += 1
     assert isinstance(node, tree_lib.NonLeaf)
-    _update_node_with_jax_param(node.neg_child, cur_node, leaf_values)
-    _update_node_with_jax_param(node.pos_child, cur_node, leaf_values)
+    _update_node_with_jax_param(node.neg_child, cur_node, leaf_values)  # pyrefly: ignore[bad-argument-type]
+    _update_node_with_jax_param(node.pos_child, cur_node, leaf_values)  # pyrefly: ignore[bad-argument-type]
 
 
 def get_bit(mask, i):

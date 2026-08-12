@@ -156,8 +156,8 @@ def _list_nodes(
     if node.value is not None:
       value_lib.set_proto_node(node.value, proto_node)
     nodes.append(proto_node)
-    _list_nodes(node.neg_child, dataspec, nodes)
-    _list_nodes(node.pos_child, dataspec, nodes)
+    _list_nodes(node.neg_child, dataspec, nodes)  # pyrefly: ignore[bad-argument-type]
+    _list_nodes(node.pos_child, dataspec, nodes)  # pyrefly: ignore[bad-argument-type]
 
 
 def tree_to_proto_nodes(

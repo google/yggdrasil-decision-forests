@@ -72,7 +72,7 @@ class TabularTransformerModel(generic_jax.GenericJAXModel):
     )
 
   def make_jax_module(self):
-    return TabularTransformerImpl(model=self, config=self.config)
+    return TabularTransformerImpl(model=self, config=self.config)  # pyrefly: ignore[bad-argument-type]
 
   def set_config_from_proto(
       self, config_proto: deep_model_pb2.TabularTransformer
@@ -135,11 +135,11 @@ class TabularTransformerImpl(nn.Module):
     )(z)
 
     with jax.profiler.TraceAnnotation("preprocess"):
-      x = self.model._preprocessor.apply_inmodel(x)
+      x = self.model._preprocessor.apply_inmodel(x)  # pyrefly: ignore[bad-assignment]
 
     with jax.profiler.TraceAnnotation("tokenize"):
-      x = FTTransformerTokenizer(config=self.config.tokenizer)(x)
-      assert len(x.shape) == 3
+      x = FTTransformerTokenizer(config=self.config.tokenizer)(x)  # pyrefly: ignore[bad-argument-type, bad-assignment]
+      assert len(x.shape) == 3  # pyrefly: ignore[missing-attribute]
 
     for i in range(self.config.num_layers):
       save_x = x  # For the residual
@@ -159,22 +159,22 @@ class TabularTransformerImpl(nn.Module):
       with jax.profiler.TraceAnnotation("dense"):
         save_x = x
         x = batch_norm(x, name=f"layer_{i}_batchnorm_2")
-        x = nn.Dense(
+        x = nn.Dense(  # pyrefly: ignore[bad-assignment]
             features=self.config.tokenizer.token_dim, name=f"layer_{i}_dense_1"
         )(x)
-        x = nn.gelu(x)
-        x = nn.Dense(
+        x = nn.gelu(x)  # pyrefly: ignore[bad-argument-type, bad-assignment]
+        x = nn.Dense(  # pyrefly: ignore[bad-assignment]
             features=self.config.tokenizer.token_dim, name=f"layer_{i}_dense_2"
         )(x)
         x = x + save_x
         assert len(x.shape) == 3
 
     with jax.profiler.TraceAnnotation("final"):
-      x = x[:, 0, :]
+      x = x[:, 0, :]  # pyrefly: ignore[bad-assignment, bad-index]
       x = batch_norm(x, name="final_layer_batchnorm")
-      x = nn.gelu(x)
-      x = nn.Dense(features=self.model._output_dim(), name="final_layer")(x)
-    return x
+      x = nn.gelu(x)  # pyrefly: ignore[bad-assignment]
+      x = nn.Dense(features=self.model._output_dim(), name="final_layer")(x)  # pyrefly: ignore[bad-assignment]
+    return x  # pyrefly: ignore[bad-return]
 
 
 class FTTransformerTokenizer(nn.Module):
@@ -238,7 +238,7 @@ class FTTransformerTokenizer(nn.Module):
       if feature.type == layer_lib.FeatureType.CATEGORICAL:
         value = ensure_shape2(value)
         embedded_value = nn.Embed(
-            num_embeddings=feature.num_categorical_values,
+            num_embeddings=feature.num_categorical_values,  # pyrefly: ignore[bad-argument-type]
             features=self.config.token_dim,
             name=f"embedding_{feature.name}",
         )(value)
@@ -382,7 +382,7 @@ class TabularTransformerLearner(generic_jax.GenericJaxLearner):
         max_num_scanned_rows_to_compute_statistics=max_num_scanned_rows_to_compute_statistics,
         working_dir=working_dir,
         num_threads=num_threads,
-        hyper_parameters=hyper_parameters,
+        hyper_parameters=hyper_parameters,  # pyrefly: ignore[bad-argument-type]
         explicit_learner_arguments=explicit_args,
         tuner=tuner,
         feature_selector=feature_selector,

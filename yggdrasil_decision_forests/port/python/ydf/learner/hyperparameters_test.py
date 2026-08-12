@@ -65,7 +65,7 @@ class HyperparametersTest(parameterized.TestCase):
         " num_candidate_attributes).*",
     ):
       hp_lib.validate_hyperparameters(
-          hp_dict=hp_dict,
+          hp_dict=hp_dict,  # pyrefly: ignore[bad-argument-type]
           train_config=train_config,
           deployment_config=abstract_learner_pb2.DeploymentConfig(),
       )
@@ -159,7 +159,7 @@ class HyperparametersTest(parameterized.TestCase):
         " subsample_count).*",
     ):
       _ = hp_lib.fix_hyperparameters(
-          hp_dict=hp_dict,
+          hp_dict=hp_dict,  # pyrefly: ignore[bad-argument-type]
           explicit_parameters=explicit_parameters,
           train_config=train_config,
           deployment_config=abstract_learner_pb2.DeploymentConfig(),

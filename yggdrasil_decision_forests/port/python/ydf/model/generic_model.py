@@ -95,7 +95,7 @@ class Task(enum.Enum):
 
   @classmethod
   def _from_proto_type(cls, task: abstract_model_pb2.Task):
-    task = PROTO_TO_TASK.get(task)
+    task = PROTO_TO_TASK.get(task)  # pyrefly: ignore[bad-assignment]
     if task is None:
       raise NotImplementedError(f"Unsupported task {task}")
     return task
@@ -1171,7 +1171,7 @@ Use `model.describe()` for more details.
       can_be_saved: bool = True,
       squeeze_binary_classification: bool = True,
       force: bool = False,
-  ) -> "tensorflow.Module":  # pylint: disable=undefined-variable
+  ) -> "tensorflow.Module":  # pylint: disable=undefined-variable  # pyrefly: ignore[unknown-name]
     """Converts the model into a callable TensorFlow Module (`@tf.function`).
 
     This allows the YDF model to be integrated into larger TensorFlow graphs.
@@ -1222,8 +1222,8 @@ Use `model.describe()` for more details.
       jit: bool = True,
       apply_activation: bool = True,
       leaves_as_params: bool = False,
-      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",  # pylint: disable=undefined-variable
-  ) -> "export_jax.JaxModel":  # pylint: disable=undefined-variable
+      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",  # pylint: disable=undefined-variable  # pyrefly: ignore[unknown-name]
+  ) -> "export_jax.JaxModel":  # pylint: disable=undefined-variable  # pyrefly: ignore[unknown-name]
     """Converts the model into a JAX function for use in JAX ecosystems.
 
     Usage example:
@@ -1659,7 +1659,7 @@ class GenericCCModel(GenericModel):
       self, value: Optional[feature_selector_logs.FeatureSelectorLogs]
   ) -> None:
     if value is None:
-      self._model.set_feature_selection_logs(None)
+      self._model.set_feature_selection_logs(None)  # pyrefly: ignore[bad-argument-type]
     else:
       self._model.set_feature_selection_logs(
           feature_selector_logs.value_to_proto(value)
@@ -2093,7 +2093,7 @@ class GenericCCModel(GenericModel):
       can_be_saved: bool = True,
       squeeze_binary_classification: bool = True,
       force: bool = False,
-  ) -> "tensorflow.Module":  # pylint: disable=undefined-variable
+  ) -> "tensorflow.Module":  # pylint: disable=undefined-variable  # pyrefly: ignore[unknown-name]
     # TODO: Add tensorflow support for anomaly detection.
     if self.task() == Task.ANOMALY_DETECTION:
       raise ValueError(
@@ -2112,8 +2112,8 @@ class GenericCCModel(GenericModel):
       jit: bool = True,
       apply_activation: bool = True,
       leaves_as_params: bool = False,
-      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",  # pylint: disable=undefined-variable
-  ) -> "export_jax.JaxModel":  # pylint: disable=undefined-variable
+      compatibility: Union[str, "export_jax.Compatibility"] = "XLA",  # pylint: disable=undefined-variable  # pyrefly: ignore[unknown-name]
+  ) -> "export_jax.JaxModel":  # pylint: disable=undefined-variable  # pyrefly: ignore[unknown-name]
     return _get_export_jax().to_jax_function(
         model=self,
         jit=jit,
@@ -2273,7 +2273,7 @@ class GenericCCModel(GenericModel):
         new_col = effective_dataspec.columns.add(name=name, type=semantic)
       else:
         new_col = effective_dataspec.columns[col_idx]
-        new_col.type = semantic
+        new_col.type = semantic  # pyrefly: ignore[bad-assignment]
 
       # Populate column content
       if (

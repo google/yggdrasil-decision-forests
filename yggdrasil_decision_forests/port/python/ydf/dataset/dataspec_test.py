@@ -117,11 +117,11 @@ class DataspecTest(parameterized.TestCase):
     )
     str_defs_positive = ["foo", "target", "bar", "", "*"]
     self.assertTrue(
-        dataspec_lib.column_defs_contains_column(column_name, str_defs_positive)
+        dataspec_lib.column_defs_contains_column(column_name, str_defs_positive)  # pyrefly: ignore[bad-argument-type]
     )
     str_defs_negative = ["foo", "tar", "bar", "", "*"]
     self.assertFalse(
-        dataspec_lib.column_defs_contains_column(column_name, str_defs_negative)
+        dataspec_lib.column_defs_contains_column(column_name, str_defs_negative)  # pyrefly: ignore[bad-argument-type]
     )
     tuple_defs_positive = [
         ("foo", Semantic.NUMERICAL),
@@ -129,7 +129,7 @@ class DataspecTest(parameterized.TestCase):
     ]
     self.assertTrue(
         dataspec_lib.column_defs_contains_column(
-            column_name, tuple_defs_positive
+            column_name, tuple_defs_positive  # pyrefly: ignore[bad-argument-type]
         )
     )
     tuple_defs_negative = [
@@ -138,19 +138,19 @@ class DataspecTest(parameterized.TestCase):
     ]
     self.assertFalse(
         dataspec_lib.column_defs_contains_column(
-            column_name, tuple_defs_negative
+            column_name, tuple_defs_negative  # pyrefly: ignore[bad-argument-type]
         )
     )
     column_defs_positive = [Column("foo"), Column("target")]
     self.assertTrue(
         dataspec_lib.column_defs_contains_column(
-            column_name, column_defs_positive
+            column_name, column_defs_positive  # pyrefly: ignore[bad-argument-type]
         )
     )
     column_defs_negative = [Column("foo"), Column("tar")]
     self.assertFalse(
         dataspec_lib.column_defs_contains_column(
-            column_name, column_defs_negative
+            column_name, column_defs_negative  # pyrefly: ignore[bad-argument-type]
         )
     )
 

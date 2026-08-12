@@ -361,6 +361,6 @@ def maybe_tqdm(iterable: Iterator[T], *args, **kwargs) -> Iterator[T]:
     import tqdm
     # pytype: enable=import-error
     # pylint: enable=g-import-not-at-top
-    return tqdm.tqdm(iterable, *args, **kwargs)
+    return tqdm.tqdm(iterable, *args, **kwargs)  # pyrefly: ignore[bad-return]
   except ImportError:
     return iterable

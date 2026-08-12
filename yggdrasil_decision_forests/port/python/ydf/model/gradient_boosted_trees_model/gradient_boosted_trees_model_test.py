@@ -154,16 +154,16 @@ class GradientBoostedTreesTest(parameterized.TestCase):
       self.assertIsNotNone(training_evaluation)
 
       if idx == 0:
-        self.assertAlmostEqual(evaluation.loss, 1.0824289)
-        self.assertAlmostEqual(training_evaluation.loss, 1.062329, places=6)
+        self.assertAlmostEqual(evaluation.loss, 1.0824289)  # pyrefly: ignore[no-matching-overload]
+        self.assertAlmostEqual(training_evaluation.loss, 1.062329, places=6)  # pyrefly: ignore[no-matching-overload]
       elif idx == 49:
-        self.assertAlmostEqual(evaluation.loss, 0.677054)
-        self.assertAlmostEqual(evaluation.accuracy, 0.8434505)
-        self.assertAlmostEqual(training_evaluation.loss, 0.57730037)
+        self.assertAlmostEqual(evaluation.loss, 0.677054)  # pyrefly: ignore[no-matching-overload]
+        self.assertAlmostEqual(evaluation.accuracy, 0.8434505)  # pyrefly: ignore[no-matching-overload]
+        self.assertAlmostEqual(training_evaluation.loss, 0.57730037)  # pyrefly: ignore[no-matching-overload]
       elif idx == 99:
-        self.assertAlmostEqual(evaluation.loss, 0.6498283)
-        self.assertAlmostEqual(training_evaluation.loss, 0.5057407)
-        self.assertAlmostEqual(training_evaluation.accuracy, 0.89436144)
+        self.assertAlmostEqual(evaluation.loss, 0.6498283)  # pyrefly: ignore[no-matching-overload]
+        self.assertAlmostEqual(training_evaluation.loss, 0.5057407)  # pyrefly: ignore[no-matching-overload]
+        self.assertAlmostEqual(training_evaluation.accuracy, 0.89436144)  # pyrefly: ignore[no-matching-overload]
 
   def test_training_logs_with_newly_trained_model(self):
     dataset = {
@@ -255,7 +255,7 @@ class GradientBoostedTreesTest(parameterized.TestCase):
 
   def test_validation_loss(self):
     validation_loss = self.adult_binary_class_gbdt.validation_loss()
-    self.assertAlmostEqual(validation_loss, 0.573842942, places=6)
+    self.assertAlmostEqual(validation_loss, 0.573842942, places=6)  # pyrefly: ignore[no-matching-overload]
 
   def test_validation_loss_if_no_validation_dataset(self):
     dataset = {"x": np.array([0, 0, 1, 1]), "y": np.array([0, 0, 0, 1])}
@@ -267,7 +267,7 @@ class GradientBoostedTreesTest(parameterized.TestCase):
 
   def test_initial_predictions(self):
     initial_predictions = self.adult_binary_class_gbdt.initial_predictions()
-    np.testing.assert_allclose(initial_predictions, [-1.1630996])
+    np.testing.assert_allclose(initial_predictions, [-1.1630996])  # pyrefly: ignore[no-matching-overload]
 
   @parameterized.parameters(
       "adult_binary_class_gbdt",
@@ -277,9 +277,9 @@ class GradientBoostedTreesTest(parameterized.TestCase):
   def test_set_initial_predictions(self, model_name):
     model = load_model(model_name)
     initial_predictions = model.initial_predictions()
-    model.set_initial_predictions(initial_predictions * 2.0)
-    np.testing.assert_allclose(
-        initial_predictions * 2, model.initial_predictions()
+    model.set_initial_predictions(initial_predictions * 2.0)  # pyrefly: ignore[unsupported-operation]
+    np.testing.assert_allclose(  # pyrefly: ignore[no-matching-overload]
+        initial_predictions * 2, model.initial_predictions()  # pyrefly: ignore[unsupported-operation]
     )
 
   def test_validation_evaluation_empty(self):
@@ -304,12 +304,12 @@ class GradientBoostedTreesTest(parameterized.TestCase):
     validation_evaluation = self.adult_binary_class_gbdt.validation_evaluation()
     self.assertIsNotNone(validation_evaluation)
     self.assertIsNone(validation_evaluation.accuracy)
-    self.assertAlmostEqual(validation_evaluation.loss, 0.57384294)
+    self.assertAlmostEqual(validation_evaluation.loss, 0.57384294)  # pyrefly: ignore[no-matching-overload]
 
   def test_validation_evaluation_with_content(self):
     validation_evaluation = self.gbt_adult_base_with_na.validation_evaluation()
     self.assertIsNotNone(validation_evaluation)
-    self.assertAlmostEqual(validation_evaluation.accuracy, 0.8498403)
+    self.assertAlmostEqual(validation_evaluation.accuracy, 0.8498403)  # pyrefly: ignore[no-matching-overload]
 
   def test_variable_importances_stored_in_model(self):
     model_path = os.path.join(
@@ -831,7 +831,7 @@ class EditModelTest(absltest.TestCase):
 """,
     )
     bias = -0.693147
-    npt.assert_almost_equal(model.initial_predictions(), [bias], decimal=4)
+    npt.assert_almost_equal(model.initial_predictions(), [bias], decimal=4)  # pyrefly: ignore[bad-argument-type]
     npt.assert_almost_equal(
         model.predict(dataset),
         [
@@ -849,7 +849,7 @@ class EditModelTest(absltest.TestCase):
     model, dataset = self.create_model_and_dataset()
     tree = model.get_tree(0)
     assert isinstance(tree.root, node_lib.NonLeaf)
-    assert isinstance(tree.root.pos_child.pos_child, node_lib.Leaf)
+    assert isinstance(tree.root.pos_child.pos_child, node_lib.Leaf)  # pyrefly: ignore[missing-attribute]
     assert isinstance(
         tree.root.pos_child.pos_child.value, value_lib.RegressionValue
     )

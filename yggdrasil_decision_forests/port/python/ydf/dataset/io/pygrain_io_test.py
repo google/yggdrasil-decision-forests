@@ -26,7 +26,7 @@ from ydf.dataset.io import pygrain_io
 class PygrainIoTest(parameterized.TestCase):
 
   @parameterized.parameters(
-      (grain.load([0, 1, 2], num_epochs=1), True),
+      (grain.load([0, 1, 2], num_epochs=1), True),  # pyrefly: ignore[bad-argument-type]
       (grain.MapDataset.source([0, 1, 2]), True),
       (grain.MapDataset.source([0, 1, 2]).to_iter_dataset(), True),
       ({}, False),
@@ -38,20 +38,20 @@ class PygrainIoTest(parameterized.TestCase):
   @parameterized.parameters(
       (
           grain.load(
-              [{"feature": 0}, {"feature": 1}, {"feature": 2}], num_epochs=1
+              [{"feature": 0}, {"feature": 1}, {"feature": 2}], num_epochs=1  # pyrefly: ignore[bad-argument-type]
           ),
           {"feature": np.asarray([0, 1, 2])},
       ),
       (
           grain.load(
-              [{"feature": "x"}, {"feature": "y"}, {"feature": "z"}],
+              [{"feature": "x"}, {"feature": "y"}, {"feature": "z"}],  # pyrefly: ignore[bad-argument-type]
               num_epochs=1,
           ),
           {"feature": np.asarray(["x", "y", "z"])},
       ),
       (
           grain.load(
-              [
+              [  # pyrefly: ignore[bad-argument-type]
                   {"feature": np.asarray([0])},
                   {"feature": np.asarray([1])},
                   {"feature": np.asarray([2])},
@@ -62,7 +62,7 @@ class PygrainIoTest(parameterized.TestCase):
       ),
       (
           grain.load(
-              [
+              [  # pyrefly: ignore[bad-argument-type]
                   {"feature": np.asarray(["x"])},
                   {"feature": np.asarray(["y"])},
                   {"feature": np.asarray(["z"])},
@@ -73,7 +73,7 @@ class PygrainIoTest(parameterized.TestCase):
       ),
       (
           grain.load(
-              [
+              [  # pyrefly: ignore[bad-argument-type]
                   {"feature": np.asarray([0, 1])},
                   {"feature": np.asarray([2])},
               ],
@@ -87,7 +87,7 @@ class PygrainIoTest(parameterized.TestCase):
       ),
       (
           grain.load(
-              [
+              [  # pyrefly: ignore[bad-argument-type]
                   {"feature": np.asarray(["x", "y"])},
                   {"feature": np.asarray(["z"])},
               ],

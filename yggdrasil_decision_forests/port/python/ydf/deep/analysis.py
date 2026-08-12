@@ -72,8 +72,8 @@ def _add_to_classification_prediction_proto(
       raise ValueError(
           f"Invalid proto distribution {proto}, expected 3 dimensions"
       )
-    proto.counts[1] += 1.0 - val
-    proto.counts[2] += val
+    proto.counts[1] += 1.0 - val  # pyrefly: ignore[unsupported-operation]
+    proto.counts[2] += val  # pyrefly: ignore[unsupported-operation]
     proto.sum += 1.0
   else:
     if len(proto.counts) != len(val) + 1:
@@ -259,7 +259,7 @@ def update_bin_with_prediction(
         accumulator.classification_class_distribution, prediction
     )
   elif accumulator.HasField("sum_of_regression_predictions"):
-    accumulator.sum_of_regression_predictions += prediction
+    accumulator.sum_of_regression_predictions += prediction  # pyrefly: ignore[bad-assignment]
   else:
     raise ValueError(
         "PDP bin is not initialized for CLASSIFICATION or REGRESSION."

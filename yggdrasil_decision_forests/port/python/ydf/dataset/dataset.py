@@ -104,7 +104,7 @@ class VerticalDataset:
           " compatible label column."
       )
 
-    normalized_values = [normalize_categorical_string_value(v) for v in values]
+    normalized_values = [normalize_categorical_string_value(v) for v in values]  # pyrefly: ignore[not-iterable]
     return np.array(normalized_values, dtype=np.bytes_)
 
   def _sanitize_forced_vocabulary(
@@ -514,9 +514,9 @@ class VerticalDataset:
     self._dataset.PopulateColumnCategoricalIntegerizedNPInt32(
         column.name,
         column_data,
-        ydf_dtype=ydf_dtype,
+        ydf_dtype=ydf_dtype,  # pyrefly: ignore[bad-argument-type]
         max_val=max_val,
-        most_frequent_value=most_frequent_value,
+        most_frequent_value=most_frequent_value,  # pyrefly: ignore[bad-argument-type]
         num_missing=num_missing,
         column_idx=column_idx,  # May be None.
     )
@@ -856,7 +856,7 @@ def create_vertical_dataset_with_spec_or_args(
       and all(isinstance(s, str) for s in data)
   ):
     return create_vertical_dataset_from_path(
-        data, required_columns, inference_args, data_spec
+        data, required_columns, inference_args, data_spec  # pyrefly: ignore[bad-argument-type]
     )
   else:
     # Ignore unrolling for list or set features.
@@ -1071,7 +1071,7 @@ def create_vertical_dataset_from_dict_of_values(
     normalized_columns, effective_unroll_feature_info = (
         dataspec_lib.get_all_columns(
             available_columns=list(data.keys()),
-            inference_args=inference_args,
+            inference_args=inference_args,  # pyrefly: ignore[bad-argument-type]
             required_columns=required_columns,
             unroll_feature_info=unroll_feature_info,
         )
@@ -1314,7 +1314,7 @@ def infer_dataspec_types(
 
     # Dtyping
     column_data = batch[py_column.name]
-    column.dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
+    column.dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)  # pyrefly: ignore[bad-assignment]
 
     # Copy filter configs
     if column.type == data_spec_pb2.ColumnType.CATEGORICAL:
@@ -1356,7 +1356,7 @@ def infer_dataspec(
   accumulators = []
   for batch_idx, batch in enumerate(
       generator.generate(
-          batch_size=1000, shuffle=True, seed=rng.integers(sys.maxsize)
+          batch_size=1000, shuffle=True, seed=rng.integers(sys.maxsize)  # pyrefly: ignore[bad-argument-type]
       )
   ):
     if batch_idx == 0:
@@ -1448,16 +1448,16 @@ class NumericalDataSpecAccumulator(DataSpecAccumulator):
   def visit(self, value: np.ndarray):
     num_values = np.size(value)
     num_missing = np.count_nonzero(np.isnan(value))
-    self._count_values += num_values - num_missing
-    self._count_missing_values += num_missing
+    self._count_values += num_values - num_missing  # pyrefly: ignore[bad-assignment]
+    self._count_missing_values += num_missing  # pyrefly: ignore[bad-assignment]
 
     if num_values == num_missing:
       return
 
     self._sum_values += np.nansum(value, dtype=np.float64)
     self._sum_square_values += np.nansum(value**2, dtype=np.float64)
-    self._max_value = np.nanmax(value, initial=self._max_value)
-    self._min_value = np.nanmin(value, initial=self._min_value)
+    self._max_value = np.nanmax(value, initial=self._max_value)  # pyrefly: ignore[no-matching-overload]
+    self._min_value = np.nanmin(value, initial=self._min_value)  # pyrefly: ignore[no-matching-overload]
     if self._reservoir is not None:
       self._reservoir.add(value.ravel())
 
@@ -1500,7 +1500,7 @@ class NumericalDataSpecAccumulator(DataSpecAccumulator):
       boundaries = np.unique(quantiles).tolist()
       if len(boundaries) < 2:
         if self._min_value == self._max_value:
-          boundaries = [self._min_value - 1, self._min_value + 1]
+          boundaries = [self._min_value - 1, self._min_value + 1]  # pyrefly: ignore[unsupported-operation]
         else:
           boundaries = [self._min_value, self._max_value]
       column.discretized_numerical.CopyFrom(

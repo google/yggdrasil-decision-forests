@@ -243,7 +243,7 @@ class EvaluatePredictionTest(parameterized.TestCase):
         task=generic_model.Task.CLASSIFICATION,
         label_classes=label_classes,
     )
-    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)
+    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)  # pyrefly: ignore[no-matching-overload]
 
   def test_sklearn_model_evaluation(self):
     features, labels = datasets.make_friedman1(
@@ -283,7 +283,7 @@ class EvaluatePredictionTest(parameterized.TestCase):
         task=generic_model.Task.CLASSIFICATION,
         label_classes=label_classes,
     )
-    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)
+    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)  # pyrefly: ignore[no-matching-overload]
 
   @parameterized.parameters(
       (np.array([1, 0, 1]), None),
@@ -318,7 +318,7 @@ class EvaluatePredictionTest(parameterized.TestCase):
         task=generic_model.Task.CLASSIFICATION,
         label_classes=label_classes,
     )
-    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)
+    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)  # pyrefly: ignore[no-matching-overload]
 
   def test_classification_string_labels_no_label_classes_fails(self):
     predictions = np.array([0.3, 0.1, 0.2])
@@ -342,7 +342,7 @@ class EvaluatePredictionTest(parameterized.TestCase):
         task=generic_model.Task.CLASSIFICATION,
         label_classes=["a", "b"],
     )
-    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)
+    self.assertAlmostEqual(evaluation.accuracy, 1 / 3)  # pyrefly: ignore[no-matching-overload]
     # Make sure the order is respected
     evaluation_flipped = evaluate.evaluate_predictions(
         predictions,
@@ -350,7 +350,7 @@ class EvaluatePredictionTest(parameterized.TestCase):
         task=generic_model.Task.CLASSIFICATION,
         label_classes=["b", "a"],
     )
-    self.assertAlmostEqual(evaluation_flipped.accuracy, 2 / 3)
+    self.assertAlmostEqual(evaluation_flipped.accuracy, 2 / 3)  # pyrefly: ignore[no-matching-overload]
 
   def test_classification_string_labels_missing_label_class(self):
     predictions = np.array([0.1, 0.2, 0.3])

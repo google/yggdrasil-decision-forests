@@ -881,8 +881,8 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
       if isinstance(node.condition, condition_type):
         return True
       return tree_contains_condition_type(
-          node.neg_child, condition_type
-      ) or tree_contains_condition_type(node.pos_child, condition_type)
+          node.neg_child, condition_type  # pyrefly: ignore[bad-argument-type]
+      ) or tree_contains_condition_type(node.pos_child, condition_type)  # pyrefly: ignore[bad-argument-type]
 
     def model_contains_condition_type(
         model: decision_forest_model.DecisionForestModel,

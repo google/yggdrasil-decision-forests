@@ -1013,7 +1013,7 @@ class ToJaxTest(parameterized.TestCase):
       # Generate Jax predictions
       del test_ds[label]
       input_values = jax_model.encoder(test_ds)
-      jax_predictions = jax_model.predict(input_values)
+      jax_predictions = jax_model.predict(input_values)  # pyrefly: ignore[bad-argument-count]
 
     # Test predictions
     # Note: This test sometime fails with OOS build.
@@ -1176,20 +1176,20 @@ class ToJaxTest(parameterized.TestCase):
     def compute_predictions(state, batch):
       batch = batch.copy()
       batch.pop(label)
-      return jax_model.predict(batch, state)
+      return jax_model.predict(batch, state)  # pyrefly: ignore[bad-argument-count]
 
     @jax.jit
     def compute_accuracy(state, batch):
       batch = batch.copy()
       labels = batch.pop(label)
-      predictions = jax_model.predict(batch, state)
+      predictions = jax_model.predict(batch, state)  # pyrefly: ignore[bad-argument-count]
       return jnp.mean((predictions >= 0.0) == labels)
 
     @jax.jit
     def compute_loss(state, batch):
       batch = batch.copy()
       labels = batch.pop(label)
-      logits = jax_model.predict(batch, state)
+      logits = jax_model.predict(batch, state)  # pyrefly: ignore[bad-argument-count]
       loss = optax.sigmoid_binary_cross_entropy(logits, labels).mean()
       return loss
 
@@ -1260,13 +1260,13 @@ class ToJaxTest(parameterized.TestCase):
     )
     np.testing.assert_allclose(
         mdl_state["initial_predictions"],
-        new_jax_model.params["initial_predictions"],
+        new_jax_model.params["initial_predictions"],  # pyrefly: ignore[unsupported-operation]
         rtol=1e-5,
         atol=1e-5,
     )
     np.testing.assert_allclose(
         mdl_state["leaf_values"],
-        new_jax_model.params["leaf_values"],
+        new_jax_model.params["leaf_values"],  # pyrefly: ignore[unsupported-operation]
         rtol=1e-5,
         atol=1e-5,
     )
@@ -1288,30 +1288,30 @@ class ToJaxTest(parameterized.TestCase):
     check_toy_model(self, model)
 
     jax_model = to_jax.to_jax_function(model, leaves_as_params=True)
-    to_jax.update_with_jax_params(model, jax_model.params)
+    to_jax.update_with_jax_params(model, jax_model.params)  # pyrefly: ignore[bad-argument-type]
 
     # Nothing have changed yet
     check_toy_model(self, model)
 
     np.testing.assert_allclose(
-        jax_model.params["leaf_values"],
+        jax_model.params["leaf_values"],  # pyrefly: ignore[unsupported-operation]
         [5.0, 4.0, 3.0, 2.0, 1.0, 7.0, 6.0],
         rtol=1e-5,
         atol=1e-5,
     )
 
     np.testing.assert_allclose(
-        jax_model.params["initial_predictions"],
+        jax_model.params["initial_predictions"],  # pyrefly: ignore[unsupported-operation]
         [0.0],
         rtol=1e-5,
         atol=1e-5,
     )
 
-    jax_model.params["leaf_values"] = jnp.asarray(
+    jax_model.params["leaf_values"] = jnp.asarray(  # pyrefly: ignore[unsupported-operation]
         [1.0, 2.0, 3.0, 4.0, 5, 6.0, 7.0], jnp.float32
     )
-    jax_model.params["initial_predictions"] = jnp.asarray([1.0], jnp.float32)
-    to_jax.update_with_jax_params(model, jax_model.params)
+    jax_model.params["initial_predictions"] = jnp.asarray([1.0], jnp.float32)  # pyrefly: ignore[unsupported-operation]
+    to_jax.update_with_jax_params(model, jax_model.params)  # pyrefly: ignore[bad-argument-type]
 
     np.testing.assert_allclose(
         model.initial_predictions(),
@@ -1323,13 +1323,13 @@ class ToJaxTest(parameterized.TestCase):
     new_jax_model = to_jax.to_jax_function(model, leaves_as_params=True)
     np.testing.assert_allclose(
         jax_model.params["initial_predictions"],
-        new_jax_model.params["initial_predictions"],
+        new_jax_model.params["initial_predictions"],  # pyrefly: ignore[unsupported-operation]
         rtol=1e-5,
         atol=1e-5,
     )
     np.testing.assert_allclose(
         jax_model.params["leaf_values"],
-        new_jax_model.params["leaf_values"],
+        new_jax_model.params["leaf_values"],  # pyrefly: ignore[unsupported-operation]
         rtol=1e-5,
         atol=1e-5,
     )

@@ -421,7 +421,7 @@ def evaluate_predictions(
       options,
       weights,
       label_classes,
-      ranking_groups,
+      ranking_groups,  # pyrefly: ignore[bad-argument-type]
       random_seed,
   )
 

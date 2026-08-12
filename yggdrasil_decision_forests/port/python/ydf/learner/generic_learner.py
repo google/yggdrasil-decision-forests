@@ -394,7 +394,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     ) -> Optional[dataspec.Column]:
       if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
         return dataspec.Column(
-            name=name,
+            name=name,  # pyrefly: ignore[bad-argument-type]
             semantic=dataspec.Semantic.CATEGORICAL,
             max_vocab_count=-1,
             min_vocab_frequency=1,
@@ -408,7 +408,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
           Task.NUMERICAL_UPLIFT,
           Task.SURVIVAL_ANALYSIS,
       ]:
-        return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)
+        return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)  # pyrefly: ignore[bad-argument-type]
       elif task in [Task.ANOMALY_DETECTION]:
         if name is None:
           # No label column
@@ -433,7 +433,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       data_spec_args.include_all_columns = True
       data_spec_args.columns = []
     column_defs = data_spec_args.columns
-    if dataspec.column_defs_contains_column(self._label, column_defs):
+    if dataspec.column_defs_contains_column(self._label, column_defs):  # pyrefly: ignore[bad-argument-type]
       raise ValueError(
           f"Label column {self._label} is also an input feature. A column"
           " cannot be both a label and input feature."
@@ -443,7 +443,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     ) is not None:
       column_defs.append(label_column)
     if self._weights is not None:
-      if dataspec.column_defs_contains_column(self._weights, column_defs):
+      if dataspec.column_defs_contains_column(self._weights, column_defs):  # pyrefly: ignore[bad-argument-type]
         raise ValueError(
             f"Weights column {self._weights} is also an input feature. A column"
             " cannot be both a weights and input feature."
@@ -456,7 +456,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
     if self._ranking_group is not None:
       assert self._task == Task.RANKING
 
-      if dataspec.column_defs_contains_column(self._ranking_group, column_defs):
+      if dataspec.column_defs_contains_column(self._ranking_group, column_defs):  # pyrefly: ignore[bad-argument-type]
         raise ValueError(
             f"Ranking group column {self._ranking_group} is also an input"
             " feature. A column cannot be both a ranking group and input"
@@ -471,7 +471,7 @@ Hyper-parameters: ydf.{self._hyperparameters}
       assert self._task in [Task.NUMERICAL_UPLIFT, Task.CATEGORICAL_UPLIFT]
 
       if dataspec.column_defs_contains_column(
-          self._uplift_treatment, column_defs
+          self._uplift_treatment, column_defs  # pyrefly: ignore[bad-argument-type]
       ):
         raise ValueError(
             "The uplift_treatment column should not be specified as a feature"
@@ -504,7 +504,7 @@ class GenericCCLearner(GenericLearner):
       verbose: Optional[Union[int, bool]],
   ) -> generic_model.ModelType:
     if isinstance(ds, str):
-      return self._train_from_path(ds, valid)
+      return self._train_from_path(ds, valid)  # pyrefly: ignore[bad-argument-type]
     else:
       return self._train_from_dataset(ds, valid)
 
@@ -533,11 +533,11 @@ class GenericCCLearner(GenericLearner):
     with log.cc_log_context():
       if self._data_spec is not None:
         cc_model = self._get_learner().TrainFromPathWithDataSpec(
-            ds, self._data_spec, valid
+            ds, self._data_spec, valid  # pyrefly: ignore[bad-argument-type]
         )
       else:
         guide = self._build_data_spec_args().to_proto_guide()
-        cc_model = self._get_learner().TrainFromPathWithGuide(ds, guide, valid)
+        cc_model = self._get_learner().TrainFromPathWithGuide(ds, guide, valid)  # pyrefly: ignore[bad-argument-type]
       model = model_lib.load_cc_model(cc_model)
 
       # Note: We don't know the number of training examples before the training
@@ -548,7 +548,7 @@ class GenericCCLearner(GenericLearner):
           discretize_numerical_columns=self._data_spec_args.discretize_numerical_columns,
       )
       if self._tuner:
-        self._tuner._validate_data_spec(self._label, model.data_spec(), raise_error=False)  # pylint:disable=protected-access
+        self._tuner._validate_data_spec(self._label, model.data_spec(), raise_error=False)  # pylint:disable=protected-access  # pyrefly: ignore[bad-argument-type]
       return model
 
   def _train_from_dataset(
@@ -563,7 +563,7 @@ class GenericCCLearner(GenericLearner):
 
       dataspec.print_common_dataspec_issues_for_training(train_ds.data_spec())
       if self._tuner:
-        self._tuner._validate_data_spec(self._label, train_ds.data_spec(), raise_error=True)  # pylint:disable=protected-access
+        self._tuner._validate_data_spec(self._label, train_ds.data_spec(), raise_error=True)  # pylint:disable=protected-access  # pyrefly: ignore[bad-argument-type]
 
       train_args = {"dataset": train_ds}
 
@@ -731,7 +731,7 @@ class GenericCCLearner(GenericLearner):
         if effective_data_spec_args is not None:
           required_columns = [
               col.name
-              for col in effective_data_spec_args.columns
+              for col in effective_data_spec_args.columns  # pyrefly: ignore[not-iterable]
               if col is not None and col.name != self._label
           ]
       return dataset.create_vertical_dataset_with_spec_or_args(

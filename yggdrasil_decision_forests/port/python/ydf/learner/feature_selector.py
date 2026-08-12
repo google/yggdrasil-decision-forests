@@ -239,14 +239,14 @@ class BackwardSelectionFeatureSelector(
       local_learner = copy.deepcopy(learner)
       local_learner._feature_selector = None  # pylint: disable=protected-access
       local_learner._data_spec_args.columns = (  # pylint: disable=protected-access
-          dataspec_lib.normalize_column_defs(current_input_features)
+          dataspec_lib.normalize_column_defs(current_input_features)  # pyrefly: ignore[bad-argument-type]
       )
       local_learner._data_spec_args.include_all_columns = False  # pylint: disable=protected-access
       # TODO: Add support for cross-validation.
       model = local_learner.train(
           ds=ds,
           valid=valid if self._use_validation_for_training(learner) else None,
-          verbose=verbose if iteration_idx else log.reduce_verbose(verbose),
+          verbose=verbose if iteration_idx else log.reduce_verbose(verbose),  # pyrefly: ignore[bad-argument-type]
       )
 
       # Print the logs and store the results
@@ -344,7 +344,7 @@ class BackwardSelectionFeatureSelector(
         logs.best_iteration_idx,
         best_score,
         best_evaluation_dict,
-        len(best_input_features),
+        len(best_input_features),  # pyrefly: ignore[bad-argument-type]
         len(input_features),
     )
 

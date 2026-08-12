@@ -82,4 +82,4 @@ def load_model(
     raise ValueError(f"Unknown weight format {deep_model_proto.weights.format}")
   model.set_model_state(weights)
 
-  return model
+  return model  # pyrefly: ignore[bad-return]

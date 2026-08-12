@@ -30,7 +30,7 @@ from ydf.dataset.io import dataset_io as dataset_io_lib
 from ydf.utils import test_utils
 
 # Make "assertEqual" print more details.
-unittest.util._MAX_LENGTH = 10000
+unittest.util._MAX_LENGTH = 10000  # pyrefly: ignore[bad-assignment]
 
 Semantic = dataspec_lib.Semantic
 VocabValue = ds_pb.CategoricalSpec.VocabValue
@@ -610,7 +610,7 @@ class GenericDatasetTest(parameterized.TestCase):
         Column("col_int_cat", Semantic.CATEGORICAL, min_vocab_frequency=1),
     ]
     ds = dataset_lib.create_vertical_dataset(
-        df, columns=feature_definitions, include_all_columns=True
+        df, columns=feature_definitions, include_all_columns=True  # pyrefly: ignore[bad-argument-type]
     )
     expected_dataset_content = """col_str,col_int_cat,col_int,col_float,col_bool
 A,1,5,1.1,1
@@ -1519,7 +1519,7 @@ B,3""")
 
     ds = dataset_lib.create_vertical_dataset(
         ["csv:" + path1, "csv:" + path2],
-        columns=feature_definitions,
+        columns=feature_definitions,  # pyrefly: ignore[bad-argument-type]
         include_all_columns=True,
     )
 

@@ -232,7 +232,7 @@ def _set_proto_node_from_probability(
   dist.sum = value.num_examples
   # Add an extra 0 for the out-of-vocabulary item.
   dist.counts[:] = np.array([0.0, *value.probability]) * dist.sum
-  proto_node.classifier.top_value = np.argmax(dist.counts)
+  proto_node.classifier.top_value = np.argmax(dist.counts)  # pyrefly: ignore[bad-assignment]
 
 
 @set_proto_node.register

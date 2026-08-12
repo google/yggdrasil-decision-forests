@@ -38,7 +38,7 @@ class TFExampleTest(absltest.TestCase):
     }
     tmp_dir = self.create_tempdir().full_path
     path = os.path.join(tmp_dir, "file")
-    tf_example.write_tf_record(original_ds, path=path)
+    tf_example.write_tf_record(original_ds, path=path)  # pyrefly: ignore[bad-argument-type]
     read_ds = tf_example.read_tf_record(path)
     logging.info("read_ds:\n%s", read_ds)
     expected_ds = original_ds.copy()

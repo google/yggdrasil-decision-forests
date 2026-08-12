@@ -62,7 +62,7 @@ def read_tf_record(
           compression_type="GZIP" if compressed else "",
           buffer_size=10_000_000,
       ):
-        yield tensor.numpy()
+        yield tensor.numpy()  # pyrefly: ignore[invalid-yield]
 
     @contextlib.contextmanager
     def cm():
@@ -199,7 +199,7 @@ def _read_shard(
             dim = len(dst_value)
             # This is a new column
             default_value = [single_default_value] * dim
-            local_data[key] = (
+            local_data[key] = (  # pyrefly: ignore[unsupported-operation]
                 [default_value] * local_num_examples,
                 ColumnSpec(
                     default_value=default_value,
@@ -296,10 +296,10 @@ def read_tensorflow_examples(
 
   # Finalize the shard aggregation
   def finalize_data(value: List[np.ndarray]) -> np.ndarray:
-    value = np.concatenate(value, axis=0)
-    if value.shape[1] == 1:
-      value = np.squeeze(value, axis=1)
-    return value
+    value = np.concatenate(value, axis=0)  # pyrefly: ignore[bad-assignment]
+    if value.shape[1] == 1:  # pyrefly: ignore[missing-attribute]
+      value = np.squeeze(value, axis=1)  # pyrefly: ignore[bad-assignment]
+    return value  # pyrefly: ignore[bad-return]
 
   return {key: finalize_data(values) for key, (values, _) in data.items()}
 

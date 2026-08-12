@@ -71,7 +71,7 @@ class FTTransformerTokenizerTest(parameterized.TestCase):
     )
     y = m.apply(state, x)
     # 2 examples, 6 tokens, dim 3
-    self.assertEqual(y.shape, (2, 6, 3))
+    self.assertEqual(y.shape, (2, 6, 3))  # pyrefly: ignore[missing-attribute]
 
     state = {
         "params": {

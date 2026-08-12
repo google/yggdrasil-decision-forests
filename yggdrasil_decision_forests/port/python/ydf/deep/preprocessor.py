@@ -118,10 +118,10 @@ class Preprocessor:
     return cls(  # pytype: disable=wrong-arg-types
         dataspec=dataspec,
         input_features_col_idxs=list(abstract_model.input_features),
-        numerical_zscore=preprocessor.numerical_zscore
+        numerical_zscore=preprocessor.numerical_zscore  # pyrefly: ignore[bad-argument-type]
         if preprocessor.HasField("numerical_zscore")
         else None,
-        numerical_quantiles=preprocessor.numerical_quantiles
+        numerical_quantiles=preprocessor.numerical_quantiles  # pyrefly: ignore[bad-argument-type]
         if preprocessor.HasField("numerical_quantiles")
         else None,
     )

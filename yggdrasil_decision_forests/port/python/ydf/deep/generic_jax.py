@@ -87,8 +87,8 @@ _HP_EARLY_STOPPING_REVERT_PARAMS = "early_stopping_revert_params"
 _HP_VALUE_LEARNING_RATE_POLICY_CONSTANT = "constant"
 _HP_VALUE_LEARNING_RATE_POLICY_COSINE_DECAY = "cosine_decay"
 LearningRatePolicy = Literal[
-    _HP_VALUE_LEARNING_RATE_POLICY_CONSTANT,
-    _HP_VALUE_LEARNING_RATE_POLICY_COSINE_DECAY,
+    _HP_VALUE_LEARNING_RATE_POLICY_CONSTANT,  # pyrefly: ignore[not-a-type]
+    _HP_VALUE_LEARNING_RATE_POLICY_COSINE_DECAY,  # pyrefly: ignore[not-a-type]
 ]
 
 _HP_MAXIMUM_TRAINING_DURATION_SECONDS = "maximum_training_duration_seconds"
@@ -109,7 +109,7 @@ ApplyModelFn = Callable[
     [ModelState, Batch, bool, jax.Array], Tuple[jax.Array, Optional[BatchState]]
 ]
 
-GenericJAXModelClass = Type[TypeVar("B", bound="GenericJAXModel")]
+GenericJAXModelClass = Type[TypeVar("B", bound="GenericJAXModel")]  # pyrefly: ignore[not-a-type]
 
 
 # Batch size used to generate model predictions
@@ -253,7 +253,7 @@ class GenericJAXModel(generic_model.GenericModel):
       self, value: Optional[feature_selector_logs.FeatureSelectorLogs]
   ) -> None:
     self._abstract_model_proto.feature_selection_logs.CopyFrom(
-        feature_selector_logs.value_to_proto(value)
+        feature_selector_logs.value_to_proto(value)  # pyrefly: ignore[bad-argument-type]
     )
 
   def feature_selection_logs(
@@ -328,7 +328,7 @@ class GenericJAXModel(generic_model.GenericModel):
     with filesystem.Open(weights_file, "wb") as f:
       f.write(
           safetensors.flax.save(
-              safetensors_lib.flatten_weights(self._model_state)
+              safetensors_lib.flatten_weights(self._model_state)  # pyrefly: ignore[bad-argument-type]
           )
       )
     with filesystem.Open(abstract_model_file, "wb") as f:
@@ -444,7 +444,7 @@ class GenericJAXModel(generic_model.GenericModel):
 
     return evaluate_lib.evaluate_predictions(
         predictions=predictions,
-        labels=np.concatenate(labels, axis=0) if labels else None,
+        labels=np.concatenate(labels, axis=0) if labels else None,  # pyrefly: ignore[bad-argument-type]
         task=task,
         label_classes=label_classes,
         bootstrapping=bootstrapping,
@@ -947,12 +947,12 @@ class GenericJaxLearner(generic_learner.GenericLearner):
           grads, opt_state, params=model_state["params"]
       )
 
-      jax_debug("updates", updates)
-      jax_debug("opt_state", opt_state)
+      jax_debug("updates", updates)  # pyrefly: ignore[bad-argument-type]
+      jax_debug("opt_state", opt_state)  # pyrefly: ignore[bad-argument-type]
 
       new_params = optax.apply_updates(model_state["params"], updates)
 
-      jax_debug("new_params", new_params)
+      jax_debug("new_params", new_params)  # pyrefly: ignore[bad-argument-type]
       jax_debug("new_batch_stats", new_batch_stats)
 
       model_state.update(params=new_params)
@@ -1137,7 +1137,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
 
       if maximum_training_duration_seconds >= 0:
         extra_snippet = (
-            f" time:{time.time() - begin_training:.1f}/{maximum_training_duration_seconds}"
+            f" time:{time.time() - begin_training:.1f}/{maximum_training_duration_seconds}"  # pyrefly: ignore[unsupported-operation]
         ) + extra_snippet
 
       # End of epoch logging
@@ -1172,7 +1172,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
             best_model_state = model_state
 
         if early_stopping_epoch_patience is not None:
-          if epoch_idx - best_epoch_idx >= early_stopping_epoch_patience:
+          if epoch_idx - best_epoch_idx >= early_stopping_epoch_patience:  # pyrefly: ignore[unsupported-operation]
             log.info(
                 "The loss did not improve for %d epochs. Stopping training",
                 early_stopping_epoch_patience,
@@ -1180,12 +1180,12 @@ class GenericJaxLearner(generic_learner.GenericLearner):
             break
 
     end_training = time.time()
-    log.info("Training done in %ss", end_training - begin_training)
+    log.info("Training done in %ss", end_training - begin_training)  # pyrefly: ignore[unsupported-operation]
     if best_valid_loss is not None:
       log.debug(
           "The best loss %g was observed at epoch %d",
           best_valid_loss,
-          best_epoch_idx + 1,
+          best_epoch_idx + 1,  # pyrefly: ignore[unsupported-operation]
       )
       if best_model_state is not None and best_epoch_idx != num_epochs:
         log.debug("Restoring model state from best loss")
@@ -1218,7 +1218,7 @@ class GenericJaxLearner(generic_learner.GenericLearner):
   def _decompose_batch(self, batch: Batch) -> Tuple[Batch, jax.Array]:
     """Decomposes a batch into features and labels."""
     batch = batch.copy()
-    label = batch.pop(self._label)
+    label = batch.pop(self._label)  # pyrefly: ignore[bad-argument-type]
     # TODO: Add support for training weights.
     return batch, label
 
@@ -1414,7 +1414,7 @@ class MetricComputer:
 
       if num_examples == 0:
         raise ValueError("No examples to evaluate")
-      return (sum_metric_values / num_examples).tolist()
+      return (sum_metric_values / num_examples).tolist()  # pyrefly: ignore[missing-attribute, unsupported-operation]
 
     if self._jit_compute_train_metric_on_batch is not None:
       train_metric_values = compute_metric_on_generator(

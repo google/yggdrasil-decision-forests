@@ -103,7 +103,7 @@ class StandardFeatureFlattener(nn.Module):
       elif feature.type == FeatureType.CATEGORICAL:
         input_layer.append(
             nn.Embed(
-                num_embeddings=feature.num_categorical_values,
+                num_embeddings=feature.num_categorical_values,  # pyrefly: ignore[bad-argument-type]
                 features=self.categorical_embedding_size,
                 name=f"embedding_{feature.name}",
             )(value)

@@ -46,7 +46,7 @@ if not _has_experimental:
   )
   from ydf.deep import jax_fallback
 
-  jax_fallback._jax_fallback_error = _experimental_import_error  # pylint:disable=protected-access
+  jax_fallback._jax_fallback_error = _experimental_import_error  # pylint:disable=protected-access  # pyrefly: ignore[bad-assignment]
 
   MultiLayerPerceptronModel = jax_fallback.JaxFallBack
   MultiLayerPerceptronLearner = jax_fallback.JaxFallBack

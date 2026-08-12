@@ -39,7 +39,7 @@ class CARTLearnerTest(learner_test_utils.LearnerTest, parameterized.TestCase):
     model, _, _ = self._check_adult_model(
         learner=learner, minimum_accuracy=0.853
     )
-    self.assertGreater(model.self_evaluation().accuracy, 0.84)
+    self.assertGreater(model.self_evaluation().accuracy, 0.84)  # pyrefly: ignore[no-matching-overload]
 
   def test_adult_with_validation(self):
     learner = specialized_learners.CartLearner(label="income")

@@ -44,12 +44,12 @@ TFDType = Any  # TensorFlow DType e.g. tf.float32
 TFTensor = Any  # A TensorFlow Tensor i.e. tensorflow.Tensor
 
 # Mapping between YDF dtype and TF dtypes.
-_YDF_DTYPE_TO_TF_DTYPE: Dict["ds_pb.DType", TFDType] = None
+_YDF_DTYPE_TO_TF_DTYPE: Dict["ds_pb.DType", TFDType] = None  # pyrefly: ignore[bad-assignment]
 
 # Mapping TF dtypes to the TF dtype compatible with tensorflow example.
 # Note that tensorflow example proto only support tf.int64, tf.float32,
 # and tf.string dtypes.
-_TF_DTYPE_TO_TF_EXAMPLE_DTYPE: Dict[TFDType, TFDType] = None
+_TF_DTYPE_TO_TF_EXAMPLE_DTYPE: Dict[TFDType, TFDType] = None  # pyrefly: ignore[bad-assignment]
 
 
 def mapping_ydf_dtype_to_tf_dtype() -> Dict["ds_pb.DType", TFDType]:
@@ -383,7 +383,7 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
     temp_dir: Optional[str],
     can_be_saved: bool,
     squeeze_binary_classification: bool,
-) -> "tensorflow.Module":  # pylint: disable=g-doc-args
+) -> "tensorflow.Module":  # pylint: disable=g-doc-args  # pyrefly: ignore[unknown-name]
   """Converts a YDF model to a TensorFlow function.
 
   See GenericModel.to_tensorflow_function for the documentation.
@@ -445,7 +445,7 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
 
     @tf.function
     def __call__(self, features):
-      return self.call(features)
+      return self.call(features)  # pyrefly: ignore[missing-attribute]
 
   callable_module = CallableModule()
 
@@ -459,8 +459,8 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
     else:
       return dense_predictions
 
-  callable_module.call = call
-  callable_module.op_model = op_model  # Link model resources
+  callable_module.call = call  # pyrefly: ignore[missing-attribute]
+  callable_module.op_model = op_model  # Link model resources  # pyrefly: ignore[missing-attribute]
   return callable_module
 
 

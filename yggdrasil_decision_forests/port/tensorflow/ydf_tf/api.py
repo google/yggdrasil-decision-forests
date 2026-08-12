@@ -348,7 +348,7 @@ class Model(object):
     )
     self.input_builder.build_from_model_path(
         model_path,
-        force_string_to_unicode_conversion=force_string_to_unicode_conversion,
+        force_string_to_unicode_conversion=force_string_to_unicode_conversion,  # pyrefly: ignore[bad-argument-type]
     )
 
     # Model loading and initialization op.
@@ -397,7 +397,7 @@ class Model(object):
     )
 
 
-class ModelV2(AutoTrackable):
+class ModelV2(AutoTrackable):  # pyrefly: ignore[invalid-inheritance]
   """Applies an Yggdrasil model.
 
   For TensorFlow V2.
@@ -526,7 +526,7 @@ FeatureMaps = collections.namedtuple(
 )
 
 
-class _InferenceArgsBuilder(AutoTrackable):
+class _InferenceArgsBuilder(AutoTrackable):  # pyrefly: ignore[invalid-inheritance]
   """Utility for the creation of the argument of the inference OP."""
 
   def __init__(
@@ -543,7 +543,7 @@ class _InferenceArgsBuilder(AutoTrackable):
     self._force_string_to_unicode_conversion = True
 
     # List of initialization ops.
-    self._init_ops: List[tf.Operation] = None
+    self._init_ops: List[tf.Operation] = None  # pyrefly: ignore[bad-assignment]
 
     # How many dimensions has the model predictions.
     self._dense_output_dim: Optional[int] = None
@@ -724,7 +724,7 @@ class _InferenceArgsBuilder(AutoTrackable):
     if feature_idx in self._all_feature_idxs(feature_maps):
       raise ValueError('The feature "{}" was already registered.'.format(name))
 
-    feature_spec = self._data_spec.columns[feature_idx]
+    feature_spec = self._data_spec.columns[feature_idx]  # pyrefly: ignore[missing-attribute]
     if feature_spec.type in [
         ColumnType.NUMERICAL,
         ColumnType.DISCRETIZED_NUMERICAL,
@@ -795,11 +795,11 @@ class _InferenceArgsBuilder(AutoTrackable):
 
         # "" (the empty string) is a missing value if it is not a valid value.
         if "" not in feature_spec.categorical.items:
-          vocabulary.append(("", -1))
+          vocabulary.append(("", -1))  # pyrefly: ignore[bad-argument-type]
 
         if self.support_missing_nonintegerized_categorical_stored_as_int:
           vocabulary.append(
-              (str(MISSING_NON_INTEGERIZED_CATEGORICAL_STORED_AS_INT), -1)
+              (str(MISSING_NON_INTEGERIZED_CATEGORICAL_STORED_AS_INT), -1)  # pyrefly: ignore[bad-argument-type]
           )
 
         vocabulary.sort(key=lambda x: x[1])
@@ -1075,7 +1075,7 @@ class _InferenceArgsBuilder(AutoTrackable):
     return value
 
 
-class _AbstractModelLoader(six.with_metaclass(abc.ABCMeta, object)):
+class _AbstractModelLoader(six.with_metaclass(abc.ABCMeta, object)):  # pyrefly: ignore[invalid-inheritance]
   """Loads a model in a _CompiledSimpleMLModelResource."""
 
   @abc.abstractmethod
@@ -1083,7 +1083,7 @@ class _AbstractModelLoader(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
 
-class _CompiledSimpleMLModelResource(TrackableResource):
+class _CompiledSimpleMLModelResource(TrackableResource):  # pyrefly: ignore[invalid-inheritance]
   """Utility class to handle compiled model resources.
 
   This code is directly copied from StaticHashTable in:
@@ -1120,7 +1120,7 @@ class _CompiledSimpleMLModelResource(TrackableResource):
     return self._model_loader.initialize(self)
 
 
-class _DiskModelLoader(_AbstractModelLoader, AutoTrackable):
+class _DiskModelLoader(_AbstractModelLoader, AutoTrackable):  # pyrefly: ignore[invalid-inheritance]
   """Loads a model from disk.
 
   This code is directly copied from TextFileInitializer in:

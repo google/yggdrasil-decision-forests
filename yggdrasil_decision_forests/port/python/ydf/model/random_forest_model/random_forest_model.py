@@ -120,7 +120,7 @@ class RandomForestModel(decision_forest_model.DecisionForestModel):
     """
     return self._model.winner_takes_all()
 
-  def self_evaluation(self) -> Optional[metric.Evaluation]:
+  def self_evaluation(self) -> Optional[metric.Evaluation]:  # pyrefly: ignore[bad-override]
     """Returns the model's self-evaluation.
 
     For Random Forest models, the self-evaluation is out-of-bag evaluation on

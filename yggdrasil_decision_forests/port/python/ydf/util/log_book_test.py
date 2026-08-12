@@ -59,9 +59,9 @@ class LogBookTest(absltest.TestCase):
     def new_experiment(idx: int):
       e = LogBook(tmp_dir, print_num_experiments=False)
       key = {"idx": idx}
-      assert not e.exist(key)
+      assert not e.exist(key)  # pyrefly: ignore[bad-argument-type]
       result = {"something": idx * 2}
-      e.add(key, result)
+      e.add(key, result)  # pyrefly: ignore[bad-argument-type]
 
     threads = []
     for i in range(100):

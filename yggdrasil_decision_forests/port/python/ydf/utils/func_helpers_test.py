@@ -24,7 +24,7 @@ class FuncHelpersTest(absltest.TestCase):
   def test_list_explicit_arguments_single_argument(self):
     @func_helpers.list_explicit_arguments
     def identity_or_false(foo=42, explicit_args=None) -> Union[int, bool]:
-      if "foo" in explicit_args:
+      if "foo" in explicit_args:  # pyrefly: ignore[not-iterable]
         return foo
       else:
         assert foo == 42
@@ -44,12 +44,12 @@ class FuncHelpersTest(absltest.TestCase):
   def test_list_explicit_arguments_multiple_arguments(self):
     @func_helpers.list_explicit_arguments
     def identity_or_false(foo=42, bar=3.14, explicit_args=None) -> Any:
-      if "foo" in explicit_args and "bar" in explicit_args:
+      if "foo" in explicit_args and "bar" in explicit_args:  # pyrefly: ignore[not-iterable]
         return (foo, bar)
-      if "foo" in explicit_args:
+      if "foo" in explicit_args:  # pyrefly: ignore[not-iterable]
         assert bar == 3.14
         return (foo, False)
-      if "bar" in explicit_args:
+      if "bar" in explicit_args:  # pyrefly: ignore[not-iterable]
         assert foo == 42
         return (False, bar)
       assert bar == 3.14
@@ -65,7 +65,7 @@ class FuncHelpersTest(absltest.TestCase):
   def test_list_explicit_arguments_raises_when_explicit_explicit_args(self):
     @func_helpers.list_explicit_arguments
     def func(foo=42, explicit_args=None) -> Union[int, bool]:
-      if "foo" in explicit_args:
+      if "foo" in explicit_args:  # pyrefly: ignore[not-iterable]
         return foo
       else:
         assert foo == 42

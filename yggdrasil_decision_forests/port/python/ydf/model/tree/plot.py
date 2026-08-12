@@ -77,7 +77,7 @@ class TreePlot:
     self._d3js_url = d3js_url
     self._options = dataclasses.asdict(options)
     if label_classes is not None:
-      self._options["labels"] = label_classes
+      self._options["labels"] = label_classes  # pyrefly: ignore[bad-assignment]
 
   def __str__(self) -> str:
     """Returns an explanation how to display the plot."""

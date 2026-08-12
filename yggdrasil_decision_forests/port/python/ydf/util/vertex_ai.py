@@ -80,7 +80,7 @@ def get_vertex_ai_cluster_spec(
   if cluster_spec is None:
     print("Get Vertex AI Cluster Spec from env. variable")
     cluster_spec = os.environ.get("CLUSTER_SPEC")
-  json_cluster_spec = json.loads(cluster_spec)
+  json_cluster_spec = json.loads(cluster_spec)  # pyrefly: ignore[bad-argument-type]
   json_cluster = json_cluster_spec["cluster"]
   if list(json_cluster.keys()) != ["workerpool0", "workerpool1"]:
     raise ValueError(

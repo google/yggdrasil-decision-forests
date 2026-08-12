@@ -42,7 +42,7 @@ class StandardFeatureFlattenerTest(parameterized.TestCase):
         {"params": {"embedding_c2": {"embedding": (3, 20)}}},
     )
     y = m.apply(state, x)
-    self.assertEqual(y.shape, (2, 24))
+    self.assertEqual(y.shape, (2, 24))  # pyrefly: ignore[missing-attribute]
 
 
 if __name__ == "__main__":
