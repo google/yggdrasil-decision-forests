@@ -19,6 +19,9 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_EXAMPLE_SET_MODEL_WRAPPER_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_EXAMPLE_SET_MODEL_WRAPPER_H_
 
+#include <memory>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
@@ -36,6 +39,7 @@ class ExampleSetModelWrapper : public FastEngine {
   // Loads the model in the engine. The "src" model can be discarded after that.
   template <typename SourceModel>
   absl::Status LoadModel(const SourceModel& src) {
+    src.CopyToPostprocessors(this);
     return GenericToSpecializedModel(src, &model_);
   }
 
@@ -44,8 +48,8 @@ class ExampleSetModelWrapper : public FastEngine {
     return std::make_unique<typename Model::ExampleSet>(num_examples, model_);
   }
 
-  void Predict(const AbstractExampleSet& examples, int num_examples,
-               std::vector<float>* predictions) const override {
+  void PredictImpl(const AbstractExampleSet& examples, int num_examples,
+                   std::vector<float>* predictions) const override {
     const auto& casted_examples =
         dynamic_cast<const typename Model::ExampleSet&>(examples);
     PredictCall(model_, casted_examples, num_examples, predictions);

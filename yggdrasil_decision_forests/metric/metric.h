@@ -34,6 +34,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/reliability_diagram.h"
 
 namespace yggdrasil_decision_forests {
 namespace metric {
@@ -48,13 +49,19 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
 absl::Status AddPrediction(const proto::EvaluationOptions& option,
                            const model::proto::Prediction& pred,
                            utils::RandomEngine* rnd,
-                           proto::EvaluationResults* eval);
+                           proto::EvaluationResults* eval,
+                           utils::reliability_diagram::ReliabilityDiagram*
+                               reliability_diagram = nullptr);
 
 // Converts a prediction from one type to another.
 absl::Status ChangePredictionType(model::proto::Task src_task,
                                   model::proto::Task dst_task,
                                   const model::proto::Prediction& src_pred,
                                   model::proto::Prediction* dst_pred);
+
+absl::Status StoreReliabilityDiagram(
+    utils::reliability_diagram::ReliabilityDiagram* reliability_diagram,
+    proto::EvaluationResults* eval);
 
 // Merge two initialized (with the same options) and non-finalized evaluations.
 absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
@@ -184,6 +191,9 @@ float DefaultLogLoss(const proto::EvaluationResults& eval);
 float DefaultErrorRate(const proto::EvaluationResults& eval);
 float DefaultRMSE(const proto::EvaluationResults& eval);
 float DefaultNDCG(const proto::EvaluationResults& eval);
+
+float ExpectedCalibrationError(const proto::EvaluationResults& eval);
+float MaximumCalibrationError(const proto::EvaluationResults& eval);
 
 // Export a set of metrics from a model evaluation.
 absl::StatusOr<std::unordered_map<std::string, std::string>> ExtractFlatMetrics(
@@ -341,6 +351,17 @@ float ComputeThresholdForMaxAccuracy(
 // See https://www.itl.nist.gov/div898/handbook/eda/section3/eda352.htm for more
 // details.
 float PValueMeanIsGreaterThanZero(const std::vector<float>& sample);
+
+template <typename T>
+struct ErrorBars {
+  std::vector<T> upper;
+  std::vector<T> lower;
+};
+
+ErrorBars<float> ComputeErrorIntervalForReliabilityDiagram(
+    const absl::Span<const float> mean_predicted,
+    const absl::Span<const float> mean_observed,
+    const absl::Span<const float> counts, float confidence_level = 0.95);
 
 namespace internal {
 // Bootstrap the performance metrics for classification.

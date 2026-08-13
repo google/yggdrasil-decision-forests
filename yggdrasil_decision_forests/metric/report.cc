@@ -32,6 +32,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "src/google/protobuf/repeated_ptr_field.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -107,55 +108,118 @@ absl::Status PlotClassificationCurves(const proto::Roc& roc,
   return absl::OkStatus();
 }
 
+absl::Status PlotBinaryCalibrationCurves(
+    const proto::BinaryCalibrationData& binary_calibration_data,
+    utils::plot::Plot* reliability_plot) {
+  auto ideal_curve = std::make_unique<utils::plot::Curve>();
+  ideal_curve->label = "Ideal Curve";
+
+  ideal_curve->xs = {0.0, 1.0};
+  ideal_curve->ys = {0.0, 1.0};
+
+  ideal_curve->style = utils::plot::LineStyle::DOTTED;
+  reliability_plot->items.push_back(std::move(ideal_curve));
+
+  auto reliability_curve = std::make_unique<utils::plot::Curve>();
+  reliability_curve->label = "Reliability Curve";
+
+  auto error_bars = ComputeErrorIntervalForReliabilityDiagram(
+      binary_calibration_data.reliability_diagram_mean_predicted(),
+      binary_calibration_data.reliability_diagram_mean_observed(),
+      binary_calibration_data.reliability_diagram_count(), 0.95);
+
+  for (int i = 0; i < binary_calibration_data.reliability_diagram_count_size();
+       ++i) {
+    reliability_curve->xs.push_back(
+        binary_calibration_data.reliability_diagram_mean_predicted(i));
+    reliability_curve->ys.push_back(
+        binary_calibration_data.reliability_diagram_mean_observed(i));
+    reliability_curve->point_labels.push_back(absl::StrFormat(
+        "Count: %.3f", binary_calibration_data.reliability_diagram_count(i)));
+    reliability_curve->error_ys.push_back(error_bars.upper[i]);
+    reliability_curve->minus_error_ys.push_back(error_bars.lower[i]);
+  }
+  reliability_plot->items.push_back(std::move(reliability_curve));
+  return absl::OkStatus();
+}
+
 // Creates the HTML report for a classfication evaluation.
 absl::Status AppendHtmlReportClassiciation(const proto::EvaluationResults& eval,
                                            const HtmlReportOptions& options,
                                            utils::html::Html* html) {
-  if (eval.classification().rocs().empty()) {
+  if (eval.classification().rocs().empty() &&
+      !eval.classification().has_binary_calibration_data()) {
     return absl::OkStatus();
+  }
+
+  int num_plots = 0;
+  if (!eval.classification().rocs().empty()) {
+    num_plots += 4;
+  }
+  if (eval.classification().has_binary_calibration_data()) {
+    num_plots += 1;
   }
 
   utils::plot::MultiPlot multiplot;
   ASSIGN_OR_RETURN(auto placer,
                    utils::plot::PlotPlacer::Create(
-                       4, options.num_plots_per_columns, &multiplot));
+                       num_plots, options.num_plots_per_columns, &multiplot));
 
-  ASSIGN_OR_RETURN(auto* roc_plot, placer.NewPlot());
-  roc_plot->title = "ROC";
-  roc_plot->x_axis.label = "False positive rate";
-  roc_plot->y_axis.label = "True positive rate (Recall)";
+  yggdrasil_decision_forests::utils::plot::Plot *roc_plot, *pr_plot, *tv_plot,
+      *ta_plot, *reliability_plot;
+  if (!eval.classification().rocs().empty()) {
+    ASSIGN_OR_RETURN(roc_plot, placer.NewPlot());
+    roc_plot->title = "ROC";
+    roc_plot->x_axis.label = "False positive rate";
+    roc_plot->y_axis.label = "True positive rate (Recall)";
 
-  ASSIGN_OR_RETURN(auto* pr_plot, placer.NewPlot());
-  pr_plot->title = "Precision Recall";
-  pr_plot->x_axis.label = "Recall";
-  pr_plot->y_axis.label = "Precision";
+    ASSIGN_OR_RETURN(pr_plot, placer.NewPlot());
+    pr_plot->title = "Precision Recall";
+    pr_plot->x_axis.label = "Recall";
+    pr_plot->y_axis.label = "Precision";
 
-  ASSIGN_OR_RETURN(auto* tv_plot, placer.NewPlot());
-  tv_plot->title = "Threshold / Volume";
-  tv_plot->x_axis.label = "Threshold";
-  tv_plot->y_axis.label = "Volume";
+    ASSIGN_OR_RETURN(tv_plot, placer.NewPlot());
+    tv_plot->title = "Threshold / Volume";
+    tv_plot->x_axis.label = "Threshold";
+    tv_plot->y_axis.label = "Volume";
 
-  ASSIGN_OR_RETURN(auto* ta_plot, placer.NewPlot());
-  ta_plot->title = "Threshold / Accuracy";
-  ta_plot->x_axis.label = "Threshold";
-  ta_plot->y_axis.label = "Accuracy";
+    ASSIGN_OR_RETURN(ta_plot, placer.NewPlot());
+    ta_plot->title = "Threshold / Accuracy";
+    ta_plot->x_axis.label = "Threshold";
+    ta_plot->y_axis.label = "Accuracy";
+  }
+
+  if (eval.classification().has_binary_calibration_data()) {
+    ASSIGN_OR_RETURN(reliability_plot, placer.NewPlot());
+    reliability_plot->title = "Reliability Diagram";
+    reliability_plot->x_axis.label = "Predicted Probability";
+    reliability_plot->y_axis.label = "Observed Frequency";
+  }
 
   RETURN_IF_ERROR(placer.Finalize());
 
-  // Note: We start at roc_idx=1 as roc_idx=0 correspond to the "OOV vs others".
+  if (!eval.classification().rocs().empty()) {
+    // Note: We start at roc_idx=1 as roc_idx=0 correspond to the
+    // "OOV vs others".
 
-  for (int roc_idx = 0; roc_idx < eval.classification().rocs().size();
-       roc_idx++) {
-    const auto& roc = eval.classification().rocs(roc_idx);
-    if (!roc.has_auc()) {
-      continue;
+    for (int roc_idx = 0; roc_idx < eval.classification().rocs().size();
+         roc_idx++) {
+      const auto& roc = eval.classification().rocs(roc_idx);
+      if (!roc.has_auc()) {
+        continue;
+      }
+      const auto positive_label_value =
+          dataset::CategoricalIdxToRepresentation(eval.label_column(), roc_idx);
+      const auto label = absl::StrCat(positive_label_value, " vs others");
+      RETURN_IF_ERROR(
+          PlotClassificationCurves(eval.classification().rocs(roc_idx), label,
+                                   roc_plot, pr_plot, tv_plot, ta_plot));
     }
-    const auto positive_label_value =
-        dataset::CategoricalIdxToRepresentation(eval.label_column(), roc_idx);
-    const auto label = absl::StrCat(positive_label_value, " vs others");
-    RETURN_IF_ERROR(
-        PlotClassificationCurves(eval.classification().rocs(roc_idx), label,
-                                 roc_plot, pr_plot, tv_plot, ta_plot));
+  }
+
+  if (eval.classification().has_binary_calibration_data()) {
+    RETURN_IF_ERROR(PlotBinaryCalibrationCurves(
+        eval.classification().binary_calibration_data(), reliability_plot));
   }
 
   utils::plot::ExportOptions plot_options;
@@ -429,6 +493,14 @@ absl::Status AppendTextReportClassification(
   AppendKeyValueIfNotNan(report, "Default LogLoss: ", DefaultLogLoss(eval));
   AppendKeyValueIfNotNan(report, "Default ErrorRate: ", DefaultErrorRate(eval));
   absl::StrAppend(report, "\n");
+
+  if (eval.classification().has_binary_calibration_data()) {
+    AppendKeyValueIfNotNan(
+        report, "Expected Calibration Error: ", ExpectedCalibrationError(eval));
+    AppendKeyValueIfNotNan(
+        report, "Maximum Calibration Error: ", MaximumCalibrationError(eval));
+    absl::StrAppend(report, "\n");
+  }
 
   if (eval.classification().has_confusion()) {
     absl::StrAppend(report, "Confusion Table:\n");

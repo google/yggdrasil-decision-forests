@@ -57,7 +57,9 @@ absl::Status AppendEvaluation(const AbstractModel& model,
   }
 
   auto engine_or_status = model.BuildFastEngine();
+  // TODO: JWH REMOVE!!!
   if (engine_or_status.ok()) {
+    // if (false) {
     const auto engine = std::move(engine_or_status.value());
     // Extract the shards from the dataset path.
     std::string path, prefix;
@@ -147,9 +149,13 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOnDisk(
   metric::proto::EvaluationResults eval;
   RETURN_IF_ERROR(
       metric::InitializeEvaluation(option, model.LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(
+      model.InitializeForEvaluation(option, model.LabelColumnSpec(), &eval));
   RETURN_IF_ERROR(AppendEvaluation(model, typed_path, option, rnd, &eval));
   RETURN_IF_ERROR(
       metric::FinalizeEvaluation(option, model.LabelColumnSpec(), &eval));
+  RETURN_IF_ERROR(
+      model.FinalizeForEvaluation(option, model.LabelColumnSpec(), &eval));
   return eval;
 }
 

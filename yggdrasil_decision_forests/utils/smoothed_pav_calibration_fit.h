@@ -92,6 +92,7 @@
 #include <cassert>
 #include <cstddef>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
@@ -104,6 +105,7 @@ namespace yggdrasil_decision_forests::utils {
 // score-distribution fitting. Array-of-structs layout: PAV's merge step
 // combines one whole (sum_pred, sum_true, count) tuple at a time.
 // TODO: Add support for differently weighted samples.
+// TODO: Add support for different types for each accumulator.
 template <typename A,
           std::enable_if_t<std::is_floating_point<A>::value, bool> = true>
 struct BinAccumulatorTemplate {
@@ -116,6 +118,15 @@ struct BinAccumulatorTemplate {
   AccumulatorType sum_true = 0;
   // Number of samples falling in this bin.
   AccumulatorType count = 0;
+
+  static std::size_t BinIndex(AccumulatorType p, std::size_t n_bins) {
+    const auto scale = static_cast<AccumulatorType>(n_bins);
+    auto pi = std::clamp(p, static_cast<AccumulatorType>(0.0),
+                         static_cast<AccumulatorType>(1.0));
+    // matches np.digitize(p, linspace(0, 1, n_bins+1)) - 1, clipped
+    return static_cast<std::size_t>(
+        std::min(pi * scale, scale - static_cast<AccumulatorType>(1.0)));
+  }
 
   // Mean predicted probability in this bin. sum_pred / count.
   constexpr AccumulatorType prob_pred() const { return sum_pred / count; }
@@ -267,9 +278,18 @@ absl::StatusOr<std::vector<BinAccumulator::AccumulatorType>> pchip_slopes(
 // A fitted monotone curve, ready for evaluation via pchip_eval_single or for
 // building a fast lookup table via build_lookup_table.
 struct FittedCalibrationCurve {
-  // Strictly increasing knot positions; x[0]=0, x.back()=1.
+  explicit FittedCalibrationCurve(
+      std::vector<BinAccumulator::AccumulatorType> x,
+      std::vector<BinAccumulator::AccumulatorType> y,
+      std::vector<BinAccumulator::AccumulatorType> d)
+      : x(std::move(x)), y(std::move(y)), d(std::move(d)) {
+    DCHECK_EQ(x.size(), y.size());
+    DCHECK_EQ(x.size(), d.size());
+  }
+
+  // Strictly increasing knot positions.
   std::vector<BinAccumulator::AccumulatorType> x;
-  // Non-decreasing values; y[0]=0, y.back()=1.
+  // Non-decreasing values.
   std::vector<BinAccumulator::AccumulatorType> y;
   // PCHIP derivative at each knot.
   std::vector<BinAccumulator::AccumulatorType> d;
