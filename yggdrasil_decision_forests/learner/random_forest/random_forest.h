@@ -22,6 +22,7 @@
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_RANDOM_FOREST_H_
 
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -158,7 +159,7 @@ class OOBEvaluator {
       bool compute_oob_performances, bool compute_oob_variable_importances,
       const dataset::VerticalDataset& train_dataset,
       const model::proto::TrainingConfig& config,
-      const model::proto::TrainingConfigLinking& config_link,
+      const model::proto::TrainingConfigLinking& config_link, int num_threads,
       RandomForestModel* model);
 
   // Called by a worker thread immediately after training a decision tree.
@@ -168,9 +169,7 @@ class OOBEvaluator {
       const dataset::VerticalDataset& train_dataset,
       const std::vector<UnsignedExampleIdx>& selected_examples,
       const decision_tree::DecisionTree& new_tree, utils::RandomEngine* random,
-      int current_num_trained_trees,
-      absl::FunctionRef<std::string()> build_common_snippet,
-      absl::FunctionRef<std::string()> build_common_snippet_extra);
+      absl::string_view extra_log_info = "");
 
   // Called after all trees have been trained to compute variable importances,
   // export predictions if requested, and log final OOB metrics.
@@ -187,7 +186,7 @@ class OOBEvaluator {
 
   absl::Status ExportPredictions(
       const dataset::proto::DataSpecification& dataspec,
-      absl::string_view typed_path) const SHARED_LOCKS_REQUIRED(mutex_);
+      absl::string_view typed_path) const;
 
   const bool compute_oob_performances_;
   const bool compute_oob_variable_importances_;
@@ -196,13 +195,30 @@ class OOBEvaluator {
   const random_forest::proto::RandomForestTrainingConfig& rf_config_;
   RandomForestModel* model_;
 
-  utils::concurrency::Mutex mutex_;
-  std::vector<PredictionAccumulator> oob_predictions_ GUARDED_BY(mutex_);
+  // Stripes configuration
+  int num_stripes_;
+  UnsignedExampleIdx stripe_size_;
+  std::vector<std::unique_ptr<utils::concurrency::Mutex>> stripe_mutexes_;
+
+  std::vector<PredictionAccumulator> oob_predictions_;
   std::vector<std::vector<PredictionAccumulator>>
-      oob_predictions_per_input_features_ GUARDED_BY(mutex_);
-  absl::Time last_oob_computation_time_ GUARDED_BY(mutex_) =
+      oob_predictions_per_input_features_;
+
+  // Gate configuration
+  utils::concurrency::Mutex gate_mutex_;
+  utils::concurrency::CondVar gate_cv_;
+  // True after the first thread has been admitted. This makes sure an
+  // evaluation is always computed after the first thread.
+  bool has_admitted_any_thread_ GUARDED_BY(gate_mutex_) = false;
+  bool gate_closed_ GUARDED_BY(gate_mutex_) = false;
+  int num_threads_inside_ GUARDED_BY(gate_mutex_) = 0;
+  int num_threads_entered_since_last_open_ GUARDED_BY(gate_mutex_) = 0;
+  int num_trees_entered_ GUARDED_BY(gate_mutex_) = 0;
+  int num_trees_finished_ GUARDED_BY(gate_mutex_) = 0;
+
+  absl::Time last_oob_evaluation_time_ GUARDED_BY(gate_mutex_) =
       absl::InfinitePast();
-  int last_oob_computation_num_trees_ GUARDED_BY(mutex_) = 0;
+  int last_oob_computation_num_trees_ GUARDED_BY(gate_mutex_) = 0;
 };
 
 // Add the predictions of a decision tree to a set of predictor accumulators.
@@ -215,11 +231,14 @@ class OOBEvaluator {
 absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
-    std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
+    const std::vector<UnsignedExampleIdx>& sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
     const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
-    std::vector<OOBEvaluator::PredictionAccumulator>* oob_predictions);
+    std::vector<OOBEvaluator::PredictionAccumulator>* oob_predictions,
+    UnsignedExampleIdx begin_example_idx = 0,
+    UnsignedExampleIdx end_example_idx =
+        std::numeric_limits<UnsignedExampleIdx>::max());
 
 // Evaluates the OOB predictions. Examples without any tree predictions are
 // skipped.

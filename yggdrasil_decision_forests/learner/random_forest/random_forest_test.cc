@@ -882,6 +882,7 @@ TEST_F(RandomForestOnAdult, OOBEvaluationIntervalInTreesIsRespected) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->set_num_trees(20);
+  rf_config->set_winner_take_all_inference(false);
   rf_config->set_oob_evaluation_interval_in_trees(5);
   rf_config->set_oob_evaluation_interval_in_seconds(10000);
   rf_config->set_compute_oob_performances(true);
@@ -910,8 +911,109 @@ TEST(OOBEvaluatorTest, RejectsInvalidVariableImportanceConfig) {
   const auto status_or = internal::OOBEvaluator::Create(
       /*compute_oob_performances=*/false,
       /*compute_oob_variable_importances=*/true, dataset, config, config_link,
-      &model);
+      /*num_threads=*/1, &model);
   EXPECT_THAT(status_or.status(), StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(OOBEvaluatorTest, GateCleanupIsExecutedOnEarlyReturn) {
+  dataset::VerticalDataset dataset;
+  utils::RandomEngine random(123456);
+  ExtremelyRandomizeTreesFigure10Dataset(5, &dataset, &random);
+
+  model::proto::TrainingConfig config;
+  auto* rf_config =
+      config.MutableExtension(random_forest::proto::random_forest_config);
+  rf_config->set_compute_oob_performances(true);
+  rf_config->set_num_trees(2);
+
+  // Set task to RANKING, which guarantees an InvalidArgumentError
+  // inside internal::UpdateOOBPredictionsWithNewTree during stripe evaluation.
+  config.set_task(model::proto::Task::RANKING);
+
+  model::proto::TrainingConfigLinking config_link;
+  RandomForestModel model;
+
+  auto status_or = internal::OOBEvaluator::Create(
+      /*compute_oob_performances=*/true,
+      /*compute_oob_variable_importances=*/false, dataset, config, config_link,
+      /*num_threads=*/1, &model);
+  ASSERT_OK(status_or);
+  auto evaluator = std::move(status_or).value();
+
+  decision_tree::DecisionTree tree;
+  tree.CreateRoot();
+  tree.mutable_root()
+      ->mutable_node()
+      ->mutable_condition()
+      ->mutable_condition()
+      ->mutable_higher_condition()
+      ->set_threshold(0);
+  tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+
+  // First call should fail due to unsupported RANKING task.
+  // It closes the gate initially, then returns early from the stripe update
+  // loop, executing gate_cleanup which re-opens the gate.
+  auto status1 =
+      evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random);
+  EXPECT_THAT(status1, StatusIs(absl::StatusCode::kInvalidArgument));
+
+  // The second call verifies that the gate was indeed re-opened.
+  // If gate_cleanup failed to reset gate_closed_, this call will hang
+  // indefinitely.
+  auto status2 =
+      evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random);
+  EXPECT_THAT(status2, StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(OOBEvaluatorTest, EvaluatesMetricsOnLastTree) {
+  dataset::VerticalDataset dataset;
+  utils::RandomEngine random(123456);
+  ExtremelyRandomizeTreesFigure10Dataset(5, &dataset, &random);
+
+  model::proto::TrainingConfig config;
+  auto* rf_config =
+      config.MutableExtension(random_forest::proto::random_forest_config);
+  rf_config->set_compute_oob_performances(true);
+
+  // We'll simulate training exactly 3 trees.
+  rf_config->set_num_trees(3);
+
+  // Choose a huge interval so that interval triggers never cause evaluations.
+  rf_config->set_oob_evaluation_interval_in_trees(100);
+
+  config.set_task(model::proto::Task::REGRESSION);
+  config.set_label("y");
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(1);
+
+  RandomForestModel model;
+  model.set_task(model::proto::Task::REGRESSION);
+  model.set_label_col_idx(1);
+
+  auto status_or = internal::OOBEvaluator::Create(
+      /*compute_oob_performances=*/true,
+      /*compute_oob_variable_importances=*/false, dataset, config, config_link,
+      /*num_threads=*/1, &model);
+  ASSERT_OK(status_or);
+  auto evaluator = std::move(status_or).value();
+
+  decision_tree::DecisionTree tree;
+  tree.CreateRoot();
+  tree.mutable_root()->mutable_node()->mutable_regressor()->set_top_value(1.0);
+
+  // Tree 1: Evaluator finishes 1 tree at Gate Exit, evaluate immediately.
+  ASSERT_OK(evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random));
+  EXPECT_EQ(model.out_of_bag_evaluations().size(), 1);
+
+  // Tree 2: Evaluator finishes 2 trees no evaluation.
+  ASSERT_OK(evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random));
+  EXPECT_EQ(model.out_of_bag_evaluations().size(), 1);
+
+  // Tree 3: Last tree, evaluation runs.
+  ASSERT_OK(evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random));
+  ASSERT_EQ(model.out_of_bag_evaluations().size(), 2);
+  EXPECT_EQ(model.out_of_bag_evaluations()[1].number_of_trees(), 3);
 }
 
 TEST_F(RandomForestOnAdult, MultithreadedOOBMatchesSequentialOOB) {
