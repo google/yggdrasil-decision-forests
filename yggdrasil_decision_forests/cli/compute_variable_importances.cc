@@ -30,11 +30,13 @@
 // :show_model --model=model
 //
 #include <memory>
+#include <string>
 
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/feature_importance.h"
 #include "yggdrasil_decision_forests/utils/logging.h"

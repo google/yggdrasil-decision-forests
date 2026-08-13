@@ -19,6 +19,7 @@ package yggdrasil_decision_forests.model.proto;
 
 import "yggdrasil_decision_forests/dataset/weight.proto";
 import "yggdrasil_decision_forests/model/hyperparameter.proto";
+import "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.proto";
 
 // Modeling task.
 enum Task {
@@ -110,9 +111,11 @@ message AbstractModel {
   // Logs of the automated feature selection of the model.
   optional FeatureSelectionLogs feature_selection_logs = 13;
 
-  // Indicate if a model is pure for serving i.e. the model was tripped of all
+  // Indicate if a model is pure for serving i.e. the model was stripped of all
   // information not required for serving.
   optional bool is_pure_model = 12 [default = false];
+
+  repeated postprocessor.proto.AbstractPostprocessor postprocessors = 16;
 }
 
 // Information about the model.
