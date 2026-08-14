@@ -326,6 +326,10 @@ message DecisionTreeTrainingConfig {
     //
     // This option is not supported by Isolation Forests.
     optional bool include_axis_aligned_splits = 12 [default = false];
+
+    // Controls how the split in the projection space is computed: EXACT (default)
+    // or HISTOGRAM_* (Random or Equal Width)
+    optional NumericalSplit projection_split = 13;
   }
 
   message MHLDObliqueSplit {
