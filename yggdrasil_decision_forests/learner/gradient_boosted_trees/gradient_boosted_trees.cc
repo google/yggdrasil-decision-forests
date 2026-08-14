@@ -2188,7 +2188,7 @@ GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
     cands->add_possible_values()->set_integer(20);
   }
 
-  if (training_config_.task() != model::proto::Task::REGRESSION) {
+  {
     auto* field = space.add_fields();
     field->set_name(kHParamUseHessianGain);
     auto* cands = field->mutable_discrete_candidates();
@@ -2374,7 +2374,7 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_categorical()->add_possible_values("false");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(If true, uses a formulation of split gain with a hessian term i.e. optimizes the splits to minimize the variance of "gradient / hessian. Available for all losses except regression.)");
+        R"(If true, uses a formulation of split gain with a hessian term i.e. optimizes the splits to minimize the variance of "gradient / hessian.)");
   }
 
   {
