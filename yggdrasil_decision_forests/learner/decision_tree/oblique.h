@@ -149,7 +149,7 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
     const InternalTrainConfig& internal_config, int first_attribute_idx,
     const NodeConstraints& constraints, int8_t monotonic_direction,
     proto::NodeCondition* condition, SplitterPerThreadCache* cache,
-    utils::RandomEngine* random = nullptr);
+    utils::RandomEngine* random);
 
 namespace internal {
 

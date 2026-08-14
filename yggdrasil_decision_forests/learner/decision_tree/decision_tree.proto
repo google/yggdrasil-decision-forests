@@ -285,6 +285,10 @@ message DecisionTreeTrainingConfig {
     // otherwise prefer `projection_density_factor` for controlling the number
     // of features per projection.
     optional int32 max_num_features = 11 [default = -1];
+
+    // Controls how the split in the projection space is computed: EXACT (default)
+    // or HISTOGRAM_* (Random or Equal Width)
+    optional NumericalSplit projection_split = 12;
   }
 
   message MHLDObliqueSplit {
