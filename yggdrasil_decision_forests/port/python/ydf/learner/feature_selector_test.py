@@ -28,6 +28,17 @@ _NUM_TREES = 10  #  Used for experimentation
 _MIN_ACCURACY_ADULT = 0.85
 
 
+def toy_dataset():
+  grid_points = np.linspace(0.05, 3.95, 100)
+  F1, F2 = np.meshgrid(grid_points, grid_points)
+  f1 = F1.flatten()
+  f2 = F2.flatten()
+  y = ((np.floor(f1) + np.floor(f2)) % 2).astype(int)
+  f3 = f1 + f2
+  f4 = f1 - f2
+  return {"l": y, "f1": f1, "f2": f2, "f3": f3, "f4": f4}
+
+
 class LearnerTest(parameterized.TestCase):
 
   def setUp(self):
@@ -70,22 +81,16 @@ class BackwardSelectionFeatureSelectorTest(LearnerTest):
       })
 
   def test_toy_rf(self):
-    n = 2000
-    f1 = np.random.uniform(size=n)
-    f2 = np.random.uniform(size=n)
-    f3 = np.random.uniform(size=n)
-    f4 = np.random.uniform(size=n)
-    l = (f1 + f2) >= 1
-    ds = {"l": l, "f1": f1, "f2": f2, "f3": f3, "f4": f4}
     learner = specialized_learners.RandomForestLearner(
         label="l",
         feature_selector=feature_selector_lib.BackwardSelectionFeatureSelector(),
         compute_oob_variable_importances=True,
+        num_trees=50,
     )
-    model = learner.train(ds)
-    self.assertSameElements(model.input_feature_names(), ["f1", "f2"])
+    model = learner.train(toy_dataset())
+    self.assertSameElements(["f1", "f2"], model.input_feature_names())
 
-  def test_simple_rf(self):
+  def test_adult_rf(self):
     learner = specialized_learners.RandomForestLearner(
         label="income",
         feature_selector=feature_selector_lib.BackwardSelectionFeatureSelector(),
@@ -97,7 +102,7 @@ class BackwardSelectionFeatureSelectorTest(LearnerTest):
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, _MIN_ACCURACY_ADULT)
 
-  def test_simple_gbt(self):
+  def test_adult_gbt(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="income",
         feature_selector=feature_selector_lib.BackwardSelectionFeatureSelector(),
@@ -130,7 +135,7 @@ class BackwardSelectionFeatureSelectorTest(LearnerTest):
     logging.info("Evaluation: %s", evaluation)
     self.assertGreaterEqual(evaluation.accuracy, _MIN_ACCURACY_ADULT)
 
-  def test_simple_cart_fails(self):
+  def test_adult_cart_fails(self):
     with self.assertRaisesRegex(
         ValueError,
         "No validation dataset was provided to the CART learner.",
@@ -259,30 +264,17 @@ class BackwardSelectionFeatureSelectorTest(LearnerTest):
     self.assertGreaterEqual(evaluation.accuracy, _MIN_ACCURACY_ADULT)
 
   def test_include_all_columns_standalone(self):
-    n = 2000
-    f1 = np.random.uniform(size=n)
-    f2 = np.random.uniform(size=n)
-    f3 = np.random.uniform(size=n)
-    f4 = np.random.uniform(size=n)
-    l = (f1 + f2) >= 1
-    ds = {"l": l, "f1": f1, "f2": f2, "f3": f3, "f4": f4}
     learner = specialized_learners.RandomForestLearner(
         label="l",
         feature_selector=feature_selector_lib.BackwardSelectionFeatureSelector(),
         compute_oob_variable_importances=True,
         include_all_columns=True,
+        num_trees=50,
     )
-    model = learner.train(ds)
+    model = learner.train(toy_dataset())
     self.assertSameElements(["f1", "f2"], model.input_feature_names())
 
   def test_include_all_columns_with_columns_specified(self):
-    n = 2000
-    f1 = np.random.uniform(size=n)
-    f2 = np.random.uniform(size=n)
-    f3 = np.random.uniform(size=n)
-    f4 = np.random.uniform(size=n)
-    l = (f1 + f2) >= 1
-    ds = {"l": l, "f1": f1, "f2": f2, "f3": f3, "f4": f4}
     learner = specialized_learners.RandomForestLearner(
         label="l",
         feature_selector=feature_selector_lib.BackwardSelectionFeatureSelector(),
@@ -291,25 +283,20 @@ class BackwardSelectionFeatureSelectorTest(LearnerTest):
         # Specify one column to make sure `include_all_columns` is respected at
         # the top level.
         features=["f1"],
+        num_trees=50,
     )
-    model = learner.train(ds)
+    model = learner.train(toy_dataset())
     self.assertSameElements(["f1", "f2"], model.input_feature_names())
 
   def test_exclude_columns(self):
-    n = 2000
-    f1 = np.random.uniform(size=n)
-    f2 = np.random.uniform(size=n)
-    f3 = np.random.uniform(size=n)
-    f4 = np.random.uniform(size=n)
-    l = f2 >= 0.5  # Label depends on f2, but that's not an input feature.
-    ds = {"l": l, "f1": f1, "f2": f2, "f3": f3, "f4": f4}
     learner = specialized_learners.RandomForestLearner(
         label="l",
         feature_selector=feature_selector_lib.BackwardSelectionFeatureSelector(),
         compute_oob_variable_importances=True,
         features=["f1", "f3", "f4"],
+        num_trees=50,
     )
-    model = learner.train(ds)
+    model = learner.train(toy_dataset())
     self.assertNoCommonElements(["f2"], model.input_feature_names())
 
 
