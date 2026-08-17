@@ -1710,7 +1710,7 @@ struct LabelHessianNumericalBucket {
   }
 
   bool operator<(const LabelHessianNumericalBucket& other) const {
-    return priority < other.priority;
+    return priority < priority;
   }
 
   class Initializer {
