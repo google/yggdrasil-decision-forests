@@ -513,6 +513,25 @@ def tf_feature_dtype_manual(
     raise ValueError(f"Unsupported semantic: {column_spec.type}")
 
 
+def _unrolled_sub_feature_names(
+    unstacked: ds_pb.Unstacked,
+    data_spec: ds_pb.DataSpecification,
+) -> Sequence[str]:
+  """Returns the sub-feature names for an unstacked column from data_spec."""
+  if (
+      unstacked.HasField("begin_column_idx")
+      and unstacked.begin_column_idx >= 0
+      and unstacked.begin_column_idx + unstacked.size <= len(data_spec.columns)
+  ):
+    return [
+        data_spec.columns[unstacked.begin_column_idx + dim_idx].name
+        for dim_idx in range(unstacked.size)
+    ]
+  return dataset_io.unrolled_feature_names(
+      unstacked.original_name, unstacked.size
+  )
+
+
 def tensorflow_raw_input_signature(
     model: "generic_model.GenericModel",
     feature_dtypes: Dict[str, TFDType],
@@ -529,11 +548,9 @@ def tensorflow_raw_input_signature(
   for unstacked in model_dataspec.unstackeds:
     if unstacked.size == 0:
       raise RuntimeError("Empty unstacked")
-    sub_names = dataset_io.unrolled_feature_names(
-        unstacked.original_name, unstacked.size
-    )
+    sub_names = _unrolled_sub_feature_names(unstacked, model_dataspec)
     # Note: The "input_features" contain unrolled feature names.
-    if sub_names[0] not in input_feature_names_set:
+    if not any(sub_name in input_feature_names_set for sub_name in sub_names):
       continue
 
     tf_dtype = tf_feature_dtype_manual(
@@ -619,11 +636,9 @@ def tensorflow_feature_spec(
   for unstacked in model_dataspec.unstackeds:
     if unstacked.size == 0:
       raise RuntimeError("Empty unstacked")
-    sub_names = dataset_io.unrolled_feature_names(
-        unstacked.original_name, unstacked.size
-    )
+    sub_names = _unrolled_sub_feature_names(unstacked, model_dataspec)
     # Note: The "input_features" contain unrolled feature names.
-    if sub_names[0] not in input_feature_names_set:
+    if not any(sub_name in input_feature_names_set for sub_name in sub_names):
       continue
 
     tf_dtype = tf_feature_dtype_manual(
@@ -723,14 +738,13 @@ def _unroll_dict(
     # Unroll multi-dim features.
     input_features_set = set(input_features)
     for unstacked in data_spec.unstackeds:
-      sub_names = dataset_io.unrolled_feature_names(
-          unstacked.original_name, unstacked.size
-      )
-      if sub_names[0] not in input_features_set:
+      sub_names = _unrolled_sub_feature_names(unstacked, data_spec)
+      if not any(sub_name in input_features_set for sub_name in sub_names):
         continue
       value = src[unstacked.original_name]
       for dim_idx, sub_name in enumerate(sub_names):
-        dst[sub_name] = value[:, dim_idx]
+        if sub_name in input_features_set:
+          dst[sub_name] = value[:, dim_idx]
 
     # Copy single-dim features
     for column in data_spec.columns:

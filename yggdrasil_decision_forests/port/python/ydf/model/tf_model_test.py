@@ -1106,6 +1106,58 @@ class TfModelTest(parameterized.TestCase):
       )
       npt.assert_array_equal(tf_prediction["classes"], [[b"<=50K", b">50K"]])
 
+  def test_to_tensorflow_saved_model_recordio_multidimensional_features(self):
+    """End-to-end test for exporting a model trained on TFRecord with multi-dim features."""
+    tmp_dir = self.create_tempdir()
+    tfrecord_path = os.path.join(tmp_dir.full_path, "toy_multidim.tfrecord")
+
+    # Write toy TFRecord dataset with multi-dimensional float features
+    with tf.io.TFRecordWriter(tfrecord_path) as writer:
+      for i in range(100):
+        label_val = b"1" if (i % 2 == 0) else b"0"
+        feature = {
+            "multi_f": tf.train.Feature(
+                float_list=tf.train.FloatList(value=[float(i), float(i * 2)])
+            ),
+            "label": tf.train.Feature(
+                bytes_list=tf.train.BytesList(value=[label_val])
+            ),
+        }
+        example = tf.train.Example(features=tf.train.Features(feature=feature))
+        writer.write(example.SerializeToString())
+
+    # Train model on the TFRecord dataset (which infers unstackeds with
+    # V1 format naming).
+    model = specialized_learners.RandomForestLearner(
+        label="label",
+        num_trees=5,
+    ).train(f"tfrecordv2+tfe:{tfrecord_path}")
+
+    self.assertNotEmpty(model.data_spec().unstackeds)
+
+    ydf_predictions = model.predict(f"tfrecordv2+tfe:{tfrecord_path}")
+
+    model_dir = os.path.join(tmp_dir.full_path, "saved_model")
+    model.to_tensorflow_saved_model(
+        model_dir,
+        mode="tf",
+        servo_api=True,
+        feed_example_proto=True,
+    )
+
+    tf_model = tf.saved_model.load(model_dir)
+    tf_predict = tf_model.signatures["serving_default"]
+
+    for example_idx, serialized_example in enumerate(
+        tf.data.TFRecordDataset([tfrecord_path]).take(10)
+    ):
+      tf_prediction = tf_predict(inputs=[serialized_example])
+      npt.assert_almost_equal(
+          tf_prediction["scores"][:, 1],
+          [ydf_predictions[example_idx]],
+          decimal=5,
+      )
+
   def test_to_tensorflow_saved_model_wrong_dtype(self):
     columns = ["f1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
