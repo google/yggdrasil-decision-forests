@@ -1585,6 +1585,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       "num_candidate_attributes_ratio" parameters. If false, all the attributes
       are tested. Default: None.
     min_examples: Minimum number of examples in a node. Default: 5.
+    min_sum_hessian_in_leaf: Minimum value of the sum of the hessians in the
+      leafs. Splits that would violate this constraint are ignored. Only used
+      when "use_hessian_gain" is true. Default: None.
     missing_value_policy: Method used to handle missing attribute values. -
       `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean
       (in case of numerical attribute) or the most-frequent-item (in case of
@@ -1898,6 +1901,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       mhld_oblique_max_num_attributes: Optional[int] = None,
       mhld_oblique_sample_attributes: Optional[bool] = None,
       min_examples: int = 5,
+      min_sum_hessian_in_leaf: Optional[float] = None,
       missing_value_policy: str = "GLOBAL_IMPUTATION",
       multinomial_initial_class_priors: Optional[bool] = None,
       ndcg_truncation: Optional[int] = None,
@@ -2003,6 +2007,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "mhld_oblique_max_num_attributes": mhld_oblique_max_num_attributes,
         "mhld_oblique_sample_attributes": mhld_oblique_sample_attributes,
         "min_examples": min_examples,
+        "min_sum_hessian_in_leaf": min_sum_hessian_in_leaf,
         "missing_value_policy": missing_value_policy,
         "multinomial_initial_class_priors": multinomial_initial_class_priors,
         "ndcg_truncation": ndcg_truncation,

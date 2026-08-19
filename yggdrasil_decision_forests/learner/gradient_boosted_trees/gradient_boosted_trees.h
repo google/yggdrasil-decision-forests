@@ -104,6 +104,8 @@ class GradientBoostedTreesLearner : public AbstractLearner {
   static constexpr char kHParamAdaptSubsampleForMaximumTrainingDuration[] =
       "adapt_subsample_for_maximum_training_duration";
   static constexpr char kHParamUseHessianGain[] = "use_hessian_gain";
+  static constexpr char kHParamMinSumHessianInLeaf[] =
+      "min_sum_hessian_in_leaf";
   static constexpr char kHParamSamplingMethod[] = "sampling_method";
   static constexpr char kSamplingMethodNone[] = "NONE";
   static constexpr char kSamplingMethodRandom[] = "RANDOM";

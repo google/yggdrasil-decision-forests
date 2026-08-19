@@ -1864,6 +1864,13 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
     }
   }
 
+  {
+    const auto hparam = generic_hyper_params->Get(kHParamMinSumHessianInLeaf);
+    if (hparam.has_value()) {
+      gbt_config->set_min_sum_hessian_in_leaf(hparam.value().value().real());
+    }
+  }
+
   // Determine the sampling strategy.
   const auto sampling_method_hparam =
       generic_hyper_params->Get(kHParamSamplingMethod);
@@ -2375,6 +2382,18 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
         R"(If true, uses a formulation of split gain with a hessian term i.e. optimizes the splits to minimize the variance of "gradient / hessian. Available for all losses except regression.)");
+  }
+
+  {
+    auto& param =
+        hparam_def.mutable_fields()->operator[](kHParamMinSumHessianInLeaf);
+    param.mutable_real()->set_default_value(
+        gbt_config.min_sum_hessian_in_leaf());
+    param.mutable_conditional()->set_control_field(kHParamUseHessianGain);
+    param.mutable_conditional()->mutable_categorical()->add_values("true");
+    param.mutable_documentation()->set_proto_path(proto_path);
+    param.mutable_documentation()->set_description(
+        R"(Minimum value of the sum of the hessians in the leafs. Splits that would violate this constraint are ignored. Only used when "use_hessian_gain" is true.)");
   }
 
   {
