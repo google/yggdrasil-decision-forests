@@ -501,13 +501,16 @@ def tf_feature_dtype_manual(
     return tf_dtype
 
   # DType from feature semantic
-  if column_spec.type == ds_pb.NUMERICAL:
+  if column_spec.type in [
+      ds_pb.ColumnType.NUMERICAL,
+      ds_pb.ColumnType.DISCRETIZED_NUMERICAL,
+  ]:
     return tf.float32
-  elif column_spec.type == ds_pb.CATEGORICAL:
+  elif column_spec.type == ds_pb.ColumnType.CATEGORICAL:
     return tf.string
-  elif column_spec.type == ds_pb.BOOLEAN:
+  elif column_spec.type == ds_pb.ColumnType.BOOLEAN:
     return tf.int64
-  elif column_spec.type == ds_pb.CATEGORICAL_SET:
+  elif column_spec.type == ds_pb.ColumnType.CATEGORICAL_SET:
     return tf.string
   else:
     raise ValueError(f"Unsupported semantic: {column_spec.type}")

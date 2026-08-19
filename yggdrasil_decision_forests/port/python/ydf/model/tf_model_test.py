@@ -1158,6 +1158,66 @@ class TfModelTest(parameterized.TestCase):
           decimal=5,
       )
 
+  def test_to_tensorflow_saved_model_discretized_numerical(self):
+    """Test SavedModel export with discretized numerical features."""
+    tmp_dir = self.create_tempdir()
+    tfrecord_path = os.path.join(
+        tmp_dir.full_path, "toy_discretized.tfrecord"
+    )
+
+    with tf.io.TFRecordWriter(tfrecord_path) as writer:
+      for i in range(100):
+        label_val = b"1" if (i % 2 == 0) else b"0"
+        feature = {
+            "num_feat": tf.train.Feature(
+                float_list=tf.train.FloatList(value=[float(i)])
+            ),
+            "multi_f": tf.train.Feature(
+                float_list=tf.train.FloatList(value=[float(i), float(i * 2)])
+            ),
+            "label": tf.train.Feature(
+                bytes_list=tf.train.BytesList(value=[label_val])
+            ),
+        }
+        example = tf.train.Example(features=tf.train.Features(feature=feature))
+        writer.write(example.SerializeToString())
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="label",
+        num_trees=5,
+        discretize_numerical_columns=True,
+    ).train(f"tfrecordv2+tfe:{tfrecord_path}")
+
+    # Verify DISCRETIZED_NUMERICAL column type in dataspec
+    has_discretized = any(
+        col.type == dataspec.ds_pb.ColumnType.DISCRETIZED_NUMERICAL
+        for col in model.data_spec().columns
+    )
+    self.assertTrue(has_discretized)
+
+    ydf_predictions = model.predict(f"tfrecordv2+tfe:{tfrecord_path}")
+
+    model_dir = os.path.join(tmp_dir.full_path, "saved_model")
+    model.to_tensorflow_saved_model(
+        model_dir,
+        mode="tf",
+        servo_api=True,
+        feed_example_proto=True,
+    )
+
+    tf_model = tf.saved_model.load(model_dir)
+    tf_predict = tf_model.signatures["serving_default"]
+
+    for example_idx, serialized_example in enumerate(
+        tf.data.TFRecordDataset([tfrecord_path]).take(10)
+    ):
+      tf_prediction = tf_predict(inputs=[serialized_example])
+      npt.assert_almost_equal(
+          tf_prediction["scores"][:, 1],
+          [ydf_predictions[example_idx]],
+          decimal=5,
+      )
+
   def test_to_tensorflow_saved_model_wrong_dtype(self):
     columns = ["f1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(
