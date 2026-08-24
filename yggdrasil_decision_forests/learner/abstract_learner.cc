@@ -1196,6 +1196,14 @@ dataset::LoadConfig OptimalDatasetLoadingConfig(
           return example.attributes(weight_attribute).numerical() > 0.f;
         };
   }
+  if (load_config.load_columns.has_value()) {
+    std::sort(load_config.load_columns->begin(),
+              load_config.load_columns->end());
+    load_config.load_columns->erase(
+        std::unique(load_config.load_columns->begin(),
+                    load_config.load_columns->end()),
+        load_config.load_columns->end());
+  }
   return load_config;
 }
 
