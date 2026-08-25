@@ -4689,14 +4689,6 @@ absl::Status GrowTreeBestFirstGlobal(
          (max_num_nodes < 0 || num_nodes < max_num_nodes) &&
          (!internal_config.timeout.has_value() ||
           internal_config.timeout >= absl::Now())) {
-    // Ensure the candidate set is not larger than  "max_num_nodes". Note:
-    // There is not need for mode than "max_num_nodes" candidate splits.
-    while (max_num_nodes >= 0 && candidate_splits.size() > max_num_nodes) {
-      candidate_splits.top().node->FinalizeAsLeaf(
-          dt_config.store_detailed_label_distribution());
-      candidate_splits.pop();
-    }
-
     // Split the node.
     auto split = candidate_splits.top();
     candidate_splits.pop();
@@ -4710,7 +4702,6 @@ absl::Status GrowTreeBestFirstGlobal(
     const auto& condition = split.node->node().condition();
 
     // Add new candidate splits for children.
-
     ASSIGN_OR_RETURN(
         auto exemple_split,
         internal::SplitExamplesInPlace(
