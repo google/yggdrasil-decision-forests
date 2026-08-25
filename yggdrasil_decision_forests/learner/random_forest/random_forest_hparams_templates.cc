@@ -49,7 +49,7 @@ RandomForestLearner::PredefinedHyperParameters() const {
         R"(A configuration that is generally better than the default parameters without being more expensive.)");
     {
       auto field = config.mutable_parameters()->add_fields();
-      field->set_name(kHParamWinnerTakeAll);
+      field->set_name(kHParamWinnerTakesAll);
       field->mutable_value()->set_categorical("false");
     }
     param_sets.push_back(std::move(config));
@@ -100,7 +100,7 @@ RandomForestLearner::PredefinedHyperParameters() const {
         R"(Top ranking hyper-parameters on our benchmark slightly modified to run in reasonable time.)");
     {
       auto field = config.mutable_parameters()->add_fields();
-      field->set_name(kHParamWinnerTakeAll);
+      field->set_name(kHParamWinnerTakesAll);
       field->mutable_value()->set_categorical("false");
     }
     {

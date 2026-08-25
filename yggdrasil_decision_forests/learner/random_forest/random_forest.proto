@@ -38,9 +38,9 @@ message RandomForestTrainingConfig {
 
   // Whether the vote of individual trees are distributions or winner-take-all.
   //
-  // With winner_take_all_inference=true, each tree cast a vote for a single
-  // label value. With winner_take_all_inference=false, each tree cast a
-  // weighted vote for each label values.
+  // With winner_take_all_inference=true, each tree casts a vote for a single
+  // label value. With winner_take_all_inference=false, each tree casts a
+  // weighted vote for each label value.
   //
   // The original random forest implementation uses
   // winner_take_all_inference=true (default value). However,
