@@ -1621,4 +1621,4 @@ class BatchReservoirSampling:
     # when returning "num_quantiles" quantiles is possible.
     thresholds = np.linspace(0, 1, num_quantiles)
     quantiles = np.nanquantile(self._samples[: self._num_in_cache], thresholds)
-    return quantiles.tolist(), thresholds.tolist()
+    return quantiles.tolist(), thresholds.tolist()  # pyrefly: ignore[bad-return]

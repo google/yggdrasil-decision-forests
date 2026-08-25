@@ -145,7 +145,7 @@ def create_dataset_ellipse(
 
   data = {"label": labels}
   for i in range(num_features):
-    data[f"f_{i}"] = features[:, i]
+    data[f"f_{i}"] = features[:, i]  # pyrefly: ignore[bad-assignment]
   return data
 
 
@@ -178,7 +178,7 @@ def plot_ellipse_predictions(
 
   disp_predictions = np.reshape(predictions, [resolution] * num_features)
   if len(disp_predictions.shape) > 2:
-    disp_predictions = np.mean(
+    disp_predictions = np.mean(  # pyrefly: ignore[no-matching-overload]
         disp_predictions,
         axis=[i for i in range(2, len(disp_predictions.shape))],
     )
