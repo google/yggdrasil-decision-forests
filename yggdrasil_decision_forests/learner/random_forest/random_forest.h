@@ -22,11 +22,13 @@
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_RANDOM_FOREST_H_
 
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
+#include "absl/container/fixed_array.h"
 #include "absl/functional/function_ref.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -133,6 +135,156 @@ void InitializeModelWithTrainingConfig(
     const model::proto::TrainingConfigLinking& training_config_linking,
     RandomForestModel* model);
 
+// Coordinates worker thread execution and periodic evaluation during Random
+// Forest training. Allows worker threads to accumulate tree predictions in
+// parallel across stripes, while periodically admitting batches and draining
+// in-flight workers so that a single elected worker can perform OOB metric
+// evaluation exclusively without data races.
+class EvaluationGate {
+ public:
+  struct Config {
+    int num_trees = 0;
+    int num_stripes = 1;
+    int evaluation_interval_in_trees = 1;
+    double evaluation_interval_in_seconds = 0.0;
+  };
+
+  // RAII Token representing an admitted worker inside the gate.
+  // If destroyed before being passed to LeaveAndMaybeElectEvaluator (e.g. on
+  // early return or error), automatically notifies the gate to decrement the
+  // in-flight worker count and reopen the gate if needed.
+  class [[nodiscard]] Token {
+   public:
+    Token(const Token&) = delete;
+    Token& operator=(const Token&) = delete;
+
+    Token(Token&& other) noexcept
+        : gate_(other.gate_),
+          start_stripe_(other.start_stripe_),
+          active_(other.active_) {
+      other.active_ = false;
+    }
+
+    Token& operator=(Token&& other) noexcept {
+      if (this != &other) {
+        Release();
+        gate_ = other.gate_;
+        start_stripe_ = other.start_stripe_;
+        active_ = other.active_;
+        other.active_ = false;
+      }
+      return *this;
+    }
+
+    ~Token() { Release(); }
+
+    int start_stripe() const { return start_stripe_; }
+
+   private:
+    friend class EvaluationGate;
+
+    Token(EvaluationGate* gate, int start_stripe)
+        : gate_(gate), start_stripe_(start_stripe), active_(true) {}
+
+    void Release() {
+      if (active_ && gate_ != nullptr) {
+        gate_->OnWorkerAbort();
+        active_ = false;
+      }
+    }
+
+    void Dismiss() { active_ = false; }
+
+    EvaluationGate* gate_ = nullptr;
+    int start_stripe_ = 0;
+    bool active_ = false;
+  };
+
+  // RAII Ticket given to the elected evaluator worker.
+  // If destroyed without calling Complete() (e.g. if evaluation fails),
+  // automatically cleans up and reopens the gate.
+  class [[nodiscard]] EvaluationTicket {
+   public:
+    EvaluationTicket(const EvaluationTicket&) = delete;
+    EvaluationTicket& operator=(const EvaluationTicket&) = delete;
+
+    EvaluationTicket(EvaluationTicket&& other) noexcept
+        : gate_(other.gate_),
+          eval_tree_count_(other.eval_tree_count_),
+          completed_(other.completed_) {
+      other.completed_ = true;
+    }
+
+    EvaluationTicket& operator=(EvaluationTicket&& other) noexcept {
+      if (this != &other) {
+        if (!completed_ && gate_ != nullptr) {
+          gate_->OnWorkerAbort();
+        }
+        gate_ = other.gate_;
+        eval_tree_count_ = other.eval_tree_count_;
+        completed_ = other.completed_;
+        other.completed_ = true;
+      }
+      return *this;
+    }
+
+    ~EvaluationTicket() {
+      if (!completed_ && gate_ != nullptr) {
+        gate_->OnWorkerAbort();
+      }
+    }
+
+    void Complete() {
+      if (!completed_ && gate_ != nullptr) {
+        gate_->CompleteEvaluation();
+        completed_ = true;
+      }
+    }
+
+    int eval_tree_count() const { return eval_tree_count_; }
+
+   private:
+    friend class EvaluationGate;
+
+    EvaluationTicket(EvaluationGate* gate, int eval_tree_count)
+        : gate_(gate), eval_tree_count_(eval_tree_count), completed_(false) {}
+
+    EvaluationGate* gate_ = nullptr;
+    int eval_tree_count_ = 0;
+    bool completed_ = true;
+  };
+
+  explicit EvaluationGate(Config config);
+
+  // Waits until the gate is open, admits the calling worker, and returns an
+  // RAII Token with the tree's starting stripe index.
+  Token Enter();
+
+  // Called when a worker finishes processing its tree.
+  // Returns an EvaluationTicket if this worker is elected to run evaluation
+  // (i.e. all in-flight workers in this batch have finished and evaluation
+  // criteria are met). Otherwise returns std::nullopt.
+  std::optional<EvaluationTicket> LeaveAndMaybeElectEvaluator(Token token);
+
+ private:
+  void OnWorkerAbort();
+  void CompleteEvaluation();
+
+  const Config config_;
+
+  utils::concurrency::Mutex mutex_;
+  utils::concurrency::CondVar cv_;
+
+  bool gate_closed_ GUARDED_BY(mutex_) = false;
+  int in_flight_workers_ GUARDED_BY(mutex_) = 0;
+  int trees_since_last_eval_ GUARDED_BY(mutex_) = 0;
+  int trees_admitted_ GUARDED_BY(mutex_) = 0;
+  int trees_completed_ GUARDED_BY(mutex_) = 0;
+
+  absl::Time last_evaluation_time_ GUARDED_BY(mutex_);
+  int last_eval_tree_count_ GUARDED_BY(mutex_) = 0;
+};
+
 // Encapsulates Out-Of-Bag (OOB) prediction accumulation, variable importance
 // calculation, and periodic metric evaluation during Random Forest training.
 class OOBEvaluator {
@@ -158,8 +310,23 @@ class OOBEvaluator {
       bool compute_oob_performances, bool compute_oob_variable_importances,
       const dataset::VerticalDataset& train_dataset,
       const model::proto::TrainingConfig& config,
-      const model::proto::TrainingConfigLinking& config_link,
+      const model::proto::TrainingConfigLinking& config_link, int num_threads,
       RandomForestModel* model);
+
+  // Determines the optimal number of stripes for concurrent OOB prediction
+  // accumulation.
+  //
+  // Balances two considerations:
+  // 1. Concurrency: Matches the maximum number of worker threads that can
+  //    concurrently execute inside the evaluation gate (bounded by thread
+  //    count, total trees, and the tree evaluation interval).
+  // 2. Granularity: Ensures each stripe contains at least
+  // `kMinExamplesPerStripe`
+  //    (1024) examples to amortize mutex acquisition overhead.
+  static int DetermineNumStripes(
+      UnsignedExampleIdx num_examples,
+      const random_forest::proto::RandomForestTrainingConfig& rf_config,
+      int num_threads);
 
   // Called by a worker thread immediately after training a decision tree.
   // Updates OOB accumulators and checks if a periodic OOB evaluation should
@@ -168,9 +335,7 @@ class OOBEvaluator {
       const dataset::VerticalDataset& train_dataset,
       const std::vector<UnsignedExampleIdx>& selected_examples,
       const decision_tree::DecisionTree& new_tree, utils::RandomEngine* random,
-      int current_num_trained_trees,
-      absl::FunctionRef<std::string()> build_common_snippet,
-      absl::FunctionRef<std::string()> build_common_snippet_extra);
+      absl::string_view extra_log_info = "");
 
   // Called after all trees have been trained to compute variable importances,
   // export predictions if requested, and log final OOB metrics.
@@ -183,11 +348,22 @@ class OOBEvaluator {
       const model::proto::TrainingConfig& config,
       const model::proto::TrainingConfigLinking& config_link,
       const random_forest::proto::RandomForestTrainingConfig& rf_config,
-      RandomForestModel* model);
+      int num_stripes, UnsignedExampleIdx num_examples,
+      EvaluationGate::Config gate_config, RandomForestModel* model);
 
   absl::Status ExportPredictions(
       const dataset::proto::DataSpecification& dataspec,
-      absl::string_view typed_path) const SHARED_LOCKS_REQUIRED(mutex_);
+      absl::string_view typed_path) const;
+
+  absl::Status UpdateAccumulators(
+      const dataset::VerticalDataset& train_dataset,
+      const std::vector<UnsignedExampleIdx>& selected_examples,
+      const decision_tree::DecisionTree& new_tree, utils::RandomEngine* random,
+      int local_start_stripe);
+
+  absl::Status RunEvaluation(const dataset::VerticalDataset& train_dataset,
+                             int eval_tree_count,
+                             absl::string_view extra_log_info);
 
   const bool compute_oob_performances_;
   const bool compute_oob_variable_importances_;
@@ -196,13 +372,16 @@ class OOBEvaluator {
   const random_forest::proto::RandomForestTrainingConfig& rf_config_;
   RandomForestModel* model_;
 
-  utils::concurrency::Mutex mutex_;
-  std::vector<PredictionAccumulator> oob_predictions_ GUARDED_BY(mutex_);
+  // Stripes configuration
+  int num_stripes_;
+  UnsignedExampleIdx stripe_size_;
+  absl::FixedArray<utils::concurrency::Mutex> stripe_mutexes_;
+
+  std::vector<PredictionAccumulator> oob_predictions_;
   std::vector<std::vector<PredictionAccumulator>>
-      oob_predictions_per_input_features_ GUARDED_BY(mutex_);
-  absl::Time last_oob_computation_time_ GUARDED_BY(mutex_) =
-      absl::InfinitePast();
-  int last_oob_computation_num_trees_ GUARDED_BY(mutex_) = 0;
+      oob_predictions_per_input_features_;
+
+  EvaluationGate evaluation_gate_;
 };
 
 // Add the predictions of a decision tree to a set of predictor accumulators.
@@ -215,10 +394,12 @@ class OOBEvaluator {
 absl::Status UpdateOOBPredictionsWithNewTree(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
-    std::vector<UnsignedExampleIdx> sorted_non_oob_example_indices,
+    const std::vector<UnsignedExampleIdx>& sorted_non_oob_example_indices,
     const bool winner_take_all_inference,
     const decision_tree::DecisionTree& new_decision_tree,
-    const std::optional<int> shuffled_attribute_idx, utils::RandomEngine* rnd,
+    const std::optional<int> shuffled_attribute_idx,
+    UnsignedExampleIdx begin_example_idx, UnsignedExampleIdx end_example_idx,
+    utils::RandomEngine* rnd,
     std::vector<OOBEvaluator::PredictionAccumulator>* oob_predictions);
 
 // Evaluates the OOB predictions. Examples without any tree predictions are
