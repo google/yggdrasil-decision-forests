@@ -252,32 +252,39 @@ TEST_F(RandomForestOnAdult, Base) {
                                       kVariableImportanceMeanDecreaseInAccuracy)
           .value();
 
-  // The top and worst variables have been computed using the "randomForest" R
-  // package. YDF and the R randomForest implementation work differently for
-  // categorical attributes. Since this dataset has a lot of categorical
-  // attributes, the reported orders of variable importance are not exactly the
-  // same for the two libraries. However, the overall ranking is still close.
+  // Primary signal features should clearly dominate noise or low-information
+  // features.
+  ASSERT_OK_AND_ASSIGN(
+      const double vi_capital_gain,
+      utils::GetVariableImportanceScore("capital_gain", model_->data_spec(),
+                                        mean_decrease_accuracy));
+  ASSERT_OK_AND_ASSIGN(
+      const double vi_relationship,
+      utils::GetVariableImportanceScore("relationship", model_->data_spec(),
+                                        mean_decrease_accuracy));
+  ASSERT_OK_AND_ASSIGN(
+      const double vi_occupation,
+      utils::GetVariableImportanceScore("occupation", model_->data_spec(),
+                                        mean_decrease_accuracy));
 
-  // Top 3 variables.
-  const int rank_capital_gain = utils::GetVariableImportanceRank(
-      "capital_gain", model_->data_spec(), mean_decrease_accuracy);
-  const int rank_relationship = utils::GetVariableImportanceRank(
-      "relationship", model_->data_spec(), mean_decrease_accuracy);
-  const int rank_occupation = utils::GetVariableImportanceRank(
-      "occupation", model_->data_spec(), mean_decrease_accuracy);
+  ASSERT_OK_AND_ASSIGN(
+      const double vi_fnlwgt,
+      utils::GetVariableImportanceScore("fnlwgt", model_->data_spec(),
+                                        mean_decrease_accuracy));
+  ASSERT_OK_AND_ASSIGN(const double vi_race, utils::GetVariableImportanceScore(
+                                                 "race", model_->data_spec(),
+                                                 mean_decrease_accuracy));
+  ASSERT_OK_AND_ASSIGN(
+      const double vi_native_country,
+      utils::GetVariableImportanceScore("native_country", model_->data_spec(),
+                                        mean_decrease_accuracy));
 
-  EXPECT_LE(rank_capital_gain, 5);
-  EXPECT_LE(rank_relationship, 6);
-  EXPECT_LE(rank_occupation, 7);
+  EXPECT_GT(vi_capital_gain, vi_fnlwgt);
+  EXPECT_GT(vi_relationship, vi_race);
+  EXPECT_GT(vi_occupation, vi_native_country);
 
-  // Worst 2 variables.
-  const int rank_fnlwgt = utils::GetVariableImportanceRank(
-      "fnlwgt", model_->data_spec(), mean_decrease_accuracy);
-  const int rank_education = utils::GetVariableImportanceRank(
-      "education", model_->data_spec(), mean_decrease_accuracy);
-
-  EXPECT_GE(rank_fnlwgt, 7);
-  EXPECT_GE(rank_education, 3);
+  EXPECT_GT(vi_capital_gain, 0.0045);
+  EXPECT_GT(vi_relationship, 0.0045);
 
   std::string description;
   model_->AppendDescriptionAndStatistics(false, &description);

@@ -418,6 +418,12 @@ int GetVariableImportanceRank(
     const dataset::proto::DataSpecification& data_spec,
     const std::vector<model::proto::VariableImportance>& variable_importance);
 
+// Returns the score of importance of an attribute.
+absl::StatusOr<double> GetVariableImportanceScore(
+    absl::string_view attribute,
+    const dataset::proto::DataSpecification& data_spec,
+    const std::vector<model::proto::VariableImportance>& variable_importance);
+
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
 
