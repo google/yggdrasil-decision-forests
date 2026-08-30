@@ -51,7 +51,7 @@
 namespace yggdrasil_decision_forests::model::decision_tree {
 
 namespace internal {
-class ProjectionEvaluatorCache;
+class ProjectionEvaluator;
 
 struct NodeAndExamples {
   // The current node
@@ -141,15 +141,6 @@ struct SplitterPerThreadCache {
 
   std::vector<int> numerical_features;
   std::vector<float> projection_values;
-  // Ownership is not shared: each SplitterPerThreadCache owns its own
-  // instance. A shared_ptr is used because ProjectionEvaluatorCache is only
-  // forward-declared here: it's defined in oblique.cc and cannot live in
-  // oblique.h, which includes this header.
-  // shared_ptr's deleter is type-erased at make_shared() time,
-  // so translation units that destroy this struct without seeing the 
-  // definition still compile, which unique_ptr's default deleter would not allow.
-  std::shared_ptr<internal::ProjectionEvaluatorCache>
-      projection_evaluator_cache;
 
   std::vector<int> catset_candidate_attributes_list;
   std::vector<std::vector<UnsignedExampleIdx>> catset_examples_by_candidate;
@@ -342,6 +333,18 @@ struct InternalTrainConfig {
   // Non owning pointer to pre-processing information.
   // Depending on the decision tree configuration this field might be required.
   const Preprocessing* preprocessing = nullptr;
+
+  // Non owning pointer to a projection evaluator shared by all the oblique
+  // split searches of a tree. Set by DecisionTreeTrain when oblique splits
+  // are enabled. If null, oblique splitters each build a per-node evaluator
+  // instead (cost: O(number of features) each).
+  //
+  // Evaluator holds pointers into the columns of the dataset it was built
+  // on, so it can only be used with that same dataset. This works for all
+  // missing policies except RANDOM_LOCAL_IMPUTATION, which calls the splitter
+  // with a nodewise copy with randomly imputed missing values.
+  // This is kept null in that case, triggering per-node construction
+  const internal::ProjectionEvaluator* projection_evaluator = nullptr;
 
   decision_tree::gpu::VectorSequenceComputer* vector_sequence_computer =
       nullptr;
