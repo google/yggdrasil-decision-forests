@@ -19,7 +19,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -271,20 +270,18 @@ class ProjectionEvaluatorCache {
 
 namespace {
 
-ProjectionEvaluator& GetProjectionEvaluator(
+// Returns the tree-wide projection evaluator provided by internal_config
+// If none, builds a node-local evaluator and returns it.
+const ProjectionEvaluator& GetProjectionEvaluator(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config,
-    SplitterPerThreadCache* cache) {
-  if (cache->projection_evaluator_cache == nullptr) {
-    cache->projection_evaluator_cache =
-        std::make_shared<internal::ProjectionEvaluatorCache>();
+    const InternalTrainConfig& internal_config,
+    std::optional<ProjectionEvaluator>* local_evaluator) {
+  if (internal_config.projection_evaluator != nullptr) {
+    return *internal_config.projection_evaluator;
   }
-  const bool reusable_dataset =
-      dt_config.missing_value_policy() ==
-      proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION;
-  return cache->projection_evaluator_cache->Get(
-      train_dataset, config_link.numerical_features(), reusable_dataset);
+  local_evaluator->emplace(train_dataset, config_link.numerical_features());
+  return **local_evaluator;
 }
 
 }  // namespace
@@ -424,8 +421,10 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   Projection current_projection;
   auto& projection_values = cache->projection_values;
 
-  ProjectionEvaluator& projection_evaluator =
-      GetProjectionEvaluator(train_dataset, config_link, dt_config, cache);
+  std::optional<ProjectionEvaluator> local_projection_evaluator;
+  const ProjectionEvaluator& projection_evaluator =
+      GetProjectionEvaluator(train_dataset, config_link, internal_config,
+                             &local_projection_evaluator);
 
   // TODO: Cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
@@ -996,8 +995,10 @@ absl::StatusOr<bool> FindBestConditionMHLDObliqueTemplate(
     return false;
   }
 
-  ProjectionEvaluator& projection_evaluator =
-      GetProjectionEvaluator(train_dataset, config_link, dt_config, cache);
+  std::optional<ProjectionEvaluator> local_projection_evaluator;
+  const ProjectionEvaluator& projection_evaluator =
+      GetProjectionEvaluator(train_dataset, config_link, internal_config,
+                             &local_projection_evaluator);
 
   // TODO: Cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
