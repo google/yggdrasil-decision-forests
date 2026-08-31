@@ -937,17 +937,6 @@ absl::StatusOr<bool> FindBestConditionOblique(
 // End of the FindBestCondition specialization.
 // =============================================================================
 
-// Returns the number of attributes to test ("num_attributes_to_test") and a
-// list of candidate attributes to test in order ("candidate_attributes").
-// "candidate_attributes" is guaranteed to have at least
-// "num_attributes_to_test" elements.
-void GetCandidateAttributes(
-    const model::proto::TrainingConfig& config,
-    const model::proto::TrainingConfigLinking& config_link,
-    const proto::DecisionTreeTrainingConfig& dt_config,
-    int* num_attributes_to_test, std::vector<int32_t>* candidate_attributes,
-    utils::RandomEngine* random);
-
 // Generate a random imputation of NA (i.e. missing) values i.e.
 // Copy the attributes in "attributes" from the examples indexed by "examples"
 // from the source dataset "src" into the "dst" dataset while replacing the
