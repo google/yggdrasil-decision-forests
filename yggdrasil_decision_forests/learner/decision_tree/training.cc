@@ -445,7 +445,8 @@ absl::StatusOr<SplitSearchResult> FindBestConditionClassification(
             result, FindSplitLabelClassificationFeatureNumericalHistogram(
                         selected_examples, weights, attribute_data->values(),
                         label_stats.label_data, label_stats.num_label_classes,
-                        na_replacement, min_num_obs, dt_config,
+                        na_replacement, min_num_obs,
+                        dt_config.numerical_split(), dt_config,
                         label_stats.label_distribution, attribute_idx, random,
                         best_condition));
       }
@@ -879,16 +880,18 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegression(
                           /*weighted=*/false>(
                           selected_examples, weights, attribute_data,
                           label_stats.label_data, na_replacement, min_num_obs,
-                          dt_config, label_stats.label_distribution,
-                          attribute_idx, random, best_condition));
+                          dt_config.numerical_split(), dt_config,
+                          label_stats.label_distribution, attribute_idx,
+                          random, best_condition));
         } else {
           ASSIGN_OR_RETURN(
               result, FindSplitLabelRegressionFeatureNumericalHistogram<
                           /*weighted=*/true>(
                           selected_examples, weights, attribute_data,
                           label_stats.label_data, na_replacement, min_num_obs,
-                          dt_config, label_stats.label_distribution,
-                          attribute_idx, random, best_condition));
+                          dt_config.numerical_split(), dt_config,
+                          label_stats.label_distribution, attribute_idx,
+                          random, best_condition));
         }
       }
     } break;
@@ -2020,6 +2023,7 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
     const std::vector<float>& weights, const absl::Span<const float> attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
     float na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::NumericalSplit& split_config,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, utils::RandomEngine* random,
@@ -2056,9 +2060,9 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
 
   ASSIGN_OR_RETURN(
       const auto bins,
-      internal::GenHistogramBins(dt_config.numerical_split().type(),
-                                 dt_config.numerical_split().num_candidates(),
-                                 attributes, min_value, max_value, random));
+      internal::GenHistogramBins(split_config.type(),
+                                 split_config.num_candidates(), attributes,
+                                 min_value, max_value, random));
 
   std::vector<CandidateSplit> candidate_splits(bins.size());
   for (int split_idx = 0; split_idx < candidate_splits.size(); split_idx++) {
@@ -2068,8 +2072,7 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
   }
 
   const bool use_equal_width_fast_path =
-      (dt_config.numerical_split().type() ==
-       proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
+      (split_config.type() == proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
 
   // Compute the split score of each threshold.
   for (const auto example_idx : selected_examples) {
@@ -2389,6 +2392,7 @@ FindSplitLabelRegressionFeatureNumericalHistogram<true>(
     const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<float>& labels, float na_replacement,
     UnsignedExampleIdx min_num_obs,
+    const proto::NumericalSplit& split_config,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, utils::RandomEngine* random,
@@ -2400,6 +2404,7 @@ FindSplitLabelRegressionFeatureNumericalHistogram<false>(
     const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<float>& labels, float na_replacement,
     UnsignedExampleIdx min_num_obs,
+    const proto::NumericalSplit& split_config,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     int32_t attribute_idx, utils::RandomEngine* random,
@@ -2412,6 +2417,7 @@ FindSplitLabelRegressionFeatureNumericalHistogram(
     const std::vector<float>& weights, const absl::Span<const float> attributes,
     const std::vector<float>& labels, float na_replacement,
     const UnsignedExampleIdx min_num_obs,
+    const proto::NumericalSplit& split_config,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::NormalDistributionDouble& label_distribution,
     const int32_t attribute_idx, utils::RandomEngine* random,
@@ -2450,9 +2456,9 @@ FindSplitLabelRegressionFeatureNumericalHistogram(
   };
   ASSIGN_OR_RETURN(
       const auto bins,
-      internal::GenHistogramBins(dt_config.numerical_split().type(),
-                                 dt_config.numerical_split().num_candidates(),
-                                 attributes, min_value, max_value, random));
+      internal::GenHistogramBins(split_config.type(),
+                                 split_config.num_candidates(), attributes,
+                                 min_value, max_value, random));
 
   std::vector<CandidateSplit> candidate_splits(bins.size());
   for (int split_idx = 0; split_idx < candidate_splits.size(); split_idx++) {
@@ -4448,6 +4454,27 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
         break;
       case proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH:
         config->mutable_numerical_split()->set_num_candidates(255);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Mirror the histogram num_candidates default for the oblique projection
+  // split (sparse_oblique_split.projection_split).
+  if (config->has_sparse_oblique_split() &&
+      config->sparse_oblique_split().has_projection_split() &&
+      !config->sparse_oblique_split()
+           .projection_split()
+           .has_num_candidates()) {
+    auto* ps = config->mutable_sparse_oblique_split()
+                   ->mutable_projection_split();
+    switch (ps->type()) {
+      case proto::NumericalSplit::HISTOGRAM_RANDOM:
+        ps->set_num_candidates(63);
+        break;
+      case proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH:
+        ps->set_num_candidates(255);
         break;
       default:
         break;
