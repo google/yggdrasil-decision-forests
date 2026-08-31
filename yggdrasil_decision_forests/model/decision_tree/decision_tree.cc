@@ -1662,6 +1662,7 @@ absl::Status NodeWithChildren::Validate(
     std::function<absl::Status(const decision_tree::proto::Node& node)>
         check_leaf) const {
   if (!IsLeaf()) {
+    const int num_columns = data_spec.columns_size();
     if (!pos_child() || !neg_child()) {
       return absl::InvalidArgumentError("Non-leaf with missing child");
     }
@@ -1669,7 +1670,7 @@ absl::Status NodeWithChildren::Validate(
       return absl::InvalidArgumentError("Non-leaf with missing condition");
     }
     if (node_.condition().attribute() < 0 ||
-        node_.condition().attribute() >= data_spec.columns_size()) {
+        node_.condition().attribute() >= num_columns) {
       return absl::InvalidArgumentError("Invalid attribute index");
     }
     const auto& condition = node_.condition().condition();
@@ -1724,25 +1725,48 @@ absl::Status NodeWithChildren::Validate(
               "Condition bitmap does not contain enough elements");
         }
         break;
-      case proto::Condition::TypeCase::kObliqueCondition:
-        if (attribute_spec.type() != dataset::proto::NUMERICAL) {
-          return absl::InvalidArgumentError(
-              "Invalid condition. Expect numerical feature.");
+      case proto::Condition::TypeCase::kObliqueCondition: {
+        const auto& oblique_condition = condition.oblique_condition();
+        if (oblique_condition.weights().empty()) {
+          return absl::InvalidArgumentError("Empty oblique condition");
         }
-        if (condition.oblique_condition().weights_size() !=
-            condition.oblique_condition().attributes_size()) {
+        if (oblique_condition.weights_size() !=
+            oblique_condition.attributes_size()) {
           return absl::InvalidArgumentError(
               "Non matching weights and attributes for oblique condition");
         }
-        if (condition.oblique_condition().weights_size() == 0) {
-          return absl::InvalidArgumentError("Empty oblique condition");
+        // NA Replacements can be empty.
+        if (!oblique_condition.na_replacements().empty() &&
+            (oblique_condition.na_replacements_size() !=
+             oblique_condition.attributes_size())) {
+          return absl::InvalidArgumentError(
+              "Non matching weights and na replacements for oblique condition");
         }
+
         if (condition.oblique_condition().attributes(0) !=
             node_.condition().attribute()) {
           return absl::InvalidArgumentError(
               "Non matching attribute in oblique condition");
         }
-        break;
+        for (const auto& oblique_attribute :
+             condition.oblique_condition().attributes()) {
+          if (oblique_attribute < 0 || oblique_attribute >= num_columns) {
+            return absl::InvalidArgumentError(
+                absl::Substitute("Oblique Condition has invalid attribute $0 "
+                                 "outside the allowed range [0, $1).",
+                                 oblique_attribute, num_columns));
+          }
+          const auto& oblique_attribute_spec =
+              data_spec.columns(oblique_attribute);
+          if (oblique_attribute_spec.type() != dataset::proto::NUMERICAL) {
+            return absl::InvalidArgumentError(absl::Substitute(
+                "Invalid oblique. Expect numerical feature, got type $0 for "
+                "attribute $1",
+                dataset::proto::ColumnType_Name(oblique_attribute_spec.type()),
+                oblique_attribute));
+          }
+        }
+      } break;
       case proto::Condition::kNumericalVectorSequence:
         if (attribute_spec.type() !=
             dataset::proto::NUMERICAL_VECTOR_SEQUENCE) {

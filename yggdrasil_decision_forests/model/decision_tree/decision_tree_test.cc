@@ -22,6 +22,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -47,6 +48,7 @@ namespace decision_tree {
 namespace {
 
 using row_t = dataset::VerticalDataset::row_t;
+using test::StatusIs;
 using ::testing::ElementsAre;
 using ::yggdrasil_decision_forests::dataset::proto::ColumnType;
 using ::yggdrasil_decision_forests::dataset::proto::DataSpecification;
@@ -1242,6 +1244,203 @@ TEST(DecisionTree, Depth) {
   EXPECT_EQ(tree.root().neg_child()->depth(), 1);
   EXPECT_EQ(tree.root().pos_child()->pos_child()->depth(), 2);
   EXPECT_EQ(tree.root().pos_child()->neg_child()->depth(), 2);
+}
+
+TEST(DecisionTree, ValidateObliqueCondition) {
+  dataset::proto::DataSpecification dataspec;
+  dataset::AddColumn("f0", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+  dataset::AddColumn("f1", dataset::proto::ColumnType::NUMERICAL, &dataspec);
+  dataset::AddColumn("f2", dataset::proto::ColumnType::CATEGORICAL, &dataspec);
+
+  const auto fake_check_leaf = [](const decision_tree::proto::Node&) {
+    return absl::OkStatus();
+  };
+
+  auto make_tree = [&]() {
+    DecisionTree tree;
+    tree.CreateRoot();
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_regressor()
+        ->set_top_value(0.0f);
+    tree.mutable_root()
+        ->mutable_neg_child()
+        ->mutable_node()
+        ->mutable_regressor()
+        ->set_top_value(0.0f);
+    return tree;
+  };
+
+  // Valid oblique condition without NA replacements.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_attributes(1);
+    oblique->add_weights(1.0f);
+    oblique->add_weights(2.0f);
+    oblique->set_threshold(0.5f);
+    EXPECT_OK(tree.Validate(dataspec, fake_check_leaf));
+  }
+
+  // Valid oblique condition with matching NA replacements.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_attributes(1);
+    oblique->add_weights(1.0f);
+    oblique->add_weights(2.0f);
+    oblique->add_na_replacements(0.0f);
+    oblique->add_na_replacements(1.0f);
+    oblique->set_threshold(0.5f);
+    EXPECT_OK(tree.Validate(dataspec, fake_check_leaf));
+  }
+
+  // Empty weights.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    EXPECT_THAT(tree.Validate(dataspec, fake_check_leaf),
+                StatusIs(absl::StatusCode::kInvalidArgument,
+                         "Empty oblique condition"));
+  }
+
+  // Non matching weights and attributes size.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_weights(1.0f);
+    oblique->add_weights(2.0f);
+    EXPECT_THAT(
+        tree.Validate(dataspec, fake_check_leaf),
+        StatusIs(absl::StatusCode::kInvalidArgument,
+                 "Non matching weights and attributes for oblique condition"));
+  }
+
+  // Non matching weights and na replacements size.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_attributes(1);
+    oblique->add_weights(1.0f);
+    oblique->add_weights(2.0f);
+    oblique->add_na_replacements(0.0f);
+    EXPECT_THAT(
+        tree.Validate(dataspec, fake_check_leaf),
+        StatusIs(
+            absl::StatusCode::kInvalidArgument,
+            "Non matching weights and na replacements for oblique condition"));
+  }
+
+  // Non matching attribute in oblique condition.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(1);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_weights(1.0f);
+    EXPECT_THAT(tree.Validate(dataspec, fake_check_leaf),
+                StatusIs(absl::StatusCode::kInvalidArgument,
+                         "Non matching attribute in oblique condition"));
+  }
+
+  // Invalid attribute out of upper bound.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_attributes(5);
+    oblique->add_weights(1.0f);
+    oblique->add_weights(2.0f);
+    EXPECT_THAT(
+        tree.Validate(dataspec, fake_check_leaf),
+        StatusIs(
+            absl::StatusCode::kInvalidArgument,
+            "Oblique Condition has invalid attribute 5 outside the allowed "
+            "range [0, 3)."));
+  }
+
+  // Invalid attribute out of lower bound.
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_attributes(-1);
+    oblique->add_weights(1.0f);
+    oblique->add_weights(2.0f);
+    EXPECT_THAT(
+        tree.Validate(dataspec, fake_check_leaf),
+        StatusIs(
+            absl::StatusCode::kInvalidArgument,
+            "Oblique Condition has invalid attribute -1 outside the allowed "
+            "range [0, 3)."));
+  }
+
+  // Invalid feature type (non-numerical).
+  {
+    auto tree = make_tree();
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    auto* oblique = tree.mutable_root()
+                        ->mutable_node()
+                        ->mutable_condition()
+                        ->mutable_condition()
+                        ->mutable_oblique_condition();
+    oblique->add_attributes(0);
+    oblique->add_attributes(2);
+    oblique->add_weights(1.0f);
+    oblique->add_weights(2.0f);
+    EXPECT_THAT(
+        tree.Validate(dataspec, fake_check_leaf),
+        StatusIs(
+            absl::StatusCode::kInvalidArgument,
+            "Invalid oblique. Expect numerical feature, got type CATEGORICAL "
+            "for attribute 2"));
+  }
 }
 
 }  // namespace
