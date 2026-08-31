@@ -4481,7 +4481,7 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
                    ->mutable_projection_split();
     switch (ps->type()) {
       case proto::NumericalSplit::HISTOGRAM_RANDOM:
-        ps->set_num_candidates(1);
+        ps->set_num_candidates(63);
         break;
       case proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH:
         ps->set_num_candidates(255);
