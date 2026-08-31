@@ -327,8 +327,10 @@ message DecisionTreeTrainingConfig {
     // This option is not supported by Isolation Forests.
     optional bool include_axis_aligned_splits = 12 [default = false];
 
-    // Controls how the split in the projection space is computed: EXACT (default)
-    // or HISTOGRAM_* (Random or Equal Width)
+    // Controls how the split in the projection space is computed: EXACT
+    // (default) or HISTOGRAM_* (Random or Equal Width). If num_candidates is
+    // not set, defaults to 63 (Random) or 255 (Equal Width); these differ from
+    // the axis-aligned numerical_split defaults.
     optional NumericalSplit projection_split = 13;
   }
 
