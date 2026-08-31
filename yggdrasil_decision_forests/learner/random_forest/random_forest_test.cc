@@ -596,6 +596,19 @@ TEST_F(RandomForestOnAdult, SparseOblique) {
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8571, 0.01);
 }
 
+TEST_F(RandomForestOnAdult, SparseObliqueHistogramRandom) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->set_winner_take_all_inference(false);
+  rf_config->mutable_decision_tree()
+      ->mutable_sparse_oblique_split()
+      ->mutable_projection_split()
+      ->set_type(decision_tree::proto::NumericalSplit::HISTOGRAM_RANDOM);
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8571, 0.01);
+}
+
 TEST_F(RandomForestOnAdult, MHLDTOblique) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
@@ -679,6 +692,18 @@ TEST_F(RandomForestOnAbalone, SparseOblique) {
   auto* rf_config = train_config_.MutableExtension(
       random_forest::proto::random_forest_config);
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
+  TrainAndEvaluateModel();
+  EXPECT_NEAR(metric::RMSE(evaluation_), 2.054, 0.01);
+}
+
+TEST_F(RandomForestOnAbalone, SparseObliqueHistogramEqualWidth) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->mutable_decision_tree()
+      ->mutable_sparse_oblique_split()
+      ->mutable_projection_split()
+      ->set_type(decision_tree::proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
   SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
   EXPECT_NEAR(metric::RMSE(evaluation_), 2.054, 0.01);
