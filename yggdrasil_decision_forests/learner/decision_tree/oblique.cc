@@ -360,22 +360,46 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
               monotonic_direction, condition, cache));
     }
   } else if constexpr (is_same<LabelStats, RegressionLabelStats>::value) {
-    if (!selected_weights.empty()) {
-      ASSIGN_OR_RETURN(
-          result,
-          FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
-              dense_example_idxs, selected_weights, projection_values,
-              selected_labels, na_replacement, min_num_obs, dt_config,
-              label_stats.label_distribution, first_attribute_idx,
-              effective_internal_config, condition, cache));
+    const auto& projection_split =
+        dt_config.sparse_oblique_split().projection_split();
+    if (projection_split.type() == proto::NumericalSplit::EXACT) {
+      if (!selected_weights.empty()) {
+        ASSIGN_OR_RETURN(
+            result,
+            FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/true>(
+                dense_example_idxs, selected_weights, projection_values,
+                selected_labels, na_replacement, min_num_obs, dt_config,
+                label_stats.label_distribution, first_attribute_idx,
+                effective_internal_config, condition, cache));
+      } else {
+        ASSIGN_OR_RETURN(
+            result,
+            FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
+                dense_example_idxs, selected_weights, projection_values,
+                selected_labels, na_replacement, min_num_obs, dt_config,
+                label_stats.label_distribution, first_attribute_idx,
+                effective_internal_config, condition, cache));
+      }
     } else {
-      ASSIGN_OR_RETURN(
-          result,
-          FindSplitLabelRegressionFeatureNumericalCart</*weighted=*/false>(
-              dense_example_idxs, selected_weights, projection_values,
-              selected_labels, na_replacement, min_num_obs, dt_config,
-              label_stats.label_distribution, first_attribute_idx,
-              effective_internal_config, condition, cache));
+      if (!selected_weights.empty()) {
+        ASSIGN_OR_RETURN(
+            result,
+            FindSplitLabelRegressionFeatureNumericalHistogram<
+                /*weighted=*/true>(
+                dense_example_idxs, selected_weights, projection_values,
+                selected_labels, na_replacement, min_num_obs, projection_split,
+                dt_config, label_stats.label_distribution, first_attribute_idx,
+                random, condition));
+      } else {
+        ASSIGN_OR_RETURN(
+            result,
+            FindSplitLabelRegressionFeatureNumericalHistogram<
+                /*weighted=*/false>(
+                dense_example_idxs, selected_weights, projection_values,
+                selected_labels, na_replacement, min_num_obs, projection_split,
+                dt_config, label_stats.label_distribution, first_attribute_idx,
+                random, condition));
+      }
     }
   } else {
     static_assert(!is_same<LabelStats, LabelStats>::value, "Not implemented.");
