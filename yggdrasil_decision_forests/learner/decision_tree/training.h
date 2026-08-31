@@ -604,6 +604,8 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
     const std::vector<float>& weights, absl::Span<const float> attributes,
     const std::vector<int32_t>& labels, int32_t num_label_classes,
     float na_replacement, UnsignedExampleIdx min_num_obs,
+    // read num_candidate_splits. Both Axis-aligned and Sparse Oblique
+    const proto::NumericalSplit& split_config,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     int32_t attribute_idx, utils::RandomEngine* random,

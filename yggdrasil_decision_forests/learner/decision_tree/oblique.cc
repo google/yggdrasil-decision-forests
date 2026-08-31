@@ -324,18 +324,14 @@ absl::StatusOr<SplitSearchResult> EvaluateProjection(
               first_attribute_idx, effective_internal_config, condition,
               cache));
     } else {
-      // The histogram splitter normally reads the split type and n.
-      // candidate thresholds from numerical_split. Apply values from
-      // projection_split
-      proto::DecisionTreeTrainingConfig histogram_dt_config = dt_config;
-      *histogram_dt_config.mutable_numerical_split() = projection_split;
       ASSIGN_OR_RETURN(
           result,
           FindSplitLabelClassificationFeatureNumericalHistogram(
               dense_example_idxs, selected_weights, projection_values,
               selected_labels, label_stats.num_label_classes, na_replacement,
-              min_num_obs, histogram_dt_config, label_stats.label_distribution,
-              first_attribute_idx, random, condition));
+              min_num_obs, projection_split, dt_config,
+              label_stats.label_distribution, first_attribute_idx, random,
+              condition));
     }
   } else if constexpr (is_same<LabelStats,
                                RegressionHessianLabelStats>::value) {

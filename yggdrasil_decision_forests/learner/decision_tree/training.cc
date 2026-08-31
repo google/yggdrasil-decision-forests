@@ -453,7 +453,8 @@ absl::StatusOr<SplitSearchResult> FindBestConditionClassification(
             result, FindSplitLabelClassificationFeatureNumericalHistogram(
                         selected_examples, weights, attribute_data->values(),
                         label_stats.label_data, label_stats.num_label_classes,
-                        na_replacement, min_num_obs, dt_config,
+                        na_replacement, min_num_obs,
+                        dt_config.numerical_split(), dt_config,
                         label_stats.label_distribution, attribute_idx, random,
                         best_condition));
       }
@@ -2021,6 +2022,7 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
     const std::vector<float>& weights, const absl::Span<const float> attributes,
     const std::vector<int32_t>& labels, const int32_t num_label_classes,
     float na_replacement, const UnsignedExampleIdx min_num_obs,
+    const proto::NumericalSplit& split_config,
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     const int32_t attribute_idx, utils::RandomEngine* random,
@@ -2057,9 +2059,9 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
 
   ASSIGN_OR_RETURN(
       const auto bins,
-      internal::GenHistogramBins(dt_config.numerical_split().type(),
-                                 dt_config.numerical_split().num_candidates(),
-                                 attributes, min_value, max_value, random));
+      internal::GenHistogramBins(split_config.type(),
+                                 split_config.num_candidates(), attributes,
+                                 min_value, max_value, random));
 
   std::vector<CandidateSplit> candidate_splits(bins.size());
   for (int split_idx = 0; split_idx < candidate_splits.size(); split_idx++) {
@@ -2069,8 +2071,7 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
   }
 
   const bool use_equal_width_fast_path =
-      (dt_config.numerical_split().type() ==
-       proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
+      (split_config.type() == proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
 
   // Compute the split score of each threshold.
   for (const auto example_idx : selected_examples) {
