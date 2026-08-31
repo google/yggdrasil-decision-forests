@@ -4834,20 +4834,14 @@ absl::Status DecisionTreeTrain(
                                      absl::MakeSpan(leaf_examples.value()))
                                : std::nullopt;
 
-  const bool use_oblique_splits = dt_config.has_sparse_oblique_split() ||
-                                  dt_config.has_mhld_oblique_split();
-
   std::optional<internal::ProjectionEvaluator> projection_evaluator;
   InternalTrainConfig effective_internal_config = internal_config;
 
   // If oblique splits are enabled, build the projection evaluator once for the
-  // entire tree. Without it, oblique splitters each build a node-local evaluator, each costing O(n. features)
-  // This is not possible with RANDOM_LOCAL_IMPUTATION, where NodeTrain() calls the
-  // splitters with a freshly generated per-node dataset
-  if (use_oblique_splits &&
-      dt_config.missing_value_policy() !=
-          proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION &&
-      internal_config.projection_evaluator == nullptr) {
+  // entire tree. Without it, oblique splitters each build a node-local
+  // evaluator, each costing O(number of features).
+  if (internal_config.projection_evaluator == nullptr &&
+      internal::ProjectionEvaluator::CanBeCached(dt_config)) {
     projection_evaluator.emplace(train_dataset,
                                  config_link.numerical_features());
     effective_internal_config.projection_evaluator = &*projection_evaluator;
