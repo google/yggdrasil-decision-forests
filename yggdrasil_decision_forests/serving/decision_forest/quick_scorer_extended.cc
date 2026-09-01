@@ -39,6 +39,8 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
+#include "hwy/detect_compiler_arch.h"
+#include "hwy/per_target.h"
 #include "hwy/targets.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
@@ -48,10 +50,6 @@
 #include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
-
-#ifdef YDF_USE_DYNAMIC_DISPATCH
-#include "hwy/per_target.h"
-#endif
 
 namespace yggdrasil_decision_forests::serving::decision_forest {
 using dataset::proto::ColumnType;
@@ -519,17 +517,17 @@ absl::Status BaseGenericToSpecializedModel(const AbstractModel& src,
                                            CompiledModel* dst,
                                            const bool use_highway) {
   if (use_highway) {
-#ifdef YDF_USE_DYNAMIC_DISPATCH
-    LOG_FIRST_N(INFO, 1) << "Highway dynamic dispatch to CPU Target: "
+    LOG_FIRST_N(INFO, 1) << "Highway dispatch to CPU Target: "
                          << hwy::TargetName(hwy::DispatchedTarget());
-#else
-    LOG_FIRST_N(INFO, 1) << "Highway static dispatch to CPU Target: "
-                         << hwy::TargetName(HWY_TARGET);
-#endif  // YDF_USE_DYNAMIC_DISPATCH
-  } else {
+#if HWY_ARCH_ARM
     LOG_FIRST_N(INFO, 1)
-        << "Using legacy Quickscorer intrinsics. Consider using the Highway "
-           "engine for better performance by updating your build flags.";
+        << "Using SIMD can slow down QuickScorer on some ARM architectures "
+           "by 10-30%. If speed is a major concern, consider forcing the use of"
+           " the GradientBoostedTreesQuickScorerExtended engine in C++ or"
+           " model.force_engine() in Python.";
+#endif
+  } else {
+    LOG_FIRST_N(INFO, 1) << "Using legacy Quickscorer implementation.";
 #ifdef __AVX2__
 #if ABSL_HAVE_BUILTIN(__builtin_cpu_supports)
   dst->cpu_supports_avx2 = __builtin_cpu_supports("avx2");
