@@ -2529,7 +2529,12 @@ class MissingColumnsTest(parameterized.TestCase):
   ):
     data_spec = self.create_data_spec(column_type)
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegex(
+        ValueError,
+        r"^Missing required column 'f2'\.\n"
+        r"The available unrolled columns are: \['f1'\]\.\n"
+        r"The required unrolled columns are: \['f1', 'f2'\]$",
+    ):
       _ = dataset_lib.create_vertical_dataset(df, data_spec=data_spec)
 
   def test_required_columns_pd_data_spec_empty(
@@ -2563,7 +2568,12 @@ class MissingColumnsTest(parameterized.TestCase):
   ):
     data_spec = self.create_data_spec(column_type)
     df = pd.DataFrame({"f1": [1, 2, 3]})
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegex(
+        ValueError,
+        r"^Missing required column 'f2'\.\n"
+        r"The available unrolled columns are: \['f1'\]\.\n"
+        r"The required unrolled columns are: \['f2'\]$",
+    ):
       _ = dataset_lib.create_vertical_dataset(
           df, data_spec=data_spec, required_columns=["f2"]
       )

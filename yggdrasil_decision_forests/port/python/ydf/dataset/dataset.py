@@ -925,7 +925,7 @@ def _create_missing_feature_error_message(
     data: Dict[str, dataset_io_types.InputValues],
     column_spec: data_spec_pb2.Column,
     shapes_of_given_columns: Dict[str, int],
-) -> Optional[str]:
+) -> str:
   """Builds an error message explaining why a feature/column is be missing."""
 
   if column_spec.is_unstacked:
@@ -973,7 +973,7 @@ def _create_missing_feature_error_message(
       )
 
   # The feature is simply missing.
-  return None
+  return ""
 
 
 def create_vertical_dataset_from_dict_of_values(
@@ -1027,7 +1027,7 @@ def create_vertical_dataset_from_dict_of_values(
             shapes_of_given_columns,
         )
 
-        if error_prefix is not None:
+        if error_prefix:
           error_prefix = f"{error_prefix}\n\nDetails: "
 
         raise ValueError(
