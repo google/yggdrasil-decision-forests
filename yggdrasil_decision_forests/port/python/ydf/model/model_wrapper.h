@@ -167,7 +167,7 @@ class GenericCCModel {
 
   absl::StatusOr<
       absl::flat_hash_map<std::string, model::proto::VariableImportanceSet>>
-  VariableImportances() const;
+  VariableImportances();
 
   void invalidate_engine() { invalidate_engine_ = true; }
 

@@ -442,7 +442,7 @@ absl::StatusOr<std::string> GenericCCModel::Describe(
 
 absl::StatusOr<
     absl::flat_hash_map<std::string, model::proto::VariableImportanceSet>>
-GenericCCModel::VariableImportances() const {
+GenericCCModel::VariableImportances() {
   RETURN_IF_ERROR(model_->PrecomputeVariableImportances(
       model_->AvailableVariableImportances()));
   return model_->precomputed_variable_importances();
