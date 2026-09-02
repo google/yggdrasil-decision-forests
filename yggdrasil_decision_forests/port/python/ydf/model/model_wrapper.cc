@@ -501,6 +501,12 @@ std::optional<int> GenericCCModel::weight_col_idx() const {
   return model_->weights()->attribute_idx();
 }
 
+void GenericCCModel::set_data_spec(
+    const dataset::proto::DataSpecification& data_spec) {
+  *model_->mutable_data_spec() = data_spec;
+  invalidate_engine();
+}
+
 std::string BenchmarkInferenceCCResult::ToString() const {
   return absl::StrFormat(
       R"BLOCK(Single-thread inference time per example: %.3f us (microseconds)
