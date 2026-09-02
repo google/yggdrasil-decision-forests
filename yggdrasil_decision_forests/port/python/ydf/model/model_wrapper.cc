@@ -320,6 +320,7 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
     const bool use_slow_engine, const int num_threads) {
   py::gil_scoped_release release;
   auto effective_options = options;
+  effective_options.set_num_threads(num_threads);
   if (weighted && model_->weights().has_value()) {
     ASSIGN_OR_RETURN(*effective_options.mutable_weights(),
                      dataset::GetUnlinkedWeightDefinition(
