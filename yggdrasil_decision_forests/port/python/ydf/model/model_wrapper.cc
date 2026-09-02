@@ -464,18 +464,12 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
 
   // Run engines.
   ASSIGN_OR_RETURN(const auto engine, GetEngine());
-  RETURN_IF_ERROR(
-      utils::BenchmarkFastEngine(options, *engine, *model_, dataset, &results));
-
-  RETURN_IF_ERROR(utils::BenchmarkFastEngineMultiThreaded(
-      options, *engine, *model_, dataset, num_threads, &results));
-
-  if (results.empty()) {
-    return absl::InternalError("No benchmark results.");
-  }
-
-  const auto& single_thread_result = results[0];
-  const auto& multi_thread_result = results[1];
+  ASSIGN_OR_RETURN(
+      const auto single_thread_result,
+      utils::BenchmarkFastEngine(options, *engine, *model_, dataset));
+  ASSIGN_OR_RETURN(const auto multi_thread_result,
+                   utils::BenchmarkFastEngineMultiThreaded(
+                       options, *engine, *model_, dataset, num_threads));
 
   return BenchmarkInferenceCCResult{
       .duration_per_example =
@@ -504,10 +498,10 @@ std::optional<int> GenericCCModel::weight_col_idx() const {
 std::string BenchmarkInferenceCCResult::ToString() const {
   return absl::StrFormat(
       R"BLOCK(Single-thread inference time per example: %.3f us (microseconds)
-Details: %d predictions in %.3f seconds
+Details: %zu predictions in %.3f seconds
 
 Multi-thread inference time per example: %.3f us (microseconds)
-Details: %d predictions in %.3f seconds using %d threads
+Details: %zu predictions in %.3f seconds using %d threads
 
 * Measured with the C++ serving API. See model.to_cpp().)BLOCK",
       duration_per_example * 1000000, num_examples * num_runs,

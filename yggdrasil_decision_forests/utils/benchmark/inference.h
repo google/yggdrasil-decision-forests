@@ -69,20 +69,17 @@ absl::Status BenchmarkGenericSlowEngine(
 // The benchmark measures one copy of the dataset (from the best possible
 // existing format; a simple memory copy in the best case) and one run of the
 // engine.
-absl::Status BenchmarkFastEngine(const BenchmarkInferenceRunOptions& options,
-                                 const serving::FastEngine& engine,
-                                 const model::AbstractModel& model,
-                                 const dataset::VerticalDataset& dataset,
-                                 std::vector<BenchmarkInferenceResult>* results,
-                                 absl::string_view engine_name = "");
+absl::StatusOr<BenchmarkInferenceResult> BenchmarkFastEngine(
+    const BenchmarkInferenceRunOptions& options,
+    const serving::FastEngine& engine, const model::AbstractModel& model,
+    const dataset::VerticalDataset& dataset,
+    absl::string_view engine_name = "");
 
-absl::Status BenchmarkFastEngineMultiThreaded(const BenchmarkInferenceRunOptions& options,
-                                 const serving::FastEngine& engine,
-                                 const model::AbstractModel& model,
-                                 const dataset::VerticalDataset& dataset,
-                                 const int num_threads, 
-                                 std::vector<BenchmarkInferenceResult>* results,
-                                 absl::string_view engine_name = "");
+absl::StatusOr<BenchmarkInferenceResult> BenchmarkFastEngineMultiThreaded(
+    const BenchmarkInferenceRunOptions& options,
+    const serving::FastEngine& engine, const model::AbstractModel& model,
+    const dataset::VerticalDataset& dataset, const int num_threads,
+    absl::string_view engine_name = "");
 
 }  // namespace yggdrasil_decision_forests::utils
 
