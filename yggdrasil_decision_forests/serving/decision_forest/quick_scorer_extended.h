@@ -74,10 +74,9 @@
 // legacy AVX2 implementation and is recommended. The AVX2 implementation will
 // be removed in the future.
 //
-// By default, the Highway implementation uses static dispatch, meaning the
-// SIMD intrinsics are selected at compile time. To enable dynamic dispatch
-// (i.e., selecting the best intrinsics available on the current CPU at
-// runtime), define the preprocessor flag YDF_USE_DYNAMIC_DISPATCH.
+// By default, the Highway implementation uses dynamic dispatch, meaning the
+// best SIMD intrinsics available on the current CPU at runtime are used.
+// Check the Highway library for preprocessor flags to modify this behavior.
 
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_QUICK_SCORER_EXTENDED_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_DECISION_FOREST_QUICK_SCORER_EXTENDED_H_
