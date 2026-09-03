@@ -334,7 +334,7 @@ absl::StatusOr<metric::proto::EvaluationResults> GenericCCModel::Evaluate(
         group_col_idx == model_->ranking_group_col_idx() &&
         effective_options.task() == model_->task()) {
       // Model default evaluation
-      return model_->Evaluate(dataset, effective_options, &rnd);
+      return model_->EvaluateWithStatus(dataset, effective_options, &rnd);
     } else {
       // Model evaluation with overrides
       return model_->EvaluateOverrideType(dataset, effective_options,
