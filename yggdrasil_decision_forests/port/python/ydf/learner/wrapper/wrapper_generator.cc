@@ -299,8 +299,6 @@ included for reference only. The actual wrappers are re-generated during
 compilation.
 """
 
-# pytype: skip-file
-# TODO: b/362480899 - Re-enable typing after pytype issue is fixed.
 from typing import Dict, List, Optional, Sequence, Set, Union
 $0
 
