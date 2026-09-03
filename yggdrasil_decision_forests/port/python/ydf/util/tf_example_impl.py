@@ -296,10 +296,10 @@ def read_tensorflow_examples(
 
   # Finalize the shard aggregation
   def finalize_data(value: List[np.ndarray]) -> np.ndarray:
-    value = np.concatenate(value, axis=0)  # pyrefly: ignore[bad-assignment]
-    if value.shape[1] == 1:  # pyrefly: ignore[missing-attribute]
-      value = np.squeeze(value, axis=1)  # pyrefly: ignore[bad-assignment]
-    return value  # pyrefly: ignore[bad-return]
+    np_value = np.concatenate(value, axis=0)
+    if np_value.shape[1] == 1:
+      np_value = np.squeeze(np_value, axis=1)
+    return np_value
 
   return {key: finalize_data(values) for key, (values, _) in data.items()}
 
