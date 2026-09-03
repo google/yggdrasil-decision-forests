@@ -50,8 +50,12 @@
 //   21.547          2154.8  Generic slow engine
 //   ----------------------------------------
 //
+#include <algorithm>
+#include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/flags/flag.h"
@@ -65,6 +69,7 @@
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/benchmark/inference.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 ABSL_FLAG(std::string, model, "", "Path to model.");
 ABSL_FLAG(std::string, dataset, "",
@@ -155,9 +160,10 @@ absl::Status Benchmark() {
   for (const auto& engine_factory : engine_factories) {
     LOG(INFO) << "Running " << engine_factory->name();
     ASSIGN_OR_RETURN(auto engine, engine_factory->CreateEngine(model.get()));
-    RETURN_IF_ERROR(utils::BenchmarkFastEngine(options, *engine.get(),
-                                               *model.get(), dataset, &results,
-                                               engine_factory->name()));
+    ASSIGN_OR_RETURN(auto result, utils::BenchmarkFastEngine(
+                                      options, *engine.get(), *model.get(),
+                                      dataset, engine_factory->name()));
+    results.push_back(std::move(result));
   }
 
   if (absl::GetFlag(FLAGS_generic)) {
