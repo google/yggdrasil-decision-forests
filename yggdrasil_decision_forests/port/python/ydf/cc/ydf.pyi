@@ -417,13 +417,13 @@ class GenericCCLearner:
       self,
       dataset_path: str,
       data_spec: data_spec_pb2.DataSpecification,
-      validation_dataset_path: str = None,
+      validation_dataset_path: Optional[str] = None,
   ) -> ModelCCType: ...
   def TrainFromPathWithGuide(
       self,
       dataset_path: str,
       data_spec_guide: data_spec_pb2.DataSpecificationGuide,
-      validation_dataset_path: str = None,
+      validation_dataset_path: Optional[str] = None,
   ) -> ModelCCType: ...
   def Evaluate(
       self,
