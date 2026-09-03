@@ -533,11 +533,11 @@ class GenericCCLearner(GenericLearner):
     with log.cc_log_context():
       if self._data_spec is not None:
         cc_model = self._get_learner().TrainFromPathWithDataSpec(
-            ds, self._data_spec, valid  # pyrefly: ignore[bad-argument-type]
+            ds, self._data_spec, valid
         )
       else:
         guide = self._build_data_spec_args().to_proto_guide()
-        cc_model = self._get_learner().TrainFromPathWithGuide(ds, guide, valid)  # pyrefly: ignore[bad-argument-type]
+        cc_model = self._get_learner().TrainFromPathWithGuide(ds, guide, valid)
       model = model_lib.load_cc_model(cc_model)
 
       # Note: We don't know the number of training examples before the training
