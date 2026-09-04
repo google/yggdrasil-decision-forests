@@ -303,6 +303,75 @@ TEST(Distribution, BinaryToIntegerConfusionMatrixAdd) {
   EXPECT_NEAR(conf.FinalEntropy(), 0.462098, 0.0001);
 }
 
+TEST(Distribution, BinaryToIntegerConfusionMatrixFinalEntropyFromTotalAndPosDouble) {
+  IntegerDistributionDouble total;
+  IntegerDistributionDouble pos;
+  total.SetNumClasses(4);
+  pos.SetNumClasses(4);
+
+  total.Add(1, 3.);
+  total.Add(2, 2.);
+  total.Add(3, 1.);
+  pos.Add(1, 1.);
+  pos.Add(2, 2.);
+
+  // (entropy(c(1,2)) * 3 + entropy(c(2,1)) * 3) / 6 in R.
+  EXPECT_NEAR(BinaryToIntegerConfusionMatrixDouble::FinalEntropyFromTotalAndPos(
+                  total, pos),
+              0.636514, 0.0001);
+}
+
+// Check FinalEntropyFromTotalAndPos is equivalent to FinalEntropy
+TEST(Distribution,
+     BinaryToIntegerConfusionMatrixFinalEntropyFromTotalAndPosMatchesFinalEntropy) {
+  IntegerDistributionDouble total;
+  IntegerDistributionDouble pos;
+  total.SetNumClasses(4);
+  pos.SetNumClasses(4);
+
+  total.Add(1, 3.);
+  total.Add(2, 2.);
+  total.Add(3, 1.);
+  pos.Add(1, 1.);
+  pos.Add(2, 2.);
+
+  BinaryToIntegerConfusionMatrixDouble conf;
+  conf.SetNumClassesIntDim(4);
+  conf.mutable_neg()->Set(total);
+  conf.mutable_neg()->Sub(pos);
+  conf.mutable_pos()->Set(pos);
+
+  EXPECT_NEAR(BinaryToIntegerConfusionMatrixDouble::FinalEntropyFromTotalAndPos(
+                  total, pos),
+              conf.FinalEntropy(), 1e-12);
+}
+
+TEST(Distribution, BinaryToIntegerConfusionMatrixFinalEntropyFromTotalAndPosDegenerate) {
+  IntegerDistributionDouble total;
+  IntegerDistributionDouble empty;
+  total.SetNumClasses(4);
+  empty.SetNumClasses(4);
+
+  total.Add(1, 3.);
+  total.Add(2, 2.);
+  total.Add(3, 1.);
+
+  // All examples in the negative branch: entropy(c(3,2,1)) in R.
+  EXPECT_NEAR(BinaryToIntegerConfusionMatrixDouble::FinalEntropyFromTotalAndPos(
+                  total, empty),
+              1.011404, 0.0001);
+
+  // All examples in the positive branch: entropy(c(3,2,1)) in R.
+  EXPECT_NEAR(BinaryToIntegerConfusionMatrixDouble::FinalEntropyFromTotalAndPos(
+                  total, total),
+              1.011404, 0.0001);
+
+  // No examples.
+  EXPECT_EQ(BinaryToIntegerConfusionMatrixDouble::FinalEntropyFromTotalAndPos(
+                empty, empty),
+            0.);
+}
+
 TEST(Distribution, IntegersConfusionMatrix_AppendTextReport) {
   IntegersConfusionMatrixDouble confusion;
   confusion.SetSize(4, 4);

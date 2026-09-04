@@ -322,6 +322,19 @@ class BinaryToIntegerConfusionMatrix {
   double InitEntropy() const;
   double FinalEntropy() const;
 
+  // Binary split entropy computed directly from the two
+  // distributions.
+  //
+  // Equivalent to:
+  //   BinaryToIntegerConfusionMatrix<T> m;
+  //   m.mutable_neg()->Set(total); m.mutable_neg()->Sub(pos);
+  //   m.mutable_pos()->Set(pos);
+  //   m.FinalEntropy();
+  // but ~20% faster end-to-end on GCC and ICX compilers.
+  // Possibly bcs. it avoids the per-call allocation and copy of the distributions.
+  static double FinalEntropyFromTotalAndPos(const IntegerDistribution<T>& total,
+                                            const IntegerDistribution<T>& pos);
+
   // Set the number of classes i.e. the possible values are [0, NumClasses() [.
   void SetNumClassesIntDim(int int_dim);
 
@@ -1014,6 +1027,34 @@ double BinaryToIntegerConfusionMatrix<T>::FinalEntropy() const {
   if (sum == 0) return 0;
   const double p_neg = static_cast<double>(neg().NumObservations()) / sum;
   return neg().Entropy() * p_neg + pos().Entropy() * (1 - p_neg);
+}
+
+template <typename T>
+double BinaryToIntegerConfusionMatrix<T>::FinalEntropyFromTotalAndPos(
+    const IntegerDistribution<T>& total, const IntegerDistribution<T>& pos) {
+  DCHECK_EQ(total.NumClasses(), pos.NumClasses());
+  const double total_sum = static_cast<double>(total.NumObservations());
+  if (total_sum <= 0) return 0.;
+  const double pos_sum = static_cast<double>(pos.NumObservations());
+  const double neg_sum = total_sum - pos_sum;
+  const int num_classes = total.NumClasses();
+  // Sum of "-count * log(count / branch_sum)" over both branches, i.e. the
+  // branch entropies weighted by the branch sizes. Dividing by "total_sum"
+  // at the end gives the size-weighted average of the two branch entropies.
+  double weighted_entropy = 0.;
+  for (int i = 0; i < num_classes; ++i) {
+    const double pos_count = static_cast<double>(pos.count(i));
+    if (pos_count > 0 && pos_count < pos_sum) {
+      weighted_entropy -= pos_count * std::log(pos_count / pos_sum);
+    }
+    const double neg_count =
+        static_cast<double>(total.count(i)) - pos_count;
+    if (neg_count > 0 && neg_count < neg_sum) {
+      weighted_entropy -= neg_count * std::log(neg_count / neg_sum);
+    }
+  }
+  const double inv_total = 1. / total_sum;
+  return weighted_entropy * inv_total;
 }
 
 }  // namespace utils
