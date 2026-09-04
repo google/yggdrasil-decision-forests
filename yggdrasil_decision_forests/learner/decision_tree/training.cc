@@ -2139,9 +2139,7 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
   }
 
   const double initial_entropy = label_distribution.Entropy();
-  const int num_classes = label_distribution.NumClasses();
   const double total_sum = label_distribution.NumObservations();
-  const double inv_total = (total_sum > 0) ? 1.0 / total_sum : 0.0;
 
   // Select the best threshold.
   bool found_split = false;
@@ -2153,25 +2151,12 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
       continue;
     }
 
-    // Inline FinalEntropy: compute both branches' weighted entropy directly
-    // from `label_distribution` and `pos_label_distribution`, avoiding the
-    // per-candidate IntegerDistribution Set/Sub copies that the previous
-    // BinaryToIntegerConfusionMatrix-based formulation required.
+    // Final entropy from the node's label distribution and the candidate's
+    // positive-branch distribution, without materializing a per-candidate
+    // BinaryToIntegerConfusionMatrix (two IntegerDistribution copies).
     const auto& pos = candidate_split.pos_label_distribution;
-    const double pos_sum = pos.NumObservations();
-    const double neg_sum = total_sum - pos_sum;
-    double w_entropy = 0.0;
-    for (int i = 0; i < num_classes; ++i) {
-      const double pi = pos.count(i);
-      if (pi > 0 && pi < pos_sum) {
-        w_entropy -= pi * std::log(pi / pos_sum);
-      }
-      const double ni = label_distribution.count(i) - pi;
-      if (ni > 0 && ni < neg_sum) {
-        w_entropy -= ni * std::log(ni / neg_sum);
-      }
-    }
-    const double final_entropy = w_entropy * inv_total;
+    const double final_entropy = utils::BinaryToIntegerConfusionMatrixDouble::
+        FinalEntropyFromTotalAndPos(label_distribution, pos);
     const double information_gain = initial_entropy - final_entropy;
     if (information_gain > condition->split_score()) {
       condition->set_split_score(information_gain);
@@ -2183,7 +2168,8 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
       condition->set_num_training_examples_with_weight(total_sum);
       condition->set_num_pos_training_examples_without_weight(
           candidate_split.num_positive_examples_without_weights);
-      condition->set_num_pos_training_examples_with_weight(pos_sum);
+      condition->set_num_pos_training_examples_with_weight(
+          pos.NumObservations());
       condition->set_na_value(na_replacement >= candidate_split.threshold);
       found_split = true;
     }
