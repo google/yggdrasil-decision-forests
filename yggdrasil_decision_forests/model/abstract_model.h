@@ -40,6 +40,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/metadata.h"
+#include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -216,8 +217,8 @@ class AbstractModel {
                           proto::AbstractModel* proto);
 
   // Load an abstract model from a proto.
-  static void ImportProto(const proto::AbstractModel& proto,
-                          AbstractModel* model);
+  static absl::Status ImportProto(const proto::AbstractModel& proto,
+                                  AbstractModel* model);
 
   // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
   //
@@ -339,6 +340,9 @@ class AbstractModel {
   // When derived, this function should also call its parent implementation.
   virtual absl::StatusOr<std::vector<proto::VariableImportance>>
   GetVariableImportance(absl::string_view key) const;
+
+  // Create a user readable description of all the postprocessors of the model.
+  void AppendPostprocessorsDescription(std::string* description) const;
 
   // Create a user readable description of all the variable importance metrics
   // of the model.
@@ -487,6 +491,11 @@ class AbstractModel {
       std::vector<model::proto::Prediction>* predictions,
       metric::proto::EvaluationResults* eval) const;
 
+  void AddPostprocessor(
+      std::shared_ptr<postprocessor::AbstractPostprocessor> postprocessor) {
+    postprocessors_.push_back(postprocessor);
+  }
+
  protected:
   // Apply the model on an example defined as a VerticalDataset and a row
   // index. Requires for the dataset to have the same structure as the training
@@ -587,6 +596,10 @@ class AbstractModel {
   // Note: New fields should be registered in:
   // - The proto serialization functions.
   // - The "CopyAbstractModelMetaData" method.
+
+ private:
+  std::vector<std::shared_ptr<postprocessor::AbstractPostprocessor>>
+      postprocessors_;
 };
 
 REGISTRATION_CREATE_POOL(AbstractModel);
