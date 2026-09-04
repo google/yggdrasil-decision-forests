@@ -1,0 +1,35 @@
+/*
+ * Copyright 2022 Google LLC.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+
+package yggdrasil_decision_forests.model.postprocessor.smoothed_pav_calibrator.proto;
+
+option java_outer_classname = "SmoothedPavCalibratorTrainingConfig";
+
+// Training configuration for Smoothed PAV Calibrator.
+message SmoothedPavCalibratorTrainingConfig {
+  // Number of bins used to accumulate the predictions of labels.
+  optional int32 n_bins = 1 [default = 10000];
+  // Threshold on the z-score used during the monotonic bin merging. With
+  // z_threshold > 0, we also merge adjacent pools (bins) that are statistically
+  // indistinguishable (two-proportion z-test).
+  optional float z_threshold = 2 [default = 0.0];
+  // Number of points to evaluate the smoothed, monotonic calibration curve used
+  // for linear interpolation of the curve during inference. The grid is evenly
+  // spaced, so lookups are O(1) and, therefore, using a fine grid here costs
+  // memory, not CPU cycles.
+  optional int32 n_grid = 3 [default = 20000];
+}

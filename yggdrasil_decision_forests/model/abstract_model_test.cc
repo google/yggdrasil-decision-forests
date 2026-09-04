@@ -69,11 +69,6 @@ class Engine1 : public serving::FastEngine {
     return {};
   }
 
-  void Predict(const serving::AbstractExampleSet& examples, int num_examples,
-               std::vector<float>* predictions) const override {
-    LOG(FATAL) << "Not implemented";
-  }
-
   int NumPredictionDimension() const override {
     LOG(FATAL) << "Not implemented";
     return 1;
@@ -82,6 +77,13 @@ class Engine1 : public serving::FastEngine {
   const serving::FeaturesDefinition& features() const override {
     LOG(FATAL) << "Not implemented";
     return features_;
+  }
+
+ protected:
+  void PredictImpl(
+      const serving::AbstractExampleSet& examples, int num_examples,
+      std::vector<float>* predictions) const override {
+    LOG(FATAL) << "Not implemented";
   }
 
  private:
@@ -123,11 +125,6 @@ class Engine2 : public serving::FastEngine {
     return {};
   }
 
-  void Predict(const serving::AbstractExampleSet& examples, int num_examples,
-               std::vector<float>* predictions) const override {
-    LOG(FATAL) << "Not implemented";
-  }
-
   int NumPredictionDimension() const override {
     LOG(FATAL) << "Not implemented";
     return 1;
@@ -136,6 +133,13 @@ class Engine2 : public serving::FastEngine {
   const serving::FeaturesDefinition& features() const override {
     LOG(FATAL) << "Not implemented";
     return features_;
+  }
+
+ protected:
+  void PredictImpl(
+      const serving::AbstractExampleSet& examples, int num_examples,
+      std::vector<float>* predictions) const override {
+    LOG(FATAL) << "Not implemented";
   }
 
  private:
@@ -653,7 +657,7 @@ TEST(AbstractModel, ImportProto) {
                        label_event_observed_col_idx: 2
                      )pb")
                          .value();
-  AbstractModel::ImportProto(proto, &model);
+  ASSERT_OK(AbstractModel::ImportProto(proto, &model));
 
   EXPECT_EQ(model.label_col_idx(), 1);
   EXPECT_EQ(model.label_event_observed_col_idx(), 2);

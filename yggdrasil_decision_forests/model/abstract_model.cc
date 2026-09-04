@@ -49,6 +49,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
+#include "yggdrasil_decision_forests/model/postprocessor/postprocessor_library.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
@@ -58,6 +59,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/reliability_diagram.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -121,10 +123,17 @@ void AbstractModel::ExportProto(const AbstractModel& model,
     *proto->mutable_feature_selection_logs() =
         model.feature_selection_logs_.value();
   }
+
+  if (!model.postprocessors_.empty()) {
+    proto->mutable_postprocessors()->Clear();
+    for (const auto& postprocessor : model.postprocessors_) {
+      postprocessor->ExportProto(proto->add_postprocessors());
+    }
+  }
 }
 
-void AbstractModel::ImportProto(const proto::AbstractModel& proto,
-                                AbstractModel* model) {
+absl::Status AbstractModel::ImportProto(const proto::AbstractModel& proto,
+                                        AbstractModel* model) {
   model->name_ = proto.name();
   model->task_ = proto.task();
   model->label_col_idx_ = proto.label_col_idx();
@@ -153,6 +162,18 @@ void AbstractModel::ImportProto(const proto::AbstractModel& proto,
   if (proto.has_feature_selection_logs()) {
     model->feature_selection_logs_ = proto.feature_selection_logs();
   }
+
+  if (!proto.postprocessors().empty()) {
+    model->postprocessors_.clear();
+    model->postprocessors_.resize(proto.postprocessors_size());
+    for (int i = 0; i < proto.postprocessors_size(); ++i) {
+      ASSIGN_OR_RETURN(
+          auto postprocessor,
+          postprocessor::CreatePostprocessor(proto.postprocessors(i)));
+      model->postprocessors_[i] = std::move(postprocessor);
+    }
+  }
+  return absl::OkStatus();
 }
 
 metric::proto::EvaluationResults AbstractModel::Evaluate(
@@ -334,11 +355,17 @@ void AbstractModel::Predict(const dataset::VerticalDataset& dataset,
                             dataset::VerticalDataset::row_t row_idx,
                             proto::Prediction* prediction) const {
   PredictImpl(dataset, row_idx, prediction);
+  for (const auto& postprocessor : postprocessors_) {
+    postprocessor->Process(dataset, row_idx, prediction);
+  }
 }
 
 void AbstractModel::Predict(const dataset::proto::Example& example,
                             proto::Prediction* prediction) const {
   PredictImpl(example, prediction);
+  for (const auto& postprocessor : postprocessors_) {
+    postprocessor->Process(example, prediction);
+  }
 }
 
 void FloatToProtoPrediction(const std::vector<float>& src_prediction,
@@ -483,6 +510,15 @@ absl::Status AbstractModel::AppendEvaluationWithEngine(
   const int num_prediction_dimensions = engine.NumPredictionDimension();
   const size_t num_examples = dataset.nrow();
 
+  std::unique_ptr<utils::reliability_diagram::ReliabilityDiagram>
+      reliability_diagram;
+  if (option.classification().max_calibration_bins() > 0 &&
+      eval->classification().has_binary_calibration_data()) {
+    reliability_diagram =
+        std::make_unique<utils::reliability_diagram::ReliabilityDiagram>(
+            option.classification().max_calibration_bins());
+  }
+
   std::vector<float> raw_predictions(num_prediction_dimensions * num_examples);
 
   size_t initial_prediction_size = 0;
@@ -541,11 +577,15 @@ absl::Status AbstractModel::AppendEvaluationWithEngine(
           dataset::GetWeightWithStatus(dataset, example_idx, weight_links));
       proto_prediction.set_weight(weight);
     }
-    RETURN_IF_ERROR(metric::AddPrediction(option, proto_prediction, rnd, eval));
+    RETURN_IF_ERROR(metric::AddPrediction(option, proto_prediction, rnd, eval,
+                                          reliability_diagram.get()));
     if (predictions) {
       (*predictions)[initial_prediction_size + example_idx] = proto_prediction;
     }
   }
+
+  CHECK_OK(metric::StoreReliabilityDiagram(reliability_diagram.get(), eval));
+
   return absl::OkStatus();
 }
 
@@ -568,12 +608,23 @@ absl::Status AbstractModel::AppendEvaluation(
   if (!option.force_slow_engine()) {
     engine_or_status = BuildFastEngine();
   }
+  // TODO: JWH REMOVE!!!
   if (engine_or_status.ok()) {
+    // if (false) {
     RETURN_IF_ERROR(AppendEvaluationWithEngine(dataset, option, weight_links,
                                                *engine_or_status.value(), rnd,
                                                predictions, eval));
   } else {
     // Evaluate using the (slow) generic inference.
+
+    std::unique_ptr<utils::reliability_diagram::ReliabilityDiagram>
+        reliability_diagram;
+    if (option.classification().max_calibration_bins() > 0 &&
+        eval->classification().has_binary_calibration_data()) {
+      reliability_diagram =
+          std::make_unique<utils::reliability_diagram::ReliabilityDiagram>(
+              option.classification().max_calibration_bins());
+    }
 
     proto::Prediction prediction;
     for (dataset::VerticalDataset::row_t test_row_idx = 0;
@@ -588,11 +639,18 @@ absl::Status AbstractModel::AppendEvaluation(
             dataset::GetWeightWithStatus(dataset, test_row_idx, weight_links));
         prediction.set_weight(weight);
       }
-      RETURN_IF_ERROR(metric::AddPrediction(option, prediction, rnd, eval));
+      RETURN_IF_ERROR(metric::AddPrediction(option, prediction, rnd, eval,
+                                            reliability_diagram.get()));
+      for (const auto& postprocessor : postprocessors_) {
+        RETURN_IF_ERROR(
+            postprocessor->AppendEvaluation(option, prediction, rnd, eval));
+      }
       if (predictions) {
         predictions->push_back(prediction);
       }
     }
+
+    CHECK_OK(metric::StoreReliabilityDiagram(reliability_diagram.get(), eval));
   }
 
   eval->set_num_folds(eval->num_folds() + 1);
@@ -621,6 +679,16 @@ absl::Status AbstractModel::AppendEvaluationOverrideType(
   } else {
     proto::Prediction original_prediction;
     proto::Prediction overridden_prediction;
+
+    std::unique_ptr<utils::reliability_diagram::ReliabilityDiagram>
+        reliability_diagram;
+    if (option.classification().max_calibration_bins() > 0 &&
+        eval->classification().has_binary_calibration_data()) {
+      reliability_diagram =
+          std::make_unique<utils::reliability_diagram::ReliabilityDiagram>(
+              option.classification().max_calibration_bins());
+    }
+
     for (dataset::VerticalDataset::row_t test_row_idx = 0;
          test_row_idx < dataset.nrow(); test_row_idx++) {
       LOG_EVERY_N_SEC(INFO, 30) << (test_row_idx + 1) << "/" << dataset.nrow()
@@ -641,12 +709,14 @@ absl::Status AbstractModel::AppendEvaluationOverrideType(
             dataset::GetWeightWithStatus(dataset, test_row_idx, weight_links));
         overridden_prediction.set_weight(weight);
       }
-      RETURN_IF_ERROR(
-          metric::AddPrediction(option, overridden_prediction, rnd, eval));
+      RETURN_IF_ERROR(metric::AddPrediction(option, overridden_prediction, rnd,
+                                            eval, reliability_diagram.get()));
       if (predictions) {
         predictions->push_back(overridden_prediction);
       }
     }
+
+    CHECK_OK(metric::StoreReliabilityDiagram(reliability_diagram.get(), eval));
   }
   return absl::OkStatus();
 }
@@ -661,6 +731,15 @@ absl::Status AbstractModel::AppendEvaluationWithEngineOverrideType(
     metric::proto::EvaluationResults* eval) const {
   const auto& engine_features = engine.features();
   const int num_prediction_dimensions = engine.NumPredictionDimension();
+
+  std::unique_ptr<utils::reliability_diagram::ReliabilityDiagram>
+      reliability_diagram;
+  if (option.classification().max_calibration_bins() > 0 &&
+      eval->classification().has_binary_calibration_data()) {
+    reliability_diagram =
+        std::make_unique<utils::reliability_diagram::ReliabilityDiagram>(
+            option.classification().max_calibration_bins());
+  }
 
   proto::Prediction original_prediction;
   proto::Prediction overridden_prediction;
@@ -707,12 +786,56 @@ absl::Status AbstractModel::AppendEvaluationWithEngineOverrideType(
                 dataset, begin_example_idx + sub_example_idx, weight_links));
         overridden_prediction.set_weight(weight);
       }
-      RETURN_IF_ERROR(
-          metric::AddPrediction(option, overridden_prediction, rnd, eval));
+      RETURN_IF_ERROR(metric::AddPrediction(option, overridden_prediction, rnd,
+                                            eval, reliability_diagram.get()));
       if (predictions) {
         predictions->push_back(overridden_prediction);
       }
     }
+  }
+
+  CHECK_OK(metric::StoreReliabilityDiagram(reliability_diagram.get(), eval));
+
+  return absl::OkStatus();
+}
+
+absl::Status AbstractModel::InitializeForEvaluation(
+    const metric::proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column,
+    metric::proto::EvaluationResults* eval) const {
+  RETURN_IF_ERROR(
+      InitializePostprocessorsForEvaluation(option, label_column, eval));
+  return absl::OkStatus();
+}
+
+absl::Status AbstractModel::FinalizeForEvaluation(
+    const metric::proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column,
+    metric::proto::EvaluationResults* eval) const {
+  RETURN_IF_ERROR(
+      FinalizePostprocessorsForEvaluation(option, label_column, eval));
+  return absl::OkStatus();
+}
+
+absl::Status AbstractModel::InitializePostprocessorsForEvaluation(
+    const metric::proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column,
+    metric::proto::EvaluationResults* eval) const {
+  for (auto& postprocessor : postprocessors_) {
+    LOG(INFO) << "Initializing postprocessor: " << postprocessor->enabled();
+    RETURN_IF_ERROR(
+        postprocessor->InitializeEvaluation(option, label_column, eval));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status AbstractModel::FinalizePostprocessorsForEvaluation(
+    const metric::proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column,
+    metric::proto::EvaluationResults* eval) const {
+  for (auto& postprocessor : postprocessors_) {
+    RETURN_IF_ERROR(
+        postprocessor->FinalizeEvaluation(option, label_column, eval));
   }
   return absl::OkStatus();
 }
@@ -962,6 +1085,10 @@ void AbstractModel::AppendDescriptionAndStatistics(
   }
 
   absl::StrAppend(description, "\n");
+  AppendPostprocessorsDescription(description);
+  absl::StrAppend(description, "\n");
+
+  absl::StrAppend(description, "\n");
   AppendAllVariableImportanceDescription(description);
   absl::StrAppend(description, "\n");
 
@@ -1114,6 +1241,18 @@ AbstractModel::GetVariableImportance(absl::string_view key) const {
   return std::vector<proto::VariableImportance>{
       vi_it->second.variable_importances().begin(),
       vi_it->second.variable_importances().end()};
+}
+
+void AbstractModel::AppendPostprocessorsDescription(
+    std::string* description) const {
+  if (postprocessors_.empty()) {
+    absl::StrAppend(description, "No postprocessors\n");
+  } else {
+    absl::StrAppend(description, "Postprocessors:\n");
+    for (const auto& postprocessor : this->postprocessors_) {
+      postprocessor->AppendDescription(description);
+    }
+  }
 }
 
 void AbstractModel::AppendAllVariableImportanceDescription(

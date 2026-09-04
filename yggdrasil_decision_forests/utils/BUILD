@@ -375,6 +375,20 @@ cc_library_ydf(
 )
 
 cc_library_ydf(
+    name = "reliability_diagram",
+    srcs = [
+        "reliability_diagram.cc",
+    ],
+    hdrs = [
+        "reliability_diagram.h",
+    ],
+    deps = [
+        ":smoothed_pav_calibration_fit",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library_ydf(
     name = "bytestream",
     srcs = [
         "bytestream.cc",
@@ -1196,6 +1210,18 @@ cc_test(
         ":smoothed_pav_calibration_inference",
         "@com_google_absl//absl/status:status_matchers",
         "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "reliability_diagram_test",
+    srcs = ["reliability_diagram_test.cc"],
+    deps = [
+        ":reliability_diagram",
+        ":smoothed_pav_calibration_fit",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:status_matchers",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -106,6 +106,7 @@ namespace yggdrasil_decision_forests::serving::decision_forest {
 
 namespace internal {
 
+// TODO: Implement calibration for this engine.
 // Base model representation compatible with the QuickScorer algorithm.
 struct QuickScorerExtendedModel {
   using ExampleSet =

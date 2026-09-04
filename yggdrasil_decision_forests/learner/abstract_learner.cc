@@ -47,6 +47,8 @@
 #include "yggdrasil_decision_forests/dataset/weight.h"
 #include "yggdrasil_decision_forests/dataset/weight.pb.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/postprocessor/abstract_postprocessor.pb.h"
+#include "yggdrasil_decision_forests/learner/postprocessor/postprocessor_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
@@ -352,14 +354,26 @@ std::unique_ptr<AbstractModel> AbstractLearner::Train(
 absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
     const dataset::VerticalDataset& train_dataset,
     std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-        valid_dataset) const {
+        valid_dataset,
+    std::unique_ptr<AbstractModel> existing_model) const {
   utils::usage::OnTrainingStart(train_dataset.data_spec(), training_config(),
                                 GetMetadataWithDefaults(training_config()),
                                 train_dataset.nrow());
   const auto begin_training = absl::Now();
 
-  ASSIGN_OR_RETURN(auto model,
-                   TrainWithStatusImpl(train_dataset, valid_dataset));
+  std::unique_ptr<AbstractModel> model;
+  if (existing_model != nullptr) {
+    model = std::move(existing_model);
+  } else {
+    ASSIGN_OR_RETURN(model, TrainWithStatusImpl(train_dataset, valid_dataset));
+  }
+
+  if (training_config().postprocessors_size() > 0) {
+    for (const auto& postprocessor : training_config().postprocessors()) {
+      RETURN_IF_ERROR(TrainPostprocessor(postprocessor, *model, train_dataset,
+                                         valid_dataset));
+    }
+  }
 
   utils::usage::OnTrainingEnd(train_dataset.data_spec(), training_config(),
                               train_dataset.nrow(), *model,
@@ -384,11 +398,63 @@ AbstractLearner::TrainWithStatusImpl(
       "TrainWithStatusImpl (deprecated).");
 }
 
+absl::Status AbstractLearner::TrainPostprocessor(
+    const postprocessor::proto::AbstractPostprocessorTrainingConfig&
+        postprocessor_config,
+    AbstractModel& model, const dataset::VerticalDataset& train_dataset,
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+        valid_dataset) const {
+  if (postprocessor_config.use_validation_dataset()) {
+    if (!valid_dataset.has_value()) {
+      return absl::InvalidArgumentError(
+          "use_validation_dataset is true, but valid_dataset is not provided.");
+    }
+    LOG(INFO) << "Using validation dataset for postprocessor training.";
+  } else {
+    LOG(INFO) << "Using training dataset for postprocessor training.";
+  }
+
+  proto::TrainingConfigLinking training_config_linking;
+  RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
+      training_config(),
+      (postprocessor_config.use_validation_dataset()
+           ? valid_dataset.value().get()
+           : train_dataset)
+          .data_spec(),
+      &training_config_linking));
+
+  ASSIGN_OR_RETURN(
+      auto postprocessor,
+      postprocessor::CreatePostprocessor(
+          deployment(), training_config_linking, postprocessor_config, model,
+          postprocessor_config.use_validation_dataset()
+              ? valid_dataset.value().get()
+              : train_dataset));
+
+  model.AddPostprocessor(postprocessor);
+
+  return absl::OkStatus();
+}
+
+absl::Status AbstractLearner::TrainPostprocessor(
+    const postprocessor::proto::AbstractPostprocessorTrainingConfig&
+        postprocessor_config,
+    AbstractModel& model, absl::string_view typed_path,
+    const dataset::proto::DataSpecification& data_spec,
+    const std::optional<std::string>& typed_valid_path) const {
+  ASSIGN_OR_RETURN(
+      auto pair_of_datasets,
+      GenerateVerticalDatasets(typed_path, data_spec, typed_valid_path));
+  return TrainPostprocessor(postprocessor_config, model, pair_of_datasets.first,
+                            pair_of_datasets.second);
+}
+
 // API; dataset on disk.
 absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
     absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
-    const std::optional<std::string>& typed_valid_path) const {
+    const std::optional<std::string>& typed_valid_path,
+    std::unique_ptr<AbstractModel> existing_model) const {
   std::string path;
   ASSIGN_OR_RETURN(std::tie(std::ignore, path),
                    dataset::SplitTypeAndPath(typed_path));
@@ -399,8 +465,20 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
                                 /*num_examples=*/-1);
   const auto begin_training = absl::Now();
 
-  ASSIGN_OR_RETURN(
-      auto model, TrainWithStatusImpl(typed_path, data_spec, typed_valid_path));
+  std::unique_ptr<AbstractModel> model;
+  if (existing_model != nullptr) {
+    model = std::move(existing_model);
+  } else {
+    ASSIGN_OR_RETURN(
+        model, TrainWithStatusImpl(typed_path, data_spec, typed_valid_path));
+  }
+
+  if (training_config().postprocessors_size() > 0) {
+    for (const auto& postprocessor : training_config().postprocessors()) {
+      RETURN_IF_ERROR(TrainPostprocessor(postprocessor, *model, typed_path,
+                                         data_spec, typed_valid_path));
+    }
+  }
 
   utils::usage::OnTrainingEnd(data_spec, training_config(),
                               /*num_examples=*/-1, *model,
@@ -415,6 +493,19 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
 // Impl; dataset on disk.
 absl::StatusOr<std::unique_ptr<AbstractModel>>
 AbstractLearner::TrainWithStatusImpl(
+    absl::string_view typed_path,
+    const dataset::proto::DataSpecification& data_spec,
+    const std::optional<std::string>& typed_valid_path) const {
+  ASSIGN_OR_RETURN(
+      auto pair_of_datasets,
+      GenerateVerticalDatasets(typed_path, data_spec, typed_valid_path));
+  return TrainWithStatusImpl(pair_of_datasets.first, pair_of_datasets.second);
+}
+
+absl::StatusOr<std::pair<
+    dataset::VerticalDataset,
+    std::optional<std::reference_wrapper<const dataset::VerticalDataset>>>>
+AbstractLearner::GenerateVerticalDatasets(
     absl::string_view typed_path,
     const dataset::proto::DataSpecification& data_spec,
     const std::optional<std::string>& typed_valid_path) const {
@@ -446,7 +537,8 @@ AbstractLearner::TrainWithStatusImpl(
         /*required_columns=*/{}, dataset_loading_config));
     valid_dataset = valid_dataset_data;
   }
-  return TrainWithStatusImpl(train_dataset, valid_dataset);
+
+  return std::make_pair(std::move(train_dataset), std::move(valid_dataset));
 }
 
 absl::Status CheckGenericHyperParameterSpecification(
