@@ -67,6 +67,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
         "//yggdrasil_decision_forests/dataset:weight",
         "//yggdrasil_decision_forests/dataset:weight_cc_proto",
+        "//yggdrasil_decision_forests/learner/postprocessor:abstract_postprocessor_cc_proto",
+        "//yggdrasil_decision_forests/learner/postprocessor:postprocessor_library",
         "//yggdrasil_decision_forests/metric",
         "//yggdrasil_decision_forests/metric:metric_cc_proto",
         "//yggdrasil_decision_forests/model:abstract_model",
@@ -139,6 +141,7 @@ all_proto_library(
     exports = ["//yggdrasil_decision_forests/model:hyperparameter_proto"],
     deps = [
         "//yggdrasil_decision_forests/dataset:weight_proto",
+        "//yggdrasil_decision_forests/learner/postprocessor:abstract_postprocessor_proto",
         "//yggdrasil_decision_forests/model:abstract_model_proto",
         "//yggdrasil_decision_forests/model:hyperparameter_proto",
         "//yggdrasil_decision_forests/utils/distribute:distribute_proto",

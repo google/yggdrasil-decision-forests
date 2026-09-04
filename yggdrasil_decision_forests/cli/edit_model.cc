@@ -40,6 +40,9 @@
 //     the model filenames) with "new_file_prefix". Set "new_file_prefix" to the
 //     empty string (i.e. --new_file_prefix=) to remove the model prefix.
 //
+#include <memory>
+#include <string>
+
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"
 #include "absl/strings/string_view.h"

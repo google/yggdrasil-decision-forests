@@ -45,14 +45,8 @@ absl::Status accumulate_bins(std::vector<BinAccumulator>& bins,
         absl::StrCat("y.size() = ", y.size(), " != p.size() = ", p.size()));
   }
 
-  const auto scale = static_cast<AccumulatorType>(n_bins);
-
   for (std::size_t i = 0; i < p.size(); ++i) {
-    auto pi = std::clamp(p[i], static_cast<AccumulatorType>(0.0),
-                         static_cast<AccumulatorType>(1.0));
-    // matches np.digitize(p, linspace(0,1,n_bins+1)) - 1, clipped
-    auto idx = static_cast<std::size_t>(
-        std::min(pi * scale, scale - static_cast<AccumulatorType>(1.0)));
+    auto idx = BinAccumulator::BinIndex(p[i], n_bins);
     bins[idx].sum_pred += p[i];
     bins[idx].sum_true += y[i];
     bins[idx].count += 1.0;

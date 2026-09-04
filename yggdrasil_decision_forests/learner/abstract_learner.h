@@ -23,6 +23,8 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -31,6 +33,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
+#include "yggdrasil_decision_forests/learner/postprocessor/abstract_postprocessor.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/utils/fold_generator.pb.h"
@@ -67,7 +70,8 @@ class AbstractLearner {
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       absl::string_view typed_path,
       const dataset::proto::DataSpecification& data_spec,
-      const std::optional<std::string>& typed_valid_path = {}) const;
+      const std::optional<std::string>& typed_valid_path = {},
+      std::unique_ptr<AbstractModel> existing_model = nullptr) const;
 
   // Trains a model using the dataset stored on memory .
   //
@@ -82,7 +86,8 @@ class AbstractLearner {
   virtual absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatus(
       const dataset::VerticalDataset& train_dataset,
       std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
-          valid_dataset = {}) const;
+          valid_dataset = {},
+      std::unique_ptr<AbstractModel> existing_model = nullptr) const;
 
   // [Deprecated] Similar as TrainWithStatus, but fails (CHECK) in case of
   // error.
@@ -198,6 +203,20 @@ class AbstractLearner {
       std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
           valid_dataset) const;
 
+  absl::Status TrainPostprocessor(
+      const postprocessor::proto::AbstractPostprocessorTrainingConfig&
+          postprocessor,
+      AbstractModel& model, const dataset::VerticalDataset& train_dataset,
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+          valid_dataset) const;
+
+  absl::Status TrainPostprocessor(
+      const postprocessor::proto::AbstractPostprocessorTrainingConfig&
+          postprocessor,
+      AbstractModel& model, absl::string_view typed_path,
+      const dataset::proto::DataSpecification& data_spec,
+      const std::optional<std::string>& typed_valid_path) const;
+
  protected:
   // Training configuration. Contains the hyper parameters of the learner.
   proto::TrainingConfig training_config_;
@@ -218,6 +237,14 @@ class AbstractLearner {
   // not at all) trained. If flag==nullptr (default behavior), the flag is
   // ignored.
   std::atomic<bool>* stop_training_trigger_ = nullptr;
+
+  absl::StatusOr<std::pair<
+      dataset::VerticalDataset,
+      std::optional<std::reference_wrapper<const dataset::VerticalDataset>>>>
+  GenerateVerticalDatasets(
+      absl::string_view typed_path,
+      const dataset::proto::DataSpecification& data_spec,
+      const std::optional<std::string>& typed_valid_path) const;
 };
 
 REGISTRATION_CREATE_POOL(AbstractLearner, const proto::TrainingConfig&);

@@ -25,8 +25,9 @@
 //
 //   You can then visualize "spec.pbtxt" directly or using :show_dataspec.
 //
+#include <string>
+
 #include "absl/flags/flag.h"
-#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"

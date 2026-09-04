@@ -118,6 +118,12 @@ struct Curve : PlotItem {
   // empty, should be of the same size as "ys".
   std::vector<double> xs;
 
+  // List of y error values (either symmetric or upper asymmetric errors).
+  std::vector<double> error_ys;
+
+  // List of y error (lower bounds) values (asymmetric errors).
+  std::vector<double> minus_error_ys;
+
   // List of labels for the points of the curve.
   std::vector<std::string> point_labels;
 
