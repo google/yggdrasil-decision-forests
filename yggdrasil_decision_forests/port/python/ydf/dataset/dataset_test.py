@@ -1919,6 +1919,117 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
 
+  def test_integerized_categorical_missing_most_frequent(self):
+    data = {"f1": np.array([-1, -1, -1, 2], dtype=np.int32)}
+    ds = dataset_lib.create_vertical_dataset(
+        data,
+        columns=[
+            Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+        ],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=4,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DType.DTYPE_INT32,
+                count_nas=3,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=2,
+                    is_already_integerized=True,
+                    number_of_unique_values=3,
+                    min_value_count=1,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_integerized_categorical_all_missing(self):
+    data = {"f1": np.array([-1, -1, -1], dtype=np.int32)}
+    ds = dataset_lib.create_vertical_dataset(
+        data,
+        columns=[
+            Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+        ],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DType.DTYPE_INT32,
+                count_nas=3,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=0,
+                    is_already_integerized=True,
+                    number_of_unique_values=1,
+                    min_value_count=1,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_integerized_categorical_empty_data(self):
+    data = {"f1": np.array([], dtype=np.int32)}
+    ds = dataset_lib.create_vertical_dataset(
+        data,
+        columns=[
+            Column("f1", Semantic.CATEGORICAL, is_already_integerized=True)
+        ],
+    )
+    expected_data_spec = ds_pb.DataSpecification(
+        created_num_rows=0,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DType.DTYPE_INT32,
+                count_nas=0,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=0,
+                    is_already_integerized=True,
+                    number_of_unique_values=1,
+                    min_value_count=1,
+                ),
+            ),
+        ),
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
+
+  def test_integerized_categorical_missing_column_from_data_spec(self):
+    data_spec = ds_pb.DataSpecification(
+        created_num_rows=3,
+        columns=(
+            ds_pb.Column(
+                name="f1",
+                type=ds_pb.ColumnType.NUMERICAL,
+                dtype=ds_pb.DType.DTYPE_INT32,
+            ),
+            ds_pb.Column(
+                name="f2",
+                type=ds_pb.ColumnType.CATEGORICAL,
+                dtype=ds_pb.DType.DTYPE_INT32,
+                categorical=ds_pb.CategoricalSpec(
+                    most_frequent_value=1,
+                    is_already_integerized=True,
+                    number_of_unique_values=3,
+                    min_value_count=1,
+                ),
+            ),
+        ),
+    )
+    df = pd.DataFrame({"f1": [1, 2, 3]})
+    ds = dataset_lib.create_vertical_dataset(
+        df, data_spec=data_spec, required_columns=["f1"]
+    )
+    test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
+    self.assertEqual(ds._dataset.DebugString(), "f1,f2\n1,NA\n2,NA\n3,NA\n")
+
+
 
 class CategoricalSetTest(absltest.TestCase):
 

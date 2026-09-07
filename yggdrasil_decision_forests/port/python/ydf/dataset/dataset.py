@@ -482,34 +482,44 @@ class VerticalDataset:
           " only supported for numpy arrays"
       )
 
-    min_val = np.min(column_data)
-    max_val = np.max(column_data)
-    if min_val < -1:
-      raise ValueError(
-          f"Column {column.name!r} is marked as already integerized, but"
-          " contains values smaller than -1, which is not allowed.  Consider"
-          " deactivating `is_already_integerized`."
-      )
-    if max_val > _MAX_INTEGERIZED_CATEGORIES:
-      raise ValueError(
-          f"Column {column.name!r} is marked as already integerized, but"
-          f" the maximum value ({max_val}) exceeds the maximum"
-          f" allowed number of categories ({_MAX_INTEGERIZED_CATEGORIES})."
-          " Too many integerized categories can lead to poor models."
-          " Automatic pruning of categories is only active for"
-          " non-integerized columns. Consider deactivating"
-          " `is_already_integerized`, or reducing the number of unique"
-          " values."
-      )
-    if min_val == -1:
-      counts = np.bincount(column_data + 1)
-      num_missing = counts[0]
-      most_frequent_value = np.argmax(counts) - 1
-    else:
-      # No missing values
-      counts = np.bincount(column_data)
+    if len(column_data) == 0:
+      max_val = 0
       num_missing = 0
-      most_frequent_value = np.argmax(counts)
+      most_frequent_value = 0
+    else:
+      min_val = np.min(column_data)
+      max_val = np.max(column_data)
+      if min_val < -1:
+        raise ValueError(
+            f"Column {column.name!r} is marked as already integerized, but"
+            " contains values smaller than -1, which is not allowed.  Consider"
+            " deactivating `is_already_integerized`."
+        )
+      if max_val > _MAX_INTEGERIZED_CATEGORIES:
+        raise ValueError(
+            f"Column {column.name!r} is marked as already integerized, but"
+            f" the maximum value ({max_val}) exceeds the maximum"
+            f" allowed number of categories ({_MAX_INTEGERIZED_CATEGORIES})."
+            " Too many integerized categories can lead to poor models."
+            " Automatic pruning of categories is only active for"
+            " non-integerized columns. Consider deactivating"
+            " `is_already_integerized`, or reducing the number of unique"
+            " values."
+        )
+      if min_val == -1:
+        counts = np.bincount(column_data + 1)
+        num_missing = int(counts[0])
+        if len(counts) > 1:
+          most_frequent_value = int(np.argmax(counts[1:]))
+        else:
+          most_frequent_value = 0
+      else:
+        # No missing values
+        counts = np.bincount(column_data)
+        num_missing = 0
+        most_frequent_value = int(np.argmax(counts))
+
+      max_val = max(0, int(max_val))
 
     self._dataset.PopulateColumnCategoricalIntegerizedNPInt32(
         column.name,
