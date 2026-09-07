@@ -94,6 +94,8 @@ class IsolationForestLearnerTest(learner_test_utils.LearnerTest):
             "characteristic_0:roc_auc",
             "confusion_matrix",
             "loss",
+            "ece",
+            "mce",
         ],
     )
     self.assertAlmostEqual(evaluation.accuracy, 0.975, delta=0.015)

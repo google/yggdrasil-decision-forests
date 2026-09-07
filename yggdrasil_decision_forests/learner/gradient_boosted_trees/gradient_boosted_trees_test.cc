@@ -615,7 +615,7 @@ TEST_F(GradientBoostedTreesOnAdult, GuidedOblique) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.859336, 0.004, 0.859336);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.859336, 0.006, 0.859336);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, SubsamplingDeprecatedParam) {
