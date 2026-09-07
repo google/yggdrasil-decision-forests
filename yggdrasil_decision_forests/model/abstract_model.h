@@ -40,6 +40,7 @@
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/fast_engine_factory.h"
 #include "yggdrasil_decision_forests/model/metadata.h"
+#include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -216,8 +217,8 @@ class AbstractModel {
                           proto::AbstractModel* proto);
 
   // Load an abstract model from a proto.
-  static void ImportProto(const proto::AbstractModel& proto,
-                          AbstractModel* model);
+  static absl::Status ImportProto(const proto::AbstractModel& proto,
+                                  AbstractModel* model);
 
   // Evaluates the model on a dataset. Returns a finalized EvaluationResults.
   //
@@ -587,6 +588,10 @@ class AbstractModel {
   // Note: New fields should be registered in:
   // - The proto serialization functions.
   // - The "CopyAbstractModelMetaData" method.
+
+ private:
+  std::vector<std::shared_ptr<postprocessor::AbstractPostprocessor>>
+      postprocessors_;
 };
 
 REGISTRATION_CREATE_POOL(AbstractModel);

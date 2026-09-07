@@ -653,7 +653,7 @@ TEST(AbstractModel, ImportProto) {
                        label_event_observed_col_idx: 2
                      )pb")
                          .value();
-  AbstractModel::ImportProto(proto, &model);
+  ASSERT_OK(AbstractModel::ImportProto(proto, &model));
 
   EXPECT_EQ(model.label_col_idx(), 1);
   EXPECT_EQ(model.label_event_observed_col_idx(), 2);
