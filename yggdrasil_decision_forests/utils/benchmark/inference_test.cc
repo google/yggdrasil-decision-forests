@@ -57,13 +57,12 @@ TEST(BenchmarkInference, FastEngine) {
   const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
                                              /*.runs =*/num_runs_options,
                                              /*.time =*/{}};
-  std::vector<BenchmarkInferenceResult> results;
 
   ASSERT_OK_AND_ASSIGN(auto engine, model->BuildFastEngine());
-  ASSERT_OK(
-      BenchmarkFastEngine(options, *engine.get(), *model, dataset, &results));
-  ASSERT_THAT(results, testing::SizeIs(1));
-  EXPECT_GT(absl::ToDoubleSeconds(results[0].duration_per_example), 0);
+  ASSERT_OK_AND_ASSIGN(
+      const auto result,
+      BenchmarkFastEngine(options, *engine.get(), *model, dataset));
+  EXPECT_GT(absl::ToDoubleSeconds(result.duration_per_example), 0);
 }
 
 TEST(BenchmarkInference, FastEngineMultiThread) {
@@ -83,13 +82,12 @@ TEST(BenchmarkInference, FastEngineMultiThread) {
   const BenchmarkInferenceRunOptions options{/*.batch_size =*/2,
                                              /*.runs =*/num_runs_options,
                                              /*.time =*/{}};
-  std::vector<BenchmarkInferenceResult> results;
-
   ASSERT_OK_AND_ASSIGN(auto engine, model->BuildFastEngine());
-  ASSERT_OK(BenchmarkFastEngineMultiThreaded(
-      options, *engine.get(), *model, dataset, /*num_threads=*/10, &results));
-  ASSERT_THAT(results, testing::SizeIs(1));
-  EXPECT_GT(absl::ToDoubleSeconds(results[0].duration_per_example), 0);
+  ASSERT_OK_AND_ASSIGN(
+      const auto result,
+      BenchmarkFastEngineMultiThreaded(options, *engine.get(), *model, dataset,
+                                       /*num_threads=*/10));
+  EXPECT_GT(absl::ToDoubleSeconds(result.duration_per_example), 0);
 }
 
 TEST(BenchmarkInference, GenericEngine) {
@@ -112,9 +110,9 @@ TEST(BenchmarkInference, GenericEngine) {
                    file::JoinPath(TestDataDir(), "dataset", "adult_test.csv")),
       model->data_spec(), &dataset));
 
-  ASSERT_OK(BenchmarkGenericSlowEngine(options, *model, dataset, &results));
-  ASSERT_THAT(results, testing::SizeIs(1));
-  EXPECT_GT(absl::ToDoubleSeconds(results[0].duration_per_example), 0);
+  ASSERT_OK_AND_ASSIGN(const auto result,
+                       BenchmarkGenericSlowEngine(options, *model, dataset));
+  EXPECT_GT(absl::ToDoubleSeconds(result.duration_per_example), 0);
 }
 
 }  // namespace

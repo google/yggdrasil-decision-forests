@@ -29,6 +29,7 @@ cc_binary_ydf(
         "//yggdrasil_decision_forests/model:all_models",
         "//yggdrasil_decision_forests/model:model_library",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils/benchmark:inference",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/log",

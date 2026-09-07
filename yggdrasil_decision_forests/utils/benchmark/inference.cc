@@ -87,10 +87,10 @@ void RunOnceEngine(const serving::FastEngine& engine, const int num_batches,
 
 }  // namespace
 
-absl::Status BenchmarkGenericSlowEngine(
+absl::StatusOr<BenchmarkInferenceResult> BenchmarkGenericSlowEngine(
     const BenchmarkInferenceRunOptions& options,
-    const model::AbstractModel& model, const dataset::VerticalDataset& dataset,
-    std::vector<BenchmarkInferenceResult>* results) {
+    const model::AbstractModel& model,
+    const dataset::VerticalDataset& dataset) {
   if (options.time.has_value() == options.runs.has_value()) {
     return absl::InvalidArgumentError(
         "Specify either the number of runs or the timing of the benchmark.");
@@ -131,22 +131,19 @@ absl::Status BenchmarkGenericSlowEngine(
   const auto end_time = absl::Now();
 
   // Save results.
-  results->push_back(
-      {/*.name =*/"Generic slow engine",
-       /*.duration_per_example =*/
-       (end_time - start_time) / (num_benchmark_runs * dataset.nrow()),
-       /*benchmark_duration=*/end_time - start_time,
-       /*num_runs=*/num_benchmark_runs,
-       /*batch_size=*/options.batch_size});
-  return absl::OkStatus();
+  return BenchmarkInferenceResult{
+      /*.name =*/"Generic slow engine",
+      /*.duration_per_example =*/
+      (end_time - start_time) / (num_benchmark_runs * dataset.nrow()),
+      /*benchmark_duration=*/end_time - start_time,
+      /*num_runs=*/num_benchmark_runs,
+      /*batch_size=*/options.batch_size};
 }
 
-absl::Status BenchmarkFastEngine(const BenchmarkInferenceRunOptions& options,
-                                 const serving::FastEngine& engine,
-                                 const model::AbstractModel& model,
-                                 const dataset::VerticalDataset& dataset,
-                                 std::vector<BenchmarkInferenceResult>* results,
-                                 absl::string_view engine_name) {
+absl::StatusOr<BenchmarkInferenceResult> BenchmarkFastEngine(
+    const BenchmarkInferenceRunOptions& options,
+    const serving::FastEngine& engine, const model::AbstractModel& model,
+    const dataset::VerticalDataset& dataset, absl::string_view engine_name) {
   if (options.time.has_value() == options.runs.has_value()) {
     return absl::InvalidArgumentError(
         "Specify either the number of runs or the timing of the benchmark.");
@@ -211,22 +208,19 @@ absl::Status BenchmarkFastEngine(const BenchmarkInferenceRunOptions& options,
   }
   const auto end_time = absl::Now();
 
-  // Save results.
-  results->push_back(
-      {/*.name =*/absl::StrCat(engine_name, " [virtual interface]"),
-       /*.duration_per_example =*/
-       (end_time - start_time) / (num_benchmark_runs * dataset.nrow()),
-       /*benchmark_duration=*/end_time - start_time,
-       /*num_runs=*/num_benchmark_runs,
-       /*batch_size=*/options.batch_size});
-  return absl::OkStatus();
+  return BenchmarkInferenceResult{
+      /*.name =*/absl::StrCat(engine_name, " [virtual interface]"),
+      /*.duration_per_example =*/
+      (end_time - start_time) / (num_benchmark_runs * dataset.nrow()),
+      /*benchmark_duration=*/end_time - start_time,
+      /*num_runs=*/num_benchmark_runs,
+      /*batch_size=*/options.batch_size};
 }
 
-absl::Status BenchmarkFastEngineMultiThreaded(
+absl::StatusOr<BenchmarkInferenceResult> BenchmarkFastEngineMultiThreaded(
     const BenchmarkInferenceRunOptions& options,
     const serving::FastEngine& engine, const model::AbstractModel& model,
     const dataset::VerticalDataset& dataset, const int num_threads,
-    std::vector<BenchmarkInferenceResult>* results,
     absl::string_view engine_name) {
   if (options.time.has_value() == options.runs.has_value()) {
     return absl::InvalidArgumentError(
@@ -338,17 +332,14 @@ absl::Status BenchmarkFastEngineMultiThreaded(
     thread.Join();
   }
 
-  // Save results.
-  results->push_back(
-      {/*.name =*/absl::StrCat(engine_name, " multi-threaded[", num_threads,
-                               "] [virtual interface]"),
-       /*.duration_per_example =*/
-       (end_time - start_time) / (num_benchmark_runs * dataset.nrow()),
-       /*benchmark_duration=*/end_time - start_time,
-       /*num_runs=*/num_benchmark_runs,
-       /*batch_size=*/options.batch_size});
-
-  return absl::OkStatus();
+  return BenchmarkInferenceResult{
+      /*.name =*/absl::StrCat(engine_name, " multi-threaded[", num_threads,
+                              "] [virtual interface]"),
+      /*.duration_per_example =*/
+      (end_time - start_time) / (num_benchmark_runs * dataset.nrow()),
+      /*benchmark_duration=*/end_time - start_time,
+      /*num_runs=*/num_benchmark_runs,
+      /*batch_size=*/options.batch_size};
 }
 
 }  // namespace yggdrasil_decision_forests::utils
