@@ -1411,6 +1411,42 @@ Use `model.describe()` for more details.
         header = abstract_model_pb2.AbstractModel.FromString(f.read())
         self.assertFalse(header.is_pure_model)
 
+  def test_set_data_spec(self):
+    model = model_lib.load_model(
+        os.path.join(self._model_dir, "adult_binary_class_gbdt")
+    )
+    dataset_path = os.path.join(
+        test_utils.ydf_test_data_path(), "dataset", "adult_test.csv"
+    )
+    test_df = pd.read_csv(dataset_path)
+
+    # Initial prediction ensures the serving engine is compiled and cached.
+    predictions_before = model.predict(test_df)
+
+    # Modify dataspec by renaming an input column.
+    data_spec = data_spec_pb2.DataSpecification()
+    data_spec.CopyFrom(model.data_spec())
+    for col in data_spec.columns:
+      if col.name == "age":
+        col.name = "age_renamed"
+        break
+
+    model.set_data_spec(data_spec)
+
+    self.assertEqual(model.data_spec(), data_spec)
+    self.assertIn("age_renamed", model.input_feature_names())
+    self.assertNotIn("age", model.input_feature_names())
+
+    # Predicting with the updated column name invalidates and recompiles
+    # the engine.
+    renamed_df = test_df.rename(columns={"age": "age_renamed"})
+    predictions_after = model.predict(renamed_df)
+    npt.assert_equal(predictions_before, predictions_after)
+
+    # Original DataFrame is missing "age_renamed" so prediction fails.
+    with self.assertRaises(ValueError):
+      model.predict(test_df)
+
 
 if __name__ == "__main__":
   absltest.main()

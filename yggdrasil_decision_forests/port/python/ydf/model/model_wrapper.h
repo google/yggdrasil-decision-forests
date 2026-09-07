@@ -150,9 +150,7 @@ class GenericCCModel {
     return model_->data_spec();
   }
 
-  void set_data_spec(const dataset::proto::DataSpecification& data_spec) {
-    *model_->mutable_data_spec() = data_spec;
-  }
+  void set_data_spec(const dataset::proto::DataSpecification& data_spec);
 
   model::proto::Metadata metadata() const;
 
