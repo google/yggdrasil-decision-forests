@@ -341,6 +341,9 @@ class AbstractModel {
   virtual absl::StatusOr<std::vector<proto::VariableImportance>>
   GetVariableImportance(absl::string_view key) const;
 
+  // Create a user readable description of all the postprocessors of the model.
+  void AppendPostprocessorsDescription(std::string* description) const;
+
   // Create a user readable description of all the variable importance metrics
   // of the model.
   void AppendAllVariableImportanceDescription(std::string* description) const;
@@ -487,6 +490,11 @@ class AbstractModel {
       const serving::FastEngine& engine, utils::RandomEngine* rnd,
       std::vector<model::proto::Prediction>* predictions,
       metric::proto::EvaluationResults* eval) const;
+
+  void AddPostprocessor(
+      std::shared_ptr<postprocessor::AbstractPostprocessor> postprocessor) {
+    postprocessors_.push_back(postprocessor);
+  }
 
  protected:
   // Apply the model on an example defined as a VerticalDataset and a row

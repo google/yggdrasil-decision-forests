@@ -15,6 +15,9 @@
 
 #include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 
+#include <string>
+
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 
@@ -39,13 +42,21 @@ void AbstractPostprocessor::Process(
   }
 }
 
-void AbstractPostprocessor::ExportProto(
-    proto::Postprocessor* proto) const {
+void AbstractPostprocessor::ExportProto(proto::Postprocessor* proto) const {
   proto->set_enabled(enabled_);
-  // TODO: Pass in only the one-of field here.
   ExportProtoImpl(proto);
+}
+
+void AbstractPostprocessor::AppendDescription(std::string* description) const {
+  if (enabled_) {
+    absl::StrAppend(description, "enabled\n");
+  } else {
+    absl::StrAppend(description, "disabled\n");
+  }
+  AppendDescriptionImpl(description);
 }
 
 }  // namespace postprocessor
 }  // namespace model
 }  // namespace yggdrasil_decision_forests
+

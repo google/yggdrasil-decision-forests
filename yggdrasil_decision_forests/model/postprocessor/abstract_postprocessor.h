@@ -16,6 +16,8 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_MODEL_POSTPROCESSOR_ABSTRACT_POSTPROCESSOR_H_
 #define YGGDRASIL_DECISION_FORESTS_MODEL_POSTPROCESSOR_ABSTRACT_POSTPROCESSOR_H_
 
+#include <string>
+
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/postprocessor/postprocessor.pb.h"
@@ -47,6 +49,9 @@ class AbstractPostprocessor {
   // Exports the postprocessor information to a proto.
   void ExportProto(proto::Postprocessor* proto) const;
 
+  // Appends a description of the postprocessor to the given string.
+  void AppendDescription(std::string* description) const;
+
   // Returns whether the postprocessor is enabled.
   bool enabled() const { return enabled_; }
   // Enables the postprocessor.
@@ -68,6 +73,9 @@ class AbstractPostprocessor {
 
   // Internal implementation of the ExportProto method.
   virtual void ExportProtoImpl(proto::Postprocessor* proto) const = 0;
+
+  // Internal implementation of the AppendDescription method.
+  virtual void AppendDescriptionImpl(std::string* description) const = 0;
 
   bool enabled_ = true;
 };

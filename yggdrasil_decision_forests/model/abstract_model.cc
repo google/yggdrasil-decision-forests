@@ -988,6 +988,9 @@ void AbstractModel::AppendDescriptionAndStatistics(
   }
 
   absl::StrAppend(description, "\n");
+  AppendPostprocessorsDescription(description);
+  absl::StrAppend(description, "\n\n");
+
   AppendAllVariableImportanceDescription(description);
   absl::StrAppend(description, "\n");
 
@@ -1140,6 +1143,20 @@ AbstractModel::GetVariableImportance(absl::string_view key) const {
   return std::vector<proto::VariableImportance>{
       vi_it->second.variable_importances().begin(),
       vi_it->second.variable_importances().end()};
+}
+
+void AbstractModel::AppendPostprocessorsDescription(
+    std::string* description) const {
+  if (postprocessors_.empty()) {
+    absl::StrAppend(description, "No postprocessors\n");
+  } else {
+    absl::StrAppend(description, "Postprocessors:\n");
+    for (int i = 0; i < postprocessors_.size(); ++i) {
+      absl::StrAppend(description, "[", i + 1, "/", postprocessors_.size(),
+                      "] - ");
+      postprocessors_[i]->AppendDescription(description);
+    }
+  }
 }
 
 void AbstractModel::AppendAllVariableImportanceDescription(

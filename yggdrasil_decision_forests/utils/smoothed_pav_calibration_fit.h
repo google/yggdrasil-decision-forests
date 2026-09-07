@@ -92,6 +92,7 @@
 #include <cassert>
 #include <cstddef>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
@@ -267,9 +268,18 @@ absl::StatusOr<std::vector<BinAccumulator::AccumulatorType>> pchip_slopes(
 // A fitted monotone curve, ready for evaluation via pchip_eval_single or for
 // building a fast lookup table via build_lookup_table.
 struct FittedCalibrationCurve {
-  // Strictly increasing knot positions; x[0]=0, x.back()=1.
+  explicit FittedCalibrationCurve(
+      std::vector<BinAccumulator::AccumulatorType> x,
+      std::vector<BinAccumulator::AccumulatorType> y,
+      std::vector<BinAccumulator::AccumulatorType> d)
+      : x(std::move(x)), y(std::move(y)), d(std::move(d)) {
+    DCHECK_EQ(x.size(), y.size());
+    DCHECK_EQ(x.size(), d.size());
+  }
+
+  // Strictly increasing knot positions.
   std::vector<BinAccumulator::AccumulatorType> x;
-  // Non-decreasing values; y[0]=0, y.back()=1.
+  // Non-decreasing values.
   std::vector<BinAccumulator::AccumulatorType> y;
   // PCHIP derivative at each knot.
   std::vector<BinAccumulator::AccumulatorType> d;

@@ -19,8 +19,10 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 #include "yggdrasil_decision_forests/model/postprocessor/postprocessor.pb.h"
+#include "yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator/smoothed_pav_calibrator.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -28,8 +30,21 @@ namespace postprocessor {
 
 absl::StatusOr<std::unique_ptr<AbstractPostprocessor>> CreatePostprocessor(
     const proto::Postprocessor& proto) {
-  // TODO: Pass in only the one-of field here.
-  return absl::UnimplementedError("Not implemented yet.");
+  switch (proto.postprocessor_case()) {
+    case proto::Postprocessor::kSmoothedPavCalibrator:
+      return std::make_unique<SmoothedPavCalibrator>(
+          proto.smoothed_pav_calibrator());
+    default:
+      if (!proto.postprocessor_case()) {
+        return absl::InvalidArgumentError(
+            "Postprocessor is not set in the proto.");
+      }
+      auto name = proto.GetDescriptor()
+                      ->FindFieldByNumber(proto.postprocessor_case())
+                      ->camelcase_name();
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unknown postprocessor type: ", name));
+  }
 }
 
 }  // namespace postprocessor

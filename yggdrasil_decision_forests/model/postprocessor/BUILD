@@ -20,12 +20,16 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/model:prediction_cc_proto",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
 all_proto_library(
     name = "postprocessor_proto",
     srcs = ["postprocessor.proto"],
+    deps = [
+        "//yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator:smoothed_pav_calibrator_proto",
+    ],
 )
 
 cc_library_ydf(
@@ -39,8 +43,10 @@ cc_library_ydf(
     deps = [
         ":abstract_postprocessor",
         ":postprocessor_cc_proto",
+        "//yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -50,6 +56,7 @@ cc_test(
     deps = [
         ":postprocessor_cc_proto",
         ":postprocessor_library",
+        "//yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator:smoothed_pav_calibrator_cc_proto",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",

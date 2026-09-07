@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 
+#include <string>
+
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
@@ -55,6 +57,8 @@ class FakePostprocessor : public AbstractPostprocessor {
   void ExportProtoImpl(proto::Postprocessor* proto) const override {
     export_called_ = true;
   }
+
+  void AppendDescriptionImpl(std::string* description) const override {}
 
  private:
   mutable bool process_dataset_called_ = false;

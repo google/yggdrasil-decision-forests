@@ -17,6 +17,13 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.model.postprocessor.proto;
 
+import "yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator/smoothed_pav_calibrator.proto";
+
 message Postprocessor {
   optional bool enabled = 1 [default = true];
+
+  oneof postprocessor {
+    smoothed_pav_calibrator.proto.SmoothedPavCalibrator
+        smoothed_pav_calibrator = 2;
+  }
 }
