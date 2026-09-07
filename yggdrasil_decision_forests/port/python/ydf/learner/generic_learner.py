@@ -367,7 +367,7 @@ class GenericLearner(abc.ABC):
 Learner: {self._learner_name}
 Task: {self._task}
 Class: ydf.{self.__class__.__name__}
-Hyper-parameters: ydf.{self._hyperparameters}
+Hyper-parameters: {self._hyperparameters}
 """
 
   def __repr__(self) -> str:
@@ -770,9 +770,8 @@ class GenericCCLearner(GenericLearner):
       bootstrapping_samples = bootstrapping
     else:
       raise ValueError(
-          "bootstrapping argument should be boolean or an integer greater than"
-          " 100 as bootstrapping will not yield useful results. Got"
-          f" {bootstrapping!r} instead"
+          "Bootstrapping should be at least 100 or a boolean. Got"
+          f" {bootstrapping!r} instead."
       )
     evaluation_options = metric_pb2.EvaluationOptions(
         bootstrapping_samples=bootstrapping_samples,
@@ -836,7 +835,7 @@ class GenericCCLearner(GenericLearner):
       resume_training_snapshot_interval_seconds: Optional[int] = None,
       working_dir: Optional[str] = None,
       workers: Optional[Sequence[str]] = None,
-  ):
+  ) -> abstract_learner_pb2.DeploymentConfig:
     """Merges constructor arguments into a deployment configuration."""
 
     if num_threads is None:
