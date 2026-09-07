@@ -29,7 +29,6 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "hwy/highway.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -337,23 +336,16 @@ class GradientBoostedTreesQuickScorerFastEngineFactory
   }
 
   std::vector<std::string> IsBetterThan() const override {
-    // Users with dynamic dispatch always get the highway engine, since it
-    // is probably faster than the legacy engine. Users with AVX2 or better also
-    // get the highway engine, since it is faster than legacy for high lane
-    // counts. Users with low lane counts (e.g. ARM) or  builds not specifying
-    // the haswell architecture get the legacy engine, which is fastest for
-    // these cases.
-#ifdef YDF_USE_DYNAMIC_DISPATCH
+    // This engine is worse than the Highway engine in the vast majority
+    // of cases, so this code defaults to the Highway engine. This
+    // intentionally does not take older ARM architectures into consideration,
+    // where the legacy engine might be faster.
+    //
+    // Users can still force this engine by e.g. setting the force_engine_name
+    // argument on the BuildFastEngine() call in C++ or model.force_engine in
+    // YDF.
     return {serving::gradient_boosted_trees::kGeneric,
             serving::gradient_boosted_trees::kOptPred};
-#elif HWY_TARGET <= HWY_AVX2
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred};
-#else
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred,
-            serving::gradient_boosted_trees::kQuickScorerExtendedHighway};
-#endif
   }
 
   absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(
@@ -474,26 +466,17 @@ class GradientBoostedTreesQuickScorerFastEngineFactoryHighway
   }
 
   std::vector<std::string> IsBetterThan() const override {
-    // Users with dynamic dispatch always get the highway engine, since it
-    // is probably faster than the legacy engine. Users with AVX2 or better also
-    // get the highway engine, since it is faster than legacy for high lane
-    // counts. Users with low lane counts (e.g. ARM) or poorly configured builds
-    // (not specifying the haswell architecture) get the legacy engine, which is
-    // fastest for these cases.
-#ifdef YDF_USE_DYNAMIC_DISPATCH
+    // The legacy engine is worse than the Highway engine in the vast majority
+    // of cases, so this code defaults to the Highway engine. This
+    // intentionally does not take older ARM architectures into consideration,
+    // where the legacy engine might be faster.
+    //
+    // Users can still force this engine by e.g. setting the force_engine_name
+    // argument on the BuildFastEngine() call in C++ or model.force_engine in
+    // YDF.
     return {serving::gradient_boosted_trees::kGeneric,
             serving::gradient_boosted_trees::kOptPred,
             serving::gradient_boosted_trees::kQuickScorerExtended};
-#else
-#if HWY_TARGET <= HWY_AVX2
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred,
-            serving::gradient_boosted_trees::kQuickScorerExtended};
-#else
-    return {serving::gradient_boosted_trees::kGeneric,
-            serving::gradient_boosted_trees::kOptPred};
-#endif
-#endif
   }
 
   absl::StatusOr<std::unique_ptr<serving::FastEngine>> CreateEngine(

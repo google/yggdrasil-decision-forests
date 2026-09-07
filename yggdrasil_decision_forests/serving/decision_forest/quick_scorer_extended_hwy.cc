@@ -27,12 +27,9 @@
 #include "yggdrasil_decision_forests/utils/usage.h"
 
 // clang-format off
-
-#ifdef YDF_USE_DYNAMIC_DISPATCH
 #undef HWY_TARGET_INCLUDE
 #define HWY_TARGET_INCLUDE "yggdrasil_decision_forests/serving/decision_forest/quick_scorer_extended_hwy.cc"  // NOLINT
 #include "hwy/foreach_target.h"  // IWYU pragma: keep
-#endif
 // clang-format on
 
 // Must come after foreach_target.h to avoid redefinition errors.
@@ -321,6 +318,13 @@ HWY_AFTER_NAMESPACE();
 #if HWY_ONCE
 namespace yggdrasil_decision_forests::serving::decision_forest {
 
+namespace {
+template <float (*Fn1)(float), float (*Fn2)(float)>
+inline constexpr bool IsSameActivation = false;
+template <float (*Fn)(float)>
+inline constexpr bool IsSameActivation<Fn, Fn> = true;
+}  // namespace
+
 template <typename Model, float (*Activation)(float)>
 void PredictQuickScorerHighway(
     const Model& model,
@@ -328,32 +332,29 @@ void PredictQuickScorerHighway(
     const std::vector<Rangei32>& categorical_set_begins_and_ends,
     const std::vector<int32_t>& categorical_item_buffer, int num_examples,
     int major_feature_offset, std::vector<float>* predictions) {
-#ifdef YDF_USE_DYNAMIC_DISPATCH
-  if constexpr (Activation == internal::ActivationBinomialLogLikelihood) {
+  if constexpr (IsSameActivation<Activation,
+                                 internal::ActivationBinomialLogLikelihood>) {
     HWY_EXPORT_AND_DYNAMIC_DISPATCH_T(
         PredictQuickScorerHighwayLogLikelihood<Model>)(
         model, fixed_length_features, categorical_set_begins_and_ends,
         categorical_item_buffer, num_examples, major_feature_offset,
         predictions);
-  } else if constexpr (Activation == internal::ActivationPoisson) {
+  } else if constexpr (IsSameActivation<Activation,
+                                        internal::ActivationPoisson>) {
     HWY_EXPORT_AND_DYNAMIC_DISPATCH_T(PredictQuickScorerHighwayPoisson<Model>)(
         model, fixed_length_features, categorical_set_begins_and_ends,
         categorical_item_buffer, num_examples, major_feature_offset,
         predictions);
-  } else if constexpr (Activation == internal::ActivationIdentity) {
+  } else if constexpr (IsSameActivation<Activation,
+                                        internal::ActivationIdentity>) {
     HWY_EXPORT_AND_DYNAMIC_DISPATCH_T(PredictQuickScorerHighwayIdentity<Model>)(
         model, fixed_length_features, categorical_set_begins_and_ends,
         categorical_item_buffer, num_examples, major_feature_offset,
         predictions);
   } else {
-    LOG(ERROR) << "Unknown Activation function";
+    static_assert(IsSameActivation<Activation, Activation> && false,
+                  "Unknown Activation function");
   }
-
-#else
-  HWY_NAMESPACE::PredictQuickScorerHighwayImpl<Model, Activation>(
-      model, fixed_length_features, categorical_set_begins_and_ends,
-      categorical_item_buffer, num_examples, major_feature_offset, predictions);
-#endif  // YDF_USE_DYNAMIC_DISPATCH
 }
 
 #define INSTANTIATE_HIGHWAY(ModelType, Activation)                         \
