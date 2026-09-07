@@ -24,6 +24,7 @@ from absl import logging
 import numpy as np
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
+from yggdrasil_decision_forests.learner.postprocessor import abstract_postprocessor_pb2
 from yggdrasil_decision_forests.metric import metric_pb2
 from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.cc import ydf
@@ -184,6 +185,22 @@ class TrainingLogEntry:
   evaluation: metric.Evaluation
   training_evaluation: Optional[metric.Evaluation]
   time: Optional[float] = None
+
+
+@enum.unique
+class CalibrationType(enum.Enum):
+  """The type of calibration algorithm to use."""
+
+  SMOOTHED_PAV = "SMOOTHED_PAV"
+
+
+@dataclasses.dataclass(frozen=True)
+class CalibrationConfig:
+  """Calibration configuration for a model."""
+  type: CalibrationType = CalibrationType.SMOOTHED_PAV
+  n_bins: int = 10000
+  z_threshold: float = 0.0
+  n_grid: int = 20000
 
 
 class GenericModel(abc.ABC):
@@ -1734,6 +1751,63 @@ class GenericCCModel(GenericModel):
           num_threads,
       )
     return result
+
+  def calibrate(
+      self,
+      data: dataset.InputDataset,
+      config: CalibrationConfig,
+      *,
+      weighted: Optional[bool] = None,
+      num_threads: Optional[int] = None,
+  ) -> None:
+    """Calibrates the model using a postprocessor.
+
+    Args:
+      data: The dataset to calibrate on.
+      config: The calibration config.
+      weighted: Whether to use weighted calibration.
+      num_threads: The number of threads to use.
+    """
+    if weighted is None:
+      weighted = False
+
+    if num_threads is None:
+      num_threads = concurrency.determine_optimal_num_threads(training=True)
+
+    pp = abstract_postprocessor_pb2.AbstractPostprocessorTrainingConfig()
+    if config.type == CalibrationConfig.type.SMOOTHED_PAV:
+      pp.smoothed_pav_calibrator_training_config.n_bins = config.n_bins
+      pp.smoothed_pav_calibrator_training_config.z_threshold = (
+          config.z_threshold
+      )
+      pp.smoothed_pav_calibrator_training_config.n_grid = config.n_grid
+    else:
+      raise ValueError(f"Unsupported calibration config type: {config.type}")
+
+    if (self.task() != Task.CLASSIFICATION):
+      raise ValueError(
+          "Calibrate is only supported for classification models."
+      )
+
+    with log.cc_log_context():
+      effective_dataspec, _, _, required_columns = (
+          self._build_evaluation_dataspec(
+              override_task=self.task()._to_proto_type(),  # pylint: disable=protected-access
+              override_label=self.label(),
+              override_group=None,
+              weighted=weighted,
+          )
+      )
+
+      ds = dataset.create_vertical_dataset(
+          data, data_spec=effective_dataspec, required_columns=required_columns
+      )
+
+      self._model.Calibrate(
+          ds._dataset,  # pylint: disable=protected-access
+          pp,
+          num_threads=num_threads,
+      )
 
   def save(
       self, path: str, advanced_options=ModelIOOptions(), *, pure_serving=False

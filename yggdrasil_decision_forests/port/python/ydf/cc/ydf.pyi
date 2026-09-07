@@ -5,6 +5,7 @@ import numpy.typing as npt
 
 from google3.third_party.yggdrasil_decision_forests.dataset import data_spec_pb2
 from google3.third_party.yggdrasil_decision_forests.learner import abstract_learner_pb2
+from google3.third_party.yggdrasil_decision_forests.learner.postprocessor import abstract_postprocessor_pb2
 from google3.third_party.yggdrasil_decision_forests.metric import metric_pb2
 from google3.third_party.yggdrasil_decision_forests.model import abstract_model_pb2
 from google3.third_party.yggdrasil_decision_forests.model import hyperparameter_pb2
@@ -174,6 +175,12 @@ class GenericCCModel:
       use_slow_engine: bool,
       num_threads: int,
   ) -> metric_pb2.EvaluationResults: ...
+  def Calibrate(
+      self,
+      dataset: VerticalDataset,
+      postprocessor_training_config: abstract_postprocessor_pb2.AbstractPostprocessorTrainingConfig,
+      num_threads: int,
+  ) -> None: ...
   def Analyze(
       self,
       dataset: VerticalDataset,

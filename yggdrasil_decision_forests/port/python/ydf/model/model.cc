@@ -130,6 +130,10 @@ void init_model(py::module_& m) {
            py::arg("label_col_idx"), py::arg("group_col_idx"),
            py::arg("use_slow_engine"), py::arg("num_threads"))
       // WARNING: This method releases the Global Interpreter Lock.
+      .def("Calibrate", WithStatus(&GenericCCModel::Calibrate),
+           py::arg("dataset"), py::arg("postprocessor_training_config"),
+           py::arg("num_threads"))
+      // WARNING: This method releases the Global Interpreter Lock.
       .def("Analyze", WithStatusOr(&GenericCCModel::Analyze),
            py::arg("dataset"), py::arg("options"))
       // WARNING: This method releases the Global Interpreter Lock.
