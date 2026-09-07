@@ -94,8 +94,8 @@ class Task(enum.Enum):
       raise NotImplementedError(f"Unsupported task {self}")
 
   @classmethod
-  def _from_proto_type(cls, task: abstract_model_pb2.Task):
-    task = PROTO_TO_TASK.get(task)  # pyrefly: ignore[bad-assignment]
+  def _from_proto_type(cls, proto_task: abstract_model_pb2.Task):
+    task = PROTO_TO_TASK.get(proto_task)
     if task is None:
       raise NotImplementedError(f"Unsupported task {task}")
     return task
@@ -2230,7 +2230,7 @@ class GenericCCModel(GenericModel):
     effective_dataspec = self._model.data_spec()
 
     def find_existing_or_add_column(
-        semantic: Optional[Any],
+        semantic: Optional[data_spec_pb2.ColumnType],
         name: Optional[str],
         default_col_idx: int,
         usage: str,
@@ -2273,7 +2273,7 @@ class GenericCCModel(GenericModel):
         new_col = effective_dataspec.columns.add(name=name, type=semantic)
       else:
         new_col = effective_dataspec.columns[col_idx]
-        new_col.type = semantic  # pyrefly: ignore[bad-assignment]
+        new_col.type = semantic
 
       # Populate column content
       if (

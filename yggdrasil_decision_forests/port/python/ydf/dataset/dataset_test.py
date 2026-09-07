@@ -29,15 +29,14 @@ from ydf.dataset import dataspec as dataspec_lib
 from ydf.dataset.io import dataset_io as dataset_io_lib
 from ydf.utils import test_utils
 
-# Make "assertEqual" print more details.
-unittest.util._MAX_LENGTH = 10000  # pyrefly: ignore[bad-assignment]
-
 Semantic = dataspec_lib.Semantic
 VocabValue = ds_pb.CategoricalSpec.VocabValue
 Column = dataspec_lib.Column
 
 
 class GenericDatasetTest(parameterized.TestCase):
+  # Make "assertEqual" print more details.
+  maxDiff = 10000
 
   @parameterized.parameters(
       (np.array([1], np.int8), Semantic.NUMERICAL),

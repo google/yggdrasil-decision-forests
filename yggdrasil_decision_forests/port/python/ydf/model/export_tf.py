@@ -14,6 +14,7 @@
 
 """Utilities to export TF models."""
 
+import functools
 import logging
 import math
 import shutil
@@ -43,59 +44,45 @@ except ImportError as tf_exc:
 TFDType = Any  # TensorFlow DType e.g. tf.float32
 TFTensor = Any  # A TensorFlow Tensor i.e. tensorflow.Tensor
 
-# Mapping between YDF dtype and TF dtypes.
-_YDF_DTYPE_TO_TF_DTYPE: Dict["ds_pb.DType", TFDType] = None  # pyrefly: ignore[bad-assignment]
 
-# Mapping TF dtypes to the TF dtype compatible with tensorflow example.
-# Note that tensorflow example proto only support tf.int64, tf.float32,
-# and tf.string dtypes.
-_TF_DTYPE_TO_TF_EXAMPLE_DTYPE: Dict[TFDType, TFDType] = None  # pyrefly: ignore[bad-assignment]
-
-
+@functools.cache
 def mapping_ydf_dtype_to_tf_dtype() -> Dict["ds_pb.DType", TFDType]:
   """Mapping between YDF dtype and TF dtypes."""
-
-  global _YDF_DTYPE_TO_TF_DTYPE
-  if _YDF_DTYPE_TO_TF_DTYPE is None:
-    _YDF_DTYPE_TO_TF_DTYPE = {
-        ds_pb.DType.DTYPE_INT8: tf.int8,
-        ds_pb.DType.DTYPE_INT16: tf.int16,
-        ds_pb.DType.DTYPE_INT32: tf.int32,
-        ds_pb.DType.DTYPE_INT64: tf.int64,
-        ds_pb.DType.DTYPE_UINT8: tf.uint8,
-        ds_pb.DType.DTYPE_UINT16: tf.uint16,
-        ds_pb.DType.DTYPE_UINT32: tf.uint32,
-        ds_pb.DType.DTYPE_UINT64: tf.uint64,
-        ds_pb.DType.DTYPE_FLOAT16: tf.float16,
-        ds_pb.DType.DTYPE_FLOAT32: tf.float32,
-        ds_pb.DType.DTYPE_FLOAT64: tf.float64,
-        ds_pb.DType.DTYPE_BOOL: tf.bool,
-        ds_pb.DType.DTYPE_BYTES: tf.string,
-    }
-  return _YDF_DTYPE_TO_TF_DTYPE
+  return {
+      ds_pb.DType.DTYPE_INT8: tf.int8,
+      ds_pb.DType.DTYPE_INT16: tf.int16,
+      ds_pb.DType.DTYPE_INT32: tf.int32,
+      ds_pb.DType.DTYPE_INT64: tf.int64,
+      ds_pb.DType.DTYPE_UINT8: tf.uint8,
+      ds_pb.DType.DTYPE_UINT16: tf.uint16,
+      ds_pb.DType.DTYPE_UINT32: tf.uint32,
+      ds_pb.DType.DTYPE_UINT64: tf.uint64,
+      ds_pb.DType.DTYPE_FLOAT16: tf.float16,
+      ds_pb.DType.DTYPE_FLOAT32: tf.float32,
+      ds_pb.DType.DTYPE_FLOAT64: tf.float64,
+      ds_pb.DType.DTYPE_BOOL: tf.bool,
+      ds_pb.DType.DTYPE_BYTES: tf.string,
+  }
 
 
+@functools.cache
 def mapping_tf_dtype_to_tf_example_dtype() -> Dict[TFDType, TFDType]:
   """Mapping TF dtypes to the TF dtype compatible with tensorflow example."""
-
-  global _TF_DTYPE_TO_TF_EXAMPLE_DTYPE
-  if _TF_DTYPE_TO_TF_EXAMPLE_DTYPE is None:
-    _TF_DTYPE_TO_TF_EXAMPLE_DTYPE = {
-        tf.int8: tf.int64,
-        tf.int16: tf.int64,
-        tf.int32: tf.int64,
-        tf.int64: tf.int64,
-        tf.uint8: tf.int64,
-        tf.uint16: tf.int64,
-        tf.uint32: tf.int64,
-        tf.uint64: tf.int64,
-        tf.float16: tf.float32,
-        tf.float32: tf.float32,
-        tf.float64: tf.float32,
-        tf.bool: tf.int64,
-        tf.string: tf.string,
-    }
-  return _TF_DTYPE_TO_TF_EXAMPLE_DTYPE
+  return {
+      tf.int8: tf.int64,
+      tf.int16: tf.int64,
+      tf.int32: tf.int64,
+      tf.int64: tf.int64,
+      tf.uint8: tf.int64,
+      tf.uint16: tf.int64,
+      tf.uint32: tf.int64,
+      tf.uint64: tf.int64,
+      tf.float16: tf.float32,
+      tf.float32: tf.float32,
+      tf.float64: tf.float32,
+      tf.bool: tf.int64,
+      tf.string: tf.string,
+  }
 
 
 def ydf_model_to_tensorflow_saved_model(
