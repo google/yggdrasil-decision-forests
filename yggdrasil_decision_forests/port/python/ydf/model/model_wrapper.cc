@@ -213,7 +213,7 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithFastEngine(
                                   size_t block_size) -> Cache {
       Cache cache;
       cache.batch_of_examples = engine->AllocateExamples(block_size);
-      cache.batch_of_predictions.resize(block_size);
+      cache.batch_of_predictions.resize(block_size * num_prediction_dimensions);
       return cache;
     };
 
@@ -224,6 +224,7 @@ absl::StatusOr<py::array_t<float>> GenericCCModel::PredictWithFastEngine(
       RETURN_IF_ERROR(CopyVerticalDatasetToAbstractExampleSet(
           dataset, begin_item_idx, end_item_idx, engine_features,
           cache->batch_of_examples.get()));
+      // Note: Predict resizes the output vector if needed.
       engine->Predict(*cache->batch_of_examples, effective_batch_size,
                       &cache->batch_of_predictions);
 
