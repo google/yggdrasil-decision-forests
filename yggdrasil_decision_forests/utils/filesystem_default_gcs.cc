@@ -18,7 +18,6 @@
 #include <cstring>
 #include <initializer_list>
 #include <memory>
-#include <regex>  // NOLINT
 #include <string>
 #include <utility>
 #include <vector>
@@ -28,6 +27,7 @@
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "google/cloud/storage/client.h"
+#include "re2/re2.h"
 #include "yggdrasil_decision_forests/utils/bytestream.h"
 #include "yggdrasil_decision_forests/utils/filesystem_default.h"
 #include "yggdrasil_decision_forests/utils/filesystem_interface.h"
@@ -198,11 +198,15 @@ class FileSystemImplementation : public FileSystemInterface {
 
     std::string regexp_filename = absl::StrReplaceAll(
         cloud_path.object, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
-    std::regex regexp_pattern(regexp_filename);
+    RE2 regexp_pattern(regexp_filename);
+    if (!regexp_pattern.ok()) {
+      return absl::InvalidArgumentError(
+          "Invalid regular expression generated from pattern.");
+    }
 
     for (const auto& candidate : candidates) {
       GCS_RETURN_IF_ERROR(candidate.status());
-      if (!std::regex_match(candidate->name(), regexp_pattern)) {
+      if (!RE2::FullMatch(candidate->name(), regexp_pattern)) {
         continue;
       }
       results->push_back(

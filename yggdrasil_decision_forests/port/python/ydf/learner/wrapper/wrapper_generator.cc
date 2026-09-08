@@ -20,7 +20,6 @@
 #include <cstddef>
 #include <iterator>
 #include <memory>
-#include <regex>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -39,6 +38,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "re2/re2.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
@@ -955,15 +955,15 @@ absl::Status FixDefaultFieldsDocumentation(std::string* fields_documentation,
       return absl::InvalidArgumentError(
           "Missing documentation for discretize_numerical_columns");
     }
-    std::regex end_pattern("\\n {4}[^ \\t\\n\\r\\f\\v]");
-    auto search_start_it =
-        fields_documentation->cbegin() + start_pos + start_marker.length();
-    std::smatch match;
-    size_t end_pos;
+    static const LazyRE2 end_pattern(R"((\n {4}[^ \t\n\r\f\v]))");
+    STATUS_CHECK(end_pattern->ok());
 
-    if (std::regex_search(search_start_it, fields_documentation->cend(), match,
-                          end_pattern)) {
-      end_pos = std::distance(fields_documentation->cbegin(), match[0].first);
+    absl::string_view subset = absl::string_view(*fields_documentation)
+                                   .substr(start_pos + start_marker.length());
+    absl::string_view match;
+
+    if (RE2::PartialMatch(subset, *end_pattern, &match)) {
+      size_t end_pos = match.data() - fields_documentation->data();
       size_t length = end_pos - start_pos;
       fields_documentation->replace(start_pos, length, replacement_string);
     } else {
