@@ -226,8 +226,9 @@ TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
   random = saved_state;
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalHistogram(
                 selected_examples, weights, attributes, labels,
-                num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &random, &best_condition)
+                num_label_classes, na_replacement, min_num_obs,
+                dt_config.numerical_split(), dt_config, label_distribution, -1,
+                &random, &best_condition)
                 .value(),
             SplitSearchResult::kBetterSplitFound);
 
@@ -242,8 +243,9 @@ TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
   random = saved_state;
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalHistogram(
                 selected_examples, weights, attributes, labels,
-                num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &random, &best_condition)
+                num_label_classes, na_replacement, min_num_obs,
+                dt_config.numerical_split(), dt_config, label_distribution, -1,
+                &random, &best_condition)
                 .value(),
             SplitSearchResult::kNoBetterSplitFound);
 
@@ -251,8 +253,9 @@ TEST(DecisionTree, FindSplitLabelClassificationFeatureNumericalHistogram) {
   random = saved_state;
   EXPECT_EQ(FindSplitLabelClassificationFeatureNumericalHistogram(
                 selected_examples, weights, attributes, labels,
-                num_label_classes, na_replacement, min_num_obs, dt_config,
-                label_distribution, -1, &random, &best_condition)
+                num_label_classes, na_replacement, min_num_obs,
+                dt_config.numerical_split(), dt_config, label_distribution, -1,
+                &random, &best_condition)
                 .value(),
             SplitSearchResult::kInvalidAttribute);
 }
@@ -907,8 +910,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
   EXPECT_EQ(
       FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
-          min_num_obs, dt_config, label_distribution, -1, &random,
-          &best_condition)
+          min_num_obs, dt_config.numerical_split(), dt_config,
+          label_distribution, -1, &random, &best_condition)
           .value(),
       SplitSearchResult::kBetterSplitFound);
 
@@ -929,8 +932,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
   EXPECT_EQ(
       FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
-          min_num_obs, dt_config, label_distribution, -1, &random,
-          &best_condition)
+          min_num_obs, dt_config.numerical_split(), dt_config,
+          label_distribution, -1, &random, &best_condition)
           .value(),
       SplitSearchResult::kNoBetterSplitFound);
 
@@ -939,8 +942,8 @@ TYPED_TEST(FindBestSplitTest, FindBestNumericalSplitHistogramForRegression) {
   EXPECT_EQ(
       FindSplitLabelRegressionFeatureNumericalHistogram<TestFixture::kWeighted>(
           selected_examples, weights, attributes, labels, na_replacement,
-          min_num_obs, dt_config, label_distribution, -1, &random,
-          &best_condition)
+          min_num_obs, dt_config.numerical_split(), dt_config,
+          label_distribution, -1, &random, &best_condition)
           .value(),
       SplitSearchResult::kInvalidAttribute);
 }
