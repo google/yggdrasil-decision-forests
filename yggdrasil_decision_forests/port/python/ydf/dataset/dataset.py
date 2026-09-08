@@ -676,7 +676,7 @@ class VerticalDataset:
     ):
       raise ValueError(
           "Each value of a numerical vector sequence should be numerical"
-          f" numpy array with two dimension. Got {column_data!r}"
+          f" numpy array with two dimensions. Got {column_data!r}"
       )
     ydf_dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data[0].dtype)
     self._dataset.PopulateColumnNumericalVectorSequence(
@@ -935,7 +935,7 @@ def _create_missing_feature_error_message(
     column_spec: data_spec_pb2.Column,
     shapes_of_given_columns: Dict[str, int],
 ) -> str:
-  """Builds an error message explaining why a feature/column is be missing."""
+  """Builds an error message explaining why a feature/column is missing."""
 
   if column_spec.is_unstacked:
     # The missing feature is multi-dimensional.
@@ -950,7 +950,7 @@ def _create_missing_feature_error_message(
     expected_shape = feature_components[2]
 
     if feature_components[0] in shapes_of_given_columns:
-      # There is a miss-match of shape.
+      # There is a mismatch of shape.
       provided_shape = shapes_of_given_columns[feature_components[0]]
       return (
           "Unexpected shape for multi-dimensional column"
@@ -977,7 +977,7 @@ def _create_missing_feature_error_message(
       # The name of the missing (single-dimensional) feature is equal to the
       # base name of a multi-dimensional feature.
       return (
-          f"Column {column_spec.name!r} is expected to single-dimensional but"
+          f"Column {column_spec.name!r} is expected to be single-dimensional but"
           f" it is multi-dimensional with shape {provided_shape}."
       )
 
@@ -1052,7 +1052,7 @@ def create_vertical_dataset_from_dict_of_values(
           != data_spec_pb2.Tokenizer.NO_SPLITTING
       ):
         log.warning(
-            f"The dataspec for columns {column_spec.name} specifies a"
+            f"The dataspec for column {column_spec.name} specifies a"
             " tokenizer, but it is ignored when reading in-memory datasets."
         )
       else:
@@ -1111,10 +1111,10 @@ def create_vertical_dataset_from_dict_of_values(
       discretize_numerical = (
           inference_args is None
       ) or inference_args.discretize_numerical_columns
-      infered_semantic = infer_semantic(
+      inferred_semantic = infer_semantic(
           column.name, column_data, discretize_numerical
       )
-      effective_column.semantic = infered_semantic
+      effective_column.semantic = inferred_semantic
       columns_to_check.append(column_idx)
 
     dataset._add_column(  # pylint: disable=protected-access
@@ -1147,8 +1147,8 @@ def validate_dataspec(
 ) -> List[str]:
   """Validates a dataspec.
 
-  Can raise an error or return a warning (as list of strings). If return None,
-  the dataspec is correctly.
+  Can raise an error or return warnings (as a list of strings). If the returned
+  list is empty, the dataspec is correct.
 
   Args:
     data_spec: A dataspec to check.
@@ -1178,7 +1178,12 @@ def validate_dataspec(
           examples_of_value.append(k)
 
     if count_look_numerical >= 0.8 * count_total:
-      examples_for_warning = b", ".join(examples_of_value)
+      examples_for_warning = ", ".join(
+          k.decode("utf-8", errors="replace")
+          if isinstance(k, bytes)
+          else str(k)
+          for k in examples_of_value
+      )
       warnings.append(
           f"Column {column.name!r} is detected as CATEGORICAL but its values"
           f" look like numbers (e.g., {examples_for_warning}). Should"
@@ -1189,7 +1194,7 @@ def validate_dataspec(
 
 
 def look_numerical(v: Union[str, bytes]) -> bool:
-  """Tests if a string look like a numerical value."""
+  """Tests if a string looks like a numerical value."""
   try:
     float(v)
     return True
@@ -1210,7 +1215,7 @@ def infer_semantic(
         f"Cannot infer automatically the semantic of column {name!r} since no"
         " data for this column was provided. Make sure this column exists in"
         " the dataset, or exclude the column from the list of required"
-        " columns. If the dataset should contain missing values for the all"
+        " columns. If the dataset should contain missing values for all"
         " examples of this column, specify the semantic of the column manually"
         f" using the `features` argument e.g. `features=[({name!r},"
         " ydf.Semantic.NUMERICAL)]` if the feature is numerical."

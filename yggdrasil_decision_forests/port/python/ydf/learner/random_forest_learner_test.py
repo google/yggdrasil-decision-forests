@@ -739,7 +739,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     })
     with self.assertRaisesRegex(
         ValueError,
-        r"Column 'feature' is expected to single-dimensional but it is"
+        r"Column 'feature' is expected to be single-dimensional but it is"
         r" multi-dimensional with shape 2.",
     ):
       _ = model.predict({
@@ -747,7 +747,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
       })
     with self.assertRaisesRegex(
         ValueError,
-        r"Column 'feature' is expected to single-dimensional but it is"
+        r"Column 'feature' is expected to be single-dimensional but it is"
         r" multi-dimensional with shape 1.",
     ):
       _ = model.predict({

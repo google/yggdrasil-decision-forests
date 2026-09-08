@@ -1695,10 +1695,12 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
             ),
         ),
     )
+    warning = dataset_lib.validate_dataspec(bad_dataspec, [0])[0]
     self.assertStartsWith(
-        dataset_lib.validate_dataspec(bad_dataspec, [0])[0],
+        warning,
         "Column 'f' is detected as CATEGORICAL",
     )
+    self.assertNotIn("b'", warning)
 
     # Bad column not selected
     self.assertEmpty(dataset_lib.validate_dataspec(bad_dataspec, []))
