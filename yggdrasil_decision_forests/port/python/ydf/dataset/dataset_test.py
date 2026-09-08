@@ -15,6 +15,7 @@
 import enum
 import os
 from typing import Optional
+
 import unittest
 
 from absl.testing import absltest
@@ -3388,6 +3389,61 @@ class DataspecInferenceFromGeneratorTest(parameterized.TestCase):
             max_num_scanned_rows_to_compute_statistics=100_000,
         ),
     )
+
+  def test_infer_dataspec_scan_all_rows_with_minus_one(self):
+    # Dataset spanning multiple batches (batch size in infer_dataspec is 1000).
+    num_rows = 2500
+    ds = {
+        "num": np.arange(num_rows, dtype=np.float32),
+        "cat": np.array(["a", "b"] * (num_rows // 2)),
+    }
+    ds_generator = dataset_io_lib.build_batched_example_generator(ds)
+    dataspec = dataset_lib.infer_dataspec(
+        ds_generator,
+        dataspec_lib.DataSpecInferenceArgs(
+            columns=None,
+            include_all_columns=True,
+            max_vocab_count=20,
+            min_vocab_frequency=1,
+            discretize_numerical_columns=False,
+            num_discretized_numerical_bins=10,
+            max_num_scanned_rows_to_infer_semantic=-1,
+            max_num_scanned_rows_to_compute_statistics=-1,
+        ),
+    )
+    self.assertEqual(dataspec.created_num_rows, num_rows)
+    self.assertLen(dataspec.columns, 2)
+    col_dict = {col.name: col for col in dataspec.columns}
+    self.assertIn("num", col_dict)
+    self.assertIn("cat", col_dict)
+
+    num_col = col_dict["num"]
+    self.assertEqual(num_col.type, ds_pb.ColumnType.NUMERICAL)
+    self.assertEqual(num_col.numerical.min_value, 0.0)
+    self.assertEqual(num_col.numerical.max_value, num_rows - 1)
+    self.assertAlmostEqual(num_col.numerical.mean, (num_rows - 1) / 2.0)
+
+    cat_col = col_dict["cat"]
+    self.assertEqual(cat_col.type, ds_pb.ColumnType.CATEGORICAL)
+    self.assertEqual(cat_col.categorical.items["a"].count, num_rows // 2)
+    self.assertEqual(cat_col.categorical.items["b"].count, num_rows // 2)
+
+    # Verify that positive threshold limits rows scanned across batches.
+    ds_generator_limited = dataset_io_lib.build_batched_example_generator(ds)
+    dataspec_limited = dataset_lib.infer_dataspec(
+        ds_generator_limited,
+        dataspec_lib.DataSpecInferenceArgs(
+            columns=None,
+            include_all_columns=True,
+            max_vocab_count=20,
+            min_vocab_frequency=1,
+            discretize_numerical_columns=False,
+            num_discretized_numerical_bins=10,
+            max_num_scanned_rows_to_infer_semantic=-1,
+            max_num_scanned_rows_to_compute_statistics=1500,
+        ),
+    )
+    self.assertEqual(dataspec_limited.created_num_rows, 2000)
 
 
 class ReservoirSamplingTest(parameterized.TestCase):

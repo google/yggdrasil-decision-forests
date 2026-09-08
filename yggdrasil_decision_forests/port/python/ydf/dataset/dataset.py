@@ -33,7 +33,6 @@ from ydf.dataset.io import generator as generator_lib
 from ydf.utils import log
 from ydf.utils import paths
 
-
 InputDataset = Union[dataset_io_types.IODataset, "VerticalDataset"]
 
 # Maximum number of categories for "already integerized" categories.
@@ -1406,7 +1405,8 @@ def infer_dataspec(
 
     num_examples += generator_lib.get_num_examples(batch)
     if (
-        num_examples
+        data_spec_args.max_num_scanned_rows_to_compute_statistics > 0
+        and num_examples
         >= data_spec_args.max_num_scanned_rows_to_compute_statistics
     ):
       break
