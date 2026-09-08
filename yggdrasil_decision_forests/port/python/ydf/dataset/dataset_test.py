@@ -2033,7 +2033,6 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
     self.assertEqual(ds._dataset.DebugString(), "f1,f2\n1,NA\n2,NA\n3,NA\n")
 
 
-
 class CategoricalSetTest(absltest.TestCase):
 
   def create_toy_csv(self) -> str:
@@ -3446,6 +3445,90 @@ class DataspecInferenceFromGeneratorTest(parameterized.TestCase):
         ),
     )
     self.assertEqual(dataspec_limited.created_num_rows, 2000)
+
+  def test_categorical_accumulator_empty_string_missing_value(self):
+    accumulator = dataset_lib.CategoricalDataSpecAccumulator(
+        name="cat", max_vocab_count=10, min_vocab_frequency=1
+    )
+    accumulator.visit(np.array(["a", "b", "", "a", ""]))
+    column = ds_pb.Column(type=ds_pb.ColumnType.CATEGORICAL)
+    accumulator.finalize(column)
+    self.assertEqual(column.count_nas, 2)
+    self.assertNotIn("", column.categorical.items)
+    self.assertNotIn(b"", column.categorical.items)
+    self.assertEqual(column.categorical.items["a"].count, 2)
+    self.assertEqual(column.categorical.items["b"].count, 1)
+    self.assertEqual(column.categorical.number_of_unique_values, 3)
+
+  def test_categorical_accumulator_literal_nan_category(self):
+    accumulator = dataset_lib.CategoricalDataSpecAccumulator(
+        name="cat", max_vocab_count=10, min_vocab_frequency=1
+    )
+    accumulator.visit(np.array(["nan", "nan", "x"]))
+    column = ds_pb.Column(type=ds_pb.ColumnType.CATEGORICAL)
+    accumulator.finalize(column)
+    self.assertEqual(column.count_nas, 0)
+    self.assertIn("nan", column.categorical.items)
+    self.assertEqual(column.categorical.items["nan"].count, 2)
+    self.assertEqual(column.categorical.items["x"].count, 1)
+    self.assertEqual(column.categorical.number_of_unique_values, 3)
+
+  def test_categorical_accumulator_object_with_nan_and_none(self):
+    accumulator = dataset_lib.CategoricalDataSpecAccumulator(
+        name="cat", max_vocab_count=10, min_vocab_frequency=1
+    )
+    accumulator.visit(np.array(["a", np.nan, None, "b", ""], dtype=object))
+    column = ds_pb.Column(type=ds_pb.ColumnType.CATEGORICAL)
+    accumulator.finalize(column)
+    self.assertEqual(column.count_nas, 3)
+    self.assertNotIn("", column.categorical.items)
+    self.assertEqual(column.categorical.items["a"].count, 1)
+    self.assertEqual(column.categorical.items["b"].count, 1)
+    self.assertEqual(column.categorical.number_of_unique_values, 3)
+
+  def test_infer_dataspec_categorical_missing_values(self):
+    ds = {
+        "cat_missing": np.array(["x", "", "y", "x", ""]),
+        "cat_nan": np.array(["nan", "nan", "z", "z", "z"]),
+    }
+    ds_generator = dataset_io_lib.build_batched_example_generator(ds)
+    dataspec = dataset_lib.infer_dataspec(
+        ds_generator,
+        dataspec_lib.DataSpecInferenceArgs(
+            columns=[
+                dataspec_lib.Column(
+                    "cat_missing",
+                    dataspec_lib.Semantic.CATEGORICAL,
+                    min_vocab_frequency=1,
+                ),
+                dataspec_lib.Column(
+                    "cat_nan",
+                    dataspec_lib.Semantic.CATEGORICAL,
+                    min_vocab_frequency=1,
+                ),
+            ],
+            include_all_columns=True,
+            max_vocab_count=10,
+            min_vocab_frequency=1,
+            discretize_numerical_columns=False,
+            num_discretized_numerical_bins=10,
+            max_num_scanned_rows_to_infer_semantic=-1,
+            max_num_scanned_rows_to_compute_statistics=10_000,
+        ),
+    )
+    col_missing = dataspec.columns[0]
+    self.assertEqual(col_missing.name, "cat_missing")
+    self.assertEqual(col_missing.count_nas, 2)
+    self.assertNotIn("", col_missing.categorical.items)
+    self.assertEqual(col_missing.categorical.items["x"].count, 2)
+    self.assertEqual(col_missing.categorical.items["y"].count, 1)
+
+    col_nan = dataspec.columns[1]
+    self.assertEqual(col_nan.name, "cat_nan")
+    self.assertEqual(col_nan.count_nas, 0)
+    self.assertIn("nan", col_nan.categorical.items)
+    self.assertEqual(col_nan.categorical.items["nan"].count, 2)
+    self.assertEqual(col_nan.categorical.items["z"].count, 3)
 
 
 class ReservoirSamplingTest(parameterized.TestCase):
