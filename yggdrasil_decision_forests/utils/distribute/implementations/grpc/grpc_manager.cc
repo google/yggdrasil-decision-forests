@@ -180,6 +180,7 @@ absl::Status GRPCManager::InitializeWorkers(
 
 absl::Status GRPCManager::WaitForAllWorkersToBeReady() {
   for (auto& worker : workers_) {
+    int num_auth_failures = 0;
     while (true) {
       ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker.get()));
       grpc::ClientContext context;
@@ -188,6 +189,23 @@ absl::Status GRPCManager::WaitForAllWorkersToBeReady() {
       proto::Empty answer;
       const auto ping_status = stub->Ping(&context, query, &answer);
       if (!ping_status.ok()) {
+        if (ping_status.error_code() == grpc::StatusCode::UNAUTHENTICATED ||
+            ping_status.error_code() == grpc::StatusCode::PERMISSION_DENIED) {
+          num_auth_failures++;
+          LOG(WARNING) << "Worker #" << worker->worker_idx
+                       << " returned authentication error: "
+                       << ping_status.error_message()
+                       << ". Please verify that manager and worker "
+                          "authentication settings match.";
+          if (num_auth_failures >= 6) {
+            return absl::PermissionDeniedError(
+                absl::StrCat("Worker #", worker->worker_idx,
+                             " returned repeated authentication errors (",
+                             ping_status.error_message(),
+                             "). Please verify that manager and worker "
+                             "authentication settings match."));
+          }
+        }
         if (verbosity_ >= 1) {
           LOG(INFO) << "Worker #" << worker->worker_idx
                     << " is not yet available. Waiting 10s";
