@@ -3163,6 +3163,103 @@ TEST(
             SplitSearchResult::kInvalidAttribute);
 }
 
+TEST(Hessian,
+     FindSplitLabelHessianRegressionFeatureNumericalCartMinSumHessianInLeaf) {
+  std::vector<float> weights;
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  const std::vector<float> attributes{1, 2, 3, 4};
+  const std::vector<float> gradients{-10, -10, 10, 10};
+  const std::vector<float> hessians{1, 1, 1, 1};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  const double sum_gradient =
+      std::accumulate(gradients.begin(), gradients.end(), 0.);
+  const double sum_hessian =
+      std::accumulate(hessians.begin(), hessians.end(), 0.);
+  const double sum_weights = selected_examples.size();
+
+  // Split is at 2.5: Left has sum_hessian = 2, Right has sum_hessian = 2.
+  {
+    // min_sum_hessian_in_leaf = 1.5 <= 2.0 -> split found.
+    InternalTrainConfig internal_config;
+    internal_config.min_sum_hessian_in_leaf = 1.5;
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+                  selected_examples, weights, attributes, gradients, hessians,
+                  /*na_replacement=*/2, /*min_num_obs=*/1, dt_config,
+                  sum_gradient, sum_hessian, sum_weights, -1, internal_config,
+                  {}, 0, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kBetterSplitFound);
+  }
+  {
+    // min_sum_hessian_in_leaf = 2.5 > 2.0 -> split rejected.
+    InternalTrainConfig internal_config;
+    internal_config.min_sum_hessian_in_leaf = 2.5;
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+                  selected_examples, weights, attributes, gradients, hessians,
+                  /*na_replacement=*/2, /*min_num_obs=*/1, dt_config,
+                  sum_gradient, sum_hessian, sum_weights, -1, internal_config,
+                  {}, 0, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kInvalidAttribute);
+  }
+}
+
+TEST(Hessian,
+     FindSplitLabelHessianRegressionFeatureNumericalCartWithAsymmetricHessian) {
+  std::vector<float> weights;
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  const std::vector<float> attributes{1, 2, 3, 4};
+  const std::vector<float> gradients{-10, -10, 10, 10};
+  const std::vector<float> hessians{1, 1, 5, 5};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  const double sum_gradient =
+      std::accumulate(gradients.begin(), gradients.end(), 0.);
+  const double sum_hessian =
+      std::accumulate(hessians.begin(), hessians.end(), 0.);
+  const double sum_weights = selected_examples.size();
+
+  // Split is at 2.5: Left has sum_hessian = 2, Right has sum_hessian = 10.
+  {
+    // min_sum_hessian_in_leaf = 3.0: Left violates (2 < 3.0), so split
+    // rejected.
+    InternalTrainConfig internal_config;
+    internal_config.min_sum_hessian_in_leaf = 3.0;
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+                  selected_examples, weights, attributes, gradients, hessians,
+                  /*na_replacement=*/0, /*min_num_obs=*/2, dt_config,
+                  sum_gradient, sum_hessian, sum_weights, -1, internal_config,
+                  {}, 0, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kInvalidAttribute);
+  }
+  {
+    // min_sum_hessian_in_leaf = 2.0: Both satisfy (2 >= 2.0, 10 >= 2.0).
+    InternalTrainConfig internal_config;
+    internal_config.min_sum_hessian_in_leaf = 2.0;
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<false>(
+                  selected_examples, weights, attributes, gradients, hessians,
+                  /*na_replacement=*/0, /*min_num_obs=*/2, dt_config,
+                  sum_gradient, sum_hessian, sum_weights, -1, internal_config,
+                  {}, 0, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kBetterSplitFound);
+  }
+}
+
 struct GenericHyperParameterTestDef {
   std::vector<std::string> keys;
   std::string generic_param;

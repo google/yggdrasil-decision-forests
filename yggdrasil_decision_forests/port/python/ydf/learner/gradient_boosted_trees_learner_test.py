@@ -213,6 +213,27 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     ):
       _ = learner.train(ds)
 
+  def test_min_sum_hessian_in_leaf(self):
+    learner = specialized_learners.GradientBoostedTreesLearner(
+        label="income",
+        num_trees=5,
+        use_hessian_gain=True,
+        min_sum_hessian_in_leaf=1e9,
+    )
+    model = learner.train(self.adult.train)
+    # Total dataset hessian is less than 1e9, so no splits are possible.
+    # All trees must have only a root leaf node.
+    for tree in model.get_all_trees():
+      self.assertTrue(tree.root.is_leaf)
+
+  def test_min_sum_hessian_in_leaf_negative_fails(self):
+    with self.assertRaises(test_utils.AbslInvalidArgumentError):
+      _ = specialized_learners.GradientBoostedTreesLearner(
+          label="income",
+          use_hessian_gain=True,
+          min_sum_hessian_in_leaf=-1.0,
+      ).train(self.adult.train)
+
   def test_monotonic_training(self):
     learner = specialized_learners.GradientBoostedTreesLearner(
         label="income",

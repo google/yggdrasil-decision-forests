@@ -482,6 +482,17 @@ absl::Status GradientBoostedTreesLearner::CheckConfiguration(
         "use_hessian_gain=false.");
   }
 
+  if (gbt_config.min_sum_hessian_in_leaf() > 0 &&
+      !gbt_config.use_hessian_gain()) {
+    return absl::InvalidArgumentError(
+        "min_sum_hessian_in_leaf is only supported with use_hessian_gain=true.");
+  }
+
+  if (gbt_config.min_sum_hessian_in_leaf() < 0) {
+    return absl::InvalidArgumentError(
+        "min_sum_hessian_in_leaf must be non-negative.");
+  }
+
   return absl::OkStatus();
 }
 
@@ -2387,13 +2398,14 @@ GradientBoostedTreesLearner::GetGenericHyperParameterSpecification() const {
   {
     auto& param =
         hparam_def.mutable_fields()->operator[](kHParamMinSumHessianInLeaf);
+    param.mutable_real()->set_minimum(0.f);
     param.mutable_real()->set_default_value(
         gbt_config.min_sum_hessian_in_leaf());
     param.mutable_conditional()->set_control_field(kHParamUseHessianGain);
     param.mutable_conditional()->mutable_categorical()->add_values("true");
     param.mutable_documentation()->set_proto_path(proto_path);
     param.mutable_documentation()->set_description(
-        R"(Minimum value of the sum of the hessians in the leafs. Splits that would violate this constraint are ignored. Only used when "use_hessian_gain" is true.)");
+        R"(Minimum value of the sum of the hessians in the leafs. Splits that would violate this constraint are ignored. For some regression losses, this is equal to the minimum number of examples in a leaf, since all hessians are 1.0. Setting this to a value larger than 0.0 makes splitting less aggressive.Only used when `use_hessian_gain` is true. Independently of this constraint, the hessian used in the Newton step denominator is clamped to 0.001 for numerical stability.)");
   }
 
   {
@@ -2682,6 +2694,8 @@ decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
   internal_config.hessian_l2_numerical = config.gbt_config->l2_regularization();
   internal_config.hessian_l2_categorical =
       config.gbt_config->l2_regularization_categorical();
+  internal_config.min_sum_hessian_in_leaf =
+      config.gbt_config->min_sum_hessian_in_leaf();
   internal_config.duplicated_selected_examples = false;
   internal_config.timeout = timeout;
   internal_config.split_finder_processor = split_finder_processor;

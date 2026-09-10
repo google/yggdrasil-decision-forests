@@ -328,6 +328,12 @@ struct InternalTrainConfig {
   float hessian_l2_numerical = 0.f;
   float hessian_l2_categorical = 0.f;
 
+  // Minimum sum of hessians in a leaf for use_hessian_gain=true.
+  // Splits that would violate this constraint are ignored. Note that score and
+  // leaf value computations independently clamp the hessian denominator to
+  // kMinHessianForNewtonStep (0.001) for numerical stability.
+  double min_sum_hessian_in_leaf = 0.0;
+
   // Non owning pointer to pre-processing information.
   // Depending on the decision tree configuration this field might be required.
   const Preprocessing* preprocessing = nullptr;

@@ -275,7 +275,15 @@ message GradientBoostedTreesTrainingConfig {
   // Minimum value of the sum of the hessians in the leafs. Splits that would
   // violate this constraint are ignored. Only used when "use_hessian_gain" is
   // true.
-  optional float min_sum_hessian_in_leaf = 21 [default = 0.001];
+  //
+  // For loss function with constant hessian (e.g. MSE loss), this is equal to
+  // the minimum number of examples in a leaf. Setting this to a value larger
+  // than 0.0 makes splitting less aggressive.
+  //
+  // Independently of this constraint, the hessian used in the Newton step
+  // denominator is clamped to kMinHessianForNewtonStep (0.001) for numerical
+  // stability.
+  optional float min_sum_hessian_in_leaf = 21 [default = 0.0];
 
   // Deprecated: Use GradientOneSideSampling in the "sampling_methods" below.
   optional bool use_goss = 23 [default = false, deprecated = true];

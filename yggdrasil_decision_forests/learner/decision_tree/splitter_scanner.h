@@ -1139,7 +1139,8 @@ SplitStats EvalSplit(const UnsignedExampleIdx num_examples,
   }
 
   const UnsignedExampleIdx num_neg_examples = num_examples - num_pos_examples;
-  if (num_pos_examples < min_num_obs || num_neg_examples < min_num_obs) {
+  if (num_pos_examples < min_num_obs || num_neg_examples < min_num_obs ||
+      !initializer.IsValidSplit(neg, pos)) {
     // Invalid split.
     return SplitStats{.valid = false};
   }
@@ -1231,6 +1232,10 @@ SplitSearchResult ScanSplitsCustomOrder(
     }
 
     if (num_neg_examples < min_num_obs) {
+      continue;
+    }
+
+    if (!initializer.IsValidSplit(neg, pos)) {
       continue;
     }
 

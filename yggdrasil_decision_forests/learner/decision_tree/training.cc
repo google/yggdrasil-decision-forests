@@ -2579,6 +2579,7 @@ FindSplitLabelHessianRegressionFeatureNumericalCart(
       initializer(sum_gradient, sum_hessian, sum_weights,
                   internal_config.hessian_l1,
                   internal_config.hessian_l2_numerical,
+                  internal_config.min_sum_hessian_in_leaf,
                   dt_config.internal().hessian_split_score_subtract_parent(),
                   monotonic_direction, constraints);
 
@@ -2686,6 +2687,7 @@ FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart(
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical,
+      internal_config.min_sum_hessian_in_leaf,
       dt_config.internal().hessian_split_score_subtract_parent(),
       monotonic_direction, constraints);
 
@@ -2973,6 +2975,7 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureNA(
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical,
+      internal_config.min_sum_hessian_in_leaf,
       dt_config.internal().hessian_split_score_subtract_parent(),
       /*monotonic_direction=*/0, constraints);
 
@@ -3160,6 +3163,7 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelHessianRegressionFeatureBoolean(
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_numerical,
+      internal_config.min_sum_hessian_in_leaf,
       dt_config.internal().hessian_split_score_subtract_parent(),
       /*monotonic_direction=*/0, constraints);
 
@@ -3231,6 +3235,7 @@ FindSplitLabelHessianRegressionFeatureCategorical(
   typename LabelHessianNumericalBucket<weighted>::Initializer initializer(
       sum_gradient, sum_hessian, sum_weights, internal_config.hessian_l1,
       internal_config.hessian_l2_categorical,
+      internal_config.min_sum_hessian_in_leaf,
       dt_config.internal().hessian_split_score_subtract_parent(),
       /*monotonic_direction=*/0, constraints);
 

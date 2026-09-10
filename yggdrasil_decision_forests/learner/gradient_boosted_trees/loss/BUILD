@@ -25,6 +25,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner/decision_tree:label",
+        "//yggdrasil_decision_forests/learner/decision_tree:splitter",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/learner/decision_tree:utils",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_cc_proto",

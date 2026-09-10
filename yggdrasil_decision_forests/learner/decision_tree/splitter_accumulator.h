@@ -749,7 +749,11 @@ struct LabelBinaryCategoricalScoreAccumulator {
 struct LabelHessianNumericalScoreAccumulator {
   static constexpr bool kNormalizeByWeight = false;
 
-  // Minimum hessian value when computing hessian scores and leaf values.
+  // Minimum hessian value when computing hessian scores and leaf values (Newton
+  // step denominator clamping for numerical stability). Even if
+  // min_sum_hessian_in_leaf is set to 0 (allowing splits with smaller
+  // hessians), the hessian used in the Newton step denominator is clamped to
+  // this value.
   static constexpr double kMinHessianForNewtonStep = 0.001;
 
   static double ComputeScore(double sum_gradient, double sum_hessian,
@@ -1053,7 +1057,7 @@ struct LabelHessianNumericalOneValueBucket {
    public:
     Initializer(const double sum_gradient, const double sum_hessian,
                 const double sum_weights, const double hessian_l1,
-                const double hessian_l2,
+                const double hessian_l2, const double min_sum_hessian_in_leaf,
                 const bool hessian_split_score_subtract_parent,
                 const int8_t monotonic_direction,
                 const NodeConstraints& constraints)
@@ -1062,10 +1066,12 @@ struct LabelHessianNumericalOneValueBucket {
           sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
           hessian_l2_(hessian_l2),
+          min_sum_hessian_in_leaf_(min_sum_hessian_in_leaf),
           monotonic_direction_(monotonic_direction),
           constraints_(constraints) {
-      const auto parent_score = LabelHessianNumericalScoreAccumulator::ComputeScore(
-          sum_gradient, sum_hessian, hessian_l1, hessian_l2, constraints);
+      const auto parent_score =
+          LabelHessianNumericalScoreAccumulator::ComputeScore(
+              sum_gradient, sum_hessian, hessian_l1, hessian_l2, constraints);
       if (hessian_split_score_subtract_parent) {
         parent_score_ = parent_score;
         min_score_ = 0;
@@ -1093,6 +1099,11 @@ struct LabelHessianNumericalOneValueBucket {
 
     bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
                       const LabelHessianNumericalScoreAccumulator& pos) const {
+      if (min_sum_hessian_in_leaf_ > 0 &&
+          (neg.sum_hessian < min_sum_hessian_in_leaf_ ||
+           pos.sum_hessian < min_sum_hessian_in_leaf_)) {
+        return false;
+      }
       if (monotonic_direction_ != 0) {
         const bool pos_is_greater =
             pos.LeafNoConstraints() >= neg.LeafNoConstraints();
@@ -1109,6 +1120,7 @@ struct LabelHessianNumericalOneValueBucket {
     const double sum_weights_;
     const double hessian_l1_;
     const double hessian_l2_;
+    const double min_sum_hessian_in_leaf_ = 0.0;
     double parent_score_;
     double min_score_;
 
@@ -1717,7 +1729,7 @@ struct LabelHessianNumericalBucket {
    public:
     Initializer(const double sum_gradient, const double sum_hessian,
                 const double sum_weights, const double hessian_l1,
-                const double hessian_l2,
+                const double hessian_l2, const double min_sum_hessian_in_leaf,
                 const bool hessian_split_score_subtract_parent,
                 const int8_t monotonic_direction,
                 const NodeConstraints& constraints)
@@ -1726,10 +1738,12 @@ struct LabelHessianNumericalBucket {
           sum_weights_(sum_weights),
           hessian_l1_(hessian_l1),
           hessian_l2_(hessian_l2),
+          min_sum_hessian_in_leaf_(min_sum_hessian_in_leaf),
           monotonic_direction_(monotonic_direction),
           constraints_(constraints) {
-      const auto parent_score = LabelHessianNumericalScoreAccumulator::ComputeScore(
-          sum_gradient, sum_hessian, hessian_l1, hessian_l2, constraints);
+      const auto parent_score =
+          LabelHessianNumericalScoreAccumulator::ComputeScore(
+              sum_gradient, sum_hessian, hessian_l1, hessian_l2, constraints);
       if (hessian_split_score_subtract_parent) {
         parent_score_ = parent_score;
         min_score_ = 0;
@@ -1757,6 +1771,11 @@ struct LabelHessianNumericalBucket {
 
     bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
                       const LabelHessianNumericalScoreAccumulator& pos) const {
+      if (min_sum_hessian_in_leaf_ > 0 &&
+          (neg.sum_hessian < min_sum_hessian_in_leaf_ ||
+           pos.sum_hessian < min_sum_hessian_in_leaf_)) {
+        return false;
+      }
       if (monotonic_direction_ != 0) {
         const bool pos_is_greater =
             pos.LeafNoConstraints() >= neg.LeafNoConstraints();
@@ -1773,6 +1792,7 @@ struct LabelHessianNumericalBucket {
     const double sum_weights_;
     const double hessian_l1_;
     const double hessian_l2_;
+    const double min_sum_hessian_in_leaf_ = 0.0;
     double parent_score_;
     double min_score_;
 

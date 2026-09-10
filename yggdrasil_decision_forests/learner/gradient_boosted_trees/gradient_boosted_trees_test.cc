@@ -1575,6 +1575,59 @@ TEST_F(GradientBoostedTreesOnAdult, HessianL2Categorical) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2948, 0.0127, 0.2901);
 }
 
+TEST_F(GradientBoostedTreesOnAdult, MinSumHessianInLeaf) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(10);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_use_hessian_gain(true);
+  constexpr float kMinSumHessian = 100.f;
+  gbt_config->set_min_sum_hessian_in_leaf(kMinSumHessian);
+
+  TrainAndEvaluateModel();
+
+  auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  ASSERT_NE(gbt_model, nullptr);
+  int num_leaves = 0;
+  int num_split_trees = 0;
+  for (const auto& tree : gbt_model->decision_trees()) {
+    if (tree->NumNodes() > 1) {
+      num_split_trees++;
+    }
+    tree->IterateOnNodes(
+        [&](const decision_tree::NodeWithChildren& node, const int depth) {
+          if (node.IsLeaf()) {
+            num_leaves++;
+            if (tree->NumNodes() > 1) {
+              EXPECT_GE(node.node().regressor().sum_hessians(), kMinSumHessian);
+            }
+          }
+        });
+  }
+  EXPECT_GT(num_split_trees, 0);
+}
+
+TEST_F(GradientBoostedTreesOnAdult, MinSumHessianInLeafTooLargePreventsSplits) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_num_trees(5);
+  gbt_config->mutable_decision_tree()->set_max_depth(4);
+  gbt_config->set_use_hessian_gain(true);
+  // Setting min_sum_hessian_in_leaf higher than total dataset hessian prevents
+  // all splits.
+  gbt_config->set_min_sum_hessian_in_leaf(1e9f);
+
+  TrainAndEvaluateModel();
+
+  auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  ASSERT_NE(gbt_model, nullptr);
+  for (const auto& tree : gbt_model->decision_trees()) {
+    EXPECT_EQ(tree->NumNodes(), 1);
+  }
+}
+
 TEST_F(GradientBoostedTreesOnAdult, PureServingModel) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -2006,6 +2059,48 @@ TEST(GradientBoostedTrees, SetHyperParameters) {
   )pb")));
   EXPECT_TRUE(gbdt_config.has_stochastic_gradient_boosting());
   EXPECT_NEAR(gbdt_config.stochastic_gradient_boosting().ratio(), 0.4, epsilon);
+
+  // Min sum hessian in leaf.
+  EXPECT_OK(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
+    fields {
+      name: "min_sum_hessian_in_leaf"
+      value { real: 5.0 }
+    }
+  )pb")));
+  EXPECT_NEAR(gbdt_config.min_sum_hessian_in_leaf(), 5.0f, epsilon);
+
+  EXPECT_THAT(learner.SetHyperParameters(PARSE_TEST_PROTO(R"pb(
+                fields {
+                  name: "min_sum_hessian_in_leaf"
+                  value { real: -1.0 }
+                }
+              )pb")),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(GradientBoostedTrees, MinSumHessianNegativeRejected) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner("GRADIENT_BOOSTED_TREES");
+  auto* gbt_config = train_config.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_min_sum_hessian_in_leaf(-1.0f);
+  dataset::VerticalDataset dataset;
+  GradientBoostedTreesLearner learner(train_config);
+  EXPECT_THAT(learner.TrainWithStatus(dataset).status(),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(GradientBoostedTrees, MinSumHessianWithoutHessianGainRejected) {
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner("GRADIENT_BOOSTED_TREES");
+  auto* gbt_config = train_config.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_min_sum_hessian_in_leaf(5.0f);
+  gbt_config->set_use_hessian_gain(false);
+  dataset::VerticalDataset dataset;
+  GradientBoostedTreesLearner learner(train_config);
+  EXPECT_THAT(learner.TrainWithStatus(dataset).status(),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST(DartPredictionAccumulator, Base) {

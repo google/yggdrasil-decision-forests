@@ -27,6 +27,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/label.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -50,9 +51,11 @@ constexpr int64_t kMaximumItemsInRankingGroup = 2048;
 // Index of the secondary metrics according to the type of loss.
 constexpr int kBinomialLossSecondaryMetricClassificationIdx = 0;
 
-// Minimum length of the hessian (i.e. denominator) in the Newton step
-// optimization.
-constexpr double kMinHessianForNewtonStep = 0.001;
+// Minimum value of the hessian (i.e. denominator) in the Newton step
+// optimization for numerical stability. Even if min_sum_hessian_in_leaf is
+// 0.0, leaf values and score denominators are clamped from below to this value.
+constexpr double kMinHessianForNewtonStep = decision_tree::
+    LabelHessianNumericalScoreAccumulator::kMinHessianForNewtonStep;
 
 // Ensures that the value is finite i.e. not NaN and not infinite.
 // This is a no-op in release mode.
