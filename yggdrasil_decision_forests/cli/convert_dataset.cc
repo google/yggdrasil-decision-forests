@@ -26,7 +26,10 @@
 //     --dataspec= spec.pbtxt \
 //     --output=tfrecord:/my/dataset.tfrecord-tfe
 //
+#include <cstdint>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"

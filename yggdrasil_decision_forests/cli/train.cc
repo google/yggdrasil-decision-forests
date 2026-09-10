@@ -15,15 +15,25 @@
 
 // Train a ML model and export it to disk.
 
+#include <memory>
 #include <optional>
+#include <string>
+#include <utility>
 
 #include "absl/flags/flag.h"
 #include "absl/log/log.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
+#include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_library.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+
+ABSL_FLAG(std::string, model, "",
+          "Directory for loading a pre-trained model. This is useful for tasks "
+          "like post-training calibration. The model's data spec will be used "
+          "as the reference data spec.");
 
 ABSL_FLAG(std::string, output, "", "Output model directory.");
 
@@ -62,15 +72,14 @@ void Train() {
   // Check required flags.
   QCHECK(!absl::GetFlag(FLAGS_output).empty());
   QCHECK(!absl::GetFlag(FLAGS_dataset).empty());
-  QCHECK(!absl::GetFlag(FLAGS_dataspec).empty());
+  QCHECK(!absl::GetFlag(FLAGS_dataspec).empty() ||
+         !absl::GetFlag(FLAGS_model).empty());
   QCHECK(!absl::GetFlag(FLAGS_config).empty());
 
   // Load configuration protos and the dataspec.
   dataset::proto::DataSpecification data_spec;
   model::proto::DeploymentConfig deployment;
   model::proto::TrainingConfig config;
-  QCHECK_OK(file::GetTextProto(absl::GetFlag(FLAGS_dataspec), &data_spec,
-                               file::Defaults()));
   QCHECK_OK(file::GetTextProto(absl::GetFlag(FLAGS_config), &config,
                                file::Defaults()));
   if (!absl::GetFlag(FLAGS_deployment).empty()) {
@@ -85,6 +94,22 @@ void Train() {
   LOG(INFO) << "Configuration:\n" << config.DebugString();
   LOG(INFO) << "Deployment:\n" << deployment.DebugString();
 
+  std::unique_ptr<model::AbstractModel> model;
+  if (!absl::GetFlag(FLAGS_model).empty()) {
+    LOG(INFO) << "Loading model from " << absl::GetFlag(FLAGS_model);
+    QCHECK_OK(model::LoadModel(absl::GetFlag(FLAGS_model), &model));
+    LOG(INFO) << "Model: " << model->name() << " loaded.";
+    config.set_learner(model->name());
+    LOG(INFO) << "Using the DataSpecification of the loaded model.";
+    data_spec = model->data_spec();
+  } else if (!absl::GetFlag(FLAGS_dataspec).empty()) {
+    LOG(INFO) << "Loading dataspec from " << absl::GetFlag(FLAGS_dataspec);
+    QCHECK_OK(file::GetTextProto(absl::GetFlag(FLAGS_dataspec), &data_spec,
+                                 file::Defaults()));
+  } else {
+    LOG(FATAL) << "Either --model or --dataspec must be specified.";
+  }
+
   std::unique_ptr<model::AbstractLearner> learner;
   QCHECK_OK(model::GetLearner(config, &learner));
   *learner->mutable_deployment() = deployment;
@@ -97,10 +122,10 @@ void Train() {
   }
 
   LOG(INFO) << "Start training model.";
-  auto model = learner
-                   ->TrainWithStatus(absl::GetFlag(FLAGS_dataset), data_spec,
-                                     valid_dataset)
-                   .value();
+  model = learner
+              ->TrainWithStatus(absl::GetFlag(FLAGS_dataset), data_spec,
+                                valid_dataset, std::move(model))
+              .value();
 
   LOG(INFO) << "Save model.";
   QCHECK_OK(model::SaveModel(absl::GetFlag(FLAGS_output), model.get()));
