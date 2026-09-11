@@ -2134,8 +2134,7 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
   }
 
   const double initial_entropy = label_distribution.Entropy();
-  utils::BinaryToIntegerConfusionMatrixDouble confusion;
-  confusion.SetNumClassesIntDim(num_label_classes);
+  const double total_sum = label_distribution.NumObservations();
 
   // Select the best threshold.
   bool found_split = false;
@@ -2147,11 +2146,12 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
       continue;
     }
 
-    confusion.mutable_neg()->Set(label_distribution);
-    confusion.mutable_neg()->Sub(candidate_split.pos_label_distribution);
-    confusion.mutable_pos()->Set(candidate_split.pos_label_distribution);
-
-    const double final_entropy = confusion.FinalEntropy();
+    // Final entropy from the node's label distribution and the candidate's
+    // positive-branch distribution, without materializing a per-candidate
+    // BinaryToIntegerConfusionMatrix (two IntegerDistribution copies).
+    const auto& pos = candidate_split.pos_label_distribution;
+    const double final_entropy = utils::BinaryToIntegerConfusionMatrixDouble::
+        FinalEntropyFromTotalAndPos(label_distribution, pos);
     const double information_gain = initial_entropy - final_entropy;
     if (information_gain > condition->split_score()) {
       condition->set_split_score(information_gain);
@@ -2160,12 +2160,11 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
       condition->set_attribute(attribute_idx);
       condition->set_num_training_examples_without_weight(
           selected_examples.size());
-      condition->set_num_training_examples_with_weight(
-          confusion.NumObservations());
+      condition->set_num_training_examples_with_weight(total_sum);
       condition->set_num_pos_training_examples_without_weight(
           candidate_split.num_positive_examples_without_weights);
       condition->set_num_pos_training_examples_with_weight(
-          confusion.pos().NumObservations());
+          pos.NumObservations());
       condition->set_na_value(na_replacement >= candidate_split.threshold);
       found_split = true;
     }
