@@ -328,6 +328,43 @@ line: {
   }
 
   absl::StrAppend(&export_acc->data, "},\n");
+
+  // Error bars.
+  if (!curve.error_ys.empty()) {
+    auto minus_error_ys = curve.error_ys;
+    if (curve.minus_error_ys.size() == curve.error_ys.size()) {
+      minus_error_ys = curve.minus_error_ys;
+    }
+    std::vector<double> x(2 * curve.xs.size());
+    std::vector<double> y(2 * curve.ys.size());
+
+    for (int i = 0; i < curve.xs.size(); ++i) {
+      x[i] = curve.xs[i];
+      x[x.size() - 1 - i] = curve.xs[i];
+      y[i] = curve.error_ys[i];
+      y[y.size() - 1 - i] = minus_error_ys[i];
+    }
+
+    absl::StrAppend(&export_acc->data, "{\n");
+
+    absl::SubstituteAndAppend(&export_acc->data, R"(x: $0,
+y: $1,
+type: 'scatter',
+fill: 'toself',
+fillcolor: 'rgba(255, 153, 0, 0.3)',
+showlegend: false,
+hoverinfo: 'skip',
+line: {
+  color: 'rgba(255,255,255,0)'
+}
+)",
+                              VectorToJsVector(x),  // $0
+                              VectorToJsVector(y)   // $1
+    );
+
+    absl::StrAppend(&export_acc->data, "},\n");
+  }
+
   return absl::OkStatus();
 }
 

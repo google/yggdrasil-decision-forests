@@ -105,6 +105,7 @@ namespace yggdrasil_decision_forests::utils {
 // score-distribution fitting. Array-of-structs layout: PAV's merge step
 // combines one whole (sum_pred, sum_true, count) tuple at a time.
 // TODO: Add support for differently weighted samples.
+// TODO: Add support for different types for each accumulator.
 template <typename A,
           std::enable_if_t<std::is_floating_point<A>::value, bool> = true>
 struct BinAccumulatorTemplate {
@@ -117,6 +118,15 @@ struct BinAccumulatorTemplate {
   AccumulatorType sum_true = 0;
   // Number of samples falling in this bin.
   AccumulatorType count = 0;
+
+  static std::size_t BinIndex(AccumulatorType p, std::size_t n_bins) {
+    const auto scale = static_cast<AccumulatorType>(n_bins);
+    auto pi = std::clamp(p, static_cast<AccumulatorType>(0.0),
+                         static_cast<AccumulatorType>(1.0));
+    // matches np.digitize(p, linspace(0, 1, n_bins+1)) - 1, clipped
+    return static_cast<std::size_t>(
+        std::min(pi * scale, scale - static_cast<AccumulatorType>(1.0)));
+  }
 
   // Mean predicted probability in this bin. sum_pred / count.
   constexpr AccumulatorType prob_pred() const { return sum_pred / count; }
