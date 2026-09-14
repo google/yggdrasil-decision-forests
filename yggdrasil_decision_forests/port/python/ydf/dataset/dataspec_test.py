@@ -198,6 +198,16 @@ class DataspecTest(parameterized.TestCase):
     self.assertEqual(dataspec_lib.priority(None, 2), 2)
     self.assertIsNone(dataspec_lib.priority(None, None), None)
 
+  def test_to_proto_column_guide_escapes_regex(self):
+    self.assertEqual(
+        Column("a(z)e").to_proto_column_guide().column_name_pattern,
+        r"^a\(z\)e$",
+    )
+    self.assertEqual(
+        Column("user.age").to_proto_column_guide().column_name_pattern,
+        r"^user\.age$",
+    )
+
   def test_get_all_columns(self):
     self.assertEqual(
         dataspec_lib.get_all_columns(

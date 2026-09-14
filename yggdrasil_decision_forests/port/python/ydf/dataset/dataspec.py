@@ -16,6 +16,7 @@
 
 import dataclasses
 import enum
+import re
 from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -411,7 +412,7 @@ class Column(object):
 
     guide = ds_pb.ColumnGuide(
         # Only match the exact name
-        column_name_pattern=f"^{self.name}$",
+        column_name_pattern=f"^{re.escape(self.name)}$",
         categorial=categorical_guide,
         discretized_numerical=ds_pb.DiscretizedNumericalGuide(
             maximum_num_bins=self.num_discretized_numerical_bins
