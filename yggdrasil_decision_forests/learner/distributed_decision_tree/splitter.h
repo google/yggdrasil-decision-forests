@@ -1026,8 +1026,9 @@ absl::Status TemplatedFindBestSplitsWithDiscretizedNumericalFeature(
           decision_tree::FeatureDiscretizedNumericalBucket,
           typename LabelFiller::LabelBucket>>;
 
+  const std::vector<dataset::DiscretizedNumericalIndex> empty_attributes;
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
-      num_discretized_values, replacement_missing_value, {});
+      num_discretized_values, replacement_missing_value, empty_attributes);
 
   // ExampleBucket for each of the open nodes.
   std::vector<ExampleBucketSet> example_bucket_set_per_node;
@@ -1086,8 +1087,9 @@ TemplatedFindBestSplitsWithDiscretizedNumericalFeatureMultiThreading(
           decision_tree::FeatureDiscretizedNumericalBucket,
           typename LabelFiller::LabelBucket>>;
 
+  const std::vector<dataset::DiscretizedNumericalIndex> empty_attributes;
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
-      num_discretized_values, replacement_missing_value, {});
+      num_discretized_values, replacement_missing_value, empty_attributes);
 
   // ExampleBucket for each of the threads and each of the open nodes.
   std::vector<std::vector<ExampleBucketSet>> example_bucket_set_per_node(
@@ -1188,13 +1190,14 @@ absl::Status TemplatedFindBestSplitsWithClassificationAndCategoricalFeature(
                                              .columns(feature)
                                              .categorical()
                                              .replacement_missing_value();
+  const std::vector<int32_t> empty_attributes;
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
       num_feature_values,
       common.dataset->meta_data()
           .columns(feature)
           .categorical()
           .replacement_missing_value(),
-      {});
+      empty_attributes);
 
   // ExampleBucket for each of the open nodes.
   std::vector<ExampleBucketSet> example_bucket_set_per_node;
@@ -1230,12 +1233,13 @@ absl::Status TemplatedFindBestSplitsWithClassificationAndBooleanFeature(
       decision_tree::ExampleBucket<decision_tree::FeatureBooleanBucket,
                                    typename LabelFiller::LabelBucket>>;
 
+  const std::vector<int8_t> empty_attributes;
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
       common.dataset->meta_data()
           .columns(feature)
           .boolean()
           .replacement_missing_value(),
-      {});
+      empty_attributes);
 
   // ExampleBucket for each of the open nodes.
   std::vector<ExampleBucketSet> example_bucket_set_per_node;
@@ -1278,13 +1282,14 @@ absl::Status TemplatedFindBestSplitsWithRegressionAndCategoricalFeature(
                                              .categorical()
                                              .replacement_missing_value();
 
+  const std::vector<int32_t> empty_attributes;
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
       num_feature_values,
       common.dataset->meta_data()
           .columns(feature)
           .categorical()
           .replacement_missing_value(),
-      {});
+      empty_attributes);
 
   // ExampleBucket for each of the open nodes.
   std::vector<ExampleBucketSet> example_bucket_set_per_node;
@@ -1320,12 +1325,13 @@ absl::Status TemplatedFindBestSplitsWithRegressionAndBooleanFeature(
       decision_tree::ExampleBucket<decision_tree::FeatureBooleanBucket,
                                    typename LabelFiller::LabelBucket>>;
 
+  const std::vector<int8_t> empty_attributes;
   typename ExampleBucketSet::FeatureBucketType::Filler feature_filler(
       common.dataset->meta_data()
           .columns(feature)
           .boolean()
           .replacement_missing_value(),
-      {});
+      empty_attributes);
 
   // ExampleBucket for each of the open nodes.
   std::vector<ExampleBucketSet> example_bucket_set_per_node;
