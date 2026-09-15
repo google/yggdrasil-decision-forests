@@ -31,8 +31,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_SERVING_FAST_ENGINE_H_
 #define YGGDRASIL_DECISION_FORESTS_SERVING_FAST_ENGINE_H_
 
+#include <cstdint>
+#include <memory>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 
 namespace yggdrasil_decision_forests {
@@ -60,7 +65,7 @@ class FastEngine {
   //
   // The "FillMissing" function sets all the features values to missing. You can
   // also call the "FillMissing" function after the example allocation (or in
-  // between Prediction calls, if you are re-using the same allocated examples),
+  // between Prediction calls, if you are reusing the same allocated examples),
   // and before setting any feature value to set all the features to an initial
   // state of missing. "FillMissing" has a cost, but it is more efficient than
   // calling "SetMissing" on all features individually.
@@ -78,8 +83,17 @@ class FastEngine {
   // Applies the model on a set of examples.
   // After the function call, "predictions" will be of size "num_examples *
   // NumPredictionDimension()".
-  virtual void Predict(const AbstractExampleSet& examples, int num_examples,
-                       std::vector<float>* predictions) const = 0;
+  void Predict(const AbstractExampleSet& examples, int num_examples,
+               std::vector<float>* predictions) const {
+    PredictImpl(examples, num_examples, predictions);
+    // Explicit check for small optimization (relying on the for loop to be
+    // optimized away by the compiler adds a small overhead).
+    if (run_postprocessors_) {
+      for (const auto& postprocessor : postprocessors_) {
+        postprocessor->Process(examples, num_examples, predictions);
+      }
+    }
+  }
 
   // Applies the model on a set of examples and returns the index of the active
   // leaf of each tree.
@@ -100,6 +114,27 @@ class FastEngine {
 
   // List of features used by the model.
   virtual const serving::FeaturesDefinition& features() const = 0;
+
+  void AddPostprocessor(
+      std::shared_ptr<model::postprocessor::AbstractPostprocessor>
+          postprocessor) {
+    postprocessors_.push_back(postprocessor);
+    for (const auto& postprocessor : postprocessors_) {
+      if (postprocessor->enabled()) {
+        run_postprocessors_ = true;
+        break;
+      }
+    }
+  }
+
+ protected:
+  virtual void PredictImpl(const AbstractExampleSet& examples, int num_examples,
+                           std::vector<float>* predictions) const = 0;
+
+ private:
+  std::vector<std::shared_ptr<model::postprocessor::AbstractPostprocessor>>
+      postprocessors_;
+  bool run_postprocessors_ = false;
 };
 
 }  // namespace serving

@@ -47,6 +47,7 @@
 #include "yggdrasil_decision_forests/utils/plot.h"
 #include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/registration.h"
+#include "yggdrasil_decision_forests/utils/reliability_diagram.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -491,9 +492,31 @@ class AbstractModel {
       std::vector<model::proto::Prediction>* predictions,
       metric::proto::EvaluationResults* eval) const;
 
+  absl::Status InitializeForEvaluation(
+      const metric::proto::EvaluationOptions& option,
+      const dataset::proto::Column& label_column,
+      metric::proto::EvaluationResults* eval) const;
+
+  absl::Status FinalizeForEvaluation(
+      const metric::proto::EvaluationOptions& option,
+      const dataset::proto::Column& label_column,
+      metric::proto::EvaluationResults* eval) const;
+
   void AddPostprocessor(
       std::shared_ptr<postprocessor::AbstractPostprocessor> postprocessor) {
     postprocessors_.push_back(postprocessor);
+  }
+
+  void CopyToPostprocessors(AbstractModel* dst) const {
+    for (const auto& postprocessor : postprocessors_) {
+      dst->AddPostprocessor(postprocessor);
+    }
+  }
+
+  void CopyToPostprocessors(serving::FastEngine* dst) const {
+    for (const auto& postprocessor : postprocessors_) {
+      dst->AddPostprocessor(postprocessor);
+    }
   }
 
  protected:
@@ -524,6 +547,16 @@ class AbstractModel {
   // TODO: Add status.
   virtual void PredictImpl(const dataset::proto::Example& example,
                            proto::Prediction* prediction) const = 0;
+
+  absl::Status InitializePostprocessorsForEvaluation(
+      const metric::proto::EvaluationOptions& option,
+      const dataset::proto::Column& label_column,
+      metric::proto::EvaluationResults* eval) const;
+
+  absl::Status FinalizePostprocessorsForEvaluation(
+      const metric::proto::EvaluationOptions& option,
+      const dataset::proto::Column& label_column,
+      metric::proto::EvaluationResults* eval) const;
 
   explicit AbstractModel(const absl::string_view name) : name_(name) {}
 

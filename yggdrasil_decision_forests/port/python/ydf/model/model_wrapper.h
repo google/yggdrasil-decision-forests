@@ -33,6 +33,7 @@
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/learner/postprocessor/abstract_postprocessor.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
@@ -93,6 +94,12 @@ class GenericCCModel {
   absl::StatusOr<BenchmarkInferenceCCResult> Benchmark(
       const dataset::VerticalDataset& dataset, double benchmark_duration,
       double warmup_duration, int batch_size, int num_threads);
+
+  absl::Status Calibrate(
+      const dataset::VerticalDataset& dataset,
+      const model::postprocessor::proto::AbstractPostprocessorTrainingConfig&
+          postprocessor_training_config,
+      int num_threads);
 
   // Gets an engine of the model. If the engine does not exist, create it.
   // This method is not thread safe.

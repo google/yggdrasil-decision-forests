@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -35,12 +36,14 @@
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/metric/ranking_utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/smoothed_pav_calibration_fit.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/substitute.h"
+#include "boost/math/distributions/beta.hpp"
 #include "boost/math/distributions/binomial.hpp"
 #include "boost/math/distributions/chi_squared.hpp"
 #include "boost/math/distributions/students_t.hpp"
@@ -57,6 +60,7 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/random.h"
+#include "yggdrasil_decision_forests/utils/reliability_diagram.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
@@ -452,14 +456,85 @@ absl::Status FinalizeRankingMetricsFromSampledPredictions(
   return absl::OkStatus();
 }
 
+void MergeCalibration(
+    const metric::proto::EvaluationOptions& option,
+    const metric::proto::EvaluationResults::Classification& src,
+    metric::proto::EvaluationResults::Classification* dst) {
+  switch (src.calibration_case()) {
+    case metric::proto::EvaluationResults::Classification::
+        kBinaryCalibrationData: {
+      const auto nbins = option.classification().max_calibration_bins();
+      auto s = src.binary_calibration_data();
+      auto d = dst->mutable_binary_calibration_data();
+
+      if (s.reliability_diagram_count().size() > nbins ||
+          d->reliability_diagram_count().size() > nbins) {
+        LOG(ERROR) << "Too many bins in calibration data during merging.";
+        return;
+      }
+
+      std::vector<utils::BinAccumulator> merged_bins(nbins);
+      for (int i = 0; i < s.reliability_diagram_count().size(); ++i) {
+        auto pred = s.reliability_diagram_mean_predicted(i);
+        auto obs = s.reliability_diagram_mean_observed(i);
+        auto count = s.reliability_diagram_count(i);
+        auto bin_idx = utils::BinAccumulator::BinIndex(pred, nbins);
+
+        merged_bins[bin_idx].count += count;
+        merged_bins[bin_idx].sum_pred += pred * count;
+        merged_bins[bin_idx].sum_true += obs * count;
+      }
+      for (int i = 0; i < d->reliability_diagram_count().size(); ++i) {
+        auto pred = d->reliability_diagram_mean_predicted(i);
+        auto obs = d->reliability_diagram_mean_observed(i);
+        auto count = d->reliability_diagram_count(i);
+        auto bin_idx = utils::BinAccumulator::BinIndex(pred, nbins);
+
+        merged_bins[bin_idx].count += count;
+        merged_bins[bin_idx].sum_pred += pred * count;
+        merged_bins[bin_idx].sum_true += obs * count;
+      }
+
+      utils::reliability_diagram::ReliabilityDiagram merged_diagram(
+          merged_bins);
+
+      d->mutable_raw_prob_pred()->Assign(s.raw_prob_pred().begin(),
+                                         s.raw_prob_pred().end());
+      d->mutable_raw_prob_true()->Assign(s.raw_prob_true().begin(),
+                                         s.raw_prob_true().end());
+
+      d->mutable_reliability_diagram_mean_predicted()->Clear();
+      d->mutable_reliability_diagram_mean_observed()->Clear();
+      d->mutable_reliability_diagram_count()->Clear();
+      auto p = merged_diagram.bin_mean_predicted();
+      d->mutable_reliability_diagram_mean_predicted()->Assign(p.begin(),
+                                                              p.end());
+      auto o = merged_diagram.bin_mean_observed();
+      d->mutable_reliability_diagram_mean_observed()->Assign(o.begin(),
+                                                             o.end());
+      auto c = merged_diagram.bin_counts();
+      d->mutable_reliability_diagram_count()->Assign(c.begin(), c.end());
+
+      d->set_ece(merged_diagram.ece());
+      d->set_mce(merged_diagram.mce());
+    } break;
+    default:
+      LOG(ERROR) << "Unknown calibration data type: " << src.calibration_case();
+  }
+}
+
 // Specialization of "MergeEvaluation" to specific task type.
 // Don't call any these methods directly as "MergeEvaluation" implements part of
 // the merging logic itself.
 void MergeEvaluationClassification(
+    const proto::EvaluationOptions& option,
     const proto::EvaluationResults::Classification& src,
     proto::EvaluationResults::Classification* dst) {
   utils::AddToConfusionMatrixProto(src.confusion(), dst->mutable_confusion());
   dst->set_sum_log_loss(dst->sum_log_loss() + src.sum_log_loss());
+  if (src.has_binary_calibration_data()) {
+    MergeCalibration(option, src, dst);
+  }
 }
 
 void MergeEvaluationRegression(const proto::EvaluationResults::Regression& src,
@@ -530,6 +605,45 @@ float PValueMeanIsGreaterThanZero(const std::vector<float>& sample) {
   const auto students_t =
       boost::math::students_t_distribution<double>(sample.size() - 1);
   return 1. - boost::math::cdf(students_t, statistic);
+}
+
+ErrorBars<float> ComputeErrorIntervalForReliabilityDiagram(
+    const absl::Span<const float> mean_predicted,
+    const absl::Span<const float> mean_observed,
+    const absl::Span<const float> counts, float confidence_level) {
+  // Methodology: Assume that the prior for the mean is the mean_predicted, the
+  // posterior mean is the mean_observed, and the posterior effective sample
+  // size are the counts. The model used here is a Beta-Binomial model such that
+  // p ~ Beta(tau*mean_predicted, tau*(1-mean_predicted)) where tau is the
+  // effective sample size. After count new observations, the posterior Beta
+  // distribution parameters are:
+  // alpha = mean_observed * (tau + count)
+  // beta = (1 - mean_observed) * (tau + count)
+  //
+  // Since we assumed the counts are the posterior effective sample sizes, this
+  // reduces to (tau = 0):
+  // alpha = mean_observed * count
+  // beta = (1 - mean_observed) * count
+
+  float lower_p = 1 - confidence_level;
+  float upper_p = confidence_level;
+  std::vector<float> upper(mean_predicted.size());
+  std::vector<float> lower(mean_predicted.size());
+  for (int i = 0; i < mean_predicted.size(); ++i) {
+    float alpha = mean_observed[i] * counts[i];
+    float beta = (1 - mean_observed[i]) * counts[i];
+    upper[i] = boost::math::ibeta_inv(alpha, beta, upper_p);
+    lower[i] = boost::math::ibeta_inv(alpha, beta, lower_p);
+
+    if (std::isnan(upper[i])) {
+      upper[i] = mean_observed[i];
+    }
+    if (std::isnan(lower[i])) {
+      lower[i] = mean_observed[i];
+    }
+  }
+
+  return {upper, lower};
 }
 
 float ComputeThresholdForMaxAccuracy(
@@ -918,6 +1032,12 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
       utils::InitializeConfusionMatrixProto(
           num_classes, num_classes,
           eval->mutable_classification()->mutable_confusion());
+      if (num_classes == 3 &&
+          option.classification().max_calibration_bins() > 0) {
+        eval->mutable_classification()
+            ->mutable_binary_calibration_data()
+            ->Clear();
+      }
     } break;
     case model::proto::Task::REGRESSION:
       if (label_column.type() != dataset::proto::ColumnType::NUMERICAL) {
@@ -965,10 +1085,11 @@ absl::Status InitializeEvaluation(const proto::EvaluationOptions& option,
   return absl::OkStatus();
 }
 
-absl::Status AddPrediction(const proto::EvaluationOptions& option,
-                           const model::proto::Prediction& pred,
-                           utils::RandomEngine* rnd,
-                           proto::EvaluationResults* eval) {
+absl::Status AddPrediction(
+    const proto::EvaluationOptions& option,
+    const model::proto::Prediction& pred, utils::RandomEngine* rnd,
+    proto::EvaluationResults* eval,
+    utils::reliability_diagram::ReliabilityDiagram* reliability_diagram) {
   if (option.has_weights() != pred.has_weight()) {
     return absl::InvalidArgumentError("Wrong weight shape");
   }
@@ -1000,8 +1121,21 @@ absl::Status AddPrediction(const proto::EvaluationOptions& option,
       // Confusion matrix.
       utils::AddToConfusionMatrixProto(ground_truth, pred_value, pred.weight(),
                                        confusion_matrix);
-      // Log-Loss
+
       if (pred_cls.has_distribution()) {
+        // Calibration.
+        if (reliability_diagram != nullptr) {
+          const int kPositiveClassIndex = 2;
+          auto pred_prob_positive_class =
+              pred_cls.distribution().counts(kPositiveClassIndex);
+          if (pred_cls.distribution().sum() > 0) {
+            pred_prob_positive_class /= pred_cls.distribution().sum();
+          }
+          RETURN_IF_ERROR(reliability_diagram->update(
+              pred_prob_positive_class, ground_truth == kPositiveClassIndex));
+        }
+
+        // Log-Loss
         auto pred_prob_true_class =
             pred_cls.distribution().counts(pred_cls.ground_truth());
         if (pred_cls.distribution().sum() > 0) {
@@ -1154,6 +1288,35 @@ absl::Status ChangePredictionType(model::proto::Task src_task,
                   model::proto::Task_Name(src_task), " to ",
                   model::proto::Task_Name(dst_task));
   }
+  return absl::OkStatus();
+}
+
+absl::Status StoreReliabilityDiagram(
+    utils::reliability_diagram::ReliabilityDiagram* reliability_diagram,
+    metric::proto::EvaluationResults* eval) {
+  if (reliability_diagram == nullptr ||
+      !eval->classification().has_binary_calibration_data()) {
+    return absl::OkStatus();
+  }
+
+  auto* bin_cal_data =
+      eval->mutable_classification()->mutable_binary_calibration_data();
+
+  bin_cal_data->mutable_reliability_diagram_mean_predicted()->Clear();
+  bin_cal_data->mutable_reliability_diagram_mean_observed()->Clear();
+  bin_cal_data->mutable_reliability_diagram_count()->Clear();
+  auto p = reliability_diagram->bin_mean_predicted();
+  bin_cal_data->mutable_reliability_diagram_mean_predicted()->Assign(p.begin(),
+                                                                     p.end());
+  auto o = reliability_diagram->bin_mean_observed();
+  bin_cal_data->mutable_reliability_diagram_mean_observed()->Assign(o.begin(),
+                                                                    o.end());
+  auto c = reliability_diagram->bin_counts();
+  bin_cal_data->mutable_reliability_diagram_count()->Assign(c.begin(), c.end());
+
+  bin_cal_data->set_ece(reliability_diagram->ece());
+  bin_cal_data->set_mce(reliability_diagram->mce());
+
   return absl::OkStatus();
 }
 
@@ -1379,6 +1542,14 @@ float DefaultNDCG(const proto::EvaluationResults& eval) {
   return eval.ranking().default_ndcg();
 }
 
+float ExpectedCalibrationError(const proto::EvaluationResults& eval) {
+  return eval.classification().binary_calibration_data().ece();
+}
+
+float MaximumCalibrationError(const proto::EvaluationResults& eval) {
+  return eval.classification().binary_calibration_data().mce();
+}
+
 void ComputeXAtYMetrics(
     const proto::EvaluationOptions& option,
     const google::protobuf::RepeatedPtrField<proto::Roc::Point>& curve, proto::Roc* roc) {
@@ -1552,7 +1723,7 @@ absl::Status MergeEvaluation(const proto::EvaluationOptions& option,
 
   switch (src.type_case()) {
     case proto::EvaluationResults::kClassification:
-      MergeEvaluationClassification(src.classification(),
+      MergeEvaluationClassification(option, src.classification(),
                                     dst->mutable_classification());
       break;
     case proto::EvaluationResults::kRegression:
@@ -2142,6 +2313,16 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
   // Note: Temporary okay CHECK_OK.
   CHECK_OK(InitializeEvaluation(option, label_column, &eval));
 
+  std::unique_ptr<utils::reliability_diagram::ReliabilityDiagram>
+      reliability_diagram;
+  if (option.has_classification() &&
+      option.classification().max_calibration_bins() > 0 &&
+      eval.classification().has_binary_calibration_data()) {
+    reliability_diagram =
+        std::make_unique<utils::reliability_diagram::ReliabilityDiagram>(
+            option.classification().max_calibration_bins());
+  }
+
   // Note: Temporary okay CHECK_OK.
   CHECK_EQ(labels.size(), predictions.size());
   model::proto::Prediction prediction_proto;
@@ -2166,8 +2347,11 @@ proto::EvaluationResults BinaryClassificationEvaluationHelper(
     prediction_distribution.set_counts(positive_value, prediction);
 
     // Note: Temporary okay CHECK_OK.
-    CHECK_OK(AddPrediction(option, prediction_proto, rnd, &eval));
+    CHECK_OK(AddPrediction(option, prediction_proto, rnd, &eval,
+                           reliability_diagram.get()));
   }
+
+  CHECK_OK(StoreReliabilityDiagram(reliability_diagram.get(), &eval));
 
   // Note: Temporary okay CHECK_OK.
   CHECK_OK(FinalizeEvaluation(option, label_column, &eval));
