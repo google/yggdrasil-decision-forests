@@ -461,6 +461,173 @@ TEST(SparseOblique, ClassificationMaxNumFeatures) {
             1);
 }
 
+// Trains sparse oblique with histogram split search on 100 examples forming
+// two well-separated single-class clusters along the f1=f2 diagonal
+// Any projection with a non-zero sum of weights separates the clusters,
+// so the histogram split is expected to linearly separate the two classes
+void TestSparseObliqueHistogramSplit(
+    const proto::NumericalSplit::Type projection_split_type,
+    const int num_candidates) {
+  const model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(0);
+  config_link.add_numerical_features(1);
+  config_link.add_numerical_features(2);
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  auto* projection_split =
+      dt_config.mutable_sparse_oblique_split()->mutable_projection_split();
+  projection_split->set_type(projection_split_type);
+  // The num_candidates default is applied by SetDefaultHyperParameters, which
+  // is not part of this code path.
+  projection_split->set_num_candidates(num_candidates);
+  dt_config.set_min_examples(1);
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  dataset::VerticalDataset dataset;
+  ASSERT_OK_AND_ASSIGN(
+      auto label_col,
+      dataset.AddColumn("l", dataset::proto::ColumnType::CATEGORICAL));
+  label_col->mutable_categorical()->set_is_already_integerized(true);
+  label_col->mutable_categorical()->set_number_of_unique_values(3);
+  EXPECT_OK(
+      dataset.AddColumn("f1", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(
+      dataset.AddColumn("f2", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+
+  for (int i = 0; i < 50; i++) {
+    const std::string low = std::to_string(0.01f * i);
+    const std::string high = std::to_string(1.f + 0.01f * i);
+    dataset.AppendExample({{"l", "1"}, {"f1", low}, {"f2", low}});
+    dataset.AppendExample({{"l", "2"}, {"f1", high}, {"f2", high}});
+  }
+
+  ASSERT_OK_AND_ASSIGN(auto* label_data,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(0));
+
+  std::vector<UnsignedExampleIdx> selected_examples(dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(selected_examples.size(), 1.f);
+
+  ClassificationLabelStats label_stats(label_data->values());
+  label_stats.num_label_classes = 3;
+  label_stats.label_distribution.SetNumClasses(3);
+  for (const auto example_idx : selected_examples) {
+    label_stats.label_distribution.Add(label_data->values()[example_idx],
+                                       weights[example_idx]);
+  }
+
+  proto::Node parent;
+  InternalTrainConfig internal_config;
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  const auto result = FindBestConditionOblique(
+                          dataset, selected_examples, weights, config,
+                          config_link, dt_config, parent, internal_config,
+                          label_stats, 20000, &best_condition, &random, &cache)
+                          .value();
+  EXPECT_TRUE(result);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 50);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 100);
+  // Information gain of a perfect split between two balanced classes.
+  EXPECT_NEAR(best_condition.split_score(), 0.693, 0.001);
+}
+
+TEST(SparseOblique, ClassificationHistogramRandom) {
+  TestSparseObliqueHistogramSplit(proto::NumericalSplit::HISTOGRAM_RANDOM, 63);
+}
+
+TEST(SparseOblique, ClassificationHistogramEqualWidth) {
+  TestSparseObliqueHistogramSplit(proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH,
+                                  255);
+}
+
+// Regression counterpart of TestSparseObliqueHistogramSplit: 100 examples in
+// two well-separated clusters along the f1=f2 diagonal with labels 0 and 1.
+// Any projection with a non-zero sum of weights separates the clusters, so the
+// histogram split is expected to remove all label variance.
+void TestSparseObliqueHistogramRegressionSplit(
+    const proto::NumericalSplit::Type projection_split_type,
+    const int num_candidates) {
+  const model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(0);
+  config_link.add_numerical_features(1);
+  config_link.add_numerical_features(2);
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  auto* projection_split =
+      dt_config.mutable_sparse_oblique_split()->mutable_projection_split();
+  projection_split->set_type(projection_split_type);
+  // The num_candidates default is applied by SetDefaultHyperParameters, which
+  // is not part of this code path.
+  projection_split->set_num_candidates(num_candidates);
+  dt_config.set_min_examples(1);
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  dataset::VerticalDataset dataset;
+  EXPECT_OK(
+      dataset.AddColumn("l", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(
+      dataset.AddColumn("f1", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(
+      dataset.AddColumn("f2", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+
+  for (int i = 0; i < 50; i++) {
+    const std::string low = std::to_string(0.01f * i);
+    const std::string high = std::to_string(1.f + 0.01f * i);
+    dataset.AppendExample({{"l", "0"}, {"f1", low}, {"f2", low}});
+    dataset.AppendExample({{"l", "1"}, {"f1", high}, {"f2", high}});
+  }
+
+  ASSERT_OK_AND_ASSIGN(auto* label_data,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::NumericalColumn>(0));
+
+  std::vector<UnsignedExampleIdx> selected_examples(dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights(selected_examples.size(), 1.f);
+
+  RegressionLabelStats label_stats(label_data->values());
+  for (const auto example_idx : selected_examples) {
+    label_stats.label_distribution.Add(label_data->values()[example_idx],
+                                       weights[example_idx]);
+  }
+
+  proto::Node parent;
+  InternalTrainConfig internal_config;
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  const auto result = FindBestConditionOblique(
+                          dataset, selected_examples, weights, config,
+                          config_link, dt_config, parent, internal_config,
+                          label_stats, 20000, &best_condition, &random, &cache)
+                          .value();
+  EXPECT_TRUE(result);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 50);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 100);
+  // Variance reduction of a perfect split between two balanced clusters with
+  // labels 0 and 1: the parent variance of 0.25 drops to zero.
+  EXPECT_NEAR(best_condition.split_score(), 0.25, 0.001);
+}
+
+TEST(SparseOblique, RegressionHistogramRandom) {
+  TestSparseObliqueHistogramRegressionSplit(
+      proto::NumericalSplit::HISTOGRAM_RANDOM, 63);
+}
+
+TEST(SparseOblique, RegressionHistogramEqualWidth) {
+  TestSparseObliqueHistogramRegressionSplit(
+      proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH, 255);
+}
+
 TEST(MHLDTOblique, Classification) {
   const model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
