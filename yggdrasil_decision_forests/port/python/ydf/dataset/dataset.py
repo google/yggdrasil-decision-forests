@@ -1533,16 +1533,36 @@ class CategoricalDataSpecAccumulator(DataSpecAccumulator):
     self._items = collections.defaultdict(int)
     self._max_vocab_count = max_vocab_count
     self._min_vocab_frequency = min_vocab_frequency
-    self._count_nan = 0
 
   def visit(self, value: np.ndarray):
-    value = value.astype(np.bytes_)
+    if np.issubdtype(value.dtype, np.floating):
+      is_na = np.isnan(value)
+      if np.any(is_na):
+        value = np.where(is_na, b"", value.astype(np.bytes_))
+      else:
+        value = value.astype(np.bytes_)
+    elif value.dtype == object:
+      try:
+        import pandas as pd  # pylint: disable=g-import-not-at-top
+        is_na = pd.isna(value)
+      except ImportError:
+        is_na = np.array([
+            x is None or (isinstance(x, (float, np.floating)) and np.isnan(x))
+            for x in value
+        ])
+      if np.any(is_na):
+        value = np.where(is_na, b"", value).astype(np.bytes_)
+      else:
+        value = value.astype(np.bytes_)
+    else:
+      value = value.astype(np.bytes_)
+
     unique_values, counts = np.unique(value, return_counts=True)
     for key, count in zip(unique_values, counts):
       self._items[key.item()] += count.item()
 
   def finalize(self, column: data_spec_pb2.Column):
-    column.count_nas = self._items.get(b"nan", 0)
+    column.count_nas = self._items.get(b"", 0)
     num_ood = self._items.get(dataspec_lib.YDF_OOD_BYTES, 0)
 
     # Sort values by count
@@ -1550,7 +1570,7 @@ class CategoricalDataSpecAccumulator(DataSpecAccumulator):
         [
             (count, key)
             for key, count in self._items.items()
-            if key != b"nan" and key != dataspec_lib.YDF_OOD_BYTES
+            if key != b"" and key != dataspec_lib.YDF_OOD_BYTES
         ],
         key=lambda x: (-x[0], x[1]),
     )
