@@ -136,6 +136,18 @@ class LogBookTest(absltest.TestCase):
     self.assertTrue(e3.exist({"k1": 1}))
     self.assertTrue(e3.exist({"k1": 1, "k2": 2}))
 
+  def test_keys(self):
+    tmp_dir = self.create_tempdir().full_path
+    e = LogBook(tmp_dir)
+    self.assertEmpty(e.keys())
+
+    e.add({"a": 1, "b": 1}, {"x": 1})
+    e.add({"a": 2}, {"x": 2})
+    self.assertEqual(e.keys(), [{"a": 1, "b": 1}, {"a": 2}])
+
+    e2 = LogBook(tmp_dir, default_keys={"b": 5})
+    self.assertEqual(e2.keys(), [{"a": 1, "b": 1}, {"a": 2, "b": 5}])
+
   def test_filtering(self):
     tmp_dir = self.create_tempdir().full_path
     e = LogBook(tmp_dir)

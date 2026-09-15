@@ -155,6 +155,14 @@ class LogBook:
         return True
     return False
 
+  def keys(self) -> List[ExperimentKey]:
+    """Lists the keys of all the recorded experiments."""
+    self._cursor.execute("SELECT key FROM experiments")
+    return [
+        self._augment_key(json.loads(row_serialized_key))
+        for (row_serialized_key,) in self._cursor.fetchall()
+    ]
+
   def count_key(self, key: ExperimentKey) -> int:
     """Counts the number of occurrences of a given key."""
     key = self._augment_key(key)
