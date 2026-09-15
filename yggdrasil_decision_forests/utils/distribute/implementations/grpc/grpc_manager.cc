@@ -19,7 +19,6 @@
 #include <optional>
 #include <random>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "grpcpp/create_channel.h"
@@ -34,6 +33,7 @@
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
+#include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
@@ -41,6 +41,8 @@
 namespace yggdrasil_decision_forests {
 namespace distribute {
 namespace {
+
+constexpr int kDeadLineInHours = 24 * 40;
 
 // In addition to control available though the "GRPCManager" class (e.g. the
 // GRPCManager::UpdateWorkerAddress function), GRPC manager can be referenced
@@ -170,7 +172,7 @@ absl::Status GRPCManager::InitializeWorkers(
   }
 
   for (auto& worker : workers_) {
-    RETURN_IF_ERROR(UpdateWorkerConnection(worker.get()));
+    RETURN_IF_ERROR(UpdateWorkerConnection(worker.get()).status());
   }
 
   return absl::OkStatus();
@@ -179,14 +181,12 @@ absl::Status GRPCManager::InitializeWorkers(
 absl::Status GRPCManager::WaitForAllWorkersToBeReady() {
   for (auto& worker : workers_) {
     while (true) {
+      ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker.get()));
       grpc::ClientContext context;
       ConfigureClientContext(&context);
-      ASSIGN_OR_RETURN(auto active_call,
-                       GetStubForCall(worker.get(), &context));
       proto::Empty query;
       proto::Empty answer;
-      const auto ping_status =
-          active_call.stub()->Ping(&context, query, &answer);
+      const auto ping_status = stub->Ping(&context, query, &answer);
       if (!ping_status.ok()) {
         if (verbosity_ >= 1) {
           LOG(INFO) << "Worker #" << worker->worker_idx
@@ -235,14 +235,11 @@ absl::StatusOr<int> GRPCManager::NumWorkersInConfiguration(
   }
 }
 
-absl::Status GRPCManager::UpdateWorkerConnection(Worker* worker) {
+absl::StatusOr<proto::Server::Stub*> GRPCManager::UpdateWorkerConnection(
+    Worker* worker) {
   utils::concurrency::MutexLock l(worker->mutex_address);
-  return UpdateWorkerConnectionLocked(worker);
-}
-
-absl::Status GRPCManager::UpdateWorkerConnectionLocked(Worker* worker) {
-  if (!worker->stub || worker->expected_address != worker->connected_address) {
-    // The worker has moved or connection is uninitialized.
+  if (worker->expected_address != worker->connected_address) {
+    // The worker has moved.
 
     if (worker->connected_address.empty()) {
       LOG(INFO) << "Set address of worker #" << worker->worker_idx << " to \""
@@ -256,35 +253,16 @@ absl::Status GRPCManager::UpdateWorkerConnectionLocked(Worker* worker) {
     worker->connected_address = worker->expected_address;
 
     if (worker->stub) {
-      // Cancel active in-flight calls on the old stub.
-      worker->stub->CancelAll();
+      worker->discarded_stubs_.push_back(std::move(worker->stub));
       worker->stub.reset();
     }
 
     DCHECK(credential_);
-    auto stub = CreateStub(worker->connected_address, &credential_);
-    worker->stub = std::make_shared<Worker::TrackedStub>();
-    worker->stub->stub = std::move(stub);
+    worker->stub = CreateStub(worker->connected_address, &credential_);
   }
 
   DCHECK(worker->stub);
-  return absl::OkStatus();
-}
-
-absl::StatusOr<GRPCManager::Worker::ActiveCall> GRPCManager::GetStubForCall(
-    Worker* worker, grpc::ClientContext* context) {
-  utils::concurrency::MutexLock l(worker->mutex_address);
-  RETURN_IF_ERROR(UpdateWorkerConnectionLocked(worker));
-  return Worker::ActiveCall(worker->stub, context);
-}
-
-std::weak_ptr<const void> GRPCManager::WorkerStubWeakPtrForTesting(
-    int worker_idx) const {
-  DCHECK_GE(worker_idx, 0);
-  DCHECK_LT(worker_idx, workers_.size());
-  auto& worker = workers_[worker_idx];
-  utils::concurrency::MutexLock l(worker->mutex_address);
-  return worker->stub;
+  return worker->stub.get();
 }
 
 absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
@@ -314,6 +292,8 @@ absl::Status GRPCManager::SetParallelExecutionPerWorker(int num) {
 }
 
 absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
+  ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker));
+
   proto::Query query;
   *query.mutable_blob() = std::move(blob);
   query.set_manager_uid(manager_uid_);
@@ -325,20 +305,13 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
     grpc::ClientContext context;
     ConfigureClientContext(&context);
 
-    ASSIGN_OR_RETURN(auto active_call, GetStubForCall(worker, &context));
-
-    const auto status = active_call.stub()->Run(&context, query, &answer);
+    const auto status = stub->Run(&context, query, &answer);
     if (done_was_called_) {
       return absl::InvalidArgumentError("Job interrupted");
     }
 
     // Check the result.
     if (!status.ok()) {
-      if (status.error_code() == grpc::StatusCode::CANCELLED) {
-        LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
-                     << " was CANCELLED (worker relocated). Retrying.";
-        continue;
-      }
       if (status.error_message() == "UNAVAILABLE: worker config required") {
         // The worker received the request, but the worker is lacking the worker
         // configuration field. The request should be re-sent with the worker
@@ -355,6 +328,7 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
         }
         // The worker is temporarily not available.
         absl::SleepFor(absl::Seconds(5));
+        ASSIGN_OR_RETURN(stub, UpdateWorkerConnection(worker));
         continue;
       } else {
         if (verbosity_ >= 1) {
@@ -474,20 +448,6 @@ absl::Status GRPCManager::Done(std::optional<bool> kill_worker_manager) {
     return absl::OkStatus();
   }
   done_was_called_ = true;
-
-  // Cancel any active calls on all workers so in-flight threads unblock and
-  // join.
-  for (auto& worker : workers_) {
-    std::shared_ptr<Worker::TrackedStub> stub;
-    {
-      utils::concurrency::MutexLock l(worker->mutex_address);
-      stub = worker->stub;
-    }
-    if (stub) {
-      stub->CancelAll();
-    }
-  }
-
   async_pending_queries_.Close();
   async_pending_answers_.Close();
 
@@ -516,13 +476,13 @@ absl::Status GRPCManager::Done(std::optional<bool> kill_worker_manager) {
 
   // TODO: Run in parallel.
   for (auto& worker : workers_) {
+    ASSIGN_OR_RETURN(auto stub, UpdateWorkerConnection(worker.get()));
+
     grpc::ClientContext context;
     ConfigureClientContext(&context);
-    ASSIGN_OR_RETURN(auto active_call, GetStubForCall(worker.get(), &context));
 
     proto::Empty ignored;
-    auto worker_shutdown =
-        active_call.stub()->Shutdown(&context, query, &ignored);
+    auto worker_shutdown = stub->Shutdown(&context, query, &ignored);
     if (!worker_shutdown.ok()) {
       // It is not a big deal if the worker crashes during shutdown.
       LOG(WARNING) << "Error when shutting down the connection:"
@@ -549,15 +509,8 @@ absl::Status GRPCManager::DebugShutdownWorker(int worker_idx) {
   ConfigureClientContext(&context);
   proto::Empty ignored;
   auto& worker = workers_[worker_idx];
-  std::shared_ptr<Worker::TrackedStub> stub;
-  {
-    utils::concurrency::MutexLock l(worker->mutex_address);
-    if (!worker->stub || !worker->stub->stub) {
-      return absl::FailedPreconditionError("Worker stub is not initialized");
-    }
-    stub = worker->stub;
-  }
-  auto worker_shutdown = stub->stub->Shutdown(&context, query, &ignored);
+  utils::concurrency::MutexLock l(worker->mutex_address);
+  auto worker_shutdown = worker->stub->Shutdown(&context, query, &ignored);
   return GrpcStatusToAbslStatus(worker_shutdown);
 }
 
@@ -604,15 +557,9 @@ absl::Status GRPCManager::UpdateWorkerAddress(
   DCHECK_GE(worker_idx, 0);
   DCHECK_LT(worker_idx, workers_.size());
   auto& worker = workers_[worker_idx];
-  std::shared_ptr<Worker::TrackedStub> stub;
   {
     utils::concurrency::MutexLock l(worker->mutex_address);
     worker->expected_address = std::string(new_address);
-    stub = worker->stub;
-  }
-  // If the connection still exists, cancel all in-flight requests.
-  if (stub) {
-    stub->CancelAll();
   }
   {
     utils::concurrency::MutexLock l(mutex_worker_config_);
@@ -647,17 +594,17 @@ void GRPCManager::ProcessPeerWorkerAddressUpdate(Worker* worker) {
 
     // Send update.
     while (!done_was_called_) {
-      grpc::ClientContext context;
-      ConfigureClientContext(&context);
-      auto active_call_or = GetStubForCall(worker, &context);
-      if (!active_call_or.ok()) {
+      auto stub_or = UpdateWorkerConnection(worker);
+      if (!stub_or.ok()) {
         LOG(WARNING) << "Cannot create stub";
         continue;
       }
 
+      grpc::ClientContext context;
+      ConfigureClientContext(&context);
       proto::Empty ignored;
-      auto worker_shutdown = active_call_or.value().stub()->UpdateWorkerAddress(
-          &context, query, &ignored);
+      auto worker_shutdown =
+          stub_or.value()->UpdateWorkerAddress(&context, query, &ignored);
 
       if (worker_shutdown.ok()) {
         break;

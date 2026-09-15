@@ -18,15 +18,11 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 
-#include <memory>
 #include <optional>
-#include <utility>
 
 #include "grpcpp/channel.h"
-#include "grpcpp/client_context.h"
 #include "grpcpp/create_channel.h"
 #include "grpcpp/server.h"
-#include "absl/container/flat_hash_set.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -79,81 +75,15 @@ class GRPCManager : public AbstractManager {
   // should only be used in unit testing.
   absl::Status DebugShutdownWorker(int worker_idx);
 
-  // Returns a weak pointer to the worker's stub for testing stub release.
-  std::weak_ptr<const void> WorkerStubWeakPtrForTesting(int worker_idx) const;
-
  private:
   struct Worker {
-    struct TrackedStub {
-      std::unique_ptr<proto::Server::Stub> stub;
-      utils::concurrency::Mutex mutex;
-      absl::flat_hash_set<grpc::ClientContext*> active_contexts
-          GUARDED_BY(mutex);
-
-      void CancelAll() {
-        utils::concurrency::MutexLock l(mutex);
-        for (auto* context : active_contexts) {
-          context->TryCancel();
-        }
-      }
-    };
-
-    // RAII guard for holding a stub during an active RPC call.
-    class ActiveCall {
-     public:
-      ActiveCall() = default;
-      ActiveCall(std::shared_ptr<TrackedStub> tracked_stub,
-                 grpc::ClientContext* context)
-          : tracked_stub_(std::move(tracked_stub)), context_(context) {
-        if (tracked_stub_ && context_) {
-          utils::concurrency::MutexLock l(tracked_stub_->mutex);
-          tracked_stub_->active_contexts.insert(context_);
-        }
-      }
-      ~ActiveCall() { Release(); }
-
-      ActiveCall(ActiveCall&& other) noexcept
-          : tracked_stub_(std::move(other.tracked_stub_)),
-            context_(std::exchange(other.context_, nullptr)) {}
-
-      ActiveCall& operator=(ActiveCall&& other) noexcept {
-        if (this != &other) {
-          Release();
-          tracked_stub_ = std::move(other.tracked_stub_);
-          context_ = std::exchange(other.context_, nullptr);
-        }
-        return *this;
-      }
-
-      ActiveCall(const ActiveCall&) = delete;
-      ActiveCall& operator=(const ActiveCall&) = delete;
-
-      proto::Server::Stub* stub() const { return tracked_stub_->stub.get(); }
-      proto::Server::Stub* operator->() const {
-        return tracked_stub_->stub.get();
-      }
-
-      void Release() {
-        if (tracked_stub_ && context_) {
-          utils::concurrency::MutexLock l(tracked_stub_->mutex);
-          tracked_stub_->active_contexts.erase(context_);
-          context_ = nullptr;
-        }
-        tracked_stub_.reset();
-      }
-
-     private:
-      std::shared_ptr<TrackedStub> tracked_stub_;
-      grpc::ClientContext* context_ = nullptr;
-    };
-
     // Starts all the communication threads with the worker.
     void StartThreads(int parallel_execution_per_worker, GRPCManager* manager);
 
     WorkerIdx worker_idx;
 
     // Connection to the worker.
-    std::shared_ptr<TrackedStub> stub GUARDED_BY(mutex_address);
+    std::unique_ptr<proto::Server::Stub> stub GUARDED_BY(mutex_address);
 
     // Address currently connected by the stub.
     std::string connected_address GUARDED_BY(mutex_address);
@@ -161,6 +91,11 @@ class GRPCManager : public AbstractManager {
     // Address of the worker. "expected_address" and "connected_address" might
     // be different for a short time when a worker is re-located.
     std::string expected_address GUARDED_BY(mutex_address);
+
+    // Disconnected worker stubs kept until releasing.
+    // TODO: Release the discarded worker stubs.
+    std::vector<std::unique_ptr<proto::Server::Stub>> discarded_stubs_
+        GUARDED_BY(mutex_address);
 
     utils::concurrency::Mutex mutex_address;
 
@@ -213,17 +148,8 @@ class GRPCManager : public AbstractManager {
 
   void JoinWorkers();
 
-  // Checks and possibly updates the effectively targeted worker.
-  absl::Status UpdateWorkerConnection(Worker* worker);
-  absl::Status UpdateWorkerConnectionLocked(Worker* worker)
-      EXCLUSIVE_LOCKS_REQUIRED(worker->mutex_address);
-
-  // Acquires an active call RAII handle, registering the ClientContext for
-  // cancellation and sharing ownership of the stub.
-  //
-  // Before creating the stub, updates the worker connection if necessary.
-  absl::StatusOr<Worker::ActiveCall> GetStubForCall(
-      Worker* worker, grpc::ClientContext* context);
+  // Checks and possibly update the effectively targeted worker.
+  absl::StatusOr<proto::Server::Stub*> UpdateWorkerConnection(Worker* worker);
 
   // Starts a thread that checks an execute events registered with
   // "GetAllEvents".

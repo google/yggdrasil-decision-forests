@@ -189,43 +189,6 @@ TEST(GRPC, TestMessup) {
   all.Join();
 }
 
-TEST(GRPC, DiscardedStubsReleasedOnWorkerAddressUpdate) {
-  auto all = CreateGrpcManager();
-  auto* grpc_manager = dynamic_cast<GRPCManager*>(all.manager.get());
-  ASSERT_NE(grpc_manager, nullptr);
-
-  // Send a blocking request to worker 0.
-  EXPECT_OK(all.manager->BlockingRequest("worker_idx", 0).status());
-
-  // Capture a weak pointer to the current stub for worker 0.
-  auto stub_weak = grpc_manager->WorkerStubWeakPtrForTesting(0);
-  EXPECT_FALSE(stub_weak.expired());
-
-  // Shutdown worker 0.
-  EXPECT_OK(grpc_manager->DebugShutdownWorker(0));
-
-  // Create new worker thread on a new port.
-  const int new_port = test::PickUnusedPortOrDie();
-  all.discarded_worker_threads.push_back(
-      std::move(all.worker_threads.front()));
-  all.worker_threads.front() = std::make_unique<utils::concurrency::Thread>(
-      [new_port]() { CHECK_OK(WorkerMain(new_port)); });
-  absl::SleepFor(absl::Seconds(0.2));
-
-  // Update worker 0 address.
-  EXPECT_OK(grpc_manager->UpdateWorkerAddress(
-      0, absl::StrCat("localhost:", new_port)));
-
-  // Send another request to worker 0 using the new connection.
-  EXPECT_OK(all.manager->BlockingRequest("worker_idx", 0).status());
-
-  // Verify that the old stub has been destroyed and released.
-  EXPECT_TRUE(stub_weak.expired());
-
-  EXPECT_OK(all.manager->Done(true));
-  all.Join();
-}
-
 }  // namespace
 }  // namespace grpc_worker
 }  // namespace distribute
