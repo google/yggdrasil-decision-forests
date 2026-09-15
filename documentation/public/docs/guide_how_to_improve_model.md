@@ -211,14 +211,14 @@ learner.
 learner = ydf.GradientBoostedTreesLearner(pure_serving_model=True, label="my_label")
 ```
 
-### Set `winner_take_all_inference=False` with Random Forests
+### Set `winner_takes_all=False` with Random Forests
 
-For Random Forests, the `winner_take_all_inference` parameter defaults to True
+For Random Forests, the `winner_takes_all` parameter defaults to True
 to match the behavior of Breiman's original algorithm. However, setting it to
 False can often reduce the model's size and may even improve its quality.
 
 ```python
-learner = ydf.RandomForestLearner(winner_take_all_inference=False, label="my_label")
+learner = ydf.RandomForestLearner(winner_takes_all=False, label="my_label")
 ```
 
 ### Set a Maximum Model Size
