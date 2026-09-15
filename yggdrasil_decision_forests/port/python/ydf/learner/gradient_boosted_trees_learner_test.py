@@ -252,7 +252,7 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
         learner._get_training_config(),
         abstract_learner_pb2.TrainingConfig(
             learner="GRADIENT_BOOSTED_TREES",
-            label="income",
+            label="^income$",
             task=abstract_model_pb2.Task.CLASSIFICATION,
             metadata=abstract_model_pb2.Metadata(framework="Python YDF"),
             monotonic_constraints=[

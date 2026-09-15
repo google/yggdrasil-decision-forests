@@ -341,6 +341,19 @@ class EmptyListFeatureTest(parameterized.TestCase):
     np.testing.assert_equal(model.predict(ds_test), np.array([0.5, 0.5]))
 
 
+class LabelTest(parameterized.TestCase):
+
+  def test_regex_label(self):
+    ds_train = {"l(ab[el)": [1, 0], "f": np.array([1, 1])}
+    ds_test = {"f": np.array([1, 1])}
+    # Note: Random Forests with bootstrapping might have unbalanced predictions.
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="l(ab[el)",
+        num_trees=1,
+    ).train(ds_train)
+    np.testing.assert_equal(model.predict(ds_test), np.array([0.5, 0.5]))
+
+
 class UtilityTest(absltest.TestCase):
 
   def test_feature_name_to_regex(self):

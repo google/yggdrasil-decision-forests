@@ -604,7 +604,7 @@ class GenericCCLearner(GenericLearner):
 
     training_config = abstract_learner_pb2.TrainingConfig(
         learner=self._learner_name,
-        label=self._label,
+        label=_feature_name_to_regex(self._label) if self._label else None,
         weight_definition=self._build_weight_definition(),
         ranking_group=self._ranking_group,
         uplift_treatment=self._uplift_treatment,
