@@ -59,11 +59,11 @@ class Channel {
 
   // Push an item in the channel.
   void Push(Input item) {
+    MutexLock results_lock(mutex_);
     if (close_channel_) {
       LOG(ERROR) << "Ignoring value added to closed channel.";
       return;
     }
-    MutexLock results_lock(mutex_);
     content_.push(std::move(item));
     cond_var_.Signal();
   }
