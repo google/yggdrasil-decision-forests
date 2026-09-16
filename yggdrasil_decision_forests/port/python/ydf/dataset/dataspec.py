@@ -19,8 +19,10 @@ import enum
 from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
+import numpy.typing as npt
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
+from ydf.dataset.io import dataset_io_types
 from ydf.utils import log
 
 
@@ -813,3 +815,228 @@ def print_common_dataspec_issues_for_training(
             " in the data spec set to the same value. The feature will likely"
             " not be useful during model training."
         )
+
+
+# Byte value representing a missing categorical value in YDF.
+MISSING_CATEGORICAL_VALUE = b""
+
+# Byte values of the two items of a boolean categorical column.
+FALSE_CATEGORICAL_VALUE = b"false"
+TRUE_CATEGORICAL_VALUE = b"true"
+
+_MISSING_VALUES_NOTE = (
+    "Note: Missing values (e.g. None, float('nan'), pandas.NA) are supported"
+    " and imported as missing categorical values."
+)
+
+_LABEL_NOTE = (
+    "Note: If the column is a label, make sure the correct task is selected."
+    " For example, you cannot train a classification model"
+    " (task=ydf.Task.CLASSIFICATION) with floating point labels."
+)
+
+_IS_LABEL_NOTE = (
+    "Note: This is a label column. Try one of the following solutions: (1) To"
+    " train a classification model, cast the label values as integers. (2) To"
+    " train a regression or a ranking model, configure the learner with"
+    " `task=ydf.Task.REGRESSION`)."
+)
+
+_SEMANTIC_NOTE = (
+    "Note: If the column is a label, the semantic was selected based on the"
+    " task. For example, task=ydf.Task.CLASSIFICATION requires a CATEGORICAL"
+    " compatible label column, and task=ydf.Task.REGRESSION requires a"
+    " NUMERICAL compatible label column."
+)
+
+
+def is_missing_value(value: Any) -> bool:
+  """Tests if a python object is a missing value.
+
+  Args:
+    value: Any python object, e.g. an item of an object-typed numpy array.
+
+  Returns:
+    True iff the value is `None` or a "not a value" sentinel such as
+    `float("nan")`, `numpy.datetime64("NaT")`, `pandas.NA` or `pandas.NaT`.
+  """
+  if value is None:
+    return True
+  if isinstance(value, (str, bytes, list, tuple, np.ndarray)):
+    # Strings and containers are never missing values. Note: They are tested
+    # first because `array != array` is an array, whose boolean value raises.
+    return False
+  try:
+    # "Not a value" sentinels are not equal to themselves.
+    return bool(value != value)  # pylint:disable=comparison-with-itself
+  except TypeError:
+    # Some sentinels (e.g. `pandas.NA`) don't have a boolean value. Valid
+    # categorical values always do, so treat those as missing.
+    return True
+
+
+def _categorical_error(
+    column_name: str,
+    semantic: Optional["Semantic"],
+    reason: str,
+    notes: Sequence[str],
+) -> ValueError:
+  """Creates the error raised when a categorical value cannot be imported."""
+  message = f"Cannot import column {column_name!r} with semantic={semantic} {reason}"
+  return ValueError("\n".join([message, *notes]))
+
+
+def _categorical_value_to_bytes(
+    value: Any,
+    column_name: str,
+    semantic: Optional["Semantic"],
+    original_type: Optional[str],
+    is_label: bool,
+) -> bytes:
+  """Converts a single non-missing categorical value into bytes.
+
+  Args:
+    value: A non-missing python value, e.g. an item of an object-typed array.
+    column_name: Name of the column containing the value, used in errors.
+    semantic: Semantic of the column, used in errors.
+    original_type: Description of the type of the column, used in errors.
+    is_label: Whether the column is a label, used in errors.
+
+  Returns:
+    The value encoded as bytes.
+
+  Raises:
+    ValueError: If the value cannot be used as a categorical value.
+  """
+  # Note: `np.bytes_` and `np.str_` are subclasses of `bytes` and `str`.
+  if isinstance(value, bytes):
+    return value
+  if isinstance(value, str):
+    return value.encode("utf-8")
+  # Note: Must be tested before integers, as `bool` is a subclass of `int`.
+  if isinstance(value, (bool, np.bool_)):
+    return TRUE_CATEGORICAL_VALUE if value else FALSE_CATEGORICAL_VALUE
+  if isinstance(value, (int, np.integer)):
+    return str(value).encode("utf-8")
+  if isinstance(value, (float, np.floating)):
+    raise _categorical_error(
+        column_name,
+        semantic,
+        f"as it contains floating point values. Got {value!r}.",
+        [_MISSING_VALUES_NOTE, _IS_LABEL_NOTE if is_label else _LABEL_NOTE],
+    )
+  if isinstance(value, (list, tuple, np.ndarray)):
+    raise _categorical_error(
+        column_name,
+        semantic,
+        f"as it contains lists. Got {value!r}.",
+        [
+            "Note: Unrolling multi-dimensional columns is only supported for"
+            " numpy arrays."
+        ],
+    )
+  raise _categorical_error(
+      column_name,
+      semantic,
+      f"and type={original_type or type(value)}. Got {value!r}.",
+      [_SEMANTIC_NOTE],
+  )
+
+
+def normalize_categorical_values(
+    values: dataset_io_types.InputValues,
+    *,
+    column_name: str,
+    semantic: Optional["Semantic"] = None,
+    original_type: Optional[str] = None,
+    is_label: bool = False,
+) -> npt.NDArray[np.bytes_]:
+  """Normalizes categorical values into an array of bytes.
+
+  This is the single entry point used to convert user-provided categorical
+  values into the byte representation expected by YDF, both when ingesting a
+  dataset and when computing a dataspec from batches of examples.
+
+  The conversion rules are:
+
+    - Missing values (`None`, `float("nan")`, `pandas.NA`, `NaT`, ...) become
+      `MISSING_CATEGORICAL_VALUE`, i.e. `b""`, which YDF interprets as a
+      missing value.
+    - Strings are encoded with UTF-8, and bytes are left as-is.
+    - Booleans become `b"true"` / `b"false"`.
+    - Integers become their decimal representation, e.g. `b"-1"`.
+    - Floating point values are not valid categorical values and raise. An
+      array of floating point values is only accepted if all its values are
+      NaN, i.e. if the entire array is missing, which happens e.g. for an
+      empty Pandas column.
+
+  Args:
+    values: An array or sequence of categorical values.
+    column_name: Name of the column, used in error messages.
+    semantic: Semantic of the column, used in error messages.
+    original_type: Description of the user-provided type of the column, used in
+      error messages. If not set, the type of the offending value is used.
+    is_label: Whether the column is a label. Only used in error messages.
+
+  Returns:
+    An array of bytes with the same shape as `values`.
+
+  Raises:
+    ValueError: If the values cannot be used as categorical values.
+  """
+
+  def value_to_bytes(value: Any) -> bytes:
+    if is_missing_value(value):
+      return MISSING_CATEGORICAL_VALUE
+    return _categorical_value_to_bytes(
+        value, column_name, semantic, original_type, is_label
+    )
+
+  if not isinstance(values, np.ndarray):
+    # Note: The values are not converted with `np.asarray` as this would hide
+    # the type of the individual values, e.g. `np.asarray(["a", 1.5])` silently
+    # converts the float into the string "1.5".
+    return np.array(
+        [value_to_bytes(value) for value in values],
+        dtype=np.bytes_,
+    )
+
+  if values.dtype.type == np.bytes_:
+    return values
+
+  if values.dtype.type == np.bool_:
+    bool_as_bytes = np.full(values.shape, FALSE_CATEGORICAL_VALUE, dtype="|S5")
+    bool_as_bytes[values] = TRUE_CATEGORICAL_VALUE
+    return bool_as_bytes
+
+  if np.issubdtype(values.dtype, np.str_):
+    # Note: `astype(np.bytes_)` encodes with ASCII, which fails on non-ASCII
+    # characters.
+    return np.char.encode(values, "utf-8")
+
+  if np.issubdtype(values.dtype, np.integer):
+    return values.astype(np.bytes_)
+
+  if np.issubdtype(values.dtype, np.floating):
+    # A fully missing column is e.g. created by Pandas for an empty column.
+    if not np.all(np.isnan(values)):
+      raise _categorical_error(
+          column_name,
+          semantic,
+          "as it contains floating point values. Got"
+          f" {values[~np.isnan(values)][:5]}.",
+          [_MISSING_VALUES_NOTE, _IS_LABEL_NOTE if is_label else _LABEL_NOTE],
+      )
+    return np.full(values.shape, MISSING_CATEGORICAL_VALUE, dtype=np.bytes_)
+
+  if values.dtype.type == np.object_:
+    return np.array(
+        [value_to_bytes(value) for value in values.ravel()], dtype=np.bytes_
+    ).reshape(values.shape)
+
+  raise _categorical_error(
+      column_name,
+      semantic,
+      f"and type={original_type or values.dtype}.",
+      [_SEMANTIC_NOTE],
+  )

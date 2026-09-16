@@ -1026,16 +1026,113 @@ B,3""")
           columns=[Column("feature", Semantic.CATEGORICAL)],
       )
 
-  def test_categorical_invalid_type_none(self):
+  def test_categorical_missing_values(self):
+    """None, NaN and pandas.NA are imported as missing values."""
+    ds = dataset_lib.create_vertical_dataset(
+        {"feature": np.array(["x", "y", None, np.nan, pd.NA, "x"])},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL)],
+    )
+    column = ds.data_spec().columns[0]
+    self.assertEqual(column.count_nas, 3)
+    self.assertNotIn("", column.categorical.items)
+    self.assertEqual(column.categorical.items["x"].count, 2)
+    self.assertEqual(column.categorical.items["y"].count, 1)
+
+  def test_categorical_all_missing_values(self):
+    """An all-NaN float column, as created by Pandas for an empty column."""
+    ds = dataset_lib.create_vertical_dataset(
+        {"feature": np.array([np.nan, np.nan])},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL)],
+    )
+    column = ds.data_spec().columns[0]
+    self.assertEqual(column.count_nas, 2)
+    self.assertNotIn("", column.categorical.items)
+    # A categorical column is never made of floating point values.
+    self.assertEqual(column.dtype, ds_pb.DType.DTYPE_BYTES)
+
+  @parameterized.named_parameters(
+      ("str", np.array(["x", "y"]), ds_pb.DType.DTYPE_BYTES),
+      ("object", np.array(["x", None], np.object_), ds_pb.DType.DTYPE_BYTES),
+      ("bytes", np.array([b"x", b"y"]), ds_pb.DType.DTYPE_BYTES),
+      ("int64", np.array([1, 2], np.int64), ds_pb.DType.DTYPE_INT64),
+      ("int8", np.array([1, 2], np.int8), ds_pb.DType.DTYPE_INT8),
+      ("bool", np.array([True, False]), ds_pb.DType.DTYPE_BOOL),
+      ("list", ["x", "y"], ds_pb.DType.DTYPE_BYTES),
+      ("all_missing_float", np.array([np.nan]), ds_pb.DType.DTYPE_BYTES),
+  )
+  def test_categorical_dtype(self, data, expected_dtype):
+    """The dtype of the data provided by the user is recorded."""
+    ds = dataset_lib.create_vertical_dataset(
+        {"feature": data},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL)],
+    )
+    self.assertEqual(ds.data_spec().columns[0].dtype, expected_dtype)
+
+  def test_categorical_label_missing_values(self):
+    """Labels, unlike features, must not contain missing values."""
     with self.assertRaisesRegex(
         ValueError,
-        "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL",
+        "The label column 'label' contains 1 missing value\\(s\\), which is not"
+        " allowed.",
     ):
       _ = dataset_lib.create_vertical_dataset(
-          {"feature": np.array(["x", "y", None])},
+          {"label": np.array(["y", "x", None, "x"], np.object_)},
           min_vocab_frequency=1,
-          columns=[Column("feature", Semantic.CATEGORICAL)],
+          columns=[Column("label", Semantic.CATEGORICAL)],
+          label="label",
       )
+
+  def test_categorical_label_missing_values_of_pandas_dataframe(self):
+    """Pandas imports missing values as empty strings, which are missing too."""
+    with self.assertRaisesRegex(
+        ValueError,
+        "The label column 'label' contains 3 missing value\\(s\\), which is not"
+        " allowed.",
+    ):
+      _ = dataset_lib.create_vertical_dataset(
+          pd.DataFrame({"label": ["y", "x", None, np.nan, pd.NA, "x"]}),
+          min_vocab_frequency=1,
+          columns=[Column("label", Semantic.CATEGORICAL)],
+          label="label",
+      )
+
+  def test_categorical_missing_values_are_allowed_for_features(self):
+    """The same column is imported without error when it is not the label."""
+    ds = dataset_lib.create_vertical_dataset(
+        {
+            "feature": np.array(["y", "x", None, "x"], np.object_),
+            "label": np.array(["a", "b", "a", "b"]),
+        },
+        min_vocab_frequency=1,
+        columns=[
+            Column("feature", Semantic.CATEGORICAL),
+            Column("label", Semantic.CATEGORICAL),
+        ],
+        label="label",
+    )
+    self.assertEqual(ds.data_spec().columns[0].count_nas, 1)
+
+  def test_categorical_missing_values_of_pandas_dataframe(self):
+    ds = dataset_lib.create_vertical_dataset(
+        pd.DataFrame({"feature": ["x", "y", None, np.nan, pd.NA, "x"]}),
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL)],
+    )
+    column = ds.data_spec().columns[0]
+    self.assertEqual(column.count_nas, 3)
+    self.assertEqual(column.categorical.items["x"].count, 2)
+
+  def test_categorical_non_ascii_values(self):
+    """Values are encoded with UTF-8, not ASCII."""
+    ds = dataset_lib.create_vertical_dataset(
+        {"feature": np.array(["â", "é"])},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL)],
+    )
+    self.assertIn("é", ds.data_spec().columns[0].categorical.items)
 
   def test_catset_invalid_type_float(self):
     with self.assertRaisesRegex(
@@ -1049,16 +1146,17 @@ B,3""")
           columns=[Column("feature", Semantic.CATEGORICAL_SET)],
       )
 
-  def test_catset_invalid_type_none(self):
-    with self.assertRaisesRegex(
-        ValueError,
-        "Cannot import column 'feature' with semantic=Semantic.CATEGORICAL_SET",
-    ):
-      _ = dataset_lib.create_vertical_dataset(
-          {"feature": np.array([["x", "y", None]], np.object_)},
-          min_vocab_frequency=1,
-          columns=[Column("feature", Semantic.CATEGORICAL_SET)],
-      )
+  def test_catset_missing_values(self):
+    """Missing items of a set are imported as missing values."""
+    ds = dataset_lib.create_vertical_dataset(
+        {"feature": np.array([["x", "y", None]], np.object_)},
+        min_vocab_frequency=1,
+        columns=[Column("feature", Semantic.CATEGORICAL_SET)],
+    )
+    column = ds.data_spec().columns[0]
+    self.assertNotIn("", column.categorical.items)
+    self.assertEqual(column.categorical.items["x"].count, 1)
+    self.assertEqual(column.categorical.items["y"].count, 1)
 
   def test_catset_string(self):
     ds = dataset_lib.create_vertical_dataset(
@@ -2031,7 +2129,6 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
     )
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
     self.assertEqual(ds._dataset.DebugString(), "f1,f2\n1,NA\n2,NA\n3,NA\n")
-
 
 
 class CategoricalSetTest(absltest.TestCase):

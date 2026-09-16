@@ -61,6 +61,7 @@ py_library(
     deps = [
         # numpy dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "//ydf/dataset/io:dataset_io_types",
         "//ydf/utils:log",
     ],
 )
@@ -108,6 +109,8 @@ py_test(
         ":dataspec",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )

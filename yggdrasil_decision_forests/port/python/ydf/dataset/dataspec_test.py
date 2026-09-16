@@ -16,6 +16,8 @@
 
 from absl.testing import absltest
 from absl.testing import parameterized
+import numpy as np
+import pandas as pd
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataspec as dataspec_lib
@@ -434,6 +436,203 @@ class MonotonicTest(parameterized.TestCase):
         ValueError, "with monotonic constraint is expected to have"
     ):
       _ = Column("feature", semantic=Semantic.CATEGORICAL, monotonic=+1)
+
+
+class NormalizeCategoricalValuesTest(parameterized.TestCase):
+  """Tests of the conversion of categorical values into bytes."""
+
+  def normalize(self, values, **kwargs):
+    return dataspec_lib.normalize_categorical_values(
+        values, column_name="f", semantic=Semantic.CATEGORICAL, **kwargs
+    )
+
+  @parameterized.named_parameters(
+      # Bytes are the native representation of categorical values in YDF.
+      ("bytes", np.array([b"a", b"b"]), [b"a", b"b"]),
+      # Strings are encoded with UTF-8, not ASCII.
+      ("str", np.array(["a", "b"]), [b"a", b"b"]),
+      ("str_non_ascii", np.array(["é"]), ["é".encode("utf-8")]),
+      ("object_str", np.array(["a", "b"], np.object_), [b"a", b"b"]),
+      (
+          "object_str_non_ascii",
+          np.array(["é"], np.object_),
+          ["é".encode("utf-8")],
+      ),
+      # An empty string is a missing value for YDF.
+      ("str_empty", np.array(["", "a"]), [b"", b"a"]),
+      # Integers are converted to their decimal representation.
+      ("int", np.array([1, -22], np.int64), [b"1", b"-22"]),
+      ("uint", np.array([1, 22], np.uint8), [b"1", b"22"]),
+      ("object_int", np.array([1, -22], np.object_), [b"1", b"-22"]),
+      # Booleans use the same vocabulary as boolean columns.
+      ("bool", np.array([True, False]), [b"true", b"false"]),
+      ("object_bool", np.array([True, False], np.object_), [b"true", b"false"]),
+      # Sequences that are not numpy arrays are converted item by item.
+      ("list_of_str", ["a", "b"], [b"a", b"b"]),
+      ("list_of_bytes", [b"a", b"b"], [b"a", b"b"]),
+      ("list_of_int", [1, -22], [b"1", b"-22"]),
+      ("list_of_bool", [True, False], [b"true", b"false"]),
+      ("list_mixed", ["a", 1, True], [b"a", b"1", b"true"]),
+      ("empty_list", [], []),
+      ("empty_str_array", np.array([], np.str_), []),
+      ("empty_object_array", np.array([], np.object_), []),
+  )
+  def test_values(self, values, expected):
+    self.assertEqual(self.normalize(values).tolist(), expected)
+
+  def test_values_are_bytes(self):
+    self.assertEqual(self.normalize(["a"]).dtype.type, np.bytes_)
+
+  @parameterized.named_parameters(
+      ("none", None),
+      ("float_nan", float("nan")),
+      ("numpy_nan", np.nan),
+      ("numpy_float32_nan", np.float32("nan")),
+      ("numpy_nat", np.datetime64("NaT")),
+      ("pandas_na", pd.NA),
+      ("pandas_nat", pd.NaT),
+  )
+  def test_missing_values_are_empty_bytes(self, missing_value):
+    """Missing values are `b""`, which YDF interprets as a missing value."""
+    self.assertEqual(
+        self.normalize(np.array(["a", missing_value], np.object_)).tolist(),
+        [b"a", b""],
+    )
+    self.assertEqual(self.normalize(["a", missing_value]).tolist(), [b"a", b""])
+
+  def test_all_missing_float_array(self):
+    """An all-NaN float array is a column of missing values.
+
+    Pandas creates such a column e.g. for a column of empty strings.
+    """
+    self.assertEqual(
+        self.normalize(np.array([np.nan, np.nan])).tolist(), [b"", b""]
+    )
+
+  def test_empty_float_array(self):
+    self.assertEqual(self.normalize(np.array([], np.float32)).tolist(), [])
+
+  def test_shape_is_preserved(self):
+    values = np.array([["a", None], ["c", "d"]], np.object_)
+    self.assertEqual(
+        self.normalize(values).tolist(), [[b"a", b""], [b"c", b"d"]]
+    )
+
+  def test_error_on_float_array(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'f' with semantic=Semantic.CATEGORICAL as it"
+        " contains floating point values. Got \\[1.5\\].",
+    ):
+      self.normalize(np.array([1.5, np.nan]))
+
+  def test_error_on_float_in_object_array(self):
+    """Floats are rejected whatever the dtype of the array containing them."""
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'f' with semantic=Semantic.CATEGORICAL as it"
+        " contains floating point values. Got 1.5.",
+    ):
+      self.normalize(np.array(["a", 1.5], np.object_))
+
+  def test_error_on_float_in_list(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'f' with semantic=Semantic.CATEGORICAL as it"
+        " contains floating point values. Got 1.5.",
+    ):
+      self.normalize(["a", 1.5])
+
+  def test_error_on_float_mentions_missing_values(self):
+    with self.assertRaisesRegex(ValueError, "Missing values"):
+      self.normalize(np.array([1.5]))
+
+  def test_error_on_float_label(self):
+    with self.assertRaisesRegex(ValueError, "Note: This is a label column."):
+      self.normalize(np.array([1.5]), is_label=True)
+
+  def test_error_on_list_value(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'f' with semantic=Semantic.CATEGORICAL as it"
+        " contains lists.",
+    ):
+      self.normalize([["a", "b"]])
+
+  @parameterized.named_parameters(
+      ("array", np.array([1, 2])),
+      # An array is not a missing value, even if it only contains one.
+      ("array_of_one_missing_value", np.array([np.nan])),
+      ("empty_array", np.array([])),
+  )
+  def test_error_on_array_value(self, value):
+    """A nested numpy array is reported as a list, not silently dropped."""
+    values = np.empty(1, np.object_)
+    values[0] = value
+    for input_values in [[value], values]:
+      with self.assertRaisesRegex(
+          ValueError,
+          "Cannot import column 'f' with semantic=Semantic.CATEGORICAL as it"
+          " contains lists.",
+      ):
+        self.normalize(input_values)
+
+  def test_error_on_unsupported_value(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'f' with semantic=Semantic.CATEGORICAL and"
+        " type=.*dict.*",
+    ):
+      self.normalize([{"a": 1}])
+
+  def test_error_on_unsupported_dtype(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "Cannot import column 'f' with semantic=Semantic.CATEGORICAL and"
+        " type=datetime64",
+    ):
+      self.normalize(np.array(["2024-01-01"], "datetime64[s]"))
+
+  def test_error_contains_the_original_type(self):
+    with self.assertRaisesRegex(ValueError, "type=some type"):
+      self.normalize([{"a": 1}], original_type="some type")
+
+
+class IsMissingValueTest(parameterized.TestCase):
+  """Tests of the detection of missing values."""
+
+  @parameterized.named_parameters(
+      ("none", None),
+      ("float_nan", float("nan")),
+      ("numpy_nan", np.nan),
+      ("numpy_float32_nan", np.float32("nan")),
+      ("numpy_nat", np.datetime64("NaT")),
+      ("pandas_na", pd.NA),
+      ("pandas_nat", pd.NaT),
+  )
+  def test_missing_values(self, value):
+    self.assertTrue(dataspec_lib.is_missing_value(value))
+
+  @parameterized.named_parameters(
+      ("str", "a"),
+      ("empty_str", ""),
+      ("bytes", b"a"),
+      ("int", 0),
+      ("bool", False),
+      ("float", 1.5),
+      ("datetime", np.datetime64("2024-01-01")),
+      # Containers are not missing values, whatever their content and size.
+      ("list", [1, 2]),
+      ("empty_list", []),
+      ("tuple", (1, 2)),
+      ("array", np.array([1, 2])),
+      ("array_of_one_missing_value", np.array([np.nan])),
+      ("empty_array", np.array([])),
+      ("dict", {"a": 1}),
+  )
+  def test_non_missing_values(self, value):
+    self.assertFalse(dataspec_lib.is_missing_value(value))
+
 
 if __name__ == "__main__":
   absltest.main()
