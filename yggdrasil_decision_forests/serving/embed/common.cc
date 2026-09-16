@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
@@ -201,12 +202,21 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
         column.number_of_unique_values() - is_label, "");
     dictionary.items.assign(column.number_of_unique_values() - is_label, "");
 
+    // Iterate over the vocabulary in index order. This is only relevant if
+    // multiple items are sanitized into the same name.
+    std::vector<std::pair<int, absl::string_view>> sorted_vocabulary;
+    sorted_vocabulary.reserve(column.items().size());
+    for (const auto& item : column.items()) {
+      sorted_vocabulary.push_back({item.second.index(), item.first});
+    }
+    std::sort(sorted_vocabulary.begin(), sorted_vocabulary.end());
+
     // Set of all sanitized_items. Used to detect duplications after the
-    // conversion to c++ symbols.
+    // conversion to C++ symbols.
     absl::flat_hash_set<std::string> sanitized_items;
 
-    for (const auto& item : column.items()) {
-      int index = item.second.index();
+    for (const auto& [vocab_index, vocab_value] : sorted_vocabulary) {
+      int index = vocab_index;
 
       // Labels don't have the OOB item.
       if (is_label) {
@@ -232,15 +242,17 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
             NOTREACHED();
             break;
         }
+        // Make sure noting is sanitized into the OOV item.
+        sanitized_items.insert(item_symbol);
       } else {
         switch (options.language_case()) {
           case proto::Options::kC:
           case proto::Options::kCpp:
-            item_symbol = StringToStructSymbol(item.first,
+            item_symbol = StringToStructSymbol(vocab_value,
                                                /*.ensure_letter_first=*/false);
             break;
           case proto::Options::kJava:
-            item_symbol = StringToJavaEnumConstant(item.first);
+            item_symbol = StringToJavaEnumConstant(vocab_value);
             break;
           case proto::Options::kCc:
           case proto::Options::LANGUAGE_NOT_SET:
@@ -261,7 +273,7 @@ absl::Status ComputeBaseInternalOptionsCategoricalDictionaries(
         sanitized_items.insert(item_symbol);
       }
       dictionary.sanitized_items[index] = item_symbol;
-      dictionary.items[index] = item.first;
+      dictionary.items[index] = std::string(vocab_value);
     }
   };
 
