@@ -29,6 +29,7 @@ In-Memory
 - Dict: {{column_name: column_data}}, where column_data can be lists of basic types or NumPy arrays (1D or 2D arrays for multi-dimensional columns).
 - Pandas DataFrame: No support for multi-dimensional columns.
 - Polars DataFrame.
+- PyArrow Table: For example, a Parquet file read with `pyarrow.parquet.read_table`.
 - Xarray Dataset.
 - ydf.VerticalDataset: For repeated use; create with `ydf.create_vertical_dataset`.
 - Batched TensorFlow Dataset.
@@ -64,6 +65,7 @@ Googlers: See go/ydf/in_google for additional internal-only formats.
   <li><b>Dict:</b> <code>{{column_name: column_data}}</code>, where <code>column_data</code> can be lists of basic types or NumPy arrays (1D or 2D arrays for multi-dimensional columns).</li>
   <li><b>Pandas DataFrame:</b> No support for multi-dimensional columns.</li>
   <li><b>Polars DataFrame</b>.</li>
+  <li><b>PyArrow Table:</b> For example, a Parquet file read with <code>pyarrow.parquet.read_table</code>.</li>
   <li><b>Xarray Dataset</b>.</li>
   <li><b><code>ydf.VerticalDataset</code>:</b> For repeated use; create with <code>ydf.create_vertical_dataset</code>.</li>
   <li><b>Batched TensorFlow Dataset</b>.</li>

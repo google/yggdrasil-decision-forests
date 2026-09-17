@@ -22,8 +22,10 @@ import numpy as np
 if typing.TYPE_CHECKING:
   import pandas as pd  # pylint: disable=unused-import,g-bad-import-order
   import xarray as xr  # pylint: disable=unused-import,g-bad-import-order
-  # Note: Polars is not include in the automatic build to speed-up compilation.
+  # Note: Polars & PyArrow are not included in the automatic build to speed-up
+  # compilation.
   # import polars as pl  # pylint: disable=unused-import,g-bad-import-order
+  # import pyarrow as pa  # pylint: disable=unused-import,g-bad-import-order
 
 # Supported type of column input values.
 InputValues = Union[np.ndarray, List[Any]]
@@ -45,6 +47,9 @@ IODataset = Union[  # pytype: disable=name-error
     Sequence[str],  # A list of typed paths
     "xr.Dataset",  # A XArray dataset
     "pl.DataFrame",  # A Polars DataFrame # TODO: Re-enable.  # pyrefly: ignore[unknown-name]
+    # A PyArrow Table or RecordBatch, e.g. as returned by
+    # `pyarrow.parquet.read_table`.
+    # "pa.Table",
     # Not listed: TensorFlow Datasets (e.g., CacheDataset, _BatchDataset),
     # PyGrain DataLoaders, PyGrain Datasets (e.g., MapDataset, IterDataset),
     # PyGrain Iterators (e.g., PyGrainDatasetIterator, DatasetIterator).

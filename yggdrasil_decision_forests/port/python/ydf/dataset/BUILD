@@ -83,6 +83,8 @@ py_test(
         # fastavro dep,
         # numpy dep,
         # pandas dep,
+        # pyarrow dep,
+        # pyarrow:pyarrow_modules dep,
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset/io:dataset_io",
         "//ydf/utils:test_utils",

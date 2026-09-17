@@ -9,6 +9,12 @@
 
 ### Fix
 
+### Features
+
+-   Support PyArrow Tables and RecordBatches as in-memory datasets.
+
+### Fix
+
 -   Refactored C++ to Python custom loss and metric evaluation to perform safe
     memory copies instead of zero-copy array sharing. This simplifies memory
     management and avoids use-after-free bugs.

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import enum
 import os
 from typing import Optional
@@ -23,6 +24,8 @@ from absl.testing import parameterized
 import fastavro
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2 as ds_pb
 from ydf.dataset import dataset as dataset_lib
@@ -3761,6 +3764,130 @@ f1,f2
 1,[[1, 2], [3, 4], [5, 6]]
 2,[[7, 8], [1, 2]]
 """,
+    )
+
+
+class PyArrowDatasetTest(parameterized.TestCase):
+
+  def test_dataspec_is_the_same_as_pandas(self):
+    columns = {
+        "col_int": [1, 2, 3],
+        "col_float": [1.0, 2.0, 3.0],
+        "col_str": ["a", "b", "a"],
+        "col_bool": [True, False, True],
+    }
+    ds_from_pyarrow = dataset_lib.create_vertical_dataset(pa.table(columns))
+    ds_from_pandas = dataset_lib.create_vertical_dataset(
+        pd.DataFrame(columns)
+    )
+    test_utils.assertProto2Equal(
+        self, ds_from_pyarrow.data_spec(), ds_from_pandas.data_spec()
+    )
+
+  def test_missing_values(self):
+    ds = dataset_lib.create_vertical_dataset(
+        pa.table({
+            "col_float": pa.array([1.0, None, 3.0], type=pa.float64()),
+            "col_str": pa.array(["a", None, "a"], type=pa.string()),
+        }),
+        min_vocab_frequency=1,
+    )
+    data_spec = ds.data_spec()
+    self.assertEqual(data_spec.columns[0].count_nas, 1)
+    self.assertEqual(data_spec.columns[1].count_nas, 1)
+
+  def test_record_batch(self):
+    ds = dataset_lib.create_vertical_dataset(
+        pa.record_batch({"col_int": [1, 2, 3]})
+    )
+    self.assertEqual(ds.data_spec().created_num_rows, 3)
+    self.assertEqual(
+        ds.data_spec().columns[0].type, ds_pb.ColumnType.NUMERICAL
+    )
+
+  def test_list_column_is_a_categorical_set(self):
+    ds = dataset_lib.create_vertical_dataset(
+        pa.table({
+            "col_cat_set": pa.array(
+                [["x"], ["x", "y"], ["x", "y", "z"]], type=pa.list_(pa.string())
+            )
+        }),
+        min_vocab_frequency=1,
+    )
+    self.assertEqual(
+        ds.data_spec().columns[0].type, ds_pb.ColumnType.CATEGORICAL_SET
+    )
+
+  def test_fixed_size_list_column_is_unrolled(self):
+    ds = dataset_lib.create_vertical_dataset(
+        pa.table({
+            "col_vec": pa.array(
+                [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+                type=pa.list_(pa.float32(), list_size=2),
+            )
+        })
+    )
+    self.assertEqual(
+        [c.name for c in ds.data_spec().columns],
+        ["col_vec.0_of_2", "col_vec.1_of_2"],
+    )
+
+  def test_temporal_column_raises(self):
+    table = pa.table({
+        "col_date": pa.array(
+            [datetime.datetime(2024, 1, 2)], type=pa.timestamp("us")
+        )
+    })
+    with self.assertRaisesRegex(ValueError, "temporal type"):
+      dataset_lib.create_vertical_dataset(table)
+
+  def test_read_parquet_file(self):
+    # "toy.parquet" mirrors "toy.csv" and was generated with:
+    #
+    #   table = pa.table({
+    #       "Num_1": pa.array([1, 2, 3, 4], pa.int64()),
+    #       "Num_2": pa.array([None, 2.0, None, 4.0], pa.float64()),
+    #       "Cat_1": pa.array(["A", "B", "A", "C"], pa.string()),
+    #       "Cat_2": pa.array(["A", None, "B", None], pa.string()),
+    #       "Cat_set_1": pa.array(
+    #           [["X"], ["X", "Y"], ["Y", "X", "Z"], ["X", "Y", "Z"]],
+    #           pa.list_(pa.string()),
+    #       ),
+    #       "Bool_1": pa.array([False, True, False, True], pa.bool_()),
+    #       "Cat_3": pa.array(["1", "2", "1", "3"]).dictionary_encode(),
+    #       "Vec_1": pa.array(
+    #           [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]],
+    #           pa.list_(pa.float32(), 2),
+    #       ),
+    #   })
+    #   pq.write_table(table, "toy.parquet")
+    table = pq.read_table(
+        os.path.join(test_utils.ydf_test_data_path(), "dataset", "toy.parquet")
+    )
+    ds = dataset_lib.create_vertical_dataset(
+        table,
+        min_vocab_frequency=1,
+        columns=[("Cat_set_1", Semantic.CATEGORICAL_SET)],
+        include_all_columns=True,
+    )
+    data_spec = ds.data_spec()
+    self.assertEqual(data_spec.created_num_rows, 4)
+    semantics = {c.name: c.type for c in data_spec.columns}
+    self.assertEqual(
+        semantics,
+        {
+            "Cat_set_1": ds_pb.ColumnType.CATEGORICAL_SET,
+            "Num_1": ds_pb.ColumnType.NUMERICAL,
+            "Num_2": ds_pb.ColumnType.NUMERICAL,
+            "Cat_1": ds_pb.ColumnType.CATEGORICAL,
+            "Cat_2": ds_pb.ColumnType.CATEGORICAL,
+            "Bool_1": ds_pb.ColumnType.BOOLEAN,
+            # Dictionary-encoded columns are decoded before being fed to YDF.
+            "Cat_3": ds_pb.ColumnType.CATEGORICAL,
+            # The fixed-size list column is unrolled.
+            "Vec_1.0_of_2": ds_pb.ColumnType.NUMERICAL,
+            "Vec_1.1_of_2": ds_pb.ColumnType.NUMERICAL,
+        },
     )
 
 

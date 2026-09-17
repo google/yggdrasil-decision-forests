@@ -30,6 +30,7 @@ py_library(
         ":numpy_io",
         ":pandas_io",
         ":polars_io",
+        ":pyarrow_io",
         ":pygrain_io",
         ":tensorflow_io",
         ":xarray_io",
@@ -55,6 +56,16 @@ py_library(
     deps = [
         ":dataset_io_types",
         # absl/logging dep,
+    ],
+)
+
+py_library(
+    name = "pyarrow_io",
+    srcs = ["pyarrow_io.py"],
+    deps = [
+        ":dataset_io_types",
+        # absl/logging dep,
+        # numpy dep,
     ],
 )
 
@@ -125,6 +136,19 @@ py_test(
         # absl/testing:absltest dep,
         # pandas dep,
         # # polars dep,  # TODO: Re-enable.
+    ],
+)
+
+py_test(
+    name = "pyarrow_io_test",
+    srcs = ["pyarrow_io_test.py"],
+    deps = [
+        ":pyarrow_io",
+        # absl/testing:absltest dep,
+        # absl/testing:parameterized dep,
+        # numpy dep,
+        # pandas dep,
+        # pyarrow dep,
     ],
 )
 

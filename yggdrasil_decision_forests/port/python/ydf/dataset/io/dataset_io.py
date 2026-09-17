@@ -25,6 +25,7 @@ from ydf.dataset.io import dataset_io_types
 from ydf.dataset.io import numpy_io
 from ydf.dataset.io import pandas_io
 from ydf.dataset.io import polars_io
+from ydf.dataset.io import pyarrow_io
 from ydf.dataset.io import pygrain_io
 from ydf.dataset.io import tensorflow_io
 from ydf.dataset.io import xarray_io
@@ -261,6 +262,8 @@ def cast_input_dataset_to_dict(
     return _unroll_dict(tensorflow_io.to_dict(data), **unroll_dict_kwargs)
   elif pygrain_io.is_pygrain(data):
     return _unroll_dict(pygrain_io.to_dict(data), **unroll_dict_kwargs)
+  elif pyarrow_io.is_pyarrow_table(data):
+    return _unroll_dict(pyarrow_io.to_dict(data), **unroll_dict_kwargs)
 
   elif isinstance(data, dict):
     # Dictionary of values
