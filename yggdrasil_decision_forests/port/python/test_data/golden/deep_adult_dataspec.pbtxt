@@ -99,11 +99,11 @@ columns {
   count_nas: 0
   discretized_numerical {
     boundaries: 12285
-    boundaries: 71557.3359
+    boundaries: 71557.336
     boundaries: 111840.664
     boundaries: 140664
     boundaries: 168232
-    boundaries: 188538.328
+    boundaries: 188538.33
     boundaries: 210474
     boundaries: 248889
     boundaries: 319854
