@@ -21,8 +21,7 @@
 ::   - Run a simple example with the pip package
 ::
 :: Usage example:
-::   :: Update "YDF_VERSION" and run
-::   tools\release_windows.bat
+::   :: run tools\release_windows.bat
 ::   :: The output pip packages are put in "dist".
 ::
 :: Requirements:
@@ -34,7 +33,7 @@
 cls
 setlocal
 
-set YDF_VERSION=0.16.1
+
 set BAZEL=bazel.exe
 set BAZEL_SH=C:\msys64\usr\bin\bash.exe
 set BAZEL_FLAGS=--config=windows_cpp20 --config=windows_avx2
@@ -64,8 +63,15 @@ CALL :Compile %PYTHON% || goto :error
 %PYTHON% tools/collect_pip_files.py || goto :error
 CALL :BuildPipPackage %PYTHON% || goto :error
 mkdir dist
-copy tmp_package\dist\ydf-%YDF_VERSION%-cp%PYTHON_VERSION%-cp%PYTHON_VERSION%-win_amd64.whl dist || goto :error
-CALL :TestPipPackage dist\ydf-%YDF_VERSION%-cp%PYTHON_VERSION%-cp%PYTHON_VERSION%-win_amd64.whl %PYTHON% || goto :error
+:: Resolve the wheel by glob so the version never needs to be hard-coded here.
+set WHEEL=
+for %%F in (tmp_package\dist\ydf-*-cp%PYTHON_VERSION%-cp%PYTHON_VERSION%-win_amd64.whl) do set WHEEL=%%~nxF
+if "%WHEEL%"=="" (
+  echo Could not find a built wheel for cp%PYTHON_VERSION% in tmp_package\dist
+  goto :error
+)
+copy tmp_package\dist\%WHEEL% dist || goto :error
+CALL :TestPipPackage dist\%WHEEL% %PYTHON% || goto :error
 EXIT /B 0
 
 :: Compiles and runs the tests.

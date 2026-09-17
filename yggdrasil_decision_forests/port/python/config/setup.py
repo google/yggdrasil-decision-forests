@@ -16,13 +16,40 @@
 
 This file is used by tools/build_pip_package.sh.
 """
+import os
 import platform
+import re
 import sys
 import setuptools
 from setuptools.command.install import install
 from setuptools.dist import Distribution
 
-_VERSION = "0.16.1"
+
+def _get_version() -> str:
+  """Reads the version from ydf/version.py, the single source of truth.
+
+  The version must not be duplicated here: `tools/change_version.sh` only
+  updates `ydf/version.py`, and a stale copy in this file would silently
+  publish a wheel under the wrong version.
+
+  Returns:
+    The version string, e.g. "0.16.1".
+
+  Raises:
+    RuntimeError: If the version cannot be located.
+  """
+  version_path = os.path.join(
+      os.path.dirname(os.path.abspath(__file__)), "ydf", "version.py"
+  )
+  with open(version_path, "r", encoding="utf-8") as f:
+    content = f.read()
+  match = re.search(r'^version = "([^"]+)"$', content, re.MULTILINE)
+  if match is None:
+    raise RuntimeError(f"Cannot find the version string in {version_path}")
+  return match.group(1)
+
+
+_VERSION = _get_version()
 
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
