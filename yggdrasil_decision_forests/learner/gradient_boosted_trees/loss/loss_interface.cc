@@ -78,7 +78,14 @@ absl::Status AbstractLoss::UpdateGradients(
 
 std::vector<std::string> AbstractLoss::SecondaryMetricNames() const {
   std::vector<std::string> names = InternalSecondaryMetricNames();
+  const std::vector<std::string> custom_names = CustomMetricNames();
+  names.insert(names.end(), custom_names.begin(), custom_names.end());
+  return names;
+}
 
+std::vector<std::string> AbstractLoss::CustomMetricNames() const {
+  std::vector<std::string> names;
+  names.reserve(custom_metrics_.size());
   for (const auto& metric : custom_metrics_) {
     names.push_back(metric.name);
   }
