@@ -32,6 +32,7 @@ def _build_evaluation_options(
     ndcg_truncation: int,
     mrr_truncation: int,
     map_truncation: int,
+    max_calibration_bins: Optional[int],
     num_threads: Optional[int],
 ) -> metric_pb2.EvaluationOptions:
   """Builds evaluation options for the given task."""
@@ -58,6 +59,12 @@ def _build_evaluation_options(
       ranking=ranking,
       num_threads=num_threads,
   )
+  if (
+      task == generic_model.Task.CLASSIFICATION
+      and max_calibration_bins is not None
+      and max_calibration_bins > 0
+  ):
+    options.classification.max_calibration_bins = max_calibration_bins
   return options
 
 
@@ -259,6 +266,7 @@ def evaluate_predictions(
     ndcg_truncation: int = 5,
     mrr_truncation: int = 5,
     map_truncation: int = 5,
+    max_calibration_bins: Optional[int] = None,
     random_seed: int = 1234,
     num_threads: Optional[int] = None,
 ) -> metric.Evaluation:
@@ -357,6 +365,7 @@ def evaluate_predictions(
       should be truncated. Default to 5. Ignored for non-ranking models.
     map_truncation: Controls at which ranking position the MAP metric loss
       should be truncated. Default to 5. Ignored for non-ranking models.
+    max_calibration_bins: The maximum number of bins for calibration plots.
     random_seed: Random seed for sampling.
     num_threads: Number of threads used to run the model.
 
@@ -374,6 +383,7 @@ def evaluate_predictions(
       ndcg_truncation,
       mrr_truncation,
       map_truncation,
+      max_calibration_bins,
       num_threads,
   )
 

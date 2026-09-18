@@ -402,6 +402,7 @@ class GenericJAXModel(generic_model.GenericModel):
       ndcg_truncation: int = 5,
       mrr_truncation: int = 5,
       map_truncation: int = 5,
+      max_calibration_bins: Optional[int] = None,
       use_slow_engine: bool = False,
       num_threads: Optional[int] = None,
   ) -> metric_lib.Evaluation:
@@ -451,6 +452,7 @@ class GenericJAXModel(generic_model.GenericModel):
         ndcg_truncation=ndcg_truncation,
         mrr_truncation=mrr_truncation,
         map_truncation=map_truncation,
+        max_calibration_bins=max_calibration_bins,
         num_threads=num_threads,
     )
 
