@@ -53,6 +53,9 @@ class EarlyStopping {
   // Last model.
   float last_loss() const { return last_loss_; }
   const std::vector<float>& last_metrics() const { return last_metrics_; }
+  // Number of trees of the model during the last update. Zero if the model was
+  // never evaluated on the validation dataset.
+  int last_num_trees() const { return last_num_trees_; }
 
   // Number of trees trained at each iteration. "set_trees_per_iterations"
   // should be called before the first update.
