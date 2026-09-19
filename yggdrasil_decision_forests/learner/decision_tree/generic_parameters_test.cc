@@ -362,7 +362,7 @@ TEST(GenericParameters, OnlyValidFails) {
   (*hparam_def.mutable_fields())["new_hp"];
   absl::flat_hash_set<std::string> valid_hyperparameters = {};
   absl::Status status = GetGenericHyperParameterSpecification(
-      config, &hparam_def, valid_hyperparameters, absl::nullopt);
+      config, &hparam_def, valid_hyperparameters, std::nullopt);
   EXPECT_THAT(
       status,
       test::StatusIs(
@@ -377,7 +377,7 @@ TEST(GenericParameters, OnlyInvalidFails) {
   (*hparam_def.mutable_fields())["new_hp"];
   absl::flat_hash_set<std::string> invalid_hyperparameters = {};
   absl::Status status = GetGenericHyperParameterSpecification(
-      config, &hparam_def, absl::nullopt, invalid_hyperparameters);
+      config, &hparam_def, std::nullopt, invalid_hyperparameters);
   EXPECT_THAT(
       status,
       test::StatusIs(
