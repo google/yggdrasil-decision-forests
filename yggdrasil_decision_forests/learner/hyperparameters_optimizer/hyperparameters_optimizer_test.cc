@@ -167,15 +167,38 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTraining) {
 }
 
 TEST_F(OnAdult, RandomTuner_MemoryDataset_LocalTrainingCrossValidation) {
-  SetLocalTraining();
+  SetTrainConfig("RANDOM", "random", 10);
   auto* spe_config = train_config_.MutableExtension(
       hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
-  spe_config->mutable_evaluation()->mutable_cross_validation();
-  SetTrainConfig("RANDOM", "random", 10);
+  spe_config->mutable_evaluation()
+      ->mutable_cross_validation()
+      ->mutable_fold_generator()
+      ->set_num_folds(3);
+
+  SetLocalTraining();
   TrainAndEvaluateModel();
   EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 10);
+}
+
+TEST_F(OnAdult, CrossValidationWithDistributedTraining_Fail) {
+  SetTrainConfig("RANDOM", "random", 5);
+  auto* spe_config = train_config_.MutableExtension(
+      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
+  spe_config->mutable_evaluation()->mutable_cross_validation();
+
+  SetDistributedTraining();
+  PrepareDataset();
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config_, &learner, deployment_config_));
+
+  auto model_or = learner->TrainWithStatus(train_dataset_);
+  EXPECT_FALSE(model_or.ok());
+  EXPECT_EQ(model_or.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(model_or.status().message(),
+              HasSubstr("not supported with distributed training"));
 }
 
 TEST_F(OnAdult, RandomTuner_FileDataset_LocalTraining) {
@@ -193,18 +216,6 @@ TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTraining) {
   EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
   EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
   EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 25);
-}
-
-TEST_F(OnAdult, RandomTuner_MemoryDataset_DistributedTrainingCrossValidation) {
-  SetDistributedTraining();
-  auto* spe_config = train_config_.MutableExtension(
-      hyperparameters_optimizer_v2::proto::hyperparameters_optimizer_config);
-  spe_config->mutable_evaluation()->mutable_cross_validation();
-  SetTrainConfig("RANDOM", "random", 10);
-  TrainAndEvaluateModel();
-  EXPECT_GE(metric::Accuracy(evaluation_), 0.865);
-  EXPECT_LT(metric::LogLoss(evaluation_), 0.30);
-  EXPECT_EQ(model_->hyperparameter_optimizer_logs()->steps_size(), 10);
 }
 
 TEST_F(OnAdult, RandomTuner_FileDataset_DistributedTraining) {

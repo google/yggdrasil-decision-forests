@@ -207,8 +207,24 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
     const dataset::VerticalDataset& train_dataset,
     std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
         valid_dataset) const {
+  // The effective configuration is the user configuration + the default value +
+  // the automatic configuration (if enabled) + the copy of the non-specified
+  // training configuration field from the learner to the sub-learner (e.g. copy
+  // of the label name).
+  model::proto::TrainingConfig effective_config;
+  model::proto::TrainingConfigLinking config_link;
+  RETURN_IF_ERROR(GetEffectiveConfiguration(train_dataset.data_spec(),
+                                            &effective_config, &config_link));
+  const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config =
+      effective_config.GetExtension(proto::hyperparameters_optimizer_config);
+
   if (deployment().execution_case() ==
       model::proto::DeploymentConfig::ExecutionCase::kDistribute) {
+    if (spe_config.evaluation().has_cross_validation()) {
+      return absl::InvalidArgumentError(
+          "The cross-validation evaluation of the hyper-parameter candidates "
+          "is not supported with distributed training");
+    }
     // Export the dataset to file and run the training on file.
     return TrainFromFileOnMemoryDataset(train_dataset, valid_dataset);
   }
@@ -221,17 +237,6 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
         "The HyperParameterOptimizerLearner only support local or distributed "
         "deployment configs.");
   }
-
-  // The effective configuration is the user configuration + the default value +
-  // the automatic configuration (if enabled) + the copy of the non-specified
-  // training configuration field from the learner to the sub-learner (e.g. copy
-  // of the label name).
-  model::proto::TrainingConfig effective_config;
-  model::proto::TrainingConfigLinking config_link;
-  RETURN_IF_ERROR(GetEffectiveConfiguration(train_dataset.data_spec(),
-                                            &effective_config, &config_link));
-  const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config =
-      effective_config.GetExtension(proto::hyperparameters_optimizer_config);
 
   // Initialize the learner with the base hyperparameters.
   ASSIGN_OR_RETURN(auto base_learner,
@@ -344,6 +349,12 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
       GetEffectiveConfiguration(data_spec, &effective_config, &config_link));
   const proto::HyperParametersOptimizerLearnerTrainingConfig& spe_config =
       effective_config.GetExtension(proto::hyperparameters_optimizer_config);
+
+  if (spe_config.evaluation().has_cross_validation()) {
+    return absl::InvalidArgumentError(
+        "The cross-validation evaluation of the hyper-parameter candidates "
+        "is not supported with distributed training");
+  }
 
   // Initialize the remote workers.
   ASSIGN_OR_RETURN(auto manager, CreateDistributeManager(spe_config));

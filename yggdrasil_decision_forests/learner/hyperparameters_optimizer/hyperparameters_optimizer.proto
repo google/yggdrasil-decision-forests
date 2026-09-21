@@ -84,7 +84,8 @@ message Evaluation {
     // Uses the self reported model evaluation e.g. validation score or OOB
     // evaluation. Default.
     SelfEvaluation self_model_evaluation = 3;
-    // Uses cross-validation on the training dataset.
+    // Uses cross-validation on the training dataset. Not supported for
+    // distributed training.
     CrossValidation cross_validation = 4;
   }
 
