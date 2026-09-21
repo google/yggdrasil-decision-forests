@@ -652,7 +652,8 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
 
   LOG(INFO) << "Start local tuner with "
             << spe_config.optimizer().parallel_trials()
-            << " parallel trial(s), each with " << deployment().num_threads()
+            << " parallel trial(s), each with "
+            << spe_config.base_learner_deployment().num_threads()
             << " thread(s)";
   async_evaluator.StartWorkers();
 
@@ -822,7 +823,12 @@ absl::StatusOr<double> HyperParameterOptimizerLearner::EvaluateCandidateLocally(
                                        *base_learner, train_dataset,
                                        fold_generator, evaluation_options,
                                        spe_config.base_learner_deployment()));
+      break;
     }
+    default:
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Unsupported evaluation source: ",
+          static_cast<int>(spe_config.evaluation().source_case())));
   }
 
   ASSIGN_OR_RETURN(const auto score, EvaluationToScore(spe_config, evaluation));
