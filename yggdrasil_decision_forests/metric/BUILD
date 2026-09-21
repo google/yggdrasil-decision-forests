@@ -35,6 +35,8 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:protobuf",
         "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:reliability_diagram",
+        "//yggdrasil_decision_forests/utils:smoothed_pav_calibration_fit",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@boost.math//:boost.math",
         "@com_google_absl//absl/base:core_headers",
@@ -124,6 +126,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
+        "@com_google_protobuf//:protobuf",
     ],
 )
 

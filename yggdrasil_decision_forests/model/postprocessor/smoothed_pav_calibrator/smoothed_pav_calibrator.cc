@@ -17,11 +17,16 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/log/check.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
+#include "yggdrasil_decision_forests/serving/example_set.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/smoothed_pav_calibration_inference.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -64,6 +69,14 @@ void SmoothedPavCalibrator::ProcessImpl(
   update_prediction(calibration_lookup_table_, prediction);
 }
 
+void SmoothedPavCalibrator::ProcessImpl(
+    const serving::AbstractExampleSet& example, int num_examples,
+    std::vector<float>* predictions) const {
+  for (int i = 0; i < num_examples; ++i) {
+    (*predictions)[i] = calibration_lookup_table_.apply((*predictions)[i]);
+  }
+}
+
 void SmoothedPavCalibrator::ExportProtoImpl(proto::Postprocessor* proto) const {
   *proto->mutable_smoothed_pav_calibrator() = proto_;
 }
@@ -74,6 +87,63 @@ void SmoothedPavCalibrator::AppendDescriptionImpl(
   absl::StrAppend(description, "Number of raw bins: ", proto_.x_size(), "\n");
   absl::StrAppend(description, "Number of lookup table bins: ",
                   calibration_lookup_table_.grid_size(), "\n");
+}
+
+absl::Status SmoothedPavCalibrator::InitializeEvaluationImpl(
+    const metric::proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column,
+    metric::proto::EvaluationResults* eval) {
+  if (!eval->has_classification() ||
+      !eval->classification().has_binary_calibration_data()) {
+    return absl::InvalidArgumentError(
+        "Evaluation results does not have binary calibration data.");
+  }
+
+  auto* cal_data =
+      eval->mutable_classification()->mutable_binary_calibration_data();
+  cal_data->mutable_raw_prob_pred()->Clear();
+  cal_data->mutable_raw_prob_true()->Clear();
+  cal_data->mutable_raw_prob_pred()->Assign(proto_.x().begin(),
+                                            proto_.x().end());
+  cal_data->mutable_raw_prob_true()->Assign(proto_.y().begin(),
+                                            proto_.y().end());
+
+  return absl::OkStatus();
+}
+
+absl::Status SmoothedPavCalibrator::FinalizeEvaluationImpl(
+    const metric::proto::EvaluationOptions& option,
+    const dataset::proto::Column& label_column,
+    metric::proto::EvaluationResults* eval) {
+  switch (option.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      // Calibration.
+      if (!eval->classification().has_binary_calibration_data()) {
+        return absl::InvalidArgumentError(
+            "Evaluation results does not have binary calibration data.");
+      }
+    } break;
+    default:
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unsupported task: ", option.task()));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status SmoothedPavCalibrator::AppendEvaluationImpl(
+    const metric::proto::EvaluationOptions& option,
+    const model::proto::Prediction& pred, utils::RandomEngine* rnd,
+    metric::proto::EvaluationResults* eval) const {
+  switch (option.task()) {
+    case model::proto::Task::CLASSIFICATION: {
+      STATUS_CHECK(pred.has_classification() &&
+                   eval->classification().has_binary_calibration_data());
+    } break;
+    default:
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unsupported task: ", option.task()));
+  }
+  return absl::OkStatus();
 }
 
 std::unique_ptr<SmoothedPavCalibrator> Create(
