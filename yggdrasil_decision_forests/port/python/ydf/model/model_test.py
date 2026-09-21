@@ -274,6 +274,8 @@ class GenericModelTest(parameterized.TestCase):
             ROC AUC: 0.927459
             PR AUC: 0.828393
             Num thresholds: 9491
+        expected calibration error: 0.00851295
+        maximum calibration error: 0.0375593
         loss: 0.279777
         num examples: 9769
         num examples (weighted): 9769
