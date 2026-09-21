@@ -40,9 +40,6 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/weight.h"
-#include "yggdrasil_decision_forests/learner/abstract_learner.h"
-#include "yggdrasil_decision_forests/learner/learner_library.h"
-#include "yggdrasil_decision_forests/learner/postprocessor/abstract_postprocessor.pb.h"
 #include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/describe.h"
@@ -497,60 +494,6 @@ absl::StatusOr<BenchmarkInferenceCCResult> GenericCCModel::Benchmark(
       .batch_size = single_thread_result.batch_size,
       .num_examples = static_cast<size_t>(dataset.nrow()),
   };
-}
-
-absl::Status GenericCCModel::Calibrate(
-    const dataset::VerticalDataset& dataset,
-    const model::postprocessor::proto::AbstractPostprocessorTrainingConfig&
-        postprocessor_training_config,
-    int num_threads) {
-  py::gil_scoped_release release;
-  model::proto::DeploymentConfig deployment;
-  model::proto::TrainingConfig config;
-
-  if (model_->task() != model::proto::Task::CLASSIFICATION ||
-      model_->LabelColumnSpec().categorical().number_of_unique_values() != 3) {
-    return absl::InvalidArgumentError(
-        "Model is not a binary classification model.");
-  }
-  if (!model_->has_label()) {
-    return absl::InvalidArgumentError(
-        "Model does not have a label column set.");
-  }
-  if (!postprocessor_training_config
-           .has_smoothed_pav_calibrator_training_config()) {
-    return absl::InvalidArgumentError(
-        "Postprocessor training config does not have a calibration "
-        "configuration (SmoothedPavCalibratorTrainingConfig).");
-  }
-
-  deployment.set_num_threads(num_threads);
-  config.set_task(model::proto::Task::CLASSIFICATION);
-  config.set_label(model_->label());
-  config.set_learner(model_->name());
-  auto postprocessor = config.add_postprocessors();
-  if (postprocessor_training_config
-          .has_smoothed_pav_calibrator_training_config()) {
-    auto c =
-        postprocessor_training_config.smoothed_pav_calibrator_training_config();
-    postprocessor->mutable_smoothed_pav_calibrator_training_config()
-        ->set_n_bins(c.n_bins());
-    postprocessor->mutable_smoothed_pav_calibrator_training_config()
-        ->set_z_threshold(c.z_threshold());
-    postprocessor->mutable_smoothed_pav_calibrator_training_config()
-        ->set_n_grid(c.n_grid());
-  }
-
-  std::unique_ptr<model::AbstractLearner> learner;
-  RETURN_IF_ERROR(model::GetLearner(config, &learner));
-  *learner->mutable_deployment() = deployment;
-
-  ASSIGN_OR_RETURN(model_, learner->TrainWithStatus(dataset, std::nullopt,
-                                                    std::move(model_)));
-
-  invalidate_engine_ = true;
-
-  return absl::OkStatus();
 }
 
 std::optional<int> GenericCCModel::weight_col_idx() const {

@@ -292,8 +292,6 @@ class Evaluation:
     map: Mean Average Precision. Used for ranking tasks.
     qini: For uplifting.
     auuc: For uplifting.
-    ece: Expected Calibration Error.
-    mce: Maximum Calibration Error.
     custom_metrics: User custom metrics dictionary.
   """
 
@@ -513,20 +511,6 @@ class Evaluation:
       if uplift.HasField("auuc"):
         return uplift.auuc
 
-  @property
-  def ece(self) -> Optional[float]:
-    if self._evaluation_proto.HasField("classification"):
-      classification = self._evaluation_proto.classification
-      if classification.HasField("binary_calibration_data"):
-        return classification.binary_calibration_data.ece
-
-  @property
-  def mce(self) -> Optional[float]:
-    if self._evaluation_proto.HasField("classification"):
-      classification = self._evaluation_proto.classification
-      if classification.HasField("binary_calibration_data"):
-        return classification.binary_calibration_data.mce
-
   def to_dict(self) -> Dict[str, Any]:
     """Metrics in a dictionary."""
 
@@ -556,8 +540,6 @@ class Evaluation:
     add_item("map", self.map)
     add_item("qini", self.qini)
     add_item("auuc", self.auuc)
-    add_item("ece", self.ece)
-    add_item("mce", self.mce)
     return output
 
 

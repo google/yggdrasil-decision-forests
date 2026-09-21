@@ -1034,12 +1034,8 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
         // Train a model.
         auto model = learner.TrainWithStatus(training_dataset).value();
         // Evaluate the model.
-        CHECK_OK(model->InitializeForEvaluation(evaluation_options,
-                                                label_col_spec, &evaluation));
         auto status_append = model->AppendEvaluation(
             testing_dataset, evaluation_options, rnd, &evaluation);
-        CHECK_OK(model->FinalizeForEvaluation(evaluation_options,
-                                              label_col_spec, &evaluation));
         // Aggregate the evaluations.
         {
           utils::concurrency::MutexLock lock(evaluation_mutex);

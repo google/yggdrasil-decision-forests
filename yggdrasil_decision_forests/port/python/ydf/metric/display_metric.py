@@ -88,20 +88,6 @@ def glossary(doc: html.Doc, e: metric.Evaluation) -> html.Elem:
       <li><b>False Negatives (FN):</b> Model incorrectly predicted negative (a "miss").</li>
     </ul>
   </dd>
-  
-  <dt><b>Calibration Metrics</b></dt>
-  <dd>Two metrics that measure how well the model's predicted probabilities reflect the actual likelihood of the positive class.
-    <ul>
-      <li><b>ECE (Expected Calibration Error):</b> The difference between the average predicted probability and the actual fraction of positives, averaged across all bins.</li>
-      <li><b>MCE (Maximum Calibration Error):</b> The maximum difference between the average predicted probability and the actual fraction of positives, across all bins.</li>
-    </ul>
-    <br><i>Interpretation:</i> A well-calibrated model should have low ECE and MCE.
-  </dd>
-  
-  <dt><b>Calibration Plot (Reliability Diagram)</b></dt>
-  <dd>A graph that plots the actual fraction of positives against the average predicted probability for each bin.
-    <br><i>Interpretation:</i> A well-calibrated model should have points lying close to the diagonal line (where actual fraction = average predicted probability).
-  </dd>
 
   <dt><b>Threshold</b></dt>
   <dd>YDF classification models predict a probability for each class. A threshold determines the cutoff for classifying something as positive or negative.
@@ -315,8 +301,6 @@ def evaluation_to_str(e: metric.Evaluation) -> str:
     text += "characteristics:"
     for characteristic in e.characteristics:
       text += "\n" + string_lib.indent(str(characteristic))
-  text += _field_to_str("expected calibration error", e.ece)
-  text += _field_to_str("maximum calibration error", e.mce)
 
   # Regression
   text += _field_to_str("RMSE", e.rmse)
@@ -435,9 +419,6 @@ def evaluation_to_html_str(e: metric.Evaluation, add_style: bool = True) -> str:
           "PR-AUC: " + characteristic.name,
           characteristic.pr_auc,
       )
-
-  _field_to_html(doc, html_metric_grid, "ECE", e.ece)
-  _field_to_html(doc, html_metric_grid, "MCE", e.mce)
 
   # Regression
   _field_to_html(doc, html_metric_grid, "RMSE", e.rmse)

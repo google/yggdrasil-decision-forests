@@ -48,9 +48,7 @@ message EvaluationOptions {
     // List of false recall for the evaluation of false positive rate at given
     // recall.
     repeated double false_positive_rate_at_recall = 7;
-    // Maximum number of bins for the calibration plots (empty bins dropped).
-    optional int32 max_calibration_bins = 8 [default = 10];
-    // Next ID: 9
+    // Next ID: 8
   }
 
   message Regression {
@@ -151,10 +149,7 @@ message EvaluationResults {
     // Accuracy of the model. If both "accuracy" and "confusion" is specified,
     // they represent the same value.
     optional double accuracy = 5;
-    oneof calibration {
-      BinaryCalibrationData binary_calibration_data = 6;
-    }
-    // Next ID: 7
+    // Next ID: 6
   }
 
   message Regression {
@@ -446,19 +441,4 @@ message MetricEstimate {
 message Bounds {
   optional double lower = 1;
   optional double upper = 2;
-}
-
-message BinaryCalibrationData {
-  // This is the information from the FittedCalibrationCurve.
-  repeated float raw_prob_pred = 1 [packed = true];
-  repeated float raw_prob_true = 2 [packed = true];
-
-  repeated float reliability_diagram_mean_predicted = 3 [packed = true];
-  repeated float reliability_diagram_mean_observed = 4 [packed = true];
-  repeated float reliability_diagram_count = 5 [packed = true];
-
-  // Expected Calibration Error.
-  optional float ece = 6;
-  // Maximum Calibration Error.
-  optional float mce = 7;
 }
