@@ -1880,6 +1880,7 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.2019);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
+
 TEST_F(GradientBoostedTreesOnIris, InitializeWithClassPriors) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -1903,6 +1904,15 @@ TEST_F(GradientBoostedTreesOnIris, InitializeWithClassPriors) {
       a_posteriori_evaluation.classification().confusion();
   EXPECT_THAT(training_logs_confusion_table,
               EqualsProto(evaluation_confusion_table));
+}
+
+TEST_F(GradientBoostedTreesOnIris, InitializeWithClassPriorsNoLogits) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_multinomial_loss_options()
+      ->set_initialize_with_class_priors(true);
+  gbt_config->set_apply_link_function(false);
+  TrainAndEvaluateModel();
 }
 
 class GradientBoostedTreesOnDNA : public utils::TrainAndTestTester {
@@ -1951,6 +1961,61 @@ TEST_F(GradientBoostedTreesOnDNA, HessianBooleanAsNumerical) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9529, 0.0104, 0.9567);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.164, 0.0487, 0.1442);
+}
+
+TEST_F(GradientBoostedTreesOnDNA, ResumeTrainingWithClassPriors) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_multinomial_loss_options()
+      ->set_initialize_with_class_priors(true);
+  gbt_config->set_early_stopping(
+      proto::GradientBoostedTreesTrainingConfig::NONE);
+
+  // Reference: 40 iterations trained in one go.
+  gbt_config->set_num_trees(40);
+  TrainAndEvaluateModel();
+  const double reference_logloss = metric::LogLoss(evaluation_);
+
+  // Same budget, but interrupted and resumed at iteration 2.
+  deployment_config_.set_cache_path(
+      file::JoinPath(test::TmpDirectory(), "cache_class_priors_resume"));
+  deployment_config_.set_try_resume_training(true);
+  gbt_config->set_num_trees(2);
+  TrainAndEvaluateModel();
+
+  // Direct invariant on the intermediate model: the fast-engine path of
+  // "ComputePredictions" must produce the exact same raw accumulator as the
+  // slow no-engine reference path.
+  auto* gbt_model = dynamic_cast<GradientBoostedTreesModel*>(model_.get());
+  ASSERT_THAT(gbt_model, testing::NotNull());
+  ASSERT_THAT(gbt_model->initial_predictions(),
+              testing::Each(testing::Ne(0.f)));
+  ASSERT_OK_AND_ASSIGN(const auto engine,
+                       internal::BuildFastEngineForRawPredictions(gbt_model));
+  std::vector<decision_tree::DecisionTree*> all_trees;
+  all_trees.reserve(gbt_model->NumTrees());
+  for (const auto& tree : gbt_model->decision_trees()) {
+    all_trees.push_back(tree.get());
+  }
+  std::vector<float> predictions_with_engine;
+  std::vector<float> predictions_without_engine;
+  ASSERT_OK(internal::ComputePredictions(gbt_model, engine.get(), {}, {},
+                                         test_dataset_,
+                                         &predictions_with_engine));
+  ASSERT_OK(internal::ComputePredictions(gbt_model, nullptr, all_trees, {},
+                                         test_dataset_,
+                                         &predictions_without_engine));
+  EXPECT_THAT(
+      predictions_with_engine,
+      testing::Pointwise(testing::FloatEq(), predictions_without_engine));
+
+  // End-to-end invariant: resuming must reproduce the uninterrupted model (up
+  // to float associativity between "(initial + leaf_0) + leaf_1" and
+  // "(leaf_0 + leaf_1) + initial"; without the fix this drifts by ~3e-3).
+  gbt_config->set_num_trees(40);
+  TrainAndEvaluateModel();
+  const double resumed_logloss = metric::LogLoss(evaluation_);
+  EXPECT_NEAR(resumed_logloss, reference_logloss, 5e-4);
 }
 
 TEST(GradientBoostedTrees, SetHyperParameters) {

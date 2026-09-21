@@ -285,11 +285,29 @@ void SetInitialPredictions(const std::vector<float>& initial_predictions,
                            UnsignedExampleIdx num_rows,
                            std::vector<V>* predictions);
 
+// Builds a fast engine whose predictions are the raw (i.e. pre-activation)
+// prediction accumulator used during training, for use with
+// "ComputePredictions".
+//
+// Engines apply the model's activation function; "output_logits" suppresses it.
+// This helper owns that handling, so callers do not have to (and must not) set
+// "output_logits" themselves.
+absl::StatusOr<std::unique_ptr<serving::FastEngine>>
+BuildFastEngineForRawPredictions(GradientBoostedTreesModel* mdl);
+
 // Computes the predictions and gradient of the model without relying on
 // existing predictions or gradient buffers.
 //
 // Only the meta-data are used from "mdl". If "optional_engine" is non-null, it
 // will be used in conjunction with "trees".
+//
+// IMPORTANT: "predictions" is the RAW, pre-activation accumulator
+// ("initial_predictions + sum of the active leaf values") expected by
+// "AbstractLoss". "optional_engine" must therefore be built with
+// "BuildFastEngineForRawPredictions"; an engine that applies an activation
+// function silently corrupts the training (e.g. for POISSON the loss would then
+// compute exp(exp(raw))). Note this corruption is silent in release builds: the
+// finiteness check in loss_utils.h is a DCHECK.
 absl::Status ComputePredictions(
     const GradientBoostedTreesModel* mdl,
     const serving::FastEngine* optional_engine,

@@ -409,9 +409,8 @@ absl::Status TryLoadSnapshotFromDisk(
 
   // Recompute the prediction caches.
   absl::Time time_begin_recompute_accumulators = absl::Now();
-  model->set_output_logits(true);
-  ASSIGN_OR_RETURN(auto engine, model->BuildFastEngine());
-  model->set_output_logits(false);
+  ASSIGN_OR_RETURN(const auto engine,
+                   internal::BuildFastEngineForRawPredictions(model));
 
   RETURN_IF_ERROR(internal::ComputePredictions(model, engine.get(), {}, config,
                                                gradient_sub_train_dataset,
@@ -1001,10 +1000,9 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
         std::vector<decision_tree::DecisionTree*> trees;
         if (iter_idx > 0) {
           //  Compile the trees into an engine.
-          mdl->set_output_logits(true);
-          ASSIGN_OR_RETURN(auto engine, mdl->BuildFastEngine());
-          mdl->set_output_logits(false);
-          last_engine = std::move(engine);
+          ASSIGN_OR_RETURN(
+              last_engine,
+              internal::BuildFastEngineForRawPredictions(mdl.get()));
           num_trees_in_last_engine = mdl->NumTrees();
 
           // Extract the trees of the current model.
@@ -2968,6 +2966,19 @@ absl::Status CreateGradientDataset(const dataset::VerticalDataset& dataset,
     predictions->resize(dataset.nrow() * loss_shape.prediction_dim);
   }
   return absl::OkStatus();
+}
+
+absl::StatusOr<std::unique_ptr<serving::FastEngine>>
+BuildFastEngineForRawPredictions(GradientBoostedTreesModel* mdl) {
+  // "output_logits" suppresses the activation function, so that the engine
+  // returns the raw prediction accumulator. It is restored to its previous
+  // value, as it is part of the model semantics.
+  const bool saved_output_logits = mdl->output_logits();
+  mdl->set_output_logits(true);
+  absl::StatusOr<std::unique_ptr<serving::FastEngine>> engine =
+      mdl->BuildFastEngine();
+  mdl->set_output_logits(saved_output_logits);
+  return engine;
 }
 
 absl::Status ComputePredictions(
