@@ -252,7 +252,7 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
   if (search_space.fields().empty()) {
     return absl::InvalidArgumentError("The search space is empty.");
   }
-  LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
+  LOG(INFO) << "Hyperparameter search space:\n" << search_space;
 
   // Select the best hyperparameters.
   model::proto::HyperparametersOptimizerLogs logs;
@@ -261,9 +261,7 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
                    SearchBestHyperparameterInProcess(
                        spe_config, config_link, search_space_spec, search_space,
                        train_dataset, valid_dataset, &best_model, &logs));
-  LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
-
-  // TODO: Record the logs.
+  LOG(INFO) << "Best hyperparameters:\n" << best_params;
 
   if (spe_config.retrain_final_model()) {
     // Train a model on the entire train dataset using the best hyperparameters.
@@ -373,7 +371,7 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
   if (search_space.fields().empty()) {
     return absl::InvalidArgumentError("The search space is empty.");
   }
-  LOG(INFO) << "Hyperparameter search space:\n" << search_space.DebugString();
+  LOG(INFO) << "Hyperparameter search space:\n" << search_space;
 
   // Select the best hyperparameters.
   model::proto::HyperparametersOptimizerLogs logs;
@@ -383,7 +381,7 @@ HyperParameterOptimizerLearner::TrainWithStatusImpl(
       SearchBestHyperparameterDistributed(
           spe_config, config_link, search_space_spec, search_space, typed_path,
           data_spec, typed_valid_path, &best_model, manager.get(), &logs));
-  LOG(INFO) << "Best hyperparameters:\n" << best_params.DebugString();
+  LOG(INFO) << "Best hyperparameters:\n" << best_params;
 
   // TODO: Record the logs.
 

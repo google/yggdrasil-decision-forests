@@ -25,16 +25,16 @@
 //     // No more parameters to evaluate.
 //     break;
 //   } else if(status==kWaitForEvaluation){
-//     // The optimizer expected at least one evaluation result before
-//     generating a new candidate. In this example, the candidates are evaluated
-//     one-by-one sequentially. At this point in the code, there are no pending
-//     evaluation running, so this message is not possible.
-//     LOG(FATAL) << "Should not append. As no evaluation pending.";
+//     // The optimizer expects at least one evaluation result before
+//     // generating a new candidate. In this example, the candidates are
+//     // evaluated one-by-one sequentially. At this point in the code, there
+//     // are no pending evaluations running, so this message is not possible.
+//     LOG(FATAL) << "Should not append as no evaluation is pending.";
 //   }
 //   double evaluation = Evaluate(candidate);
 //   optimizer->ConsumeEvaluation(candidate,evaluation);
-//   }
 // }
+//
 // GenericHyperParameters best_params;
 // double best_score;
 // tie(best_params, best_score) = optimizer.BestParameters();

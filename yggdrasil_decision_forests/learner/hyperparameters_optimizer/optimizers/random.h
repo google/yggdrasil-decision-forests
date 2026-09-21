@@ -109,7 +109,7 @@ absl::Status UpdateWeights(model::proto::HyperParameterSpace* space);
 absl::StatusOr<double> UpdateWeights(
     model::proto::HyperParameterSpace::Field* field);
 
-absl::StatusOr<size_t> Sample(std::vector<float>& weights,
+absl::StatusOr<size_t> Sample(std::vector<double>& weights,
                               utils::RandomEngine* random);
 
 }  // namespace internal

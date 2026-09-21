@@ -67,7 +67,7 @@ absl::Status RandomOptimizer::BuildRandomSet(
   switch (field.Type_case()) {
     case model::proto::HyperParameterSpace::Field::TypeCase::
         kDiscreteCandidates: {
-      std::vector<float> sampling_weight{
+      std::vector<double> sampling_weight{
           field.discrete_candidates().weights().begin(),
           field.discrete_candidates().weights().end()};
       ASSIGN_OR_RETURN(const auto selected_value_idx,
@@ -241,7 +241,7 @@ absl::StatusOr<double> UpdateWeights(
   return field_weight;
 }
 
-absl::StatusOr<size_t> Sample(std::vector<float>& weights,
+absl::StatusOr<size_t> Sample(std::vector<double>& weights,
                               utils::RandomEngine* random) {
   const double sum = utils::accumulate(weights.begin(), weights.end(), 0.0);
   if (sum <= 0) {

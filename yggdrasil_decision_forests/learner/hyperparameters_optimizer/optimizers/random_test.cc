@@ -214,13 +214,13 @@ TEST(Random, UpdateWeights) {
 
 TEST(Benchmark, Sample) {
   utils::RandomEngine random;
-  std::vector<float> weights{0, 0.5, 0, 1.0};
+  std::vector<double> weights{0, 0.5, 0, 1.0};
   for (int i = 0; i < 100; i++) {
     int sample = internal::Sample(weights, &random).value();
     EXPECT_TRUE(sample == 1 || sample == 3);
   }
 
-  std::vector<float> weights_2{1.0, 1.0, 1.0, 1.0};
+  std::vector<double> weights_2{1.0, 1.0, 1.0, 1.0};
   for (int i = 0; i < 100; i++) {
     int sample_2 = internal::Sample(weights_2, &random).value();
     EXPECT_TRUE(sample_2 >= 0 && sample_2 < 4);

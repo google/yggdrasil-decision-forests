@@ -206,4 +206,4 @@ absl::StatusOr<metric::proto::MetricAccessor> DefaultTargetMetric(
 }  // namespace model
 }  // namespace yggdrasil_decision_forests
 
-#endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETER_OPTIMIZER_RANDOM_H_
+#endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_HYPERPARAMETERS_OPTIMIZER_H_
