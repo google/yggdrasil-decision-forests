@@ -16,16 +16,12 @@
 #include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 
 #include <string>
-#include <vector>
 
 #include "gtest/gtest.h"
-#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/postprocessor/postprocessor.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
-#include "yggdrasil_decision_forests/serving/example_set.h"
-#include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests::model::postprocessor {
 namespace {
@@ -58,35 +54,11 @@ class FakePostprocessor : public AbstractPostprocessor {
     process_example_called_ = true;
   }
 
-  void ProcessImpl(const serving::AbstractExampleSet& example, int num_examples,
-                   std::vector<float>* predictions) const override {}
-
   void ExportProtoImpl(proto::Postprocessor* proto) const override {
     export_called_ = true;
   }
 
   void AppendDescriptionImpl(std::string* description) const override {}
-
-  absl::Status InitializeEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval) override {
-    return absl::OkStatus();
-  }
-
-  absl::Status FinalizeEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval) override {
-    return absl::OkStatus();
-  }
-
-  absl::Status AppendEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const model::proto::Prediction& pred, utils::RandomEngine* rnd,
-      metric::proto::EvaluationResults* eval) const override {
-    return absl::OkStatus();
-  }
 
  private:
   mutable bool process_dataset_called_ = false;

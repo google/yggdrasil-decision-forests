@@ -72,7 +72,6 @@ pybind_library(
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_cc_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution",
         "@ydf_cc//yggdrasil_decision_forests/utils:random",
-        "@ydf_cc//yggdrasil_decision_forests/utils:reliability_diagram",
         "@ydf_cc//yggdrasil_decision_forests/utils:status_macros",
     ],
 )

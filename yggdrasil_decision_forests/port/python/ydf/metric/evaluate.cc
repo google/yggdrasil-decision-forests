@@ -21,7 +21,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -39,7 +38,6 @@
 #include "ydf/utils/status_casters.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/random.h"
-#include "yggdrasil_decision_forests/utils/reliability_diagram.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace py = ::pybind11;
@@ -58,15 +56,6 @@ absl::Status AddBinaryClassificationPredictions(
   // Categorical value of the "positive" and "negative" classes;
   constexpr int kNegativeValue = 1;
   constexpr int kPositiveValue = 2;
-
-  std::unique_ptr<utils::reliability_diagram::ReliabilityDiagram>
-      reliability_diagram;
-  if (eval_options.classification().max_calibration_bins() > 0 &&
-      eval->classification().has_binary_calibration_data()) {
-    reliability_diagram =
-        std::make_unique<utils::reliability_diagram::ReliabilityDiagram>(
-            eval_options.classification().max_calibration_bins());
-  }
 
   model::proto::Prediction prediction_proto;
   auto& prediction_distribution =
@@ -98,12 +87,9 @@ absl::Status AddBinaryClassificationPredictions(
     prediction_distribution.set_sum(1.f);
     prediction_distribution.set_counts(kNegativeValue, 1 - prediction);
     prediction_distribution.set_counts(kPositiveValue, prediction);
-    RETURN_IF_ERROR(metric::AddPrediction(eval_options, prediction_proto, rnd,
-                                          eval, reliability_diagram.get()));
+    RETURN_IF_ERROR(
+        metric::AddPrediction(eval_options, prediction_proto, rnd, eval));
   }
-
-  CHECK_OK(metric::StoreReliabilityDiagram(reliability_diagram.get(), eval));
-
   return absl::OkStatus();
 }
 

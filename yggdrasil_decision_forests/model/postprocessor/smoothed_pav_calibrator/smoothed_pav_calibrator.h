@@ -20,14 +20,11 @@
 #include <string>
 #include <vector>
 
-#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 #include "yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator/smoothed_pav_calibrator.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
-#include "yggdrasil_decision_forests/serving/example_set.h"
-#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/smoothed_pav_calibration_fit.h"
 #include "yggdrasil_decision_forests/utils/smoothed_pav_calibration_inference.h"
 
@@ -59,27 +56,10 @@ class SmoothedPavCalibrator : public AbstractPostprocessor {
   void ProcessImpl(const dataset::proto::Example& example,
                    yggdrasil_decision_forests::model::proto::Prediction*
                        prediction) const override;
-  void ProcessImpl(const serving::AbstractExampleSet& example, int num_examples,
-                   std::vector<float>* predictions) const override;
 
   void ExportProtoImpl(proto::Postprocessor* proto) const override;
 
   void AppendDescriptionImpl(std::string* description) const override;
-
-  absl::Status InitializeEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval) override;
-
-  absl::Status FinalizeEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval) override;
-
-  absl::Status AppendEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const model::proto::Prediction& pred, utils::RandomEngine* rnd,
-      metric::proto::EvaluationResults* eval) const override;
 
   smoothed_pav_calibrator::proto::SmoothedPavCalibrator proto_;
   utils::CalibrationLookupTable calibration_lookup_table_;
