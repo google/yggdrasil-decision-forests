@@ -845,10 +845,16 @@ void Predict(
     const GradientBoostedTreesPoissonRegression& model,
     const typename GradientBoostedTreesPoissonRegression::ExampleSet& examples,
     int num_examples, std::vector<float>* predictions) {
-  // Add activation
-  PredictHelper<std::remove_reference<decltype(model)>::type,
-                ActivationGradientBoostedTreesPoissonRegression>(
-      model, examples, num_examples, predictions);
+  if (model.output_logits) {
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationAddInitialPrediction>(model, examples, num_examples,
+                                                  predictions);
+  } else {
+    // Add activation
+    PredictHelper<std::remove_reference<decltype(model)>::type,
+                  ActivationGradientBoostedTreesPoissonRegression>(
+        model, examples, num_examples, predictions);
+  }
 }
 
 }  // namespace decision_forest

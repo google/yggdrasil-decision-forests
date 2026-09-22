@@ -1675,6 +1675,22 @@ TEST_F(GradientBoostedTreesOnAdult, PoissonLoss) {
   TrainAndEvaluateModel();
 }
 
+TEST_F(GradientBoostedTreesOnAdult, PoissonLossLogits) {
+  SetSortingStrategy(Internal::AUTO, Internal::IN_NODE, &train_config_);
+
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::POISSON);
+  train_config_.set_label("hours_per_week");
+  train_config_.set_task(model::proto::Task::REGRESSION);
+  gbt_config->set_num_trees(10);
+  gbt_config->mutable_decision_tree()
+      ->mutable_growing_strategy_best_first_global();
+  gbt_config->mutable_decision_tree()->mutable_sparse_oblique_split();
+  gbt_config->set_apply_link_function(false);
+  TrainAndEvaluateModel();
+}
+
 TEST_F(GradientBoostedTreesOnAdult, TotalMaxNumNodes) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);

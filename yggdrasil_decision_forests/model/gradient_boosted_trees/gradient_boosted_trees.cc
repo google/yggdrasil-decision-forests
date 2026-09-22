@@ -424,11 +424,15 @@ void GradientBoostedTreesModel::PredictImpl(
                        accumulator += node.regressor().top_value();
                      });
       if (task() == model::proto::REGRESSION) {
-        float clamped_accumulator =
-            std::clamp(static_cast<float>(accumulator),
-                       -kPoissonLossClampBounds, kPoissonLossClampBounds);
-        prediction->mutable_regression()->set_value(
-            std::exp(clamped_accumulator));
+        if (output_logits_) {
+          prediction->mutable_regression()->set_value(accumulator);
+        } else {
+          float clamped_accumulator =
+              std::clamp(static_cast<float>(accumulator),
+                         -kPoissonLossClampBounds, kPoissonLossClampBounds);
+          prediction->mutable_regression()->set_value(
+              std::exp(clamped_accumulator));
+        }
       } else {
         LOG(FATAL) << "Only regression is supported with poison loss";
       }

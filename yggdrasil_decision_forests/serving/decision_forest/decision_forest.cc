@@ -1275,6 +1275,7 @@ absl::Status GenericToSpecializedModel(
   }
 
   dst->initial_predictions = src.initial_predictions()[0];
+  dst->output_logits = src.output_logits();
 
   using DstType = std::remove_pointer<decltype(dst)>::type;
   return GenericToSpecializedGenericModelHelper(

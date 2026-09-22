@@ -481,6 +481,8 @@ struct GenericGradientBoostedTreesPoissonRegression
   // Output of the model before any tree is applied, and before the final
   // activation function.
   float initial_predictions = 0.f;
+  // If true, `Predict` returns the raw sum of the tree outputs.
+  bool output_logits = false;
 };
 using GradientBoostedTreesPoissonRegression =
     GenericGradientBoostedTreesPoissonRegression<>;
