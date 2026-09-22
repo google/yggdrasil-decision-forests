@@ -15,12 +15,18 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_cox.h"
 
+#include <cmath>
+#include <limits>
+#include <memory>
 #include <utility>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/log/check.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
@@ -170,6 +176,164 @@ TEST_F(CoxProportionalHazardLossTest, RightCensoringNoLeftTruncation) {
                           FloatNear(0.0369726755, kTestPrecision),
                           FloatNear(0.0232583769, kTestPrecision),
                           FloatNear(0.141042158, kTestPrecision)));
+}
+
+class CoxProportionalHazardLossStabilityTest : public ::testing::Test {
+ protected:
+  // Builds a right-censored dataset (no left truncation) with the given
+  // departure ages and event indicators.
+  dataset::VerticalDataset BuildDataset(
+      const std::vector<float>& departure_ages,
+      const std::vector<bool>& events) {
+    dataset::VerticalDataset dataset;
+    *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
+      columns { type: NUMERICAL name: "departure_age" }
+      columns { type: BOOLEAN name: "event" }
+    )pb");
+    CHECK_OK(dataset.CreateColumnsFromDataspec());
+    for (int i = 0; i < departure_ages.size(); ++i) {
+      CHECK_OK(dataset.AppendExampleWithStatus(
+          {{"departure_age", absl::StrCat(departure_ages[i])},
+           {"event", events[i] ? "1" : "0"}}));
+    }
+    return dataset;
+  }
+
+  absl::StatusOr<std::unique_ptr<AbstractLoss>> BuildLoss(
+      const dataset::VerticalDataset& dataset) {
+    const TrainingConfigLinking config =
+        PARSE_TEST_PROTO(R"pb(label: 0 label_event_observed: 1)pb");
+    return CoxProportionalHazardLoss::RegistrationCreate(
+        {config,
+         {},
+         model::proto::Task::SURVIVAL_ANALYSIS,
+         dataset.data_spec().columns(0)});
+  }
+
+  utils::RandomEngine random_;
+};
+
+// A single example with a very large log-hazard must not wipe out the
+// contributions of the other examples from the risk set.
+TEST_F(CoxProportionalHazardLossStabilityTest, LargeLogHazardRange) {
+  // Example 0 is censored first and has a log-hazard so large that
+  // `exp(40) + 3 == exp(40)` in double precision.
+  auto dataset = BuildDataset(/*departure_ages=*/{1, 2, 3, 4},
+                              /*events=*/{false, true, true, true});
+  ASSERT_OK_AND_ASSIGN(const auto loss, BuildLoss(dataset));
+  ASSERT_OK_AND_ASSIGN(auto cache, loss->CreateLossCache(dataset));
+
+  const std::vector<float> predictions = {40.f, 0.f, 0.f, 0.f};
+  ASSERT_OK_AND_ASSIGN(
+      auto loss_result,
+      loss->Loss(dataset, /*label_col_idx=*/0, predictions, {}, cache.get()));
+
+  // Risk sets of the three events are {1,2,3}, {2,3} and {3}.
+  const float expected = (std::log(3.f) + std::log(2.f) + std::log(1.f)) / 4.f;
+  EXPECT_THAT(loss_result.loss, FloatNear(expected, kTestPrecision));
+}
+
+// The Cox partial likelihood is invariant to adding a constant to all the
+// log-hazard predictions. Large predictions must not overflow `exp`.
+TEST_F(CoxProportionalHazardLossStabilityTest, InvariantToGlobalShift) {
+  auto dataset = BuildDataset(/*departure_ages=*/{1, 2, 3, 4},
+                              /*events=*/{true, false, true, true});
+  ASSERT_OK_AND_ASSIGN(const auto loss, BuildLoss(dataset));
+  ASSERT_OK_AND_ASSIGN(auto cache, loss->CreateLossCache(dataset));
+
+  const std::vector<float> predictions = {-0.8f, 0.f, 0.2f, 0.5f};
+  std::vector<float> shifted_predictions;
+  for (const float prediction : predictions) {
+    shifted_predictions.push_back(prediction + 800.f);
+  }
+
+  ASSERT_OK_AND_ASSIGN(
+      auto loss_result,
+      loss->Loss(dataset, /*label_col_idx=*/0, predictions, {}, cache.get()));
+  ASSERT_OK_AND_ASSIGN(auto shifted_loss_result,
+                       loss->Loss(dataset, /*label_col_idx=*/0,
+                                  shifted_predictions, {}, cache.get()));
+
+  // The tolerance accounts for the float32 rounding of "prediction + 800"
+  // itself (the ulp of 800.f is ~6e-5), not for the loss computation.
+  EXPECT_THAT(shifted_loss_result.loss, FloatNear(loss_result.loss, 1e-4f));
+}
+
+// Gradients must be finite and hessians non-negative even for extreme
+// predictions.
+TEST_F(CoxProportionalHazardLossStabilityTest, FiniteGradientsAndHessians) {
+  auto dataset = BuildDataset(/*departure_ages=*/{1, 2, 3, 4},
+                              /*events=*/{false, true, true, true});
+  ASSERT_OK_AND_ASSIGN(const auto loss, BuildLoss(dataset));
+  ASSERT_OK_AND_ASSIGN(auto cache, loss->CreateLossCache(dataset));
+
+  std::vector<GradientData> gradients;
+  dataset::VerticalDataset gradient_dataset;
+  std::vector<float> predictions = {40.f, 0.f, 0.f, 0.f};
+  ASSERT_OK(internal::CreateGradientDataset(dataset, /*label_col_idx=*/0, *loss,
+                                            &gradient_dataset, &gradients,
+                                            &predictions));
+  ASSERT_OK(loss->UpdateGradients(dataset, /*label_col_idx=*/0, predictions,
+                                  cache.get(), &gradients, &random_));
+
+  ASSERT_THAT(gradients, Not(IsEmpty()));
+  for (const float gradient : gradients.front().gradient) {
+    EXPECT_TRUE(std::isfinite(gradient)) << "gradient: " << gradient;
+  }
+  for (const float hessian : gradients.front().hessian) {
+    EXPECT_TRUE(std::isfinite(hessian)) << "hessian: " << hessian;
+    EXPECT_GE(hessian, 0.f);
+  }
+}
+
+// An extreme spread between the log-hazards leaves the examples at risk with a
+// hazard many orders of magnitude below the largest one. The reciprocals of the
+// sum of the hazards at risk must stay finite.
+TEST_F(CoxProportionalHazardLossStabilityTest, ExtremePredictionSpread) {
+  auto dataset = BuildDataset(/*departure_ages=*/{1, 2, 3, 4},
+                              /*events=*/{false, true, true, true});
+  ASSERT_OK_AND_ASSIGN(const auto loss, BuildLoss(dataset));
+  ASSERT_OK_AND_ASSIGN(auto cache, loss->CreateLossCache(dataset));
+
+  std::vector<GradientData> gradients;
+  dataset::VerticalDataset gradient_dataset;
+  // Example 0 is censored first, so the risk set of every event is made only
+  // of examples whose hazard is exp(-3000) times the largest one.
+  std::vector<float> predictions = {3000.f, 0.f, 0.f, 0.f};
+  ASSERT_OK(internal::CreateGradientDataset(dataset, /*label_col_idx=*/0, *loss,
+                                            &gradient_dataset, &gradients,
+                                            &predictions));
+
+  ASSERT_OK_AND_ASSIGN(
+      auto loss_result,
+      loss->Loss(dataset, /*label_col_idx=*/0, predictions, {}, cache.get()));
+  EXPECT_TRUE(std::isfinite(loss_result.loss)) << "loss: " << loss_result.loss;
+
+  ASSERT_OK(loss->UpdateGradients(dataset, /*label_col_idx=*/0, predictions,
+                                  cache.get(), &gradients, &random_));
+  for (const float gradient : gradients.front().gradient) {
+    EXPECT_TRUE(std::isfinite(gradient)) << "gradient: " << gradient;
+  }
+  for (const float hessian : gradients.front().hessian) {
+    EXPECT_TRUE(std::isfinite(hessian)) << "hessian: " << hessian;
+    EXPECT_GE(hessian, 0.f);
+  }
+}
+
+// Non-finite predictions must be reported instead of silently producing a
+// null loss.
+TEST_F(CoxProportionalHazardLossStabilityTest, NonFinitePredictionsAreAnError) {
+  auto dataset =
+      BuildDataset(/*departure_ages=*/{1, 2}, /*events=*/{true, true});
+  ASSERT_OK_AND_ASSIGN(const auto loss, BuildLoss(dataset));
+  ASSERT_OK_AND_ASSIGN(auto cache, loss->CreateLossCache(dataset));
+
+  const std::vector<float> predictions = {
+      0.f, std::numeric_limits<float>::quiet_NaN()};
+  EXPECT_THAT(
+      loss->Loss(dataset, /*label_col_idx=*/0, predictions, {}, cache.get())
+          .status(),
+      test::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 }  // namespace

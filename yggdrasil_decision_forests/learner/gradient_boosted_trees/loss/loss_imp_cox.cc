@@ -19,26 +19,82 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
 #include "absl/log/log.h"
-#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
+#include "yggdrasil_decision_forests/utils/accurate_sum.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace yggdrasil_decision_forests::model::gradient_boosted_trees {
 
 using BooleanColumn = dataset::VerticalDataset::BooleanColumn;
+using NeumaierSum = utils::NeumaierSum;
 using NumericalColumn = dataset::VerticalDataset::NumericalColumn;
+
+namespace {
+
+// Smallest shifted log-hazard that is exponentiated.
+//
+// The value is chosen so that no intermediate quantity can overflow: with
+// "h_min = exp(-250) ~= 2.7e-109", the sum of the hazards at risk "S" is in
+// [h_min, n], so "1/S <= 3.8e108" and "1/S^2 <= 1.4e217" are finite, and so are
+// their sums over the events (bounded by "n/h_min^2 <= 1.4e226" for a dataset
+// of at most 1e9 examples). A floor of, say, -700 would keep the hazards
+// normal but would let "1/S^2" overflow to infinity and poison the gradients of
+// every subsequent example.
+//
+// Clamping is harmless in practice: an example whose log-hazard is 250 nats
+// below the largest one contributes ~1e-109 of the risk set, i.e. nothing.
+constexpr double kMinShiftedLogHazard = -250.;
+
+// Computes exp(prediction - max(predictions)) for each example.
+//
+// The Cox partial likelihood is invariant to the addition of a constant to all
+// the log-hazards: log(sum_j exp(p_j - c)) - (p_i - c) does not depend on "c".
+// Shifting by the largest prediction keeps all the exponentials in (0, 1] and
+// makes overflow impossible, whatever the magnitude of the predictions.
+//
+// Note: The vector returned by this function only contains strictly positive
+// values.
+absl::StatusOr<std::vector<double>> ShiftedHazards(
+    const absl::Span<const float> log_hazard_predictions) {
+  double max_log_hazard = -std::numeric_limits<double>::infinity();
+  for (size_t i = 0; i < log_hazard_predictions.size(); ++i) {
+    const double log_hazard = log_hazard_predictions[i];
+    if (!std::isfinite(log_hazard)) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "The Cox proportional hazard loss received the non-finite "
+          "log-hazard prediction ",
+          log_hazard, " for example ", i,
+          ". This generally indicates that the training diverged; consider "
+          "reducing the shrinkage or increasing the regularization."));
+    }
+    max_log_hazard = std::max(max_log_hazard, log_hazard);
+  }
+
+  std::vector<double> hazards(log_hazard_predictions.size());
+  for (size_t i = 0; i < log_hazard_predictions.size(); ++i) {
+    hazards[i] = std::exp(std::max(
+        static_cast<double>(log_hazard_predictions[i]) - max_log_hazard,
+        kMinShiftedLogHazard));
+  }
+  return hazards;
+}
+
+}  // namespace
 
 absl::StatusOr<std::unique_ptr<AbstractLoss>>
 CoxProportionalHazardLoss::RegistrationCreate(const ConstructorArgs& args) {
@@ -113,31 +169,35 @@ absl::StatusOr<LossResults> CoxProportionalHazardLoss::Loss(
   // TODO: Add support for non-uniform weights.
   const double w = 1.0 / log_hazard_predictions.size();
 
-  std::vector<double> exp_preds(log_hazard_predictions.size());
-  for (size_t i = 0; i < log_hazard_predictions.size(); ++i) {
-    exp_preds[i] = std::exp(log_hazard_predictions[i]);
-  }
+  ASSIGN_OR_RETURN(const std::vector<double> hazards,
+                   ShiftedHazards(log_hazard_predictions));
 
   double loss = 0.;
-  double hazard = 0.;
+  NeumaierSum risk_set;
   // Updates are sorted by time and every item first arrives before
   // event / censor.
   for (const auto& [time, update_type, example_idx] : cox_cache->updates) {
+    const double hazard = hazards[example_idx];
     switch (update_type) {
       case CoxProportionalHazardLoss::Update::Type::ARRIVAL:
-        hazard += exp_preds[example_idx];
+        risk_set.Add(hazard);
         break;
-      case CoxProportionalHazardLoss::Update::Type::EVENT:
-        if (hazard > 0.0) {
-          loss += w * (std::log(hazard) - log_hazard_predictions[example_idx]);
-        }
+      case CoxProportionalHazardLoss::Update::Type::EVENT: {
+        // The example is part of its own risk set, so the sum of the hazards
+        // at risk is at least "hazard", i.e. the max() returns
+        // risk_set.Value(). Using the max just enforces it in case the
+        // arithmetic drifted.
+        const double sum_at_risk = std::max(risk_set.Value(), hazard);
+        loss += w * std::log(sum_at_risk / hazard);
+      }
         [[fallthrough]];
       case CoxProportionalHazardLoss::Update::Type::CENSORING:
-        hazard -= exp_preds[example_idx];
-        if (hazard < 0.0) {
-          LOG_EVERY_POW_2(INFO) << "Cox loss has encountered negative hazard "
-                                << hazard << " setting hazard to 0.";
-          hazard = 0.0;
+        risk_set.Add(-hazard);
+        if (risk_set.Value() < 0.0) {
+          LOG_EVERY_POW_2(WARNING)
+              << "Cox loss has encountered a negative sum of hazards "
+              << risk_set.Value() << " at risk. Setting it to 0.";
+          risk_set.Reset();
         }
         break;
     }
@@ -154,63 +214,69 @@ absl::Status CoxProportionalHazardLoss::UpdateGradients(
   }
   const auto* cox_cache = dynamic_cast<const Cache*>(cache);
   // TODO: Add support for non-uniform weights.
-  float w = 1.f / log_hazard_predictions.size();
+  const double w = 1.f / log_hazard_predictions.size();
 
   std::vector<float>& hessians = *(*gradient_data)[0].hessian;
   std::vector<float>& gradients = *(*gradient_data)[0].gradient;
 
-  std::vector<double> exp_preds(log_hazard_predictions.size());
-  for (size_t i = 0; i < log_hazard_predictions.size(); ++i) {
-    exp_preds[i] = std::exp(log_hazard_predictions[i]);
-  }
+  ASSIGN_OR_RETURN(const std::vector<double> hazards,
+                   ShiftedHazards(log_hazard_predictions));
 
-  double hazard = 0.;
-  double sum_1_over_hazard = 0.;
-  double sum_1_over_hazard_sq = 0.;
+  NeumaierSum risk_set;
+  NeumaierSum sum_1_over_risk_set;
+  NeumaierSum sum_1_over_risk_set_sq;
   std::vector<double> snapshot_S1(log_hazard_predictions.size(), 0.0);
   std::vector<double> snapshot_S2(log_hazard_predictions.size(), 0.0);
+
+  // Computes the gradient and the hessian of the example leaving the risk set,
+  // and removes it from the risk set.
+  const auto depart = [&](const row_t example_idx) {
+    const double hazard = hazards[example_idx];
+    const double dS1 =
+        std::max(sum_1_over_risk_set.Value() - snapshot_S1[example_idx], 0.0);
+    const double dS2 = std::max(
+        sum_1_over_risk_set_sq.Value() - snapshot_S2[example_idx], 0.0);
+    // hazard * dS2 <= dS1 since the example is part of each of the risk sets
+    // accumulated in dS1 and dS2. The clamping only removes the residual
+    // numerical noise.
+    hessians[example_idx] =
+        static_cast<float>(w * std::max(hazard * (dS1 - hazard * dS2), 0.0));
+    risk_set.Add(-hazard);
+    if (risk_set.Value() < 0.0) {
+      LOG_EVERY_POW_2(WARNING)
+          << "Cox loss has encountered a negative sum of hazards "
+          << risk_set.Value() << " at risk. Setting it to 0.";
+      risk_set.Reset();
+    }
+    return std::pair<double, double>{hazard, dS1};
+  };
 
   // Updates are sorted by time and every item first arrives before
   // event / censor.
   for (const auto& [time, update_type, example_idx] : cox_cache->updates) {
     switch (update_type) {
       case CoxProportionalHazardLoss::Update::Type::ARRIVAL:
-        snapshot_S1[example_idx] = sum_1_over_hazard;
-        snapshot_S2[example_idx] = sum_1_over_hazard_sq;
-        hazard += exp_preds[example_idx];
+        snapshot_S1[example_idx] = sum_1_over_risk_set.Value();
+        snapshot_S2[example_idx] = sum_1_over_risk_set_sq.Value();
+        risk_set.Add(hazards[example_idx]);
         break;
       case CoxProportionalHazardLoss::Update::Type::EVENT: {
-        if (hazard > 0.0) {
-          sum_1_over_hazard += 1.0 / hazard;
-          sum_1_over_hazard_sq += 1.0 / (hazard * hazard);
-        }
-        double dS1 = sum_1_over_hazard - snapshot_S1[example_idx];
-        double dS2 = sum_1_over_hazard_sq - snapshot_S2[example_idx];
-        double exp_pred = exp_preds[example_idx];
-        gradients[example_idx] = w * (1.0 - exp_pred * dS1);
-        hessians[example_idx] =
-            w * (exp_pred * dS1 - exp_pred * exp_pred * dS2);
-        hazard -= exp_preds[example_idx];
-        if (hazard < 0.0) {
-          LOG_EVERY_POW_2(INFO) << "Cox loss has encountered negative hazard "
-                                << hazard << " setting hazard to 0.";
-          hazard = 0.0;
-        }
+        // The example is part of its own risk set, so the sum of the hazards
+        // at risk is at least "hazard", i.e. the max() returns
+        // risk_set.Value(). Using the max just enforces it in case the
+        // arithmetic drifted.
+        const double sum_at_risk =
+            std::max(risk_set.Value(), hazards[example_idx]);
+        // sum_at_risk > 0 since all hazards are > 0.
+        sum_1_over_risk_set.Add(1.0 / sum_at_risk);
+        sum_1_over_risk_set_sq.Add(1.0 / (sum_at_risk * sum_at_risk));
+        const auto [hazard, dS1] = depart(example_idx);
+        gradients[example_idx] = static_cast<float>(w * (1.0 - hazard * dS1));
         break;
       }
       case CoxProportionalHazardLoss::Update::Type::CENSORING: {
-        double dS1 = sum_1_over_hazard - snapshot_S1[example_idx];
-        double dS2 = sum_1_over_hazard_sq - snapshot_S2[example_idx];
-        double exp_pred = exp_preds[example_idx];
-        gradients[example_idx] = w * (-exp_pred * dS1);
-        hessians[example_idx] =
-            w * (exp_pred * dS1 - exp_pred * exp_pred * dS2);
-        hazard -= exp_preds[example_idx];
-        if (hazard < 0.0) {
-          LOG_EVERY_POW_2(INFO) << "Cox loss has encountered negative hazard "
-                                << hazard << " setting hazard to 0.";
-          hazard = 0.0;
-        }
+        const auto [hazard, dS1] = depart(example_idx);
+        gradients[example_idx] = static_cast<float>(w * (-hazard * dS1));
         break;
       }
     }
