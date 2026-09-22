@@ -54,6 +54,9 @@ class CppEmitter {
   // Prints the `struct Instance { ... }` block containing the typed features.
   void EmitInstanceStruct(std::string* out) const;
 
+  // Prints the calibration function if enabled.
+  absl::Status EmitCalibrationFunction(std::string* out) const;
+
   // Prints the `nodes[]` array, data banks, and condition eval blocks
   // required by the ROUTING algorithm.
   absl::Status EmitRoutingData(std::string* out) const;

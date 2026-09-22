@@ -88,6 +88,10 @@ class CppTargetLowering {
   // only if the Routing algorithm is selected.
   absl::Status LowerRoutingData();
 
+  // Populates the specific C++ types and formatted array strings needed
+  // only if calibration is enabled.
+  absl::Status LowerCalibrationData();
+
   // --- Helpers ---
 
   const ModelIR& model_ir_;

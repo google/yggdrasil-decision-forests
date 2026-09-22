@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
+#include <regex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -79,6 +80,11 @@ absl::StatusOr<CppIR> CppTargetLowering::Run() {
     RETURN_IF_ERROR(LowerRoutingData());
   }
 
+  // Step 6: Calibration Data (Conditional)
+  if (options_.enable_calibration()) {
+    RETURN_IF_ERROR(LowerCalibrationData());
+  }
+
   return std::move(cpp_ir_);
 }
 
@@ -87,6 +93,9 @@ absl::Status CppTargetLowering::LowerGlobalFormatting() {
   cpp_ir_.header_guard = absl::Substitute(
       "YDF_MODEL_$0_H_", StringToConstantSymbol(options_.name()));
   cpp_ir_.num_trees = model_ir_.num_trees;
+  if (!model_ir_.binary_calibration_deltas.empty()) {
+    cpp_ir_.includes.insert("<algorithm>");
+  }
   // For integer types.
   cpp_ir_.includes.insert("<stdint.h>");
   // For memcpy.
@@ -801,6 +810,39 @@ absl::Status CppTargetLowering::LowerRoutingData() {
     cpp_ir_.leaf_value_bank_content = std::move(assets.leaf_value_bank_content);
   }
 
+  return absl::OkStatus();
+}
+
+absl::Status CppTargetLowering::LowerCalibrationData() {
+  if (!model_ir_.binary_calibration_deltas.empty()) {
+    cpp_ir_.binary_calibration_deltas_content = absl::StrJoin(
+        model_ir_.binary_calibration_deltas, ",");
+    cpp_ir_.binary_calibration_deltas_size =
+        model_ir_.binary_calibration_deltas.size();
+
+    std::regex return_regex("return (.+);", std::regex_constants::ECMAScript);
+    std::string return_arg;
+
+    {
+      std::smatch base_match;
+      if (std::regex_match(cpp_ir_.activation_statement, base_match,
+                           return_regex)) {
+        // The first sub_match is the whole string; the next sub_match is the
+        // first parenthesized expression.
+        if (base_match.size() == 2) {
+          std::ssub_match base_sub_match = base_match[1];
+          return_arg = base_sub_match.str();
+        } else {
+          return absl::InternalError(
+              "Failed to parse activation statement for calibration.");
+        }
+      }
+    }
+
+    cpp_ir_.activation_statement =
+        std::regex_replace(cpp_ir_.activation_statement, return_regex,
+                           "return binary_calibrate($1);");
+  }
   return absl::OkStatus();
 }
 

@@ -519,6 +519,12 @@ class AbstractModel {
     }
   }
 
+  int num_postprocessors() const { return postprocessors_.size(); }
+
+  const postprocessor::AbstractPostprocessor& postprocessor(int i) const {
+    return *postprocessors_[i].get();
+  }
+
  protected:
   // Apply the model on an example defined as a VerticalDataset and a row
   // index. Requires for the dataset to have the same structure as the training

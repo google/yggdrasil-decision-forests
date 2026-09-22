@@ -136,6 +136,9 @@ struct CppIR {
   std::string leaf_value_bank_content;
 
   BaseTypes types;
+
+  std::string binary_calibration_deltas_content;
+  size_t binary_calibration_deltas_size;
 };
 }  // namespace yggdrasil_decision_forests::serving::embed::internal
 

@@ -52,6 +52,10 @@ absl::StatusOr<std::string> CppEmitter::Run() const {
   EmitEnums(&out);
   EmitInstanceStruct(&out);
 
+  if (options_.enable_calibration()) {
+    RETURN_IF_ERROR(EmitCalibrationFunction(&out));
+  }
+
   if (options_.algorithm() == proto::Algorithm::ROUTING) {
     RETURN_IF_ERROR(EmitRoutingData(&out));
     RETURN_IF_ERROR(EmitPredictUnsafeRouting(&out));
@@ -149,6 +153,35 @@ void CppEmitter::EmitInstanceStruct(std::string* out) const {
     absl::SubstituteAndAppend(out, "  $0 $1;\n", feat.cpp_type, feat.var_name);
   }
   absl::StrAppend(out, "};\n\n");
+}
+
+absl::Status CppEmitter::EmitCalibrationFunction(std::string* out) const {
+  if (!ir_.binary_calibration_deltas_content.empty()) {
+    absl::SubstituteAndAppend(
+        out,
+        "\n"
+        "static const float DELTAS[] = {$0};\n"
+        "// Multiplying by p directly gives the fractional index.\n"
+        "const float INV_STEP = $1;\n\n"
+        "float binary_calibrate(float p) {\n"
+        "  const std::size_t n_deltas = $2;\n"
+        "  const float pc = std::clamp(p, 0.0f, 1.0f);\n"
+        "  const auto pos = pc * INV_STEP;  // fractional grid index\n"
+        "  float integral_pos;\n"
+        "  const auto frac_pos = std::modf(pos, &integral_pos);\n"
+        "  const auto i0 = static_cast<std::size_t>(integral_pos);\n"
+        "  const std::size_t i1 = std::min(i0 + 1, n_deltas - 1);\n\n"
+        "  // Linear Interpolation (NOTE: using std::lerp actually increases "
+        "latency).\n"
+        "  const auto delta = DELTAS[i0] + frac_pos * (DELTAS[i1] - "
+        "DELTAS[i0]);\n"
+        "  return std::clamp(pc + delta, 0.0f, 1.0f);\n"
+        "};\n\n",
+        ir_.binary_calibration_deltas_content,
+        static_cast<float>(ir_.binary_calibration_deltas_size - 1),
+        ir_.binary_calibration_deltas_size);
+  }
+  return absl::OkStatus();
 }
 
 absl::Status CppEmitter::EmitRoutingData(std::string* out) const {

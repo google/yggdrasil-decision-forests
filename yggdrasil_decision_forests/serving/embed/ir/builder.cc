@@ -37,6 +37,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator/smoothed_pav_calibrator.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
 #include "yggdrasil_decision_forests/serving/embed/utils.h"
@@ -397,6 +398,8 @@ absl::Status ModelIRBuilder::CompileTrees() {
 
   ir_.node_offset_bytes = MaxUnsignedValueToNumBytes(max_nodes_per_tree);
 
+  RETURN_IF_ERROR(CompilePostprocessors());
+
   return absl::OkStatus();
 }
 absl::StatusOr<int32_t> ModelIRBuilder::CompileNode(
@@ -445,6 +448,29 @@ absl::StatusOr<int32_t> ModelIRBuilder::CompileNode(
                    CompileNode(*node.pos_child(), target_class_idx, tree_idx,
                                active_condition_types));
   return 1 + num_nodes_neg_subtree + num_nodes_pos_subtree;
+}
+
+absl::Status ModelIRBuilder::CompilePostprocessors() {
+  for (int i = 0; i < model_->num_postprocessors(); ++i) {
+    const auto& postprocessor = model_->postprocessor(i);
+
+    if (typeid(postprocessor) ==
+        typeid(model::postprocessor::SmoothedPavCalibrator)) {
+      const model::postprocessor::SmoothedPavCalibrator& sc =
+          dynamic_cast<const model::postprocessor::SmoothedPavCalibrator&>(
+              postprocessor);
+      if (options_->enable_calibration() &&
+          options_->classification_output() ==
+              proto::ClassificationOutput::PROBABILITY) {
+        ir_.binary_calibration_deltas = sc.GetDeltas();
+      }
+    } else {
+      return absl::InvalidArgumentError(
+          "Unsupported postprocessor type: " +
+          std::string(typeid(postprocessor).name()));
+    }
+  }
+  return absl::OkStatus();
 }
 
 absl::Status ModelIRBuilder::HandleCondition(
