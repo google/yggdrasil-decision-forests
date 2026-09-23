@@ -208,107 +208,117 @@ std::vector<std::string> SampleTrainingShards(
   return selected;
 }
 
-// Truncate the model (if early stopping is enabled), update the validation loss
-// and display the final snippet.
-absl::Status FinalizeModelWithValidationDataset(
+// Loss and metrics of the final model on the validation dataset.
+struct ValidationEvaluation {
+  // Validation dataset. Not owned, never null.
+  const dataset::VerticalDataset* validation_dataset;
+  // Loss of the final model.
+  float loss;
+  // Secondary metrics of the final model. Follows the order of
+  // "TrainingLogs::secondary_metric_names".
+  std::vector<float> secondary_metrics;
+};
+
+absl::StatusOr<std::optional<ValidationEvaluation>>
+TruncateModelWithEarlyStopping(
     const internal::AllTrainingConfiguration& config,
     const EarlyStopping& early_stopping,
-    const dataset::VerticalDataset& validation_dataset, const int num_threads,
+    const dataset::VerticalDataset& validation_dataset,
     GradientBoostedTreesModel* mdl) {
-  std::vector<float> final_secondary_metrics;
-  std::string log_snippet;
-  if (config.gbt_config->early_stopping() ==
+  if (early_stopping.last_num_trees() == 0) {
+    LOG(WARNING) << "The model was never evaluated on the validation dataset.";
+    return std::nullopt;
+  }
+
+  const bool truncate_model =
+      config.gbt_config->early_stopping() ==
           proto::GradientBoostedTreesTrainingConfig::
               MIN_VALIDATION_LOSS_ON_FULL_MODEL ||
       config.gbt_config->early_stopping() ==
-          proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE) {
-    int early_stopping_initial_iteration =
-        config.gbt_config->early_stopping_initial_iteration();
-    if (mdl->NumTrees() <
-        (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
-      LOG(INFO) << "Insufficient number of trees to apply early stopping. "
-                   "Using last loss for metrics.";
-      mdl->set_validation_loss(early_stopping.last_loss());
-      final_secondary_metrics = early_stopping.last_metrics();
-    } else {
-      LOG(INFO) << "Truncates the model to " << early_stopping.best_num_trees()
-                << " tree(s) i.e. "
-                << early_stopping.best_num_trees() / mdl->num_trees_per_iter()
-                << "  iteration(s).";
-      if (early_stopping.best_num_trees() < 0) {
-        return absl::InvalidArgumentError(
-            "The model should be evaluated once on the validation dataset.");
-      }
-
-      mdl->set_validation_loss(early_stopping.best_loss());
-      final_secondary_metrics = early_stopping.best_metrics();
-      mdl->mutable_decision_trees()->resize(early_stopping.best_num_trees());
-
-      DCHECK_EQ(mdl->NumTrees() % mdl->num_trees_per_iter(), 0)
-          << "The number of trees should be divisible by the number of trees "
-             "per "
-             "iteration.";
-
-      if (mdl->NumTrees() ==
-          (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
-        LOG(WARNING)
-            << "The best validation loss was obtained during iteration "
-            << early_stopping_initial_iteration
-            << ". This is the first step during which a validation loss was "
-               "computed, hence the validation loss might still have been "
-               "unstable and not optimal. Following are examples of "
-               "hyper-parameter changes that might help with the "
-               "situation. Try them in order: (1) Decrease the 'shrinkage "
-               "rate' parameter (default value of 0.1). For example divide "
-               "its value by 2. (2) Decrease the "
-               "'num_candidate_attributes_ratio' hyper-parameter (default "
-               "value of 1) by 80%. (3) Increase the "
-               "early_stopping_num_trees_look_ahead parameter (e.g., try "
-               "multiplying it by a factor of 2). (4) Use a more expensive "
-               "but stable version of early stopping with "
-               "'early_stopping=MIN_LOSS_FINAL'. (4) Disable early "
-               "stopping completely with 'early_stopping=NONE'.";
-      }
-      mdl->set_early_stopping_triggered(true);
-    }
-
-    // Final snippet
-    absl::StrAppendFormat(
-        &log_snippet, "Final model num-trees:%d valid-loss:%f",
-        early_stopping.best_num_trees() / mdl->num_trees_per_iter(),
-        mdl->validation_loss());
-  } else {
-    mdl->set_validation_loss(early_stopping.last_loss());
-    final_secondary_metrics = early_stopping.last_metrics();
-
-    // Final snippet
-    absl::StrAppendFormat(
-        &log_snippet, "Final model num-trees:%d valid-loss:%f",
-        mdl->NumTrees() / mdl->num_trees_per_iter(), mdl->validation_loss());
+          proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE;
+  if (!truncate_model) {
+    return ValidationEvaluation{
+        /*dataset=*/&validation_dataset,
+        /*loss=*/early_stopping.last_loss(),
+        /*secondary_metrics=*/early_stopping.last_metrics()};
   }
 
-  if (!final_secondary_metrics.empty()) {
-    for (int secondary_metric_idx = 0;
-         secondary_metric_idx <
-         mdl->training_logs().secondary_metric_names().size();
-         secondary_metric_idx++) {
-      absl::StrAppendFormat(
-          &log_snippet, " valid-%s:%f",
-          mdl->training_logs().secondary_metric_names(secondary_metric_idx),
-          final_secondary_metrics[secondary_metric_idx]);
-    }
+  if (early_stopping.best_num_trees() < 0) {
+    LOG(INFO) << "Insufficient number of trees to apply early stopping. "
+                 "Using last loss for metrics.";
+    return ValidationEvaluation{
+        /*dataset=*/&validation_dataset,
+        /*loss=*/early_stopping.last_loss(),
+        /*secondary_metrics=*/early_stopping.last_metrics()};
+  }
+
+  if (early_stopping.best_num_trees() > mdl->NumTrees()) {
+    return absl::InternalError(absl::StrCat(
+        "The early stopping state is inconsistent with the model: the best "
+        "model has ",
+        early_stopping.best_num_trees(), " tree(s) while the model only has ",
+        mdl->NumTrees(), " tree(s)."));
+  }
+
+  LOG(INFO) << "Truncate the model to " << early_stopping.best_num_trees()
+            << " tree(s) i.e. "
+            << early_stopping.best_num_trees() / mdl->num_trees_per_iter()
+            << "  iteration(s).";
+
+  // Early stopping is only "triggered" if it removes trees from the model.
+  mdl->set_early_stopping_triggered(early_stopping.best_num_trees() <
+                                    mdl->NumTrees());
+  mdl->mutable_decision_trees()->resize(early_stopping.best_num_trees());
+
+  DCHECK_EQ(mdl->NumTrees() % mdl->num_trees_per_iter(), 0)
+      << "The number of trees should be divisible by the number of trees "
+         "per iteration.";
+
+  const int early_stopping_initial_iteration =
+      config.gbt_config->early_stopping_initial_iteration();
+  if (mdl->NumTrees() ==
+      (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
+    LOG(WARNING)
+        << "The best validation loss was obtained during iteration "
+        << early_stopping_initial_iteration
+        << ". This is the first step during which a validation loss was "
+           "computed, hence the validation loss might still have been "
+           "unstable and not optimal. Following are examples of "
+           "hyper-parameter changes that might help with the "
+           "situation. Try them in order: (1) Decrease the 'shrinkage "
+           "rate' parameter (default value of 0.1). For example divide "
+           "its value by 2. (2) Decrease the "
+           "'num_candidate_attributes_ratio' hyper-parameter (default "
+           "value of 1) by 80%. (3) Increase the "
+           "early_stopping_num_trees_look_ahead parameter (e.g., try "
+           "multiplying it by a factor of 2). (4) Use a more expensive "
+           "but stable version of early stopping with "
+           "'early_stopping=MIN_LOSS_FINAL'. (4) Disable early "
+           "stopping completely with 'early_stopping=NONE'.";
+  }
+
+  return ValidationEvaluation{
+      /*dataset=*/&validation_dataset, /*loss=*/early_stopping.best_loss(),
+      /*secondary_metrics=*/early_stopping.best_metrics()};
+}
+
+void LogFinalSnippet(const ValidationEvaluation& validation,
+                     const GradientBoostedTreesModel& mdl) {
+  std::string log_snippet = absl::StrFormat(
+      "Final model num-trees:%d valid-loss:%f",
+      mdl.NumTrees() / mdl.num_trees_per_iter(), validation.loss);
+
+  const int num_secondary_metrics =
+      std::min<int>(mdl.training_logs().secondary_metric_names().size(),
+                    validation.secondary_metrics.size());
+  for (int secondary_metric_idx = 0;
+       secondary_metric_idx < num_secondary_metrics; secondary_metric_idx++) {
+    absl::StrAppendFormat(
+        &log_snippet, " valid-%s:%f",
+        mdl.training_logs().secondary_metric_names(secondary_metric_idx),
+        validation.secondary_metrics[secondary_metric_idx]);
   }
   LOG(INFO) << log_snippet;
-
-  if (config.gbt_config->compute_permutation_variable_importance()) {
-    LOG(INFO) << "Compute permutation variable importances";
-    RETURN_IF_ERROR(utils::ComputePermutationFeatureImportance(
-        validation_dataset, mdl,
-        mdl->mutable_precomputed_variable_importances(),
-        utils::ComputeFeatureImportanceOptions{num_threads}));
-  }
-
-  return absl::OkStatus();
 }
 
 absl::Status MaybeExportTrainingLogs(const absl::string_view log_directory,
@@ -322,8 +332,27 @@ absl::Status MaybeExportTrainingLogs(const absl::string_view log_directory,
   return absl::OkStatus();
 }
 
-absl::Status FinalizeModel(const absl::string_view log_directory,
-                           GradientBoostedTreesModel* mdl) {
+absl::Status FinalizeModel(
+    const internal::AllTrainingConfiguration& config,
+    const absl::string_view log_directory, const int num_threads,
+    const std::optional<ValidationEvaluation>& validation,
+    GradientBoostedTreesModel* mdl) {
+  if (validation.has_value()) {
+    mdl->set_validation_loss(validation->loss);
+    LogFinalSnippet(*validation, *mdl);
+
+    if (config.gbt_config->compute_permutation_variable_importance()) {
+      LOG(INFO) << "Compute permutation variable importances";
+      RETURN_IF_ERROR(utils::ComputePermutationFeatureImportance(
+          *validation->validation_dataset, mdl,
+          mdl->mutable_precomputed_variable_importances(),
+          utils::ComputeFeatureImportanceOptions{num_threads}));
+    }
+  } else if (config.gbt_config->compute_permutation_variable_importance()) {
+    LOG(WARNING) << "The permutation variable importances require a validation "
+                    "dataset. Skipping their computation.";
+  }
+
   // Cache the structural variable importance in the model data.
   RETURN_IF_ERROR(mdl->PrecomputeVariableImportances(
       mdl->AvailableStructuralVariableImportances()));
@@ -1185,12 +1214,16 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     thread_load_next_shards = {};
   }
 
+  std::optional<ValidationEvaluation> validation_evaluation;
   if (has_validation_dataset) {
-    RETURN_IF_ERROR(FinalizeModelWithValidationDataset(
-        config, early_stopping, validation->dataset, deployment().num_threads(),
-        mdl.get()));
+    ASSIGN_OR_RETURN(
+        validation_evaluation,
+        TruncateModelWithEarlyStopping(config, early_stopping,
+                                       validation->dataset, mdl.get()));
   }
-  RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+  RETURN_IF_ERROR(FinalizeModel(config, log_directory_,
+                                deployment().num_threads(),
+                                validation_evaluation, mdl.get()));
   return mdl;
 }
 
@@ -1741,10 +1774,11 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
                                    snapshots_idxs));
   }
 
+  std::optional<ValidationEvaluation> validation_evaluation;
   if (has_validation_dataset) {
-    RETURN_IF_ERROR(FinalizeModelWithValidationDataset(
-        config, early_stopping, validation_dataset, deployment().num_threads(),
-        mdl.get()));
+    ASSIGN_OR_RETURN(validation_evaluation, TruncateModelWithEarlyStopping(
+                                                config, early_stopping,
+                                                validation_dataset, mdl.get()));
   }
 
   if (dart_extraction) {
@@ -1765,7 +1799,9 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     }
   }
 
-  RETURN_IF_ERROR(FinalizeModel(log_directory_, mdl.get()));
+  RETURN_IF_ERROR(FinalizeModel(config, log_directory_,
+                                deployment().num_threads(),
+                                validation_evaluation, mdl.get()));
 
   if (vector_sequence_computer) {
     RETURN_IF_ERROR(vector_sequence_computer->Release());
