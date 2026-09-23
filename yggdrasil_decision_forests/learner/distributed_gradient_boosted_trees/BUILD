@@ -172,6 +172,7 @@ cc_test(
         "//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:snapshot",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
         "//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread",

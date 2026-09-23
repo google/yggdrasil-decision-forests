@@ -325,7 +325,7 @@ absl::Status RestoreManagerCheckpoint(
 absl::Status CreateCheckpoint(
     int iter_idx,
     const gradient_boosted_trees::GradientBoostedTreesModel& model,
-    absl::string_view work_directory,
+    absl::string_view work_directory, int max_kept_snapshots,
     const decision_tree::proto::LabelStatistics& label_statistics,
     distribute::AbstractManager* distribute_manager,
     internal::Monitoring* monitoring,

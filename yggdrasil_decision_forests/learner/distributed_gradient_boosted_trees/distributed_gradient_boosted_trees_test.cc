@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
 #include <cstddef>
+#include <deque>
 #include <random>
 #include <string>
 #include <vector>
@@ -40,6 +41,7 @@
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/snapshot.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 
@@ -50,6 +52,7 @@ namespace {
 
 using test::EqualsProto;
 using ::testing::AllOf;
+using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 using ::testing::Not;
 using ::testing::status::StatusIs;
@@ -169,6 +172,41 @@ TEST_F(DatasetAdult, CheckpointFailureTrigger) {
   // Note: This result does not take early stopping into account.
   EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8748, 0.01);
   EXPECT_NEAR(metric::LogLoss(evaluation_), 0.2765, 0.04);
+}
+
+TEST_F(DatasetAdult, MaxKeptSnapshots) {
+  SetNumWorkers(2);
+  deployment_config_.set_try_resume_training(true);
+  deployment_config_.set_max_kept_snapshots(2);
+  auto* spe_config = train_config_.MutableExtension(
+      distributed_gradient_boosted_trees::proto::
+          distributed_gradient_boosted_trees_config);
+  spe_config->mutable_gbt()->set_num_trees(20);
+  spe_config->set_checkpoint_interval_trees(5);
+  TrainAndEvaluateModel();
+
+  const std::string checkpoint_root =
+      file::JoinPath(deployment_config_.cache_path(), kFileNameCheckPoint);
+  const std::string snapshot_dir =
+      file::JoinPath(checkpoint_root, kFileNameSnapshot);
+  ASSERT_OK_AND_ASSIGN(const std::deque<int> snapshots,
+                       utils::GetSnapshots(snapshot_dir));
+  EXPECT_THAT(snapshots, ElementsAre(15, 20));
+
+  for (const int removed_iter : {0, 5, 10}) {
+    ASSERT_OK_AND_ASSIGN(const bool exists,
+                         file::FileExists(file::JoinPath(
+                             checkpoint_root, absl::StrCat(removed_iter))));
+    EXPECT_FALSE(exists) << "Expected checkpoint/" << removed_iter
+                         << " to be removed.";
+  }
+  for (const int kept_iter : {15, 20}) {
+    ASSERT_OK_AND_ASSIGN(const bool exists,
+                         file::FileExists(file::JoinPath(
+                             checkpoint_root, absl::StrCat(kept_iter))));
+    EXPECT_TRUE(exists) << "Expected checkpoint/" << kept_iter
+                        << " to be kept.";
+  }
 }
 
 // Train and test a model on the adult dataset with workers continuously

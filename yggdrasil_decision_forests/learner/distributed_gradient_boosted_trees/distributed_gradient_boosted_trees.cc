@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -565,10 +566,10 @@ TrainWithCache(
         (!last_checkpoint_idx.ok() || iter_idx > last_checkpoint_idx.value())) {
       time_last_checkpoint = absl::Now();
       last_checkpoint_idx = iter_idx;
-      RETURN_IF_ERROR(CreateCheckpoint(iter_idx, *model, work_directory,
-                                       label_statistics,
-                                       distribute_manager.get(), monitoring,
-                                       &load_balancer, &validation_aggregator));
+      RETURN_IF_ERROR(CreateCheckpoint(
+          iter_idx, *model, work_directory, deployment.max_kept_snapshots(),
+          label_statistics, distribute_manager.get(), monitoring,
+          &load_balancer, &validation_aggregator));
     }
 
     const auto iter_status = RunIteration(
@@ -626,10 +627,10 @@ TrainWithCache(
 
   if (!last_checkpoint_idx.ok() || iter_idx > last_checkpoint_idx.value()) {
     // Create the final checkpoint
-    RETURN_IF_ERROR(CreateCheckpoint(iter_idx, *model, work_directory,
-                                     label_statistics, distribute_manager.get(),
-                                     monitoring, &load_balancer,
-                                     &validation_aggregator));
+    RETURN_IF_ERROR(CreateCheckpoint(
+        iter_idx, *model, work_directory, deployment.max_kept_snapshots(),
+        label_statistics, distribute_manager.get(), monitoring, &load_balancer,
+        &validation_aggregator));
   }
 
   // Display the final training logs.
@@ -913,7 +914,7 @@ absl::Status InitializeDirectoryStructure(
 absl::Status CreateCheckpoint(
     const int iter_idx,
     const gradient_boosted_trees::GradientBoostedTreesModel& model,
-    const absl::string_view work_directory,
+    const absl::string_view work_directory, const int max_kept_snapshots,
     const decision_tree::proto::LabelStatistics& label_statistics,
     distribute::AbstractManager* distribute_manager,
     internal::Monitoring* monitoring,
@@ -953,8 +954,27 @@ absl::Status CreateCheckpoint(
                            checkpoint, file::Defaults()));
 
   // Record the snapshot.
-  RETURN_IF_ERROR(
-      utils::AddSnapshot(SnapshotDirectory(work_directory), iter_idx));
+  const auto snapshot_directory = SnapshotDirectory(work_directory);
+  RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
+
+  // Remove old snapshots and their checkpoint directories.
+  absl::StatusOr<std::deque<int>> snapshots =
+      utils::GetSnapshots(snapshot_directory);
+  if (snapshots.ok()) {
+    const std::vector<int> snapshots_to_remove = utils::RemoveOldSnapshots(
+        snapshot_directory, std::max(1, max_kept_snapshots), *snapshots);
+    for (const int old_iter_idx : snapshots_to_remove) {
+      LOG(INFO) << "Remove checkpoint at iteration " << old_iter_idx;
+      const auto old_checkpoint_dir = file::JoinPath(
+          work_directory, kFileNameCheckPoint, absl::StrCat(old_iter_idx));
+      const absl::Status status =
+          file::RecursivelyDelete(old_checkpoint_dir, file::Defaults());
+      if (!status.ok()) {
+        LOG(WARNING) << "Cannot remove checkpoint directory "
+                     << old_checkpoint_dir << ": " << status.message();
+      }
+    }
+  }
 
   LOG(INFO) << "Checkpoint created in " << absl::Now() - begin_create_checkpoint
             << " for iteration " << iter_idx;
