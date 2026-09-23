@@ -112,6 +112,7 @@ void SetExpectedSortingStrategy(Internal::SortingStrategy expected,
 // "a" : {0, 2, 4}
 // "b" : {1, 2, 1}
 void BuildToyModelAndToyDataset(const model::proto::Task task,
+                                const int num_examples,
                                 RandomForestModel* model,
                                 dataset::VerticalDataset* dataset) {
   dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
@@ -129,18 +130,18 @@ void BuildToyModelAndToyDataset(const model::proto::Task task,
                     ->MutableColumnWithCastWithStatus<
                         dataset::VerticalDataset::NumericalColumn>(0)
                     .value();
-  col_1->Add(0);
-  col_1->Add(2);
-  col_1->Add(4);
+  for (int i = 0; i < num_examples; i++) {
+    col_1->Add(2 * i);
+  }
 
   auto* col_2 = dataset
                     ->MutableColumnWithCastWithStatus<
                         dataset::VerticalDataset::CategoricalColumn>(1)
                     .value();
-  col_2->Add(1);
-  col_2->Add(2);
-  col_2->Add(1);
-  dataset->set_nrow(3);
+  for (int i = 0; i < num_examples; i++) {
+    col_2->Add(1 + (i % 2));
+  }
+  dataset->set_nrow(num_examples);
 
   // Create a tree of the form.
   // [a> alpha]
@@ -751,8 +752,8 @@ TEST(RandomForest, OOBPredictions) {
   utils::RandomEngine rnd;
   RandomForestModel model;
   dataset::VerticalDataset dataset;
-  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION, &model,
-                             &dataset);
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             /*num_examples=*/3, &model, &dataset);
 
   std::vector<internal::OOBEvaluator::PredictionAccumulator> predictions;
 
@@ -775,10 +776,12 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.NumObservations(), 1);
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
-  const auto evaluation_1 =
+  ASSERT_OK_AND_ASSIGN(
+      const auto evaluation_1,
       internal::EvaluateOOBPredictions(dataset, config.task(),
-                                       config_link.label(), -1, {}, predictions)
-          .value();
+                                       config_link.label(), -1, {}, predictions,
+                                       /*for_permutation_importance=*/false,
+                                       /*for_final_evaluation=*/false));
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_1),
             "accuracy:0.5 logloss:18.0218");
 
@@ -796,10 +799,12 @@ TEST(RandomForest, OOBPredictions) {
   EXPECT_EQ(predictions[2].classification.NumObservations(), 2);
   EXPECT_EQ(predictions[2].classification.TopClass(), 0);
 
-  const auto evaluation_2 =
+  ASSERT_OK_AND_ASSIGN(
+      const auto evaluation_2,
       internal::EvaluateOOBPredictions(dataset, config.task(),
-                                       config_link.label(), -1, {}, predictions)
-          .value();
+                                       config_link.label(), -1, {}, predictions,
+                                       /*for_permutation_importance=*/false,
+                                       /*for_final_evaluation=*/false));
   EXPECT_EQ(internal::EvaluationSnippet(evaluation_2),
             "accuracy:0.5 logloss:18.0218");
 }
@@ -816,8 +821,8 @@ TEST(RandomForest, ComputeVariableImportancesFromAccumulatedPredictions) {
   utils::RandomEngine rnd;
   RandomForestModel model;
   dataset::VerticalDataset dataset;
-  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION, &model,
-                             &dataset);
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             /*num_examples=*/3, &model, &dataset);
 
   std::vector<internal::OOBEvaluator::PredictionAccumulator> oob_predictions;
   std::vector<std::vector<internal::OOBEvaluator::PredictionAccumulator>>
@@ -1073,6 +1078,98 @@ TEST(OOBEvaluatorTest, EvaluatesMetricsOnLastTree) {
   ASSERT_OK(evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random));
   ASSERT_EQ(model.out_of_bag_evaluations().size(), 2);
   EXPECT_EQ(model.out_of_bag_evaluations()[1].number_of_trees(), 3);
+}
+
+
+TEST(OOBEvaluatorTest, FinalEvaluationAfterEarlyStop) {
+  dataset::VerticalDataset dataset;
+  utils::RandomEngine random(123456);
+  ExtremelyRandomizeTreesFigure10Dataset(5, &dataset, &random);
+
+  model::proto::TrainingConfig config;
+  auto* rf_config =
+      config.MutableExtension(random_forest::proto::random_forest_config);
+  rf_config->set_compute_oob_performances(true);
+  rf_config->set_num_trees(3);
+  // Only the first tree triggers a periodic evaluation.
+  rf_config->set_oob_evaluation_interval_in_trees(100);
+
+  config.set_task(model::proto::Task::REGRESSION);
+  config.set_label("y");
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(1);
+
+  RandomForestModel model;
+  model.set_task(model::proto::Task::REGRESSION);
+  model.set_label_col_idx(1);
+
+  ASSERT_OK_AND_ASSIGN(
+      auto evaluator,
+      internal::OOBEvaluator::Create(
+          /*compute_oob_performances=*/true,
+          /*compute_oob_variable_importances=*/false, dataset, config,
+          config_link, /*num_threads=*/1, &model));
+
+  decision_tree::DecisionTree tree;
+  tree.CreateRoot();
+  tree.mutable_root()->mutable_node()->mutable_regressor()->set_top_value(1.0);
+
+  // Only 2 of the 3 trees are trained i.e. the gate never elects a worker to
+  // evaluate the final model.
+  ASSERT_OK(evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random));
+  ASSERT_OK(evaluator->UpdateAndMaybeEvaluate(dataset, {1, 2}, tree, &random));
+  ASSERT_EQ(model.out_of_bag_evaluations().size(), 1);
+  ASSERT_EQ(model.out_of_bag_evaluations()[0].number_of_trees(), 1);
+
+  ASSERT_OK(evaluator->FinalizeTraining(dataset, /*num_threads=*/1));
+  ASSERT_EQ(model.out_of_bag_evaluations().size(), 2);
+  EXPECT_EQ(model.out_of_bag_evaluations().back().number_of_trees(), 2);
+}
+
+TEST(OOBEvaluatorTest, FinalEvaluationIsFull) {
+  utils::RandomEngine random(123456);
+  RandomForestModel model;
+  dataset::VerticalDataset dataset;
+  BuildToyModelAndToyDataset(model::proto::Task::CLASSIFICATION,
+                             /*num_examples=*/30, &model, &dataset);
+
+  model::proto::TrainingConfig config;
+  config.set_task(model::proto::Task::CLASSIFICATION);
+  auto* rf_config =
+      config.MutableExtension(random_forest::proto::random_forest_config);
+  rf_config->set_compute_oob_performances(true);
+  rf_config->set_num_trees(model.NumTrees());
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(1);
+  config_link.set_num_label_classes(3);
+
+  ASSERT_OK_AND_ASSIGN(
+      auto evaluator,
+      internal::OOBEvaluator::Create(
+          /*compute_oob_performances=*/true,
+          /*compute_oob_variable_importances=*/false, dataset, config,
+          config_link, /*num_threads=*/1, &model));
+
+  for (const auto& tree : model.decision_trees()) {
+    ASSERT_OK(evaluator->UpdateAndMaybeEvaluate(dataset, {1}, *tree, &random));
+  }
+  // The evaluations computed during the training are cheap.
+  ASSERT_FALSE(model.out_of_bag_evaluations().empty());
+  EXPECT_EQ(model.out_of_bag_evaluations()
+                .back()
+                .evaluation()
+                .classification()
+                .rocs_size(),
+            0);
+
+  ASSERT_OK(evaluator->FinalizeTraining(dataset, /*num_threads=*/1));
+  const auto& final_evaluation =
+      model.out_of_bag_evaluations().back().evaluation();
+  EXPECT_GT(final_evaluation.classification().rocs_size(), 0);
+  // The raw predictions would grow the model by one proto per example.
+  EXPECT_EQ(final_evaluation.sampled_predictions_size(), 0);
 }
 
 TEST_F(RandomForestOnAdult, MultithreadedOOBMatchesSequentialOOB) {

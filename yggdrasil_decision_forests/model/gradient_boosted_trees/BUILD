@@ -53,6 +53,7 @@ all_proto_library(
     name = "gradient_boosted_trees_proto",
     srcs = ["gradient_boosted_trees.proto"],
     deps = [
+        "//yggdrasil_decision_forests/metric:metric_proto",
         "//yggdrasil_decision_forests/model:abstract_model_proto",
         "//yggdrasil_decision_forests/utils:distribution_proto",
     ],
