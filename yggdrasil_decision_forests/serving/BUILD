@@ -25,7 +25,6 @@ cc_library_ydf(
     ],
     deps = [
         ":example_set",
-        "//yggdrasil_decision_forests/model/postprocessor:abstract_postprocessor",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:span",
     ],

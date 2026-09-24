@@ -16,14 +16,10 @@
 #include "yggdrasil_decision_forests/model/postprocessor/abstract_postprocessor.h"
 
 #include <string>
-#include <vector>
 
-#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/serving/example_set.h"
-#include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -46,14 +42,6 @@ void AbstractPostprocessor::Process(
   }
 }
 
-void AbstractPostprocessor::Process(const serving::AbstractExampleSet& example,
-                                    int num_examples,
-                                    std::vector<float>* predictions) const {
-  if (enabled_) {
-    ProcessImpl(example, num_examples, predictions);
-  }
-}
-
 void AbstractPostprocessor::ExportProto(proto::Postprocessor* proto) const {
   proto->set_enabled(enabled_);
   ExportProtoImpl(proto);
@@ -66,36 +54,6 @@ void AbstractPostprocessor::AppendDescription(std::string* description) const {
     absl::StrAppend(description, "disabled\n");
   }
   AppendDescriptionImpl(description);
-}
-
-absl::Status AbstractPostprocessor::InitializeEvaluation(
-    const metric::proto::EvaluationOptions& option,
-    const dataset::proto::Column& label_column,
-    metric::proto::EvaluationResults* eval) {
-  if (!enabled_) {
-    return absl::OkStatus();
-  }
-  return InitializeEvaluationImpl(option, label_column, eval);
-}
-
-absl::Status AbstractPostprocessor::FinalizeEvaluation(
-    const metric::proto::EvaluationOptions& option,
-    const dataset::proto::Column& label_column,
-    metric::proto::EvaluationResults* eval) {
-  if (!enabled_) {
-    return absl::OkStatus();
-  }
-  return FinalizeEvaluationImpl(option, label_column, eval);
-}
-
-absl::Status AbstractPostprocessor::AppendEvaluation(
-    const metric::proto::EvaluationOptions& option,
-    const model::proto::Prediction& pred, utils::RandomEngine* rnd,
-    metric::proto::EvaluationResults* eval) const {
-  if (!enabled_) {
-    return absl::OkStatus();
-  }
-  return AppendEvaluationImpl(option, pred, rnd, eval);
 }
 
 }  // namespace postprocessor

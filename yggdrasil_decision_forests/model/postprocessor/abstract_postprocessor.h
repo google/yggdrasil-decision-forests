@@ -17,16 +17,11 @@
 #define YGGDRASIL_DECISION_FORESTS_MODEL_POSTPROCESSOR_ABSTRACT_POSTPROCESSOR_H_
 
 #include <string>
-#include <vector>
 
-#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
-#include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/postprocessor/postprocessor.pb.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
-#include "yggdrasil_decision_forests/serving/example_set.h"
-#include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -51,29 +46,11 @@ class AbstractPostprocessor {
       const dataset::proto::Example& example,
       yggdrasil_decision_forests::model::proto::Prediction* prediction) const;
 
-  void Process(const serving::AbstractExampleSet& example, int num_examples,
-               std::vector<float>* predictions) const;
-
   // Exports the postprocessor information to a proto.
   void ExportProto(proto::Postprocessor* proto) const;
 
   // Appends a description of the postprocessor to the given string.
   void AppendDescription(std::string* description) const;
-
-  absl::Status InitializeEvaluation(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval);
-
-  absl::Status FinalizeEvaluation(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval);
-
-  absl::Status AppendEvaluation(const metric::proto::EvaluationOptions& option,
-                                const model::proto::Prediction& pred,
-                                utils::RandomEngine* rnd,
-                                metric::proto::EvaluationResults* eval) const;
 
   // Returns whether the postprocessor is enabled.
   bool enabled() const { return enabled_; }
@@ -93,30 +70,12 @@ class AbstractPostprocessor {
   virtual void ProcessImpl(const dataset::proto::Example& example,
                            yggdrasil_decision_forests::model::proto::Prediction*
                                prediction) const = 0;
-  virtual void ProcessImpl(const serving::AbstractExampleSet& example,
-                           int num_examples,
-                           std::vector<float>* predictions) const = 0;
 
   // Internal implementation of the ExportProto method.
   virtual void ExportProtoImpl(proto::Postprocessor* proto) const = 0;
 
   // Internal implementation of the AppendDescription method.
   virtual void AppendDescriptionImpl(std::string* description) const = 0;
-
-  virtual absl::Status InitializeEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval) = 0;
-
-  virtual absl::Status FinalizeEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const dataset::proto::Column& label_column,
-      metric::proto::EvaluationResults* eval) = 0;
-
-  virtual absl::Status AppendEvaluationImpl(
-      const metric::proto::EvaluationOptions& option,
-      const model::proto::Prediction& pred, utils::RandomEngine* rnd,
-      metric::proto::EvaluationResults* eval) const = 0;
 
   bool enabled_ = true;
 };
