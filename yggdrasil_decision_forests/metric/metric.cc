@@ -1919,7 +1919,10 @@ absl::StatusOr<std::unordered_map<std::string, std::string>> ExtractFlatMetrics(
     absl::string_view model_name, absl::string_view evaluation_file) {
   ASSIGN_OR_RETURN(auto serialized_content, file::GetContent(evaluation_file));
   proto::EvaluationResults evaluation;
-  evaluation.ParsePartialFromString(std::move(serialized_content));
+  const auto res = evaluation.ParseFromString(std::move(serialized_content));
+  if (!res) {
+    return absl::InvalidArgumentError("Could not parse evaluation file");
+  }
   return ExtractFlatMetrics(model_name, evaluation);
 }
 
@@ -2004,7 +2007,8 @@ absl::StatusOr<double> GetMetricClassificationOneVsOthers(
                          metric.positive_class(), evaluation.label_column()));
   }
 
-  if (positive_class_idx > evaluation.classification().rocs_size()) {
+  if (positive_class_idx >= evaluation.classification().rocs_size() ||
+      positive_class_idx < 0) {
     return absl::InvalidArgumentError(absl::StrCat(
         "The evaluation does not contains the requested metric. Make sure "
         "that the component that made this evaluation generated the request "
@@ -2013,7 +2017,7 @@ absl::StatusOr<double> GetMetricClassificationOneVsOthers(
         metric.DebugString()));
   }
 
-  const auto roc = evaluation.classification().rocs(positive_class_idx);
+  const auto& roc = evaluation.classification().rocs(positive_class_idx);
   switch (metric.Type_case()) {
     case proto::MetricAccessor::Classification::OneVsOther::kAuc:
       return roc.auc();
@@ -2024,41 +2028,48 @@ absl::StatusOr<double> GetMetricClassificationOneVsOthers(
 
     case proto::MetricAccessor::Classification::OneVsOther::
         kPrecisionAtRecall: {
-      const auto metric_idx = XAtYMetricIndexFromConstraint(
-          roc.precision_at_recall(), metric.precision_at_recall().recall());
-      return roc.precision_at_recall(metric_idx.value()).x_metric_value();
+      ASSIGN_OR_RETURN(
+          const auto metric_idx,
+          XAtYMetricIndexFromConstraint(roc.precision_at_recall(),
+                                        metric.precision_at_recall().recall()));
+      return roc.precision_at_recall(metric_idx).x_metric_value();
     }
 
     case proto::MetricAccessor::Classification::OneVsOther::
         kRecallAtPrecision: {
-      const auto metric_idx = XAtYMetricIndexFromConstraint(
-          roc.recall_at_precision(), metric.recall_at_precision().precision());
-      return roc.recall_at_precision(metric_idx.value()).x_metric_value();
+      ASSIGN_OR_RETURN(const auto metric_idx,
+                       XAtYMetricIndexFromConstraint(
+                           roc.recall_at_precision(),
+                           metric.recall_at_precision().precision()));
+      return roc.recall_at_precision(metric_idx).x_metric_value();
     }
 
     case proto::MetricAccessor::Classification::OneVsOther::
         kPrecisionAtVolume: {
-      const auto metric_idx = XAtYMetricIndexFromConstraint(
-          roc.precision_at_volume(), metric.precision_at_volume().volume());
-      return roc.precision_at_volume(metric_idx.value()).x_metric_value();
+      ASSIGN_OR_RETURN(
+          const auto metric_idx,
+          XAtYMetricIndexFromConstraint(roc.precision_at_volume(),
+                                        metric.precision_at_volume().volume()));
+      return roc.precision_at_volume(metric_idx).x_metric_value();
     }
 
     case proto::MetricAccessor::Classification::OneVsOther::
         kRecallAtFalsePositiveRate: {
-      const auto metric_idx = XAtYMetricIndexFromConstraint(
-          roc.recall_at_false_positive_rate(),
-          metric.recall_at_false_positive_rate().false_positive_rate());
-      return roc.recall_at_false_positive_rate(metric_idx.value())
-          .x_metric_value();
+      ASSIGN_OR_RETURN(
+          const auto metric_idx,
+          XAtYMetricIndexFromConstraint(
+              roc.recall_at_false_positive_rate(),
+              metric.recall_at_false_positive_rate().false_positive_rate()));
+      return roc.recall_at_false_positive_rate(metric_idx).x_metric_value();
     }
 
     case proto::MetricAccessor::Classification::OneVsOther::
         kFalsePositiveRateAtRecall: {
-      const auto metric_idx = XAtYMetricIndexFromConstraint(
-          roc.false_positive_rate_at_recall(),
-          metric.false_positive_rate_at_recall().recall());
-      return roc.false_positive_rate_at_recall(metric_idx.value())
-          .x_metric_value();
+      ASSIGN_OR_RETURN(const auto metric_idx,
+                       XAtYMetricIndexFromConstraint(
+                           roc.false_positive_rate_at_recall(),
+                           metric.false_positive_rate_at_recall().recall()));
+      return roc.false_positive_rate_at_recall(metric_idx).x_metric_value();
     }
 
     default:
@@ -2200,6 +2211,8 @@ absl::StatusOr<double> GetMetric(const proto::EvaluationResults& evaluation,
       return GetUserCustomizedMetrics(evaluation, metric.user_metric());
     case proto::MetricAccessor::TASK_NOT_SET:
       return absl::InvalidArgumentError("Metric accessor not set");
+    default:
+      return absl::UnimplementedError("Not implemented");
   }
 }
 
@@ -2562,7 +2575,6 @@ absl::StatusOr<double> MSLE(const absl::Span<const float> labels,
             size_t block_idx, size_t begin_idx,
             size_t end_idx) -> absl::Status {
           auto& block = per_threads[block_idx];
-          absl::Status status;
           if (weights.empty()) {
             return MSLEImp<false>(labels, predictions, weights, begin_idx,
                                   end_idx, &block.sum_sq_log_err,
