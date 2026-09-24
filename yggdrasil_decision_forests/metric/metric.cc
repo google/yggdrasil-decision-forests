@@ -1354,6 +1354,7 @@ absl::Status FinalizeEvaluation(const proto::EvaluationOptions& option,
               BuildROCCurve(option, label_column, *eval, label_value, roc));
         }
       }
+      eval_cls->set_accuracy(Accuracy(*eval));
     } break;
     case model::proto::Task::REGRESSION: {
       // Performs bootstrapping.

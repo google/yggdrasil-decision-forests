@@ -116,6 +116,7 @@ TEST(Metric, EvaluationOfClassification) {
   EXPECT_EQ(eval.count_sampled_predictions(), 4);
   EXPECT_EQ(eval.task(), model::proto::Task::CLASSIFICATION);
   EXPECT_NEAR(Accuracy(eval), 0.5f, 0.0001f);
+  EXPECT_NEAR(eval.classification().accuracy(), 0.5f, 0.0001f);
   EXPECT_NEAR(ErrorRate(eval), 0.5f, 0.0001f);
   EXPECT_NEAR(LogLoss(eval), (-log(0.8) - log(0.2) - log(0.9) - log(0.2)) / 4,
               0.0001f);
@@ -219,6 +220,8 @@ TEST(Metric, EvaluationOfClassificationWithNumericalWeights) {
   EXPECT_EQ(eval.count_sampled_predictions(), sum_weights);
   EXPECT_EQ(eval.task(), model::proto::Task::CLASSIFICATION);
   EXPECT_NEAR(Accuracy(eval), (2.5f + 2.f) / sum_weights, 0.0001f);
+  EXPECT_NEAR(eval.classification().accuracy(), (2.5f + 2.f) / sum_weights,
+              0.0001f);
   EXPECT_NEAR(ErrorRate(eval), 1.f - (2.5f + 2.f) / sum_weights, 0.0001f);
   EXPECT_NEAR(
       LogLoss(eval),
