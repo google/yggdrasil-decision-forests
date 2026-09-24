@@ -39,15 +39,21 @@ TEST(Distribution, NormalDistribution) {
   NormalDistributionDouble dist;
   EXPECT_EQ(dist.Mean(), 0);
   EXPECT_EQ(dist.Std(), 0);
+  EXPECT_EQ(dist.Var(), 0);
+  EXPECT_EQ(dist.VarTimesSumWeights(), 0);
   EXPECT_EQ(dist.NumObservations(), 0);
   dist.Add(5.f);
   EXPECT_EQ(dist.Mean(), 5);
   EXPECT_EQ(dist.Std(), 0);
+  EXPECT_EQ(dist.Var(), 0);
+  EXPECT_EQ(dist.VarTimesSumWeights(), 0);
   EXPECT_EQ(dist.NumObservations(), 1);
   dist.Add(10.);
   EXPECT_EQ(dist.Mean(), 7.5);
   EXPECT_EQ(dist.Std(),
             sqrt(((5 - 7.5) * (5 - 7.5) + (10 - 7.5) * (10 - 7.5)) / 2));
+  EXPECT_EQ(dist.VarTimesSumWeights(),
+            (5 - 7.5) * (5 - 7.5) + (10 - 7.5) * (10 - 7.5));
   EXPECT_EQ(dist.NumObservations(), 2);
 
   proto::NormalDistributionDouble proto;
@@ -59,6 +65,18 @@ TEST(Distribution, NormalDistribution) {
   EXPECT_EQ(dist.Mean(), dist2.Mean());
   EXPECT_EQ(dist.Std(), dist2.Std());
   EXPECT_EQ(dist.NumObservations(), dist2.NumObservations());
+
+  // Verify zero-weight and floating-point subtraction edge cases do not
+  // divide by zero or return negative/infinite VarTimesSumWeights().
+  NormalDistributionDouble weighted_dist;
+  weighted_dist.Add(0.5, 0.0);
+  EXPECT_EQ(weighted_dist.VarTimesSumWeights(), 0);
+  weighted_dist.Add(0.1, 1.0);
+  weighted_dist.Add(0.7, 1e13);
+  weighted_dist.Sub(0.7, 1e13);
+  weighted_dist.Sub(0.1, 1.0);
+  EXPECT_EQ(weighted_dist.VarTimesSumWeights(), 0);
+  EXPECT_EQ(weighted_dist.Var(), 0);
 }
 
 TEST(Distribution, IntegerDistributionInt64) {

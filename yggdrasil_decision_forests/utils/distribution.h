@@ -103,7 +103,7 @@ class NormalDistributionDouble {
 
   // Mean of the observations.
   double Mean() const {
-    if (count_ == 0) return 0.;
+    if (count_ <= 0) return 0.;
     return sum_ / count_;
   }
 
@@ -112,12 +112,13 @@ class NormalDistributionDouble {
 
   // Variance.
   double Var() const {
-    if (count_ == 0) return 0.;
+    if (count_ <= 0) return 0.;
     return sum_squares_ / count_ - (sum_ * sum_) / (count_ * count_);
   }
 
   // Variance multiplied by the weighted number of observations.
   double VarTimesSumWeights() const {
+    if (count_ <= 0) return 0.;
     return sum_squares_ - (sum_ * sum_) / count_;
   }
 
