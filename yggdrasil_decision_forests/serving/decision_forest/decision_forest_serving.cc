@@ -34,9 +34,19 @@ namespace yggdrasil_decision_forests {
 namespace serving {
 namespace decision_forest {
 
+// Final function applied by a multi-dimensional Gradient Boosted Trees when
+// the activation function is suppressed i.e. when the model outputs logits.
+//
+// Mirrors the single-dimension "ActivationAddInitialPrediction": the logit of
+// class "i" is the sum of the leaf values plus "initial_predictions[i]".
 template <typename SpecializedModel>
-void ActivationMultiDimIdentity(const SpecializedModel& model,
-                                float* const values, const int num_values) {}
+void ActivationMultiDimAddInitialPredictions(const SpecializedModel& model,
+                                             float* const values,
+                                             const int num_values) {
+  for (int value_idx = 0; value_idx < num_values; value_idx++) {
+    values[value_idx] += model.initial_predictions[value_idx];
+  }
+}
 
 // Final function applied by a Gradient Boosted Trees with
 // BINOMIAL_LOG_LIKELIHOOD loss function.
@@ -802,7 +812,8 @@ void Predict(
   if (model.output_logits) {
     PredictHelperMultiDimensionFromSingleDimensionTrees<
         std::remove_reference<decltype(model)>::type,
-        ActivationMultiDimIdentity>(model, examples, num_examples, predictions);
+        ActivationMultiDimAddInitialPredictions>(model, examples, num_examples,
+                                                 predictions);
   } else {
     PredictHelperMultiDimensionFromSingleDimensionTrees<
         std::remove_reference<decltype(model)>::type,
