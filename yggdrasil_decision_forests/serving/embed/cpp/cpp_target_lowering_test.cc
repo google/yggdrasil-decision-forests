@@ -29,11 +29,15 @@ TEST(CppTargetLoweringTest, Smoke) {
                             .leaf_value_dims = 1,
                             .task = ModelIR::Task::kBinaryClassification,
                             .feature_value_bytes = 1,
-                            .node_offset_bytes = 1};
+                            .node_offset_bytes = 1,
+                            .binary_calibration_deltas = {0.1f, -0.2f}};
   proto::Options options;
+  options.set_enable_calibration(true);
   ASSERT_OK_AND_ASSIGN(const auto cpp_ir,
                        CppTargetLowering::Lower(model_ir, options));
   EXPECT_EQ(cpp_ir.num_trees, 5);
+  EXPECT_EQ(cpp_ir.binary_calibration_deltas_content, "0.1,-0.2");
+  EXPECT_EQ(cpp_ir.binary_calibration_deltas_size, 2);
 }
 
 TEST(CppTargetLoweringTest, Enums) {

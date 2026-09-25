@@ -29,6 +29,8 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/model/isolation_forest/isolation_forest.h"
+#include "yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator/smoothed_pav_calibrator.h"
+#include "yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator/smoothed_pav_calibrator.pb.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
@@ -192,6 +194,59 @@ TEST(ModelIRBuilder, ClassificationBinary) {
   EXPECT_EQ(model_ir.task, ModelIR::Task::kBinaryClassification);
   EXPECT_EQ(model_ir.num_output_classes, 1);
   EXPECT_EQ(model_ir.activation, ModelIR::Activation::kEquality);
+}
+
+TEST(ModelIRBuilder, ClassificationBinaryCalibration) {
+  model::random_forest::RandomForestModel model;
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "label"
+      categorical {
+        is_already_integerized: true
+        number_of_unique_values: 3  # 0=OOD, 1=False, 2=True
+      }
+    }
+  )pb");
+  model.set_task(model::proto::CLASSIFICATION);
+  model.set_data_spec(dataspec);
+  *model.mutable_input_features() = {};
+  model.set_label_col_idx(0);
+  model.set_winner_take_all_inference(false);
+
+  // Add a dummy tree
+  auto tree = std::make_unique<model::decision_tree::DecisionTree>();
+  tree->CreateRoot();
+  tree->mutable_root()->mutable_node()->mutable_regressor()->set_top_value(1.0);
+  model.AddTree(std::move(tree));
+
+  // Add a dummy postprocessor
+  model::postprocessor::smoothed_pav_calibrator::proto::SmoothedPavCalibrator
+      cal_proto = PARSE_TEST_PROTO(R"pb(
+        x: 0.1
+        x: 0.5
+        x: 0.9
+        y: 0.2
+        y: 0.55
+        y: 0.95
+        slope: 0.5
+        slope: 1.1
+        slope: 0.96
+        n_grid: 100
+      )pb");
+  auto postprocessor =
+      std::make_unique<model::postprocessor::SmoothedPavCalibrator>(cal_proto);
+  model.AddPostprocessor(std::move(postprocessor));
+
+  proto::Options options;
+  options.set_classification_output(proto::ClassificationOutput::PROBABILITY);
+  ASSERT_OK_AND_ASSIGN(const auto model_ir,
+                       ModelIRBuilder::Build(model, options));
+
+  EXPECT_EQ(model_ir.task, ModelIR::Task::kBinaryClassification);
+  EXPECT_EQ(model_ir.num_output_classes, 1);
+  EXPECT_EQ(model_ir.activation, ModelIR::Activation::kEquality);
+  EXPECT_THAT(model_ir.binary_calibration_deltas, SizeIs(100));
 }
 
 TEST(ModelIRBuilder, ClassificationMulticlass) {

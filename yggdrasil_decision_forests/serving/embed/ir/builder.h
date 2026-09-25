@@ -59,6 +59,8 @@ class ModelIRBuilder {
       std::optional<int> target_class_idx, NodeIdx tree_idx,
       absl::flat_hash_set<ConditionType>& active_condition_types);
 
+  absl::Status CompilePostprocessors();
+
   // Converts a categorical mask (set of integers) into 32-bit chunks,
   // adds them to bitset_bank.
   absl::StatusOr<int32_t> AddToBitsetBank(const std::vector<int32_t>& items,
