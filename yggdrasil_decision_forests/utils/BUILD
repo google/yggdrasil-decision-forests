@@ -114,6 +114,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:optional",
+        "@re2//re2",
     ],
 )
 
@@ -130,6 +131,7 @@ cc_library_ydf(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@google_cloud_cpp//:storage",
+        "@re2//re2",
     ],
     alwayslink = 1,
 )
@@ -218,6 +220,7 @@ cc_library_ydf(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_protobuf//:protobuf",
+        "@re2//re2",
     ] + select({
         "//yggdrasil_decision_forests:tensorflow_with_header_lib": [
             "@local_config_tf//:tensorflow",
