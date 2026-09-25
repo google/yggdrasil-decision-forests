@@ -495,8 +495,10 @@ class GenericDatasetTest(parameterized.TestCase):
         "col2": [1, 2, 3],
     })
     ds = dataset_lib.create_vertical_dataset(df)
-    # 2 columns * 3 rows * 4 bytes per values
-    self.assertEqual(ds.memory_usage(), 2 * 3 * 4)
+    # Memory usage is capacity-based; at least 2 columns * 3 rows * 4 bytes per values
+    min_memory = 2 * 3 * 4
+    self.assertGreaterEqual(ds.memory_usage(), min_memory)
+    self.assertLessEqual(ds.memory_usage(), min_memory * 2)
 
   def test_create_vds_pd_with_spec(self):
     data_spec = ds_pb.DataSpecification(
@@ -597,8 +599,10 @@ class GenericDatasetTest(parameterized.TestCase):
     }
     ds = dataset_lib.create_vertical_dataset(ds_dict, data_spec=data_spec)
     test_utils.assertProto2Equal(self, ds.data_spec(), data_spec)
-    # 2 columns * 3 rows * 4 bytes per value + 1 col * 3 rows * 1 byte p.v.
-    self.assertEqual(ds.memory_usage(), 2 * 3 * 4 + 1 * 3 * 1)
+    # Memory usage is capacity-based; at least 2 columns * 3 rows * 4 bytes per value + 1 col * 3 rows * 1 byte p.v.
+    min_memory = 2 * 3 * 4 + 1 * 3 * 1
+    self.assertGreaterEqual(ds.memory_usage(), min_memory)
+    self.assertLessEqual(ds.memory_usage(), min_memory * 2)
 
   def test_create_vds_pd_check_contents(self):
     df = pd.DataFrame({
