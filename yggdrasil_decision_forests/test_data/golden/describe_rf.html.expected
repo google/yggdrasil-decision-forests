@@ -143,12 +143,12 @@ Task: CLASSIFICATION
 Label: income
 
 Accuracy: 0.865128  CI95[W][0.86135 0.868837]
-LogLoss: : 0.314743
-ErrorRate: : 0.134872
+LogLoss: 0.314743
+ErrorRate: 0.134872
 
-Default Accuracy: : 0.759389
-Default LogLoss: : 0.551783
-Default ErrorRate: : 0.240611
+Default Accuracy: 0.759389
+Default LogLoss: 0.551783
+Default ErrorRate: 0.240611
 
 Confusion Table:
 truth\prediction

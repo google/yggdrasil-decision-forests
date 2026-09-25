@@ -142,7 +142,7 @@ Label: income
 Loss (BINOMIAL_LOG_LIKELIHOOD): 0.581716
 
 Accuracy: 0.867198  CI95[W][0 1]
-ErrorRate: : 0.132802
+ErrorRate: 0.132802
 
 
 Confusion Table:

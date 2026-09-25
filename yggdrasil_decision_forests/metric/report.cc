@@ -53,11 +53,11 @@ std::string PairToString(const std::pair<T, T>& p) {
   return absl::StrCat(p.first, " ", p.second);
 }
 
-// Adds the string "<key>: <value>\n" is "value is not Nan.
+// Adds the string "<key><value>\n" if `value` is not Nan.
 void AppendKeyValueIfNotNan(std::string* dst, absl::string_view key,
                             float value) {
   if (!std::isnan(value)) {
-    absl::StrAppend(dst, key, ": ", value, "\n");
+    absl::StrAppend(dst, key, value, "\n");
   }
 }
 
@@ -154,9 +154,9 @@ absl::Status PlotBinaryCalibrationCurves(
 }
 
 // Creates the HTML report for a classification evaluation.
-absl::Status AppendHtmlReportClassiciation(const proto::EvaluationResults& eval,
-                                           const HtmlReportOptions& options,
-                                           utils::html::Html* html) {
+absl::Status AppendHtmlReportClassification(
+    const proto::EvaluationResults& eval, const HtmlReportOptions& options,
+    utils::html::Html* html) {
   if (eval.classification().rocs().empty() &&
       !eval.classification().has_binary_calibration_data()) {
     return absl::OkStatus();
@@ -209,9 +209,6 @@ absl::Status AppendHtmlReportClassiciation(const proto::EvaluationResults& eval,
   RETURN_IF_ERROR(placer.Finalize());
 
   if (!eval.classification().rocs().empty()) {
-    // Note: We start at roc_idx=1 as roc_idx=0 correspond to the
-    // "OOV vs others".
-
     for (int roc_idx = 0; roc_idx < eval.classification().rocs().size();
          roc_idx++) {
       const auto& roc = eval.classification().rocs(roc_idx);
@@ -253,15 +250,15 @@ void PlotConditionalVariables(const std::vector<float>& var_1,
   // Compute the distribution of var_2 for a set of non-overlapping contiguous
   // segments of var1.
   struct ValuesAndWeights {
-    double sum_value;
+    double weighted_sum_values;
     double sum_weight;
 
     void add(const float value, const float weight) {
-      sum_value += value;
+      weighted_sum_values += value * weight;
       sum_weight += weight;
     }
 
-    float mean() const { return sum_value / sum_weight; }
+    float mean() const { return weighted_sum_values / sum_weight; }
   };
   utils::histogram::BucketizedContainer<float, ValuesAndWeights> buckets(
       var_1_min, var_1_max, num_bins);
@@ -396,10 +393,10 @@ absl::Status AppendHtmlReportRegression(const proto::EvaluationResults& eval,
                            num_bins, gt_pred_plot);
   PlotConditionalVariables(ground_truths, residuals, weights,
                            ground_truth_bounds.min(), ground_truth_bounds.max(),
-                           num_bins, pred_res_plot);
+                           num_bins, gt_res_plot);
   PlotConditionalVariables(predictions, residuals, weights,
                            prediction_bounds.min(), prediction_bounds.max(),
-                           num_bins, gt_res_plot);
+                           num_bins, pred_res_plot);
 
   // Plot the histograms
   // Capturing `num_bins` is required for Windows compilation.
@@ -725,7 +722,7 @@ absl::Status AppendHtmlReport(const proto::EvaluationResults& eval,
 
   switch (eval.type_case()) {
     case proto::EvaluationResults::TypeCase::kClassification:
-      RETURN_IF_ERROR(AppendHtmlReportClassiciation(eval, options, &html));
+      RETURN_IF_ERROR(AppendHtmlReportClassification(eval, options, &html));
       break;
 
     case proto::EvaluationResults::TypeCase::kRegression:

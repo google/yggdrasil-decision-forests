@@ -230,7 +230,8 @@ class BucketizedContainer {
   int NumBins() const { return content_.size(); }
 
   Key BinCenter(const int bin_idx) const {
-    return min_value_ + bin_idx * (max_value_ - min_value_) / content_.size();
+    return min_value_ +
+           (bin_idx + 0.5) * (max_value_ - min_value_) / content_.size();
   }
 
  private:
