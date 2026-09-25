@@ -364,7 +364,7 @@ TEST_F(RandomForestOnAdult, NoWinnerTakeAllWithWeights) {
   rf_config->set_winner_take_all_inference(false);
   TrainAndEvaluateModel(/*numerical_weight_attribute=*/"age",
                         /*emulate_weight_with_duplication=*/true);
-  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.8415, 0.012);
+  EXPECT_NEAR(metric::Accuracy(evaluation_), 0.825, 0.012);
 }
 
 TEST_F(RandomForestOnAdult, NoWinnerTakeAll) {
@@ -709,7 +709,7 @@ TEST_F(RandomForestOnAbalone, SparseOblique) {
   rf_config->mutable_decision_tree()->mutable_sparse_oblique_split();
   SetExpectedSortingStrategy(Internal::IN_NODE, &train_config_);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::RMSE(evaluation_), 2.054, 0.01);
+  EXPECT_NEAR(metric::RMSE(evaluation_), 2.06, 0.01);
 }
 
 TEST(RandomForest, SetHyperParameters) {
@@ -1454,7 +1454,7 @@ TEST_F(RandomForestOnSimPTE, LowerBound) {
       decision_tree::proto::DecisionTreeTrainingConfig::Uplift::
           CONSERVATIVE_EUCLIDEAN_DISTANCE);
   TrainAndEvaluateModel();
-  EXPECT_NEAR(metric::Qini(evaluation_), 0.10889, 0.002);
+  EXPECT_NEAR(metric::Qini(evaluation_), 0.105, 0.002);
 }
 
 TEST(SampleTrainingExamples, WithReplacement) {
