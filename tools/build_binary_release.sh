@@ -49,13 +49,8 @@ $SUDO apt-get -y --no-install-recommends install \
   g++-10 \
   clang-12 \
   git \
-  python3 \
-  python3-pip \
-  python3-dev \
   zip \
   wget
-
-python3 -m pip install numpy
 
 wget -O bazelisk https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64
 chmod +x bazelisk

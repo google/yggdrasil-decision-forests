@@ -73,12 +73,7 @@ if [[ ! -z ${INSTALL_DEPENDENCIES+z} ]]; then
     g++-10 \
     clang-12 \
     git \
-    python3 \
-    python3-pip \
-    python3-dev \
     wget
-
-  python3 -m pip install numpy
 
   wget -O bazel https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64
   chmod +x bazel

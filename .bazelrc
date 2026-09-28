@@ -38,6 +38,10 @@ common --enable_platform_specific_config
 # Avoid long path issues on Windows
 # startup --output_user_root=C:/tmpbld
 
+# rules_python >= 2 requires symlinks on Windows. This needs the Windows
+# "Developer Mode" (or admin rights). No-op on other platforms.
+startup --windows_enable_symlinks
+
 # Flags to compile with or without recent version of Bazel.
 
 # Required for bazel <=4, fails with bazel >= 5.
@@ -46,6 +50,11 @@ common --enable_platform_specific_config
 build -c opt
 build --announce_rc
 build --noincompatible_strict_action_env
+
+# Hermetic Python: Start the Python binaries and tests with the hermetic
+# interpreter directly, instead of bootstrapping with the system "python3"
+# (default on Bazel 7). Has no effect on Windows.
+build --@rules_python//python/config_settings:bootstrap_impl=script
 
 # Enable after adding python headers to protobuf.
 # build --define=use_fast_cpp_protos=true
