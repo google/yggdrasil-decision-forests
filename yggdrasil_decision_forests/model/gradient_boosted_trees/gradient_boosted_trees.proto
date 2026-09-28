@@ -17,6 +17,7 @@ syntax = "proto2";
 
 package yggdrasil_decision_forests.model.gradient_boosted_trees.proto;
 
+import "yggdrasil_decision_forests/metric/metric.proto";
 import "yggdrasil_decision_forests/model/abstract_model.proto";
 import "yggdrasil_decision_forests/utils/distribution.proto";
 
@@ -97,6 +98,9 @@ message TrainingLogs {
   // "number_of_trees_in_final_model" is equal to the "number_of_trees" of the
   // last "entries".
   optional int32 number_of_trees_in_final_model = 3;
+
+  // Complete evaluation of the full model on the validation dataset.
+  optional metric.proto.EvaluationResults final_evaluation = 4;
 
   message Entry {
     // Number of trees. In the case of multi-dimensional gradients,

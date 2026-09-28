@@ -21,7 +21,6 @@
 #include <cstdint>
 #include <functional>
 #include <iterator>
-#include <limits>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -30,7 +29,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/cleanup/cleanup.h"
 #include "absl/container/fixed_array.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/log/log.h"
@@ -1054,7 +1052,11 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     const int uplift_treatment_col_idx,
     const std::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<OOBEvaluator::PredictionAccumulator>& oob_predictions,
-    const bool for_permutation_importance) {
+    const bool for_permutation_importance, const bool for_final_evaluation) {
+  const auto& label_column_spec =
+      train_dataset.data_spec().columns(label_col_idx);
+  const int64_t num_examples = train_dataset.nrow();
+
   // Configure the evaluation options.
   metric::proto::EvaluationOptions eval_options;
   eval_options.set_task(task);
@@ -1064,7 +1066,24 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
   switch (task) {
     case model::proto::Task::CLASSIFICATION:
       eval_options.mutable_classification()->set_roc_enable(
-          for_permutation_importance);
+          for_permutation_importance || for_final_evaluation);
+      if (for_final_evaluation) {
+        // Limit peak memory usage of the evaluation.
+        const int kMaxSampledPredictions = 100'000;
+        const int kMaxSampledProbabilities = 10'000'000;
+        const int num_label_classes =
+            label_column_spec.categorical().number_of_unique_values();
+        STATUS_CHECK_GT(num_label_classes, 0);
+        const int64_t max_sampled_predictions =
+            std::min(kMaxSampledPredictions,
+                     kMaxSampledProbabilities / num_label_classes);
+        if (num_examples > max_sampled_predictions) {
+          eval_options.set_prediction_sampling(
+              static_cast<float>(max_sampled_predictions) / num_examples);
+        }
+        // ROC curves take ~22 KB / class.
+        eval_options.mutable_classification()->set_max_roc_samples(500);
+      }
       break;
     case model::proto::Task::REGRESSION:
       eval_options.mutable_regression()->set_enable_regression_plots(false);
@@ -1081,15 +1100,13 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     eval_options.mutable_weights();
   }
 
-  const auto& label_column_spec =
-      train_dataset.data_spec().columns(label_col_idx);
   utils::RandomEngine rnd;
   metric::proto::EvaluationResults evaluation;
   RETURN_IF_ERROR(metric::InitializeEvaluation(eval_options, label_column_spec,
                                                &evaluation));
   model::proto::Prediction prediction;
 
-  for (UnsignedExampleIdx example_idx = 0; example_idx < train_dataset.nrow();
+  for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
        example_idx++) {
     auto& prediction_accumulator = oob_predictions[example_idx];
     if (prediction_accumulator.num_trees == 0) {
@@ -1133,11 +1150,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
   }
   RETURN_IF_ERROR(
       metric::FinalizeEvaluation(eval_options, label_column_spec, &evaluation));
-  if (!for_permutation_importance &&
-      evaluation.sampled_predictions_size() != 0) {
-    LOG(WARNING) << "Internal error: Non empty oob evaluation";
-    evaluation.clear_sampled_predictions();
-  }
+  evaluation.clear_sampled_predictions();
   return evaluation;
 }
 
@@ -1147,14 +1160,14 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
         oob_predictions_per_input_features,
     const dataset::VerticalDataset& dataset, const int num_threads,
     RandomForestModel* model) {
-  // Note: "for_permutation_importance=true" allows to compute AUC, PR-AUC and
-  // other expensive evaluation metrics.
+  // Note: "include_roc_curve=true" allows to compute AUC, PR-AUC and other
+  // expensive evaluation metrics.
   ASSIGN_OR_RETURN(
       const auto base_evaluation,
-      EvaluateOOBPredictions(dataset, model->task(), model->label_col_idx(),
-                             model->uplift_treatment_col_idx(),
-                             model->weights(), oob_predictions,
-                             /*for_permutation_importance=*/true));
+      EvaluateOOBPredictions(
+          dataset, model->task(), model->label_col_idx(),
+          model->uplift_treatment_col_idx(), model->weights(), oob_predictions,
+          /*for_permutation_importance=*/true, /*for_final_evaluation=*/false));
 
   const auto permutation_evaluation = [&](const int feature_idx)
       -> absl::StatusOr<std::optional<metric::proto::EvaluationResults>> {
@@ -1166,7 +1179,8 @@ absl::Status ComputeVariableImportancesFromAccumulatedPredictions(
                          dataset, model->task(), model->label_col_idx(),
                          model->uplift_treatment_col_idx(), model->weights(),
                          oob_predictions_per_input_features[feature_idx],
-                         /*for_permutation_importance=*/true));
+                         /*for_permutation_importance=*/true,
+                         /*for_final_evaluation=*/false));
     return eval;
   };
 
@@ -1437,6 +1451,11 @@ void EvaluationGate::CompleteEvaluation() {
   cv_.SignalAll();
 }
 
+int EvaluationGate::trees_completed() const {
+  utils::concurrency::MutexLock lock(mutex_);
+  return trees_completed_;
+}
+
 int OOBEvaluator::DetermineNumStripes(
     const UnsignedExampleIdx num_examples,
     const random_forest::proto::RandomForestTrainingConfig& rf_config,
@@ -1560,7 +1579,7 @@ absl::Status OOBEvaluator::UpdateAndMaybeEvaluate(
     // 4. Compute evaluation exclusively (all workers in this batch have
     // drained).
     RETURN_IF_ERROR(RunEvaluation(train_dataset, eval_ticket->eval_tree_count(),
-                                  extra_log_info));
+                                  /*full_evaluation=*/false, extra_log_info));
     // 5. Open gate and resume waiting workers.
     eval_ticket->Complete();
   }
@@ -1609,8 +1628,8 @@ absl::Status OOBEvaluator::UpdateAccumulators(
 }
 
 absl::Status OOBEvaluator::RunEvaluation(
-    const dataset::VerticalDataset& train_dataset, int eval_tree_count,
-    absl::string_view extra_log_info) {
+    const dataset::VerticalDataset& train_dataset, const int eval_tree_count,
+    const bool full_evaluation, absl::string_view extra_log_info) {
   proto::OutOfBagTrainingEvaluations evaluation;
   evaluation.set_number_of_trees(eval_tree_count);
   ASSIGN_OR_RETURN(const auto evaluation_results,
@@ -1618,18 +1637,22 @@ absl::Status OOBEvaluator::RunEvaluation(
                        train_dataset, model_->task(), model_->label_col_idx(),
                        model_->uplift_treatment_col_idx(), model_->weights(),
                        oob_predictions_,
-                       /*for_permutation_importance=*/false));
+                       /*for_permutation_importance=*/false,
+                       /*for_final_evaluation=*/full_evaluation));
 
   *evaluation.mutable_evaluation() = evaluation_results;
   model_->mutable_out_of_bag_evaluations()->push_back(evaluation);
 
-  // Print progress in the console.
-  std::string snippet = absl::StrFormat("Train tree %d/%d", eval_tree_count,
-                                        rf_config_.num_trees());
-  absl::StrAppend(&snippet, " ",
-                  internal::EvaluationSnippet(evaluation.evaluation()));
-  absl::StrAppend(&snippet, extra_log_info);
-  LOG(INFO) << snippet;
+  if (!full_evaluation) {
+    // Print progress in the console. The final evaluation is logged by
+    // "FinalizeTraining".
+    std::string snippet = absl::StrFormat("Train tree %d/%d", eval_tree_count,
+                                          rf_config_.num_trees());
+    absl::StrAppend(&snippet, " ",
+                    internal::EvaluationSnippet(evaluation.evaluation()));
+    absl::StrAppend(&snippet, extra_log_info);
+    LOG(INFO) << snippet;
+  }
 
   return absl::OkStatus();
 }
@@ -1640,11 +1663,30 @@ absl::Status OOBEvaluator::FinalizeTraining(
     DCHECK(!compute_oob_variable_importances_);
     return absl::OkStatus();
   }
-  if (!model_->mutable_out_of_bag_evaluations()->empty()) {
-    LOG(INFO)
-        << "Final OOB metrics: "
-        << internal::EvaluationSnippet(
-               model_->mutable_out_of_bag_evaluations()->back().evaluation());
+
+  // Full evaluation of the final model.
+  //
+  // Note: If `total_max_num_nodes` is set, the final model may contain fewer
+  // trees than what's evaluated here.
+  //
+  // At this point, all the workers have drained i.e. the accumulators can be
+  // read without synchronization.
+  auto* evaluations = model_->mutable_out_of_bag_evaluations();
+  const int num_accumulated_trees = evaluation_gate_.trees_completed();
+  if (num_accumulated_trees > 0) {
+    if (!evaluations->empty() &&
+        evaluations->back().number_of_trees() == num_accumulated_trees) {
+      // Replace the cheap evaluation of the final model.
+      evaluations->pop_back();
+    }
+    RETURN_IF_ERROR(RunEvaluation(train_dataset, num_accumulated_trees,
+                                  /*full_evaluation=*/true,
+                                  /*extra_log_info=*/""));
+  }
+
+  if (!evaluations->empty()) {
+    LOG(INFO) << "Final OOB metrics: "
+              << internal::EvaluationSnippet(evaluations->back().evaluation());
   }
 
   if (compute_oob_variable_importances_) {

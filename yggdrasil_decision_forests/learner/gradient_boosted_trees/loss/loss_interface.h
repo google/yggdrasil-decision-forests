@@ -316,6 +316,10 @@ class AbstractLoss {
   // method and the custom metrics registered on the fly.
   std::vector<std::string> SecondaryMetricNames() const;
 
+  // Names of the custom metrics registered with "RegisterCustomMetric". Those
+  // are the last entries of "SecondaryMetricNames", in the same order.
+  std::vector<std::string> CustomMetricNames() const;
+
   // The "Loss" methods compute the loss(es) for the currently accumulated
   // predictions. Like for "UpdateGradients", different version of "Loss" are
   // implemented for different representation of the label.

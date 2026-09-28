@@ -66,6 +66,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
+#include "yggdrasil_decision_forests/metric/metric.pb.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
@@ -208,26 +209,54 @@ std::vector<std::string> SampleTrainingShards(
   return selected;
 }
 
-// Loss and metrics of the final model on the validation dataset.
-struct ValidationEvaluation {
-  // Validation dataset. Not owned, never null.
-  const dataset::VerticalDataset* validation_dataset;
-  // Loss of the final model.
-  float loss;
-  // Secondary metrics of the final model. Follows the order of
-  // "TrainingLogs::secondary_metric_names".
-  std::vector<float> secondary_metrics;
+// Extracts the user-defined custom metrics and their names from the secondary
+// metrics.
+// Note: this function assumes that the user metrics are the last metrics in
+// the `secondary_metrics`.
+absl::StatusOr<std::vector<std::pair<std::string, float>>> ExtractUserMetrics(
+    const AbstractLoss& loss, absl::Span<const float> secondary_metrics) {
+  // "SecondaryMetricNames" is the concatenation of the loss internal metric
+  // names and of "CustomMetricNames". If it does not have as many entries as
+  // there are values, the names and the values are not aligned and the custom
+  // metrics cannot be identified.
+  const std::vector<std::string> all_names = loss.SecondaryMetricNames();
+  if (all_names.size() != secondary_metrics.size()) {
+    return absl::InternalError(absl::Substitute(
+        "Found $0 secondary metric names but $1 secondary metric values",
+        all_names.size(), secondary_metrics.size()));
+  }
+  const std::vector<std::string> names = loss.CustomMetricNames();
+  std::vector<std::pair<std::string, float>> user_metrics;
+  // Index of the first custom metric in `secondary_metrics`.
+  const size_t offset = secondary_metrics.size() - names.size();
+  user_metrics.reserve(names.size());
+  for (size_t metric_idx = 0; metric_idx < names.size(); metric_idx++) {
+    user_metrics.push_back(
+        {names[metric_idx], secondary_metrics[offset + metric_idx]});
+  }
+  return user_metrics;
+}
+
+// Everything needed to compute the self-evaluation of the final model on the
+// validation dataset. The pointees are not owned.
+struct ValidationDatasetForEvaluation {
+  // The validation dataset. Never null.
+  const dataset::VerticalDataset* dataset;
+  // "dataset" with the extra columns required by the loss (e.g. gradients).
+  // Never null.
+  const dataset::VerticalDataset* gradient_dataset;
+  absl::Span<const float> weights;
+  const AbstractLossCache* loss_cache = nullptr;
+  utils::concurrency::ThreadPool* thread_pool = nullptr;
 };
 
-absl::StatusOr<std::optional<ValidationEvaluation>>
-TruncateModelWithEarlyStopping(
+// Removes the trees that the early stopping did not select.
+absl::Status TruncateModelWithEarlyStopping(
     const internal::AllTrainingConfiguration& config,
-    const EarlyStopping& early_stopping,
-    const dataset::VerticalDataset& validation_dataset,
-    GradientBoostedTreesModel* mdl) {
+    const EarlyStopping& early_stopping, GradientBoostedTreesModel* mdl) {
   if (early_stopping.last_num_trees() == 0) {
     LOG(WARNING) << "The model was never evaluated on the validation dataset.";
-    return std::nullopt;
+    return absl::OkStatus();
   }
 
   const bool truncate_model =
@@ -237,19 +266,13 @@ TruncateModelWithEarlyStopping(
       config.gbt_config->early_stopping() ==
           proto::GradientBoostedTreesTrainingConfig::VALIDATION_LOSS_INCREASE;
   if (!truncate_model) {
-    return ValidationEvaluation{
-        /*dataset=*/&validation_dataset,
-        /*loss=*/early_stopping.last_loss(),
-        /*secondary_metrics=*/early_stopping.last_metrics()};
+    return absl::OkStatus();
   }
 
   if (early_stopping.best_num_trees() < 0) {
     LOG(INFO) << "Insufficient number of trees to apply early stopping. "
-                 "Using last loss for metrics.";
-    return ValidationEvaluation{
-        /*dataset=*/&validation_dataset,
-        /*loss=*/early_stopping.last_loss(),
-        /*secondary_metrics=*/early_stopping.last_metrics()};
+                 "Keeping all the trees.";
+    return absl::OkStatus();
   }
 
   if (early_stopping.best_num_trees() > mdl->NumTrees()) {
@@ -297,26 +320,24 @@ TruncateModelWithEarlyStopping(
            "stopping completely with 'early_stopping=NONE'.";
   }
 
-  return ValidationEvaluation{
-      /*dataset=*/&validation_dataset, /*loss=*/early_stopping.best_loss(),
-      /*secondary_metrics=*/early_stopping.best_metrics()};
+  return absl::OkStatus();
 }
 
-void LogFinalSnippet(const ValidationEvaluation& validation,
+void LogFinalSnippet(float loss, absl::Span<const float> secondary_metrics,
                      const GradientBoostedTreesModel& mdl) {
-  std::string log_snippet = absl::StrFormat(
-      "Final model num-trees:%d valid-loss:%f",
-      mdl.NumTrees() / mdl.num_trees_per_iter(), validation.loss);
+  std::string log_snippet =
+      absl::StrFormat("Final model num-trees:%d valid-loss:%f",
+                      mdl.NumTrees() / mdl.num_trees_per_iter(), loss);
 
   const int num_secondary_metrics =
       std::min<int>(mdl.training_logs().secondary_metric_names().size(),
-                    validation.secondary_metrics.size());
+                    secondary_metrics.size());
   for (int secondary_metric_idx = 0;
        secondary_metric_idx < num_secondary_metrics; secondary_metric_idx++) {
     absl::StrAppendFormat(
         &log_snippet, " valid-%s:%f",
         mdl.training_logs().secondary_metric_names(secondary_metric_idx),
-        validation.secondary_metrics[secondary_metric_idx]);
+        secondary_metrics[secondary_metric_idx]);
   }
   LOG(INFO) << log_snippet;
 }
@@ -332,21 +353,77 @@ absl::Status MaybeExportTrainingLogs(const absl::string_view log_directory,
   return absl::OkStatus();
 }
 
-absl::Status FinalizeModel(
-    const internal::AllTrainingConfiguration& config,
-    const absl::string_view log_directory, const int num_threads,
-    const std::optional<ValidationEvaluation>& validation,
-    GradientBoostedTreesModel* mdl) {
-  if (validation.has_value()) {
-    mdl->set_validation_loss(validation->loss);
-    LogFinalSnippet(*validation, *mdl);
+absl::Status FinalizeModel(const internal::AllTrainingConfiguration& config,
+                           const absl::string_view log_directory,
+                           const int num_threads,
+                           const ValidationDatasetForEvaluation* validation_ds,
+                           utils::RandomEngine* rnd,
+                           GradientBoostedTreesModel* mdl) {
+  if (validation_ds != nullptr) {
+    // Compute the loss.
+    std::vector<decision_tree::DecisionTree*> trees;
+    trees.reserve(mdl->NumTrees());
+    for (const auto& tree : mdl->decision_trees()) {
+      trees.push_back(tree.get());
+    }
+    std::vector<float> predictions;
+    RETURN_IF_ERROR(internal::ComputePredictions(
+        mdl, /*optional_engine=*/nullptr, trees, config,
+        *validation_ds->gradient_dataset, &predictions));
+
+    ASSIGN_OR_RETURN(
+        const LossResults loss_results,
+        config.loss->Loss(*validation_ds->gradient_dataset,
+                          config.train_config_link.label(), predictions,
+                          validation_ds->weights, validation_ds->loss_cache,
+                          validation_ds->thread_pool));
+    ASSIGN_OR_RETURN(
+        auto user_metrics,
+        ExtractUserMetrics(*config.loss, loss_results.secondary_metrics));
+    mdl->set_validation_loss(loss_results.loss);
+    LogFinalSnippet(loss_results.loss, loss_results.secondary_metrics, *mdl);
 
     if (config.gbt_config->compute_permutation_variable_importance()) {
       LOG(INFO) << "Compute permutation variable importances";
       RETURN_IF_ERROR(utils::ComputePermutationFeatureImportance(
-          *validation->validation_dataset, mdl,
+          *validation_ds->dataset, mdl,
           mdl->mutable_precomputed_variable_importances(),
           utils::ComputeFeatureImportanceOptions{num_threads}));
+    }
+
+    metric::proto::EvaluationOptions eval_options;
+    eval_options.set_num_threads(num_threads);
+    eval_options.set_task(mdl->task());
+    eval_options.set_bootstrapping_samples(-1);
+    switch (mdl->task()) {
+      case model::proto::Task::CLASSIFICATION:
+        // With this change, ROC curves take ~22 KB / class.
+        eval_options.mutable_classification()->set_max_roc_samples(500);
+        break;
+      case model::proto::Task::REGRESSION:
+        eval_options.mutable_regression()->set_enable_regression_plots(false);
+        break;
+      default:
+        break;
+    }
+    if (config.train_config.has_weight_definition()) {
+      *eval_options.mutable_weights() = config.train_config.weight_definition();
+    }
+    auto final_evaluation =
+        mdl->EvaluateWithStatus(*validation_ds->dataset, eval_options, rnd);
+    if (final_evaluation.ok()) {
+      // Add the actual validation loss and the custom metrics.
+      final_evaluation->set_loss_value(loss_results.loss);
+      final_evaluation->set_loss_name(mdl->GetLossName());
+      for (const auto& [metric_name, metric_value] : user_metrics) {
+        (*final_evaluation->mutable_user_metrics())[metric_name] = metric_value;
+      }
+      final_evaluation->clear_sampled_predictions();
+      *mdl->mutable_training_logs()->mutable_final_evaluation() =
+          *std::move(final_evaluation);
+    } else {
+      LOG(WARNING) << "Final evaluation on the validation dataset failed with "
+                   << final_evaluation.status();
     }
   } else if (config.gbt_config->compute_permutation_variable_importance()) {
     LOG(WARNING) << "The permutation variable importances require a validation "
@@ -1214,16 +1291,22 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
     thread_load_next_shards = {};
   }
 
-  std::optional<ValidationEvaluation> validation_evaluation;
+  std::optional<ValidationDatasetForEvaluation> validation_for_evaluation;
   if (has_validation_dataset) {
-    ASSIGN_OR_RETURN(
-        validation_evaluation,
-        TruncateModelWithEarlyStopping(config, early_stopping,
-                                       validation->dataset, mdl.get()));
+    RETURN_IF_ERROR(
+        TruncateModelWithEarlyStopping(config, early_stopping, mdl.get()));
+    validation_for_evaluation = ValidationDatasetForEvaluation{
+        /*dataset=*/&validation->dataset,
+        /*gradient_dataset=*/&validation->gradient_dataset,
+        /*weights=*/validation->weights,
+        /*loss_cache=*/nullptr,
+        /*thread_pool=*/thread_pool.get()};
   }
-  RETURN_IF_ERROR(FinalizeModel(config, log_directory_,
-                                deployment().num_threads(),
-                                validation_evaluation, mdl.get()));
+  RETURN_IF_ERROR(FinalizeModel(
+      config, log_directory_, deployment().num_threads(),
+      validation_for_evaluation.has_value() ? &*validation_for_evaluation
+                                            : nullptr,
+      &random, mdl.get()));
   return mdl;
 }
 
@@ -1598,6 +1681,17 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           absl::ToDoubleSeconds(absl::Now() - begin_iter_training));
     }
 
+    if (total_num_nodes.has_value()) {
+      for (const auto& tree : new_trees) {
+        current_num_nodes += tree->NumNodes();
+      }
+      if (current_num_nodes > *total_num_nodes) {
+        LOG(INFO) << "Model has reached the maximum number of nodes, stopping "
+                     "training.";
+        break;
+      }
+    }
+
     double mean_abs_prediction = 0;
     if (dart_extraction) {
       // Update the Dart cache and the predictions on the training dataset.
@@ -1627,17 +1721,6 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
                                           gradient_validation_dataset,
                                           &validation_predictions,
                                           /*mean_abs_prediction=*/nullptr));
-      }
-    }
-
-    if (total_num_nodes.has_value()) {
-      for (auto& tree : new_trees) {
-        current_num_nodes += tree->NumNodes();
-      }
-      if (current_num_nodes > *total_num_nodes) {
-        LOG(INFO) << "Model has reached the maximum number of nodes, stopping "
-                     "training.";
-        break;
       }
     }
 
@@ -1774,11 +1857,9 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
                                    snapshots_idxs));
   }
 
-  std::optional<ValidationEvaluation> validation_evaluation;
   if (has_validation_dataset) {
-    ASSIGN_OR_RETURN(validation_evaluation, TruncateModelWithEarlyStopping(
-                                                config, early_stopping,
-                                                validation_dataset, mdl.get()));
+    RETURN_IF_ERROR(
+        TruncateModelWithEarlyStopping(config, early_stopping, mdl.get()));
   }
 
   if (dart_extraction) {
@@ -1799,9 +1880,20 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
     }
   }
 
-  RETURN_IF_ERROR(FinalizeModel(config, log_directory_,
-                                deployment().num_threads(),
-                                validation_evaluation, mdl.get()));
+  std::optional<ValidationDatasetForEvaluation> validation_for_evaluation;
+  if (has_validation_dataset) {
+    validation_for_evaluation = ValidationDatasetForEvaluation{
+        /*dataset=*/&validation_dataset,
+        /*gradient_dataset=*/&gradient_validation_dataset,
+        /*weights=*/validation_weights,
+        /*loss_cache=*/valid_loss_cache.get(),
+        /*thread_pool=*/thread_pool.get()};
+  }
+  RETURN_IF_ERROR(FinalizeModel(
+      config, log_directory_, deployment().num_threads(),
+      validation_for_evaluation.has_value() ? &*validation_for_evaluation
+                                            : nullptr,
+      &random, mdl.get()));
 
   if (vector_sequence_computer) {
     RETURN_IF_ERROR(vector_sequence_computer->Release());

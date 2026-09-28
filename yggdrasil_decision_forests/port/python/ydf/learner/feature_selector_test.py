@@ -119,8 +119,8 @@ class BackwardSelectionFeatureSelectorTest(LearnerTest):
     self.assertAlmostEqual(logs.iterations[0].score, -0.381, delta=0.1)
     self.assertLen(logs.iterations[-1].features, 1)
     self.assertAlmostEqual(logs.iterations[-1].score, -0.5, delta=0.1)
-    self.assertSetEqual(
-        set(logs.iterations[0].metrics.keys()), set(["accuracy", "loss"])
+    self.assertContainsSubset(
+        set(["accuracy", "loss"]), set(logs.iterations[0].metrics.keys())
     )
 
     self.assertSetEqual(

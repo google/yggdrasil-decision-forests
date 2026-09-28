@@ -266,13 +266,16 @@ class EvaluationGate {
   // criteria are met). Otherwise returns std::nullopt.
   std::optional<EvaluationTicket> LeaveAndMaybeElectEvaluator(Token token);
 
+  // Number of trees whose predictions have been accumulated so far.
+  int trees_completed() const;
+
  private:
   void OnWorkerAbort();
   void CompleteEvaluation();
 
   const Config config_;
 
-  utils::concurrency::Mutex mutex_;
+  mutable utils::concurrency::Mutex mutex_;
   utils::concurrency::CondVar cv_;
 
   bool gate_closed_ GUARDED_BY(mutex_) = false;
@@ -361,8 +364,11 @@ class OOBEvaluator {
       const decision_tree::DecisionTree& new_tree, utils::RandomEngine* random,
       int local_start_stripe);
 
+  // Computes and records an OOB evaluation of the trees accumulated so far.
+  // If "full_evaluation", the expensive metrics (e.g. ROC curves) are also
+  // computed. This is only done once, for the final model.
   absl::Status RunEvaluation(const dataset::VerticalDataset& train_dataset,
-                             int eval_tree_count,
+                             int eval_tree_count, bool full_evaluation,
                              absl::string_view extra_log_info);
 
   const bool compute_oob_performances_;
@@ -410,7 +416,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateOOBPredictions(
     int uplift_treatment_col_idx,
     const std::optional<dataset::proto::LinkedWeightDefinition>& weight_links,
     const std::vector<OOBEvaluator::PredictionAccumulator>& oob_predictions,
-    bool for_permutation_importance = false);
+    bool for_permutation_importance, bool for_final_evaluation);
 
 // Update the variable importance of the model with set of oob predictions.
 absl::Status ComputeVariableImportancesFromAccumulatedPredictions(

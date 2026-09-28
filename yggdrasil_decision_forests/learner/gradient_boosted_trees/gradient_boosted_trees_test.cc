@@ -121,6 +121,30 @@ absl::StatusOr<dataset::VerticalDataset> CreateToyDataset() {
   return dataset;
 }
 
+// Same as "CreateToyDataset", with a constant example weight of 2.
+absl::StatusOr<dataset::VerticalDataset> CreateWeightedToyDataset() {
+  dataset::VerticalDataset dataset;
+  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "a" }
+    columns {
+      type: CATEGORICAL
+      name: "b"
+      categorical { number_of_unique_values: 3 is_already_integerized: true }
+    }
+    columns { type: NUMERICAL name: "w" }
+  )pb");
+  RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"a", "1"}, {"b", "1"}, {"w", "2"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"a", "2"}, {"b", "2"}, {"w", "2"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"a", "3"}, {"b", "1"}, {"w", "2"}}));
+  RETURN_IF_ERROR(
+      dataset.AppendExampleWithStatus({{"a", "4"}, {"b", "2"}, {"w", "2"}}));
+  return dataset;
+}
+
 // Shards a dataset. Returns the sharded path in the temp directory.
 std::string ShardDataset(const dataset::VerticalDataset& dataset,
                          const int num_shards, const float sampling) {
@@ -2416,11 +2440,12 @@ TEST(GradientBoostedTrees, EarlyStoppingWithoutBestModel) {
       dynamic_cast<const GradientBoostedTreesModel*>(model.get());
   EXPECT_EQ(gbt_model->NumTrees(), 15);
   EXPECT_EQ(gbt_model->early_stopping_triggered(), false);
-  // The loss of the last (and only) validation is used.
+  // The periodic evaluation only covers 10 trees, but the reported loss is
+  // always computed on the final model.
   EXPECT_FALSE(std::isnan(gbt_model->validation_loss()));
 }
 
-TEST(GradientBoostedTrees, NoValidationEvaluation) {
+TEST(GradientBoostedTrees, ValidationEvaluationWithoutPeriodicEvaluation) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());
   model::proto::TrainingConfig train_config;
@@ -2442,8 +2467,11 @@ TEST(GradientBoostedTrees, NoValidationEvaluation) {
   const auto* gbt_model =
       dynamic_cast<const GradientBoostedTreesModel*>(model.get());
   EXPECT_EQ(gbt_model->NumTrees(), 5);
+  // The early stopping had no validation loss to work with, so it cannot have
+  // removed any tree.
   EXPECT_EQ(gbt_model->early_stopping_triggered(), false);
-  EXPECT_TRUE(std::isnan(gbt_model->validation_loss()));
+  EXPECT_FALSE(std::isnan(gbt_model->validation_loss()));
+  EXPECT_TRUE(gbt_model->training_logs().has_final_evaluation());
 }
 
 // The best model is the full model: early stopping does not remove any tree,
@@ -2473,6 +2501,142 @@ TEST(GradientBoostedTrees, EarlyStoppingKeepingTheFullModel) {
   EXPECT_EQ(gbt_model->NumTrees(), 1);
   EXPECT_EQ(gbt_model->early_stopping_triggered(), false);
   EXPECT_FALSE(std::isnan(gbt_model->validation_loss()));
+}
+
+TEST(GradientBoostedTrees, FinalValidationEvaluationIsStored) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::CLASSIFICATION);
+  train_config.set_label("b");
+  train_config.add_features("a");
+  auto* gbt_config = train_config.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_validation_set_ratio(0.3f);
+  gbt_config->set_num_trees(5);
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config, &learner));
+  ASSERT_OK_AND_ASSIGN(const std::unique_ptr<AbstractModel> model,
+                       learner->TrainWithStatus(dataset));
+
+  const auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model.get());
+  ASSERT_TRUE(gbt_model->training_logs().has_final_evaluation());
+
+  const auto validation_evaluation = gbt_model->ValidationEvaluation();
+  EXPECT_EQ(validation_evaluation.task(), model::proto::Task::CLASSIFICATION);
+  EXPECT_EQ(validation_evaluation.loss_name(), gbt_model->GetLossName());
+  EXPECT_EQ(validation_evaluation.loss_value(), gbt_model->validation_loss());
+  EXPECT_GT(validation_evaluation.count_predictions_no_weight(), 0);
+  EXPECT_TRUE(validation_evaluation.classification().has_confusion());
+
+  EXPECT_THAT(validation_evaluation.sampled_predictions(), IsEmpty());
+}
+
+TEST(GradientBoostedTrees, ValidationEvaluationCoversTheFinalModel) {
+  // "CreateToyDataset" is too small: no split satisfies "min_examples", so all
+  // the trees are empty and the validation loss does not depend on the number
+  // of trees.
+  dataset::VerticalDataset dataset;
+  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "a" }
+    columns {
+      type: CATEGORICAL
+      name: "b"
+      categorical { number_of_unique_values: 3 is_already_integerized: true }
+    }
+  )pb");
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  for (int example_idx = 0; example_idx < 100; example_idx++) {
+    ASSERT_OK(dataset.AppendExampleWithStatus(
+        {{"a", absl::StrCat(example_idx)},
+         {"b", (example_idx % 3 == 0) ? "1" : "2"}}));
+  }
+
+  const auto train = [&dataset](const int num_trees,
+                                const int validation_interval_in_trees) {
+    model::proto::TrainingConfig train_config;
+    train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+    train_config.set_task(model::proto::Task::CLASSIFICATION);
+    train_config.set_label("b");
+    train_config.add_features("a");
+    auto* gbt_config = train_config.MutableExtension(
+        gradient_boosted_trees::proto::gradient_boosted_trees_config);
+    gbt_config->set_validation_set_ratio(0.3f);
+    gbt_config->set_num_trees(num_trees);
+    gbt_config->set_validation_interval_in_trees(validation_interval_in_trees);
+    // Keep all the trees so that the comparisons below are about the
+    // evaluation, not about the model selection.
+    gbt_config->set_early_stopping(
+        proto::GradientBoostedTreesTrainingConfig::NONE);
+    std::unique_ptr<model::AbstractLearner> learner;
+    CHECK_OK(model::GetLearner(train_config, &learner));
+    return learner->TrainWithStatus(dataset);
+  };
+
+  // The last periodic evaluation covers 3 of the 5 trees.
+  ASSERT_OK_AND_ASSIGN(
+      const std::unique_ptr<AbstractModel> model,
+      train(/*num_trees=*/5, /*validation_interval_in_trees=*/3));
+  // The same model, but the last periodic evaluation covers all the trees.
+  ASSERT_OK_AND_ASSIGN(
+      const std::unique_ptr<AbstractModel> reference_model,
+      train(/*num_trees=*/5, /*validation_interval_in_trees=*/1));
+  // The intermediate model covered by the last periodic evaluation of "model".
+  ASSERT_OK_AND_ASSIGN(
+      const std::unique_ptr<AbstractModel> intermediate_model,
+      train(/*num_trees=*/3, /*validation_interval_in_trees=*/3));
+
+  const auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model.get());
+  const auto* gbt_reference_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(reference_model.get());
+  const auto* gbt_intermediate_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(intermediate_model.get());
+  ASSERT_EQ(gbt_model->NumTrees(), 5);
+  ASSERT_EQ(gbt_reference_model->NumTrees(), 5);
+  ASSERT_EQ(gbt_intermediate_model->NumTrees(), 3);
+  ASSERT_FALSE(std::isnan(gbt_model->validation_loss()));
+
+  EXPECT_FLOAT_EQ(gbt_model->validation_loss(),
+                  gbt_reference_model->validation_loss());
+  EXPECT_NE(gbt_model->validation_loss(),
+            gbt_intermediate_model->validation_loss());
+  EXPECT_FLOAT_EQ(gbt_model->ValidationEvaluation().loss_value(),
+                  gbt_reference_model->ValidationEvaluation().loss_value());
+}
+
+TEST(GradientBoostedTrees, FinalValidationEvaluationIsWeighted) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateWeightedToyDataset());
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(GradientBoostedTreesLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::CLASSIFICATION);
+  train_config.set_label("b");
+  train_config.add_features("a");
+  train_config.mutable_weight_definition()->set_attribute("w");
+  train_config.mutable_weight_definition()->mutable_numerical();
+  auto* gbt_config = train_config.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_validation_set_ratio(0.3f);
+  gbt_config->set_num_trees(5);
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config, &learner));
+  ASSERT_OK_AND_ASSIGN(const std::unique_ptr<AbstractModel> model,
+                       learner->TrainWithStatus(dataset));
+
+  const auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model.get());
+  ASSERT_TRUE(gbt_model->training_logs().has_final_evaluation());
+
+  const auto validation_evaluation = gbt_model->ValidationEvaluation();
+  ASSERT_GT(validation_evaluation.count_predictions_no_weight(), 0);
+  // All the examples have a weight of 2.
+  EXPECT_DOUBLE_EQ(validation_evaluation.count_predictions(),
+                   2. * validation_evaluation.count_predictions_no_weight());
 }
 
 TEST_F(GradientBoostedTreesOnAdult,
@@ -3084,6 +3248,12 @@ TEST_F(GradientBoostedTreesOnAdult, CustomMetricsTrainAndValidation) {
   // the metric at index 1 is the custom metric.
   EXPECT_EQ(last_entry.training_secondary_metrics(1), 42.0f);
   EXPECT_EQ(last_entry.validation_secondary_metrics(1), 42.0f);
+
+  const auto self_evaluation = gbt_model->ValidationEvaluation();
+  EXPECT_THAT(
+      self_evaluation.user_metrics(),
+      ::testing::UnorderedElementsAre(::testing::Pair("static_metric", 42.0)));
+  EXPECT_TRUE(self_evaluation.classification().has_confusion());
 }
 
 TEST_F(GradientBoostedTreesOnAdult,

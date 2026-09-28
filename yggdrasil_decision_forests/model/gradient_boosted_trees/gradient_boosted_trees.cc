@@ -670,6 +670,12 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
     return {};
   }
 
+  if (training_logs_.has_final_evaluation()) {
+    return training_logs_.final_evaluation();
+  }
+
+  // Older models don't have a full evaluation stored inside the model. We can
+  // still recover some information from the last training logs.
   for (const auto& log : training_logs_.entries()) {
     // The log entry corresponding to the final model is identified with the
     // number of trees in the final model.

@@ -42,6 +42,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_interface",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees/loss:loss_library",
         "//yggdrasil_decision_forests/metric",
+        "//yggdrasil_decision_forests/metric:metric_cc_proto",
         "//yggdrasil_decision_forests/metric:ranking",
         "//yggdrasil_decision_forests/metric:ranking_utils",
         "//yggdrasil_decision_forests/model:abstract_model",
