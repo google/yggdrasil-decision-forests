@@ -82,7 +82,7 @@ jobs:
       - name: Restore Bazel cache
         id: bazel-cache
         if: env.REFRESH_CACHE != 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: .bazel-cache
           key: ${{ steps.bazel-cache-keys.outputs.CACHE_KEY }}
@@ -122,7 +122,7 @@ jobs:
       - name: Restore pip cache
         id: pip-cache
         if: env.REFRESH_CACHE != 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.cache/pip
           key: ${{ steps.pip-cache-key.outputs.CACHE_KEY }}
@@ -183,7 +183,7 @@ jobs:
         run: gh cache delete "$CACHE_KEY"
 
       - name: Save Bazel cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: env.REFRESH_CACHE == 'true' || steps.bazel-cache.outputs.cache-hit != 'true'
         with:
           path: .bazel-cache
@@ -197,7 +197,7 @@ jobs:
         run: gh cache delete "$CACHE_KEY"
 
       - name: Save pip cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: env.REFRESH_CACHE == 'true' || steps.pip-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.cache/pip
