@@ -2313,7 +2313,7 @@ class GenericCCModel(GenericModel):
     effective_dataspec = self._model.data_spec()
 
     def find_existing_or_add_column(
-        semantic: Optional[data_spec_pb2.ColumnType],
+        semantic: "Optional[data_spec_pb2.ColumnType]",
         name: Optional[str],
         default_col_idx: int,
         usage: str,

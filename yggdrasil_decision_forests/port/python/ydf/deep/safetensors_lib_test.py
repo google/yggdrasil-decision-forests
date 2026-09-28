@@ -19,7 +19,7 @@ from absl.testing import parameterized
 import jax.numpy as jnp
 import numpy as np
 
-from ydf.deep import safetensors as safetensors_lib
+from ydf.deep import safetensors_lib
 
 
 class SafetensorsTest(parameterized.TestCase):

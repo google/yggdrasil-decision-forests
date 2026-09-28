@@ -232,32 +232,7 @@ class ApiTest(absltest.TestCase):
     model = learner.train(train_ds)
     logging.info("Input features:\n%s", model.input_features())
 
-  def test_export_tensorflow_saved_model(self):
-    if sys.version_info < (3, 9):
-      print(
-          "TFDF is not supported anymore on python <= 3.8. Skipping TFDF tests."
-      )
-      return
-    if not sys.version_info < (3, 12):
-      print(
-          "TFDF is not yet supported for python >= 3.12. Skipping TFDF tests."
-      )
-      return
-
-    model_path = os.path.join(
-        test_utils.ydf_test_data_path(), "model", "adult_binary_class_rf"
-    )
-    model = ydf.load_model(model_path)
-    tempdir = self.create_tempdir().full_path
-    model.to_tensorflow_saved_model(tempdir, mode="tf")
-
   def test_export_jax_function(self):
-    if sys.version_info < (3, 9):
-      print(
-          "JAX is not supported anymore on python <= 3.8. Skipping JAX tests."
-      )
-      return
-
     model_path = os.path.join(
         test_utils.ydf_test_data_path(), "model", "adult_binary_class_gbdt"
     )

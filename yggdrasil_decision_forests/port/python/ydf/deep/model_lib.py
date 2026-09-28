@@ -22,7 +22,7 @@ from ydf.deep import deep_model_pb2
 from ydf.deep import generic_jax
 from ydf.deep import mlp
 from ydf.deep import preprocessor as preprocessor_lib
-from ydf.deep import safetensors as safetensors_lib
+from ydf.deep import safetensors_lib
 from ydf.deep import tabular_transformer
 from ydf.model import generic_model
 from ydf.utils import filesystem

@@ -45,7 +45,7 @@ from ydf.deep import deep_model_pb2
 from ydf.deep import hyperparameter as hyperparameter_lib
 from ydf.deep import metric as deep_metric_lib
 from ydf.deep import preprocessor as preprocessor_lib
-from ydf.deep import safetensors as safetensors_lib
+from ydf.deep import safetensors_lib
 from ydf.learner import abstract_feature_selector as abstract_feature_selector_lib
 from ydf.learner import generic_learner
 from ydf.learner import hyperparameters as hp_lib

@@ -19,8 +19,8 @@ py_library(
 )
 
 py_library(
-    name = "safetensors",
-    srcs = ["safetensors.py"],
+    name = "safetensors_lib",
+    srcs = ["safetensors_lib.py"],
     deps = [
         # jaxtyping dep,
         # numpy dep,
@@ -35,7 +35,7 @@ py_library(
         ":generic_jax",
         ":mlp",
         ":preprocessor",
-        ":safetensors",
+        ":safetensors_lib",
         ":tabular_transformer",
         # safetensors dep,
         # safetensors:flax dep,
@@ -56,7 +56,7 @@ py_library(
         ":hyperparameter",
         ":metric",
         ":preprocessor",
-        ":safetensors",
+        ":safetensors_lib",
         # jax dep,
         # jaxtyping dep,
         # numpy dep,
@@ -288,10 +288,10 @@ py_test(
 )
 
 py_test(
-    name = "safetensors_test",
-    srcs = ["safetensors_test.py"],
+    name = "safetensors_lib_test",
+    srcs = ["safetensors_lib_test.py"],
     deps = [
-        ":safetensors",
+        ":safetensors_lib",
         # absl/testing:absltest dep,
         # absl/testing:parameterized dep,
         # jax dep,
