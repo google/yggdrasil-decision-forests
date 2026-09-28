@@ -25,7 +25,7 @@ on:
       pull_request_base_sha:
         required: false
         type: string
-        description: "Force refresh the cache"
+        description: "SHA of the PR"
 
 jobs:
   build-test:
@@ -41,6 +41,7 @@ jobs:
         --build_tag_filters=-tf_dep,-cuda_dep
         --test_tag_filters=-tf_dep,-cuda_dep
       REFRESH_CACHE: ${{ inputs.refresh_cache }}
+      GH_TOKEN: ${{ github.token }} # Required for gh cache delete
     permissions:
       actions: write  # For gh cache delete
       contents: read
@@ -51,20 +52,27 @@ jobs:
       - name: Set safe directory  # https://github.com/actions/checkout/issues/2031
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name : Set up cache keys
+      - name: Set up cache keys
         id: cache-keys
+        env:
+          RUNNER_OS_NAME: ${{ runner.os }}
+          COMPILER_CONFIG: ${{ inputs.compiler_config }}
+          MODULE_HASH: ${{ hashFiles('**/MODULE.bazel', '.bazelrc') }}
+          BUILD_HASH: ${{ hashFiles('**/BUILD*') }}
+          COMMIT_SHA: ${{ github.sha }}
+          PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
         run: |
-          CACHE_PREFIX="${{ runner.os }}-bazel-cc-${{ inputs.compiler_config }}"
+          CACHE_PREFIX="$RUNNER_OS_NAME-bazel-cc-$COMPILER_CONFIG"
           CACHE_RESTORE_KEY_2="$CACHE_PREFIX"
-          CACHE_RESTORE_KEY_1="$CACHE_RESTORE_KEY_2-${{ hashFiles('**/MODULE.bazel', '.bazelrc') }}"
-          CACHE_RESTORE_KEY_0="$CACHE_RESTORE_KEY_1-${{ hashFiles('**/BUILD*') }}"
-          CACHE_KEY="$CACHE_RESTORE_KEY_0-${{ github.sha }}"
+          CACHE_RESTORE_KEY_1="$CACHE_RESTORE_KEY_2-$MODULE_HASH"
+          CACHE_RESTORE_KEY_0="$CACHE_RESTORE_KEY_1-$BUILD_HASH"
+          CACHE_KEY="$CACHE_RESTORE_KEY_0-$COMMIT_SHA"
           echo "CACHE_RESTORE_KEY_2=$CACHE_RESTORE_KEY_2" >> "$GITHUB_OUTPUT"
           echo "CACHE_RESTORE_KEY_1=$CACHE_RESTORE_KEY_1" >> "$GITHUB_OUTPUT"
           echo "CACHE_RESTORE_KEY_0=$CACHE_RESTORE_KEY_0" >> "$GITHUB_OUTPUT"
           echo "CACHE_KEY=$CACHE_KEY" >> "$GITHUB_OUTPUT"
-          if [[ -n "${{ inputs.pull_request_base_sha }}" ]]; then
-            CACHE_RESTORE_KEY_HEAD="$CACHE_RESTORE_KEY_0-${{ inputs.pull_request_base_sha }}"
+          if [[ -n "$PULL_REQUEST_BASE_SHA" ]]; then
+            CACHE_RESTORE_KEY_HEAD="$CACHE_RESTORE_KEY_0-$PULL_REQUEST_BASE_SHA"
             echo "CACHE_RESTORE_KEY_HEAD=$CACHE_RESTORE_KEY_HEAD" >> "$GITHUB_OUTPUT"
           fi
 
@@ -88,27 +96,37 @@ jobs:
             ${{ steps.cache-keys.outputs.CACHE_RESTORE_KEY_2 }}-
 
       - name: Check cache hit
+        env:
+          CACHE_HIT: ${{ steps.bazel-cache.outputs.cache-hit }}
+          CACHE_PRIMARY_KEY: ${{ steps.bazel-cache.outputs.cache-primary-key }}
+          CACHE_MATCHED_KEY: ${{ steps.bazel-cache.outputs.cache-matched-key }}
         run: |
-          echo "Cache Hit: ${{ steps.bazel-cache.outputs.cache-hit }}"
-          echo "Cache Primary Key: ${{ steps.bazel-cache.outputs.cache-primary-key }}"
-          echo "Cache Matched Key: ${{ steps.bazel-cache.outputs.cache-matched-key }}"
+          echo "Cache Hit: $CACHE_HIT"
+          echo "Cache Primary Key: $CACHE_PRIMARY_KEY"
+          echo "Cache Matched Key: $CACHE_MATCHED_KEY"
 
       - name: Create Bazel Cache Directories
         run: mkdir -p .bazel-cache/repository .bazel-cache/disk
 
       - name: Build C++
+        env:
+          COMPILER_CONFIG: ${{ inputs.compiler_config }}
+        # BAZEL_COMMON_FLAGS is intentionally unquoted so it is split into separate flags.
         run: |
           bazel build //yggdrasil_decision_forests/...:all //examples:beginner_cc \
-            ${{ env.BAZEL_COMMON_FLAGS }} \
-            --repo_env=CC=${{ inputs.compiler_config }}
+            $BAZEL_COMMON_FLAGS \
+            "--repo_env=CC=$COMPILER_CONFIG"
 
       - name: Test C++
         id: cc_test
         continue-on-error: true
+        env:
+          COMPILER_CONFIG: ${{ inputs.compiler_config }}
+        # BAZEL_COMMON_FLAGS is intentionally unquoted so it is split into separate flags.
         run: |
           bazel test //yggdrasil_decision_forests/...:all \
-            ${{ env.BAZEL_COMMON_FLAGS }} \
-            --repo_env=CC=${{ inputs.compiler_config }} \
+            $BAZEL_COMMON_FLAGS \
+            "--repo_env=CC=$COMPILER_CONFIG" \
             --test_output=errors \
             --output_groups=+test_xml
 
@@ -119,12 +137,14 @@ jobs:
           testlogs_xml_path: bazel-testlogs/**/*.xml
           artifact_name: cc-test-logs-${{ inputs.compiler_config }}
           testlogs_log_path: bazel-testlogs/**/*.log
-          failure_message: "CC tests failed for compiler config \'${{ inputs.compiler_config }}\'. See annotations in the Checks tab for details, or \'cc-test-logs-${{ inputs.compiler_config }}\' artifact for full logs."
+          failure_message: "CC tests failed for compiler config '${{ inputs.compiler_config }}'. See annotations in the Checks tab for details, or 'cc-test-logs-${{ inputs.compiler_config }}' artifact for full logs."
 
       - name: Remove cache if cache is being refreshed
         if: env.REFRESH_CACHE == 'true'
         continue-on-error: true # Ignore errors when cache is not found.
-        run: gh cache delete ${{ steps.cache-keys.outputs.CACHE_KEY }}
+        env:
+          CACHE_KEY: ${{ steps.cache-keys.outputs.CACHE_KEY }}
+        run: gh cache delete "$CACHE_KEY"
 
       - name: Save bazel cache
         uses: actions/cache/save@v4
