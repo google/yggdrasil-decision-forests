@@ -55,16 +55,17 @@ jobs:
         env:
           RUNNER_OS_NAME: ${{ runner.os }}
           PYTHON_VERSION: ${{ inputs.python_version }}
-          MODULE_HASH: ${{ hashFiles('**/MODULE.bazel', '.bazelrc', '**/requirements_lock.txt') }}
+          MODULE_HASH: ${{ hashFiles('**/MODULE.bazel', 'yggdrasil_decision_forests/port/python/.bazelrc', 'yggdrasil_decision_forests/port/python/.bazelversion', '**/requirements_lock.txt') }}
           BUILD_HASH: ${{ hashFiles('**/BUILD*') }}
           COMMIT_SHA: ${{ github.sha }}
           PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
         run: |
-          CACHE_PREFIX="$RUNNER_OS_NAME-bazel-py-$PYTHON_VERSION"
-          CACHE_RESTORE_KEY_2="$CACHE_PREFIX"
+          CACHE_RESTORE_KEY_3="$RUNNER_OS_NAME-bazel-py"
+          CACHE_RESTORE_KEY_2="$CACHE_RESTORE_KEY_3-$PYTHON_VERSION"
           CACHE_RESTORE_KEY_1="$CACHE_RESTORE_KEY_2-$MODULE_HASH"
           CACHE_RESTORE_KEY_0="$CACHE_RESTORE_KEY_1-$BUILD_HASH"
           CACHE_KEY="$CACHE_RESTORE_KEY_0-$COMMIT_SHA"
+          echo "CACHE_RESTORE_KEY_3=$CACHE_RESTORE_KEY_3" >> "$GITHUB_OUTPUT"
           echo "CACHE_RESTORE_KEY_2=$CACHE_RESTORE_KEY_2" >> "$GITHUB_OUTPUT"
           echo "CACHE_RESTORE_KEY_1=$CACHE_RESTORE_KEY_1" >> "$GITHUB_OUTPUT"
           echo "CACHE_RESTORE_KEY_0=$CACHE_RESTORE_KEY_0" >> "$GITHUB_OUTPUT"
@@ -92,6 +93,7 @@ jobs:
             ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_0 }}-
             ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_1 }}-
             ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_2 }}-
+            ${{ steps.bazel-cache-keys.outputs.CACHE_RESTORE_KEY_3 }}-
 
       - name: Check Bazel cache hit
         env:
@@ -154,7 +156,7 @@ jobs:
 
       # --- Cache Saving ---
       - name: Remove old Bazel cache if refreshing
-        if: env.REFRESH_CACHE == 'true'
+        if: ${{ !cancelled() && env.REFRESH_CACHE == 'true' }}
         continue-on-error: true # Ignore errors when cache is not found.
         env:
           CACHE_KEY: ${{ steps.bazel-cache-keys.outputs.CACHE_KEY }}
@@ -162,7 +164,7 @@ jobs:
 
       - name: Save Bazel cache
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: env.REFRESH_CACHE == 'true' || steps.bazel-cache.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && (env.REFRESH_CACHE == 'true' || steps.bazel-cache.outputs.cache-hit != 'true') }}
         with:
           path: .bazel-cache
           key: ${{ steps.bazel-cache-keys.outputs.CACHE_KEY }}

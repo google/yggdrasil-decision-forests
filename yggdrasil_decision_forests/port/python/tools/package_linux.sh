@@ -16,9 +16,16 @@
 
 # Packaged already compiled (i.e. build) YDF into a pip package.
 #
+# Must run in a virtual environment of the hermetic Python interpreter of the
+# same version as the Bazel build (i.e. PYTHON_VERSION of build_test_linux.sh).
+#
 # Usage example:
-#   # Generate the pip package with python3.9
-#   ./tools/package_linux.sh python3.9
+#   # Generate the pip package for Python 3.11
+#   bazel run --@rules_python//python/config_settings:python_version=3.11 \
+#     @rules_python//python/bin:python -- -m venv --clear /tmp/venv
+#   source /tmp/venv/bin/activate
+#   PYTHON_VERSION=3.11 RUN_TESTS=0 ./tools/build_test_linux.sh
+#   PYTHON_VERSION=3.11 ./tools/package_linux.sh
 
 set -vex
 
@@ -57,9 +64,20 @@ function check_is_build() {
   fi
 }
 
+# The native extension is compiled for the Python version of the Bazel build,
+# while the pip package is tagged with the version of the active Python.
+function check_python_version() {
+  local active_version=$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+  if [[ "${active_version}" != "${PYTHON_VERSION:=3.12}" ]]; then
+    echo "The active Python (${active_version}) does not match the Python version of the Bazel build (PYTHON_VERSION=${PYTHON_VERSION})."
+    exit 1
+  fi
+}
+
 # Collects the library files into ${SRCPK}
 function assemble_files() {
   check_is_build
+  check_python_version
   python tools/collect_pip_files.py
 }
 

@@ -21,7 +21,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded PR runs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   cc-build-test-matrix:
@@ -54,4 +55,5 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python_version: ['3.12']  # Currently unused
+        # Don't test the full matrix, just the youngest and oldest supported Python versions.
+        python_version: ['3.10', '3.14']

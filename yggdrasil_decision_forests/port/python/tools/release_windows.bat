@@ -27,6 +27,8 @@
 :: Requirements:
 ::   - MSYS2
 ::   - Python versions installed in "C:\Python<version>" e.g. C:\Python310.
+::     Only used to build and test the pip package: Bazel compiles YDF with
+::     its hermetic Python toolchain of the same version (see MODULE.bazel).
 ::   - Bazel
 ::   - Visual Studio (tested with VS2022).
 ::
@@ -40,11 +42,11 @@ set BAZEL_FLAGS=--config=windows_cpp20 --config=windows_avx2
 set BAZEL_VC=C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC
 %BAZEL% version
 
-CALL :End2End 38 || goto :error
-CALL :End2End 39 || goto :error
 CALL :End2End 310 || goto :error
 CALL :End2End 311 || goto :error
 CALL :End2End 312 || goto :error
+CALL :End2End 313 || goto :error
+CALL :End2End 314 || goto :error
 
 :: In case of error
 goto :EOF
@@ -59,7 +61,9 @@ set PYTHON_DIR=C:/Python%PYTHON_VERSION%
 set PYTHON=%PYTHON_DIR%/python.exe
 set PYTHON3_BIN_PATH=%PYTHON%
 set PYTHON3_LIB_PATH=%PYTHON_DIR%/Lib
-CALL :Compile %PYTHON% || goto :error
+:: e.g. 310 -> 3.10
+set PYTHON_DOT_VERSION=%PYTHON_VERSION:~0,1%.%PYTHON_VERSION:~1%
+CALL :Compile %PYTHON_DOT_VERSION% || goto :error
 %PYTHON% tools/collect_pip_files.py || goto :error
 CALL :BuildPipPackage %PYTHON% || goto :error
 mkdir dist
@@ -74,15 +78,14 @@ copy tmp_package\dist\%WHEEL% dist || goto :error
 CALL :TestPipPackage dist\%WHEEL% %PYTHON% || goto :error
 EXIT /B 0
 
-:: Compiles and runs the tests.
+:: Compiles and runs the tests with the hermetic Python toolchain of the given
+:: version (e.g. 3.10).
 :Compile
-set PYTHON=%~1
-%PYTHON% -m pip install -r dev_requirements.txt || goto :error
-%PYTHON% -m pip install -r requirements.txt || goto :error
-%BAZEL% build %BAZEL_FLAGS% -- //ydf/...:all || goto :error
+set BAZEL_PY_FLAGS=--@rules_python//python/config_settings:python_version=%~1
+%BAZEL% build %BAZEL_FLAGS% %BAZEL_PY_FLAGS% -- //ydf/...:all || goto :error
 :: Non blocking tests
 :: TODO: Figure how to get pybind11 + bazel + window to work with the ".pyd" trick.
-%BAZEL% test %BAZEL_FLAGS% --test_output=errors -- //ydf/...:all
+%BAZEL% test %BAZEL_FLAGS% %BAZEL_PY_FLAGS% --test_output=errors -- //ydf/...:all
 EXIT /B 0
 
 :: Builds a pip package

@@ -17,20 +17,21 @@
 # Running this script inside a python venv may not work.
 set -vex
 
-declare -a python_versions=("3.9" "3.10" "3.11" "3.12" "3.13")
+declare -a python_versions=("3.10" "3.11" "3.12" "3.13" "3.14")
 
 for pyver in "${python_versions[@]}"
 do
-  pyenv install -s $pyver
-  export PYENV_VERSION=$pyver
+  bazel clean --expunge
+
   rm -rf ${TMPDIR}venv
-  python -m venv ${TMPDIR}venv
+  bazel run --@rules_python//python/config_settings:python_version=$pyver \
+    @rules_python//python/bin:python -- -m venv ${TMPDIR}venv
   source ${TMPDIR}venv/bin/activate
   pip install --upgrade pip
+  export PYTHON_VERSION=$pyver
 
   echo "Building with $(python -V 2>&1)"
 
-  bazel clean --expunge
   RUN_TESTS=0 CC="clang" ./tools/build_test_linux.sh
   ./tools/package_linux.sh
   deactivate

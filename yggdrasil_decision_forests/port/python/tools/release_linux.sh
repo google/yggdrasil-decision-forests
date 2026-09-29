@@ -21,27 +21,29 @@ set -vex
 if [[ "$INTERACTIVE" = 1 ]]; then
   PYTHON_VERSIONS=( 3.12 )
 else
-  PYTHON_VERSIONS=( 3.9 3.10 3.11 3.12 3.13)
+  PYTHON_VERSIONS=( 3.10 3.11 3.12 3.13 3.14 )
 fi
 
 function build_py() {
   VERSION=$1
   echo "Build YDF for python $VERSION"
 
+  VENV="bazel run --@rules_python//python/config_settings:python_version=$VERSION @rules_python//python/bin:python -- -m venv --clear /tmp/venv && source /tmp/venv/bin/activate && export PYTHON_VERSION=$VERSION"
+
   if [[ "$INTERACTIVE" = 1 ]]; then
     # Start an interactive shell with:
-    CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && /bin/bash"
+    CMD="$VENV && /bin/bash"
     echo "In the interactive shell, you can run commands such as:"
     echo "Run all the tests: RUN_TESTS=1 ./tools/build_test_linux.sh"
     echo "or"
     echo "Create a release: RUN_TESTS=0 ./tools/build_test_linux.sh && ./tools/package_linux.sh"
   else
     # Note: set RUN_TESTS=1 to run the tests.
-    CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && RUN_TESTS=0 ./tools/build_test_linux.sh && ./tools/package_linux.sh"
+    CMD="$VENV && RUN_TESTS=0 ./tools/build_test_linux.sh && ./tools/package_linux.sh"
   fi
 
   # You can also start an interactive shell with:
-  # CMD="python$VERSION -m venv /tmp/venv && source /tmp/venv/bin/activate && /bin/bash"
+  # CMD="$VENV && /bin/bash"
   # In the interactive shell, you can run commands such as "RUN_TESTS=1 ./tools/build_test_linux.sh"
 
   docker run \

@@ -17,12 +17,15 @@ remember to update `CHANGELOG.md`.
 
 ### Linux x86_64
 
+After changing `requirements.txt` or `dev_requirements.txt`, update the lock
+file with `bazel run //:requirements.update`.
+
 #### Docker
 
 For building manylinux_2_28-compatible packages, you can use an appropriate
-Docker image. The pre-configured build script at
-`tools/release_linux_in_docker.sh` starts a container and builds the wheels
-end-to-end. You can find the wheels in the `dist/`subdirectory.
+Docker image. The pre-configured build script at `tools/release_linux.sh`
+starts a container and builds the wheels end-to-end. You can find the wheels in
+the `dist/`subdirectory.
 
 #### Manual build
 
@@ -34,18 +37,14 @@ Note that we may not be able to help with issues during manual builds.
     [Bazelisk](https://github.com/bazelbuild/bazelisk) recommended
 *   GCC >= 9 or Clang >= 14
 *   rsync
-*   Python headers (e.g. `python-dev` package on Ubuntu)
-*   Python virtualenv
 
 **Steps**
 
 1.  Compile and test the code with
 
     ```shell
-    # Create a virtual environment where Python dependencies will be installed.
-    python -m venv myvenv
-    RUN_TESTS=1 ./tools/build_test_linux.sh
-    deactivate
+    # PYTHON_VERSION is one of 3.10, 3.11, 3.12 (default), 3.13, 3.14.
+    PYTHON_VERSION=3.12 RUN_TESTS=1 ./tools/build_test_linux.sh
     ```
 
     Substitute for your compiler name / version
@@ -53,15 +52,14 @@ Note that we may not be able to help with issues during manual builds.
 1.  Build the Pip package
 
     ```shell
-    PYTHON_BIN=python
-    ./tools/package_linux.sh $PYTHON_BIN
-    ```
-
-    If you want to build with [Pyenv](https://github.com/pyenv/pyenv) for all
-    supported Python versions, run
-
-    ```shell
-    ./tools/package_linux.sh ALL_VERSIONS
+    # Create a virtual environment with the (hermetic) Python interpreter of the
+    # Bazel build.
+    bazel run --@rules_python//python/config_settings:python_version=3.12 \
+      @rules_python//python/bin:python -- -m venv --clear /tmp/venv
+    source /tmp/venv/bin/activate
+    PYTHON_VERSION=3.12 RUN_TESTS=0 ./tools/build_test_linux.sh
+    PYTHON_VERSION=3.12 ./tools/package_linux.sh
+    deactivate
     ```
 
 ### Linux ARM64
@@ -84,7 +82,6 @@ For details and configuration options, please consult the corresponding scripts.
 *   Bazel (version as specified in `.bazelversion`,
     [Bazelisk](https://github.com/bazelbuild/bazelisk) recommended)
 *   XCode command line tools
-*   [Pyenv](https://github.com/pyenv/pyenv)
 
 **Building for all supported Python versions**
 
