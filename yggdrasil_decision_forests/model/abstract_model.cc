@@ -382,13 +382,13 @@ void FloatToProtoPrediction(const std::vector<float>& src_prediction,
       if (num_prediction_dimensions == 1) {
         const float proba_class2 = src_prediction[example_idx];
         classification->set_value((proba_class2 > 0.5f) ? 2 : 1);
-        distribution->mutable_counts()->Resize(3, 0.f);
+        distribution->mutable_counts()->resize(3, 0.f);
         distribution->mutable_counts()->Set(0, 0.f);
         distribution->mutable_counts()->Set(1, 1.f - proba_class2);
         distribution->mutable_counts()->Set(2, proba_class2);
         distribution->set_sum(1.f);
       } else {
-        distribution->mutable_counts()->Resize(num_prediction_dimensions + 1,
+        distribution->mutable_counts()->resize(num_prediction_dimensions + 1,
                                                0.f);
         float sum_predictions = 0.f;
         int top_class = 0;
@@ -1386,7 +1386,7 @@ void PredictionMerger::Add(const proto::Prediction& src,
       const auto& src_cls = src.classification();
       const int num_classes = src_cls.distribution().counts_size();
       if (!dst_cls->has_distribution()) {
-        dst_cls->mutable_distribution()->mutable_counts()->Resize(num_classes,
+        dst_cls->mutable_distribution()->mutable_counts()->resize(num_classes,
                                                                   0);
       }
       const float normalization = src_factor / src_cls.distribution().sum();
