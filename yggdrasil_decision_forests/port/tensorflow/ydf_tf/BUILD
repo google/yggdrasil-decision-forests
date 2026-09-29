@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_python//python:py_library.bzl", "py_library")
 
 package(
     default_visibility = ["//visibility:public"],

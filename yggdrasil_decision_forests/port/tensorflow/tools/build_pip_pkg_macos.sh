@@ -27,6 +27,10 @@
 # To add a post-release tag (e.g., .post1), provide POST_RELEASE.
 # Example: POST_RELEASE="post1" TF_VERSIONS="2.21.0" PY_VERSIONS="3.10 3.11 3.12 3.13" ./tools/build_pip_pkg_macos.sh
 # When building for TF < 2.20, pass LEGACY=1
+#
+# The wheels are built and tested in virtual environments of the hermetic
+# Python interpreters of the Bazel module (see MODULE.bazel).
+# Exception: LEGACY=1 (MODULE.bazel.legacy has no Python toolchains).
 
 set -e
 
@@ -51,6 +55,22 @@ function cleanup {
   rm -rf test_env_build test_env test_run_dir
 }
 trap cleanup EXIT
+
+# Creates a virtual environment in directory $2 (absolute path) for Python
+# version $1.
+# Note: "bazel run" can update the "bazel-bin" symlink. Don't call this function
+# between the build of the op and the copy of bazel-bin/ydf_tf/inference.so.
+function create_venv() {
+  local py_version="$1"
+  local venv_dir="$2"
+  if [[ "$LEGACY" == "1" ]]; then
+    pyenv install -s "${py_version}"
+    PYENV_VERSION="${py_version}" python -m venv --clear "${venv_dir}"
+  else
+    bazel run --@rules_python//python/config_settings:python_version="${py_version}" \
+      @rules_python//python/bin:python -- -m venv --clear "${venv_dir}"
+  fi
+}
 
 # Backup original configuration files
 cp MODULE.bazel MODULE.bazel.bak
@@ -111,13 +131,9 @@ for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
     echo "Building for Python $YDF_PY_VERSION and TF $YDF_TF_VERSION"
     echo "================================================="
 
-    # Install Python version via pyenv if missing
-    pyenv install -s "$YDF_PY_VERSION"
-    export PYENV_VERSION=$YDF_PY_VERSION
-
     # Create fresh build environment
     rm -rf test_env_build
-    python -m venv test_env_build
+    create_venv "$YDF_PY_VERSION" "$(pwd)/test_env_build"
     source test_env_build/bin/activate
 
     pip install --upgrade pip setuptools wheel build
@@ -157,7 +173,7 @@ for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
 
     echo "Testing wheel for Python $YDF_PY_VERSION..."
     rm -rf test_env
-    python -m venv test_env
+    create_venv "$YDF_PY_VERSION" "$(pwd)/test_env"
     source test_env/bin/activate
 
     PY_TAG="cp${YDF_PY_VERSION//.}"

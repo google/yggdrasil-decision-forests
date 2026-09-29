@@ -26,6 +26,11 @@
 # Example: POST_RELEASE="post1" TF_VERSIONS="2.21.0" ./build_pip_pkg.sh
 # When building for TF < 2.20, pass LEGACY=1. Note that this might not work
 # out-of-the box if dependencies have changed too much.
+#
+# The wheels are built, repaired and tested in virtual environments of the
+# hermetic Python interpreters of the Bazel module (see MODULE.bazel), not with
+# the Pythons of the Docker image. Exception: LEGACY=1 (MODULE.bazel.legacy has
+# no Python toolchains).
 
 set -e
 
@@ -47,9 +52,24 @@ function cleanup {
   if [[ -f pip_pkg/setup.py.bak ]]; then
     mv pip_pkg/setup.py.bak pip_pkg/setup.py
   fi
-  rm -rf test_env test_run_dir
+  rm -rf build_env test_env test_run_dir
 }
 trap cleanup EXIT
+
+# Creates a virtual environment in directory $2 (absolute path) for Python
+# version $1.
+# Note: "bazel run" can update the "bazel-bin" symlink. Don't call this function
+# between the build of the op and the copy of bazel-bin/ydf_tf/inference.so.
+function create_venv() {
+  local py_version="$1"
+  local venv_dir="$2"
+  if [[ "$LEGACY" == "1" ]]; then
+    "python${py_version}" -m venv --clear "${venv_dir}"
+  else
+    bazel run --@rules_python//python/config_settings:python_version="${py_version}" \
+      @rules_python//python/bin:python -- -m venv --clear "${venv_dir}"
+  fi
+}
 
 # Prepare build environment
 mkdir -p /build_tools
@@ -115,11 +135,6 @@ if [[ -n "${POST_RELEASE}" ]]; then
   sed -i "s/version=tf_version,/version=tf_version + \".${POST_RELEASE}\",/g" pip_pkg/setup.py
 fi
 
-for YDF_PY_VERSION in "${PY_VERSIONS[@]}"; do
-  echo "Installing build dependencies for Python $YDF_PY_VERSION..."
-  python$YDF_PY_VERSION -m pip install auditwheel setuptools build --quiet
-done
-
 for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
   for YDF_PY_VERSION in "${PY_VERSIONS[@]}"; do
     echo "================================================="
@@ -129,6 +144,9 @@ for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
     # Set Tensorflow & Python version for TF Header download
     export YDF_TF_VERSION
     export YDF_PY_VERSION
+
+    create_venv "$YDF_PY_VERSION" "$(pwd)/build_env"
+    build_env/bin/python -m pip install auditwheel setuptools build --quiet
 
     # Build C++
     # Added --action_env to ensure Bazel respects the changing env vars
@@ -153,7 +171,7 @@ for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
 
     pushd pip_pkg
     rm -rf dist build *.egg-info
-    python$YDF_PY_VERSION -m build --wheel
+    ../build_env/bin/python -m build --wheel
 
     # Repair package (Auditwheel)
     # Using 'head' to safely grab the generated wheel name
@@ -163,14 +181,15 @@ for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
         exit 1
     fi
 
-    auditwheel repair "$RAW_WHEEL" --plat manylinux_2_28_x86_64 -w wheelhouse --exclude libtensorflow_framework.so.2
+    ../build_env/bin/python -m auditwheel repair "$RAW_WHEEL" --plat manylinux_2_28_x86_64 -w wheelhouse --exclude libtensorflow_framework.so.2
     popd
+    rm -rf build_env
 
     echo "Testing wheel for Python $YDF_PY_VERSION..."
 
     # Clean up previous venv
     rm -rf test_env
-    python$YDF_PY_VERSION -m venv test_env
+    create_venv "$YDF_PY_VERSION" "$(pwd)/test_env"
     source test_env/bin/activate
 
     # Identify the repaired wheel in the wheelhouse
