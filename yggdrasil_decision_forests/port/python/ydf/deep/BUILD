@@ -22,8 +22,8 @@ py_library(
     name = "safetensors_lib",
     srcs = ["safetensors_lib.py"],
     deps = [
-        # jaxtyping dep,
-        # numpy dep,
+        "@pypi_ydf//jaxtyping",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -37,12 +37,12 @@ py_library(
         ":preprocessor",
         ":safetensors_lib",
         ":tabular_transformer",
-        # safetensors dep,
-        # safetensors:flax dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/model:generic_model",
         "//ydf/utils:filesystem",
+        "@pypi_ydf//safetensors",
+        "@pypi_ydf//safetensors:pkg",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 
@@ -57,15 +57,6 @@ py_library(
         ":metric",
         ":preprocessor",
         ":safetensors_lib",
-        # jax dep,
-        # jaxtyping dep,
-        # numpy dep,
-        # optax dep,
-        # safetensors dep,
-        # safetensors:flax dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
@@ -86,6 +77,15 @@ py_library(
         "//ydf/utils:filesystem",
         "//ydf/utils:html",
         "//ydf/utils:log",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//jaxtyping",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//optax",
+        "@pypi_ydf//safetensors",
+        "@pypi_ydf//safetensors:pkg",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
     ],
 )
@@ -94,8 +94,8 @@ py_library(
     name = "dataset",
     srcs = ["dataset.py"],
     deps = [
-        # jax dep,
         "//ydf/dataset/io:generator",
+        "@pypi_ydf//jax",
     ],
 )
 
@@ -103,8 +103,8 @@ py_library(
     name = "metric",
     srcs = ["metric.py"],
     deps = [
-        # jax dep,
-        # optax dep,
+        "@pypi_ydf//jax",
+        "@pypi_ydf//optax",
     ],
 )
 
@@ -115,11 +115,11 @@ py_library(
         ":dataset",
         ":deep_model_py_proto",
         ":layer",
-        # jax dep,
-        # numpy dep,
+        "//ydf/dataset:dataspec",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
-        "//ydf/dataset:dataspec",
     ],
 )
 
@@ -127,8 +127,8 @@ py_library(
     name = "layer",
     srcs = ["layer.py"],
     deps = [
-        # flax:core dep,
-        # jax dep,
+        "@pypi_ydf//flax",
+        "@pypi_ydf//jax",
     ],
 )
 
@@ -146,15 +146,15 @@ py_library(
         ":generic_jax",
         ":hyperparameter",
         ":layer",
-        # flax:core dep,
-        # jax dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/learner:abstract_feature_selector",
         "//ydf/learner:generic_learner",
         "//ydf/learner:tuner",
         "//ydf/model:generic_model",
         "//ydf/utils:func_helpers",
+        "@pypi_ydf//flax",
+        "@pypi_ydf//jax",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -166,9 +166,6 @@ py_library(
         ":generic_jax",
         ":hyperparameter",
         ":layer",
-        # flax:core dep,
-        # jax dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/learner:abstract_feature_selector",
         "//ydf/learner:generic_learner",
@@ -176,6 +173,9 @@ py_library(
         "//ydf/model:generic_model",
         "//ydf/utils:func_helpers",
         "//ydf/utils:log",
+        "@pypi_ydf//flax",
+        "@pypi_ydf//jax",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -183,10 +183,6 @@ py_library(
     name = "analysis",
     srcs = ["analysis.py"],
     deps = [
-        # absl/logging dep,
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/dataset:example_py_proto",
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
         "//ydf/dataset/io:dataset_io",
@@ -194,6 +190,10 @@ py_library(
         "//ydf/model:analysis",
         "//ydf/model:generic_model",
         "//ydf/utils:log",
+        "@abseil-py//absl/logging",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:example_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:partial_dependence_plot_py_proto",
@@ -219,16 +219,16 @@ py_test(
     deps = [
         ":mlp",
         ":model_lib",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
         "//ydf/dataset:dataspec",
         "//ydf/dataset/io:dataset_io",
         "//ydf/learner:specialized_learners",
         "//ydf/model:generic_model",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
     ],
 )
 
@@ -241,10 +241,10 @@ py_test(
     ],
     deps = [
         ":dataset",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -255,13 +255,13 @@ py_test(
         ":dataset",
         ":layer",
         ":preprocessor",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -271,8 +271,8 @@ py_test(
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     deps = [
         ":hyperparameter",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
     ],
 )
 
@@ -281,9 +281,9 @@ py_test(
     srcs = ["layer_test.py"],
     deps = [
         ":layer",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//jax",
     ],
 )
 
@@ -292,10 +292,10 @@ py_test(
     srcs = ["safetensors_lib_test.py"],
     deps = [
         ":safetensors_lib",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -304,9 +304,9 @@ py_test(
     srcs = ["metric_test.py"],
     deps = [
         ":metric",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//jax",
     ],
 )
 
@@ -315,14 +315,14 @@ py_test(
     srcs = ["analysis_test.py"],
     deps = [
         ":analysis",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/dataset:example_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/model:generic_model",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:example_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:model_analysis_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:partial_dependence_plot_py_proto",
@@ -342,13 +342,13 @@ py_test(
         ":layer",
         ":model_lib",
         ":tabular_transformer",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
-        # numpy dep,
-        # pandas dep,
         "//ydf/model:generic_model",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
     ],
 )

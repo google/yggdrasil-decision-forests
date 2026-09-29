@@ -15,11 +15,11 @@ py_library(
     srcs = ["evaluate.py"],
     deps = [
         ":metric",
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "//ydf/cc:ydf",
         "//ydf/model:generic_model",
         "//ydf/utils:concurrency",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
     ],
 )
 
@@ -30,14 +30,14 @@ py_library(
         "metric.py",
     ],
     deps = [
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset:dataspec",
         "//ydf/utils:documentation",
         "//ydf/utils:html",
         "//ydf/utils:string_lib",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 
@@ -86,8 +86,8 @@ py_test(
     data = ["//test_data"],
     deps = [
         ":metric",
-        # absl/testing:absltest dep,
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//numpy",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/metric:metric_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
@@ -100,13 +100,13 @@ py_test(
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     deps = [
         ":evaluate",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
-        # sklearn dep,
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//scikit_learn",
     ],
 )

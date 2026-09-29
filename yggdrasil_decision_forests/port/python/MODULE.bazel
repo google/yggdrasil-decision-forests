@@ -4,49 +4,84 @@ module(
 )
 
 bazel_dep(name = "abseil-cpp", version = "20250814.1", repo_name = "com_google_absl")
+
+# Note: abseil-py 2.4.0 registers non-hermetic `runtime_env` Python toolchains.
+bazel_dep(name = "abseil-py", version = "2.1.0")
 bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "31.1", repo_name = "com_google_protobuf")
 bazel_dep(name = "pybind11_bazel", version = "2.13.6")
 bazel_dep(name = "pybind11_protobuf", version = "0.0.0-20250210-f02a2b7")
-bazel_dep(name = "rules_cc", version = "0.2.0")
-bazel_dep(name = "rules_python", version = "1.6.0")
+bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "rules_python", version = "2.3.4")
 bazel_dep(name = "yggdrasil_decision_forests", version = "1.12.0", repo_name = "ydf_cc")
 local_path_override(
     module_name = "yggdrasil_decision_forests",
     path = "../../../",
 )
 
-# Use system Python until the migration to hermetic Python is completed.
-local_runtime_repo = use_repo_rule(
-    "@rules_python//python/local_toolchains:repos.bzl",
-    "local_runtime_repo",
+# The protobuf module compiles `@com_google_protobuf//python:proto_api` (used by
+# pybind11_protobuf) against `@system_python//:python_headers`, which protobuf
+# maps to the Python 3.12 headers whatever the selected Python version. This
+# breaks Python 3.14 (e.g. the layout of tuples changed). The patch uses the
+# headers of the selected Python toolchain instead, like protobuf does at HEAD
+# (https://github.com/protocolbuffers/protobuf/commit/720e5468cebb). Remove the
+# patch once YDF uses a protobuf release that includes this change.
+single_version_override(
+    module_name = "protobuf",
+    patch_strip = 1,
+    patches = ["//:protobuf_hermetic_python_headers.patch"],
 )
 
-local_runtime_toolchains_repo = use_repo_rule(
-    "@rules_python//python/local_toolchains:repos.bzl",
-    "local_runtime_toolchains_repo",
+# Hermetic Python toolchains (python-build-standalone).
+#
+# Select the Python version with
+#   --@rules_python//python/config_settings:python_version=3.X
+PYTHON_VERSIONS = [
+    "3.10",
+    "3.11",
+    "3.12",
+    "3.13",
+    "3.14",
+]
+
+DEFAULT_PYTHON_VERSION = "3.12"
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+
+[
+    python.toolchain(
+        is_default = python_version == DEFAULT_PYTHON_VERSION,
+        python_version = python_version,
+    )
+    for python_version in PYTHON_VERSIONS
+]
+
+# Update the lock file with:
+#   bazel run //:requirements.update
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.default(
+    index_url = "https://pypi.org/simple",
 )
 
-# Step 1: Define the Python runtime
-local_runtime_repo(
-    name = "local_python3",
+[
+    pip.parse(
+        hub_name = "pypi_ydf",
+        python_version = python_version,
+        requirements_lock = "//:requirements_lock.txt",
+    )
+    for python_version in PYTHON_VERSIONS
+]
+
+use_repo(pip, "pypi_ydf")
+
+# uv toolchain for the `lock` rule (see BUILD).
+uv = use_extension(
+    "@rules_python//python/uv:uv.bzl",
+    "uv",
     dev_dependency = True,
-    interpreter_path = "python3",
-    on_failure = "fail",
 )
+uv.configure(version = "0.11.2")
 
-# Step 2: Create toolchains for the runtimes
-local_runtime_toolchains_repo(
-    name = "local_toolchains",
-    # TIP: The `target_settings` arg can be used to activate them based on
-    # command line flags; see docs below.
-    dev_dependency = True,
-    runtimes = ["local_python3"],
-)
-
-# Step 3: Register the toolchains
-register_toolchains(
-    "@local_toolchains//:all",
-    dev_dependency = True,
-)
+# Use the PyPI protobuf package as the runtime of `py_proto_library`.
+register_toolchains("//:python_proto_toolchain")

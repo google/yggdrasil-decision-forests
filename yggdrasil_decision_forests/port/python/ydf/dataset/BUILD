@@ -44,14 +44,14 @@ py_library(
     srcs = ["dataset.py"],
     deps = [
         ":dataspec",
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/cc:ydf",
         "//ydf/dataset/io:dataset_io",
         "//ydf/dataset/io:dataset_io_types",
         "//ydf/dataset/io:generator",
         "//ydf/utils:log",
         "//ydf/utils:paths",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -59,10 +59,10 @@ py_library(
     name = "dataspec",
     srcs = ["dataspec.py"],
     deps = [
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset/io:dataset_io_types",
         "//ydf/utils:log",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 # Tests
@@ -78,16 +78,16 @@ py_test(
     deps = [
         ":dataset",
         ":dataspec",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # fastavro dep,
-        # numpy dep,
-        # pandas dep,
-        # pyarrow dep,
-        # pyarrow:pyarrow_modules dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "//ydf/dataset/io:dataset_io",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//fastavro",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//pyarrow",
+        "@pypi_ydf//pyarrow:pkg",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
@@ -95,11 +95,12 @@ py_test(
     name = "dataset_with_tf_test",
     srcs = ["dataset_with_tf_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    tags = ["tf_dep"],
     deps = [
         ":dataset",
-        # absl/testing:absltest dep,
-        # numpy dep,
-        # tensorflow dep,
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//tensorflow",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
@@ -109,10 +110,10 @@ py_test(
     srcs = ["dataspec_test.py"],
     deps = [
         ":dataspec",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )

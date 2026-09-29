@@ -15,10 +15,10 @@ py_library(
     name = "dataset_io_types",
     srcs = ["dataset_io_types.py"],
     deps = [
-        # numpy dep,
-        # pandas dep,
-        # # polars dep,   # TODO: Re-enable.
-        # xarray dep,
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        # "@pypi_ydf//polars",   # TODO: Re-enable.
+        "@pypi_ydf//xarray",
     ],
 )
 
@@ -34,7 +34,7 @@ py_library(
         ":pygrain_io",
         ":tensorflow_io",
         ":xarray_io",
-        # numpy dep,
+        "@pypi_ydf//numpy",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
@@ -45,8 +45,8 @@ py_library(
     deps = [
         ":dataset_io_types",
         ":generator",
-        # absl/logging dep,
-        # numpy dep,
+        "@abseil-py//absl/logging",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -55,7 +55,7 @@ py_library(
     srcs = ["polars_io.py"],
     deps = [
         ":dataset_io_types",
-        # absl/logging dep,
+        "@abseil-py//absl/logging",
     ],
 )
 
@@ -64,8 +64,8 @@ py_library(
     srcs = ["pyarrow_io.py"],
     deps = [
         ":dataset_io_types",
-        # absl/logging dep,
-        # numpy dep,
+        "@abseil-py//absl/logging",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -74,8 +74,8 @@ py_library(
     srcs = ["xarray_io.py"],
     deps = [
         ":dataset_io_types",
-        # absl/logging dep,
-        # xarray dep,
+        "@abseil-py//absl/logging",
+        "@pypi_ydf//xarray",
     ],
 )
 
@@ -90,8 +90,8 @@ py_library(
     srcs = ["pygrain_io.py"],
     deps = [
         ":dataset_io_types",
-        # absl/logging dep,
-        # numpy dep,
+        "@abseil-py//absl/logging",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -99,7 +99,7 @@ py_library(
     name = "generator",
     srcs = ["generator.py"],
     deps = [
-        # numpy dep,
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -108,7 +108,7 @@ py_library(
     srcs = ["numpy_io.py"],
     deps = [
         ":generator",
-        # numpy dep,
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -121,9 +121,9 @@ py_test(
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     deps = [
         ":pandas_io",
-        # absl/testing:absltest dep,
-        # pandas dep,
-        # # polars dep,  # TODO: Re-enable.
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//pandas",
+        # "@pypi_ydf//polars",  # TODO: Re-enable.
         "//ydf/utils:test_utils",
     ],
 )
@@ -133,9 +133,9 @@ py_test(
     srcs = ["polars_io_test.py"],
     deps = [
         ":polars_io",
-        # absl/testing:absltest dep,
-        # pandas dep,
-        # # polars dep,  # TODO: Re-enable.
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//pandas",
+        # "@pypi_ydf//polars",  # TODO: Re-enable.
     ],
 )
 
@@ -144,11 +144,11 @@ py_test(
     srcs = ["pyarrow_io_test.py"],
     deps = [
         ":pyarrow_io",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
-        # pyarrow dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//pyarrow",
     ],
 )
 
@@ -158,11 +158,11 @@ py_test(
     deps = [
         ":dataset_io_types",
         ":xarray_io",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
-        # xarray dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//xarray",
     ],
 )
 
@@ -170,15 +170,18 @@ py_test(
     name = "pygrain_io_test",
     srcs = ["pygrain_io_test.py"],
     # TODO: Figure out what to do with Pygrain support, since it does not work on MacOS.
-    tags = ["manual"],  # Grain is not supported on MacOS
+    tags = [
+        "grain_dep",
+        "manual",
+    ],  # Grain is not supported on MacOS
     deps = [
         ":dataset_io_types",
         ":pygrain_io",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # grain:python dep,
-        # jax dep,  # buildcleaner: keep
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//grain",
+        "@pypi_ydf//jax",  # buildcleaner: keep
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -187,9 +190,9 @@ py_test(
     srcs = ["dataset_io_test.py"],
     deps = [
         ":dataset_io",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -198,8 +201,8 @@ py_test(
     srcs = ["numpy_io_test.py"],
     deps = [
         ":numpy_io",
-        # absl/testing:absltest dep,
-        # numpy dep,
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//numpy",
     ],
 )

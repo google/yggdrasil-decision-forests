@@ -110,16 +110,17 @@ py_test(
     srcs = ["api_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     shard_count = 5,
+    tags = ["tf_dep"],
     deps = [
         ":api",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # fastavro dep,
-        # jax dep,  # buildcleaner: keep
-        # numpy dep,
-        # pandas dep,
-        # sklearn dep,  # buildcleaner: keep
-        # tensorflow dep,  # buildcleaner: keep
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//fastavro",
+        "@pypi_ydf//jax",  # buildcleaner: keep
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//scikit_learn",  # buildcleaner: keep
+        "@pypi_ydf//tensorflow",  # buildcleaner: keep
         # tensorflow_decision_forests dep,  # buildcleaner: keep
         "//ydf/utils:test_utils",
     ],

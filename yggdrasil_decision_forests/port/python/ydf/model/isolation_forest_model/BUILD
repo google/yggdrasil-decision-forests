@@ -44,10 +44,10 @@ py_test(
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
     deps = [
-        # absl/testing:absltest dep,
-        # numpy dep,
-        # pandas dep,
         "//ydf/model:model_lib",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
     ],
 )

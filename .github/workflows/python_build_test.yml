@@ -36,6 +36,7 @@ jobs:
         --config=linux_cpp17
         --config=linux_avx2
         --features=-fully_static_link
+        --@rules_python//python/config_settings:python_version=${{ inputs.python_version }}
       REFRESH_CACHE: ${{ inputs.refresh_cache }}
       GH_TOKEN: ${{ github.token }} # Required for gh cache delete
     permissions:
@@ -54,7 +55,7 @@ jobs:
         env:
           RUNNER_OS_NAME: ${{ runner.os }}
           PYTHON_VERSION: ${{ inputs.python_version }}
-          MODULE_HASH: ${{ hashFiles('**/MODULE.bazel', '.bazelrc') }}
+          MODULE_HASH: ${{ hashFiles('**/MODULE.bazel', '.bazelrc', '**/requirements_lock.txt') }}
           BUILD_HASH: ${{ hashFiles('**/BUILD*') }}
           COMMIT_SHA: ${{ github.sha }}
           PULL_REQUEST_BASE_SHA: ${{ inputs.pull_request_base_sha }}
@@ -105,45 +106,21 @@ jobs:
       - name: Create Bazel Cache Directories
         run: mkdir -p .bazel-cache/repository .bazel-cache/disk
 
-      # --- pip Cache Setup ---
-      - name: Set up pip cache key
-        id: pip-cache-key
-        env:
-          RUNNER_OS_NAME: ${{ runner.os }}
-          PYTHON_VERSION: ${{ inputs.python_version }}
-          REQUIREMENTS_HASH: ${{ hashFiles('yggdrasil_decision_forests/port/python/requirements.txt', 'yggdrasil_decision_forests/port/python/dev_requirements.txt') }}
-        run: |
-          echo "CACHE_KEY=$RUNNER_OS_NAME-pip-$PYTHON_VERSION-$REQUIREMENTS_HASH-v2" >> "$GITHUB_OUTPUT"
-
-      - name: Clean pip cache if refresh is enabled
-        if: env.REFRESH_CACHE == 'true'
-        run: rm -rf ~/.cache/pip
-
-      - name: Restore pip cache
-        id: pip-cache
-        if: env.REFRESH_CACHE != 'true'
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        with:
-          path: ~/.cache/pip
-          key: ${{ steps.pip-cache-key.outputs.CACHE_KEY }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ inputs.python_version }}-
-            ${{ runner.os }}-pip-
-
-      - name: Check pip cache hit
-        env:
-          CACHE_HIT: ${{ steps.pip-cache.outputs.cache-hit }}
-        run: echo "Pip Cache Hit $CACHE_HIT"
-
       # --- Build and Test Steps ---
-      - name: Install Python Dependencies
-        working-directory: yggdrasil_decision_forests/port/python
+      - name: Set up Bazel tag filters
+        env:
+          PYTHON_VERSION: ${{ inputs.python_version }}
         run: |
-          python --version
-          python -m pip install -q -r dev_requirements.txt
-          python -m pip install -q -r requirements.txt
-          python -m pip uninstall -y ydf
-          pip list
+          case $PYTHON_VERSION in
+            3.13|3.14)
+              # TensorFlow and Grain are not available for these Python
+              # versions (see dev_requirements.txt).
+              echo "BAZEL_TAG_FILTERS=--build_tag_filters=-tf_dep,-grain_dep --test_tag_filters=-tf_dep,-grain_dep" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "BAZEL_TAG_FILTERS=" >> "$GITHUB_ENV"
+              ;;
+          esac
 
       - name: Build Python
         working-directory: yggdrasil_decision_forests/port/python
@@ -151,7 +128,7 @@ jobs:
         run: |
           bazel version
           bazel build //ydf/...:all \
-            $BAZEL_PY_FLAGS
+            $BAZEL_PY_FLAGS $BAZEL_TAG_FILTERS
 
       - name: Test Python
         working-directory: yggdrasil_decision_forests/port/python
@@ -161,6 +138,7 @@ jobs:
         run: |
           bazel test //ydf/...:all \
             $BAZEL_PY_FLAGS \
+            $BAZEL_TAG_FILTERS \
             --test_output=errors \
             --output_groups=+test_xml
 
@@ -188,17 +166,3 @@ jobs:
         with:
           path: .bazel-cache
           key: ${{ steps.bazel-cache-keys.outputs.CACHE_KEY }}
-
-      - name: Remove old pip cache if refreshing
-        if: env.REFRESH_CACHE == 'true'
-        continue-on-error: true # Ignore errors when cache is not found.
-        env:
-          CACHE_KEY: ${{ steps.pip-cache-key.outputs.CACHE_KEY }}
-        run: gh cache delete "$CACHE_KEY"
-
-      - name: Save pip cache
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: env.REFRESH_CACHE == 'true' || steps.pip-cache.outputs.cache-hit != 'true'
-        with:
-          path: ~/.cache/pip
-          key: ${{ steps.pip-cache-key.outputs.CACHE_KEY }}

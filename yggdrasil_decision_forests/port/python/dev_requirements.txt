@@ -4,7 +4,6 @@ pydantic
 requests
 urllib3
 fastapi[standard]>=0.112.0,<0.113.0
-# ydf-tf; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.13'
 tensorflow; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.13'
 portpicker
 matplotlib

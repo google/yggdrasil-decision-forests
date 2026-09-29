@@ -35,14 +35,14 @@ py_library(
     testonly = True,
     srcs = ["test_utils.py"],
     deps = [
-        # absl/flags dep,
-        # absl/testing:absltest dep,
-        # jax dep,
-        # numpy dep,
-        # pandas dep,
-        # sklearn dep,
         "//ydf/dataset",
         "//ydf/dataset:dataspec",
+        "@abseil-py//absl/flags",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//scikit_learn",
     ],
 )
 
@@ -50,8 +50,8 @@ py_library(
     name = "log",
     srcs = ["log.py"],
     deps = [
-        # absl/logging dep,
         "//ydf/cc:ydf",
+        "@abseil-py//absl/logging",
     ],
 )
 
@@ -135,7 +135,7 @@ py_test(
     srcs = ["filesystem_test.py"],
     deps = [
         ":filesystem",
-        # absl/testing:parameterized dep,
+        "@abseil-py//absl/testing:parameterized",
     ],
 )
 
@@ -144,7 +144,7 @@ py_test(
     srcs = ["func_helpers_test.py"],
     deps = [
         ":func_helpers",
-        # absl/testing:absltest dep,
+        "@abseil-py//absl/testing:absltest",
     ],
 )
 
@@ -153,7 +153,7 @@ py_test(
     srcs = ["html_test.py"],
     deps = [
         ":html",
-        # absl/testing:absltest dep,
+        "@abseil-py//absl/testing:absltest",
     ],
 )
 
@@ -162,7 +162,7 @@ py_test(
     srcs = ["paths_test.py"],
     deps = [
         ":paths",
-        # absl/testing:absltest dep,
+        "@abseil-py//absl/testing:absltest",
     ],
 )
 
@@ -171,7 +171,7 @@ py_test(
     srcs = ["string_lib_test.py"],
     deps = [
         ":string_lib",
-        # absl/testing:absltest dep,
+        "@abseil-py//absl/testing:absltest",
     ],
 )
 
@@ -180,8 +180,8 @@ py_test(
     srcs = ["test_utils_test.py"],
     deps = [
         ":test_utils",
-        # absl/testing:absltest dep,
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -202,6 +202,6 @@ py_test(
     srcs = ["pybind_test.py"],
     deps = [
         ":pybind_test_helper",
-        # absl/testing:absltest dep,
+        "@abseil-py//absl/testing:absltest",
     ],
 )

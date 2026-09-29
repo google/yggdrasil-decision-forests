@@ -34,12 +34,12 @@ py_library(
     name = "decision_forest_model",
     srcs = ["decision_forest_model.py"],
     deps = [
-        # numpy dep,
         "//ydf/cc:ydf",
         "//ydf/dataset",
         "//ydf/model:generic_model",
         "//ydf/model/tree",
         "//ydf/model/tree:plot",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -55,13 +55,13 @@ py_test(
     ],
     deps = [
         ":decision_forest_model",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
-        "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@ydf_cc//yggdrasil_decision_forests/model/random_forest:random_forest_py_proto",
     ],
 )

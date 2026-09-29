@@ -20,9 +20,9 @@ py_binary(
     srcs = ["worker_main.py"],
     visibility = ["//visibility:public"],
     deps = [
-        # absl:app dep,
-        # absl/flags dep,
-        # ydf dep,
+        "//ydf:api",
+        "@abseil-py//absl:app",
+        "@abseil-py//absl/flags",
     ],
 )
 
@@ -183,9 +183,9 @@ py_library(
     name = "custom_loss_py",
     srcs = ["custom_loss.py"],
     deps = [
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 
@@ -193,9 +193,9 @@ py_library(
     name = "custom_metric_py",
     srcs = ["custom_metric.py"],
     deps = [
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/cc:ydf",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 
@@ -292,15 +292,15 @@ py_library(
     srcs = ["learner_test_utils.py"],
     deps = [
         ":generic_learner",
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/metric",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
     ],
 )
 
@@ -310,13 +310,13 @@ py_test(
     deps = [
         ":generic_learner",
         ":specialized_learners",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # fastavro dep,
-        # numpy dep,
-        # # polars dep,  # TODO: Re-enable.
-        # pandas dep,
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//fastavro",
+        "@pypi_ydf//numpy",
+        # "@pypi_ydf//polars",  # TODO: Re-enable.
+        "@pypi_ydf//pandas",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/model:generic_model",
@@ -334,18 +334,18 @@ py_test(
         ":generic_learner",
         ":learner_test_utils",
         ":specialized_learners",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/model/decision_forest_model",
         "//ydf/model/tree:condition",
         "//ydf/model/tree:node",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_py_proto",
     ],
 )
 
@@ -362,17 +362,17 @@ py_test(
         ":learner_test_utils",
         ":specialized_learners",
         ":tuner",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
-        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
         "//ydf/dataset:dataspec",
         "//ydf/model/decision_forest_model",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
+        "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
+        "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )
 
@@ -385,12 +385,12 @@ py_test(
         ":learner_test_utils",
         ":specialized_learners",
         ":tuner",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
         "//ydf/dataset:dataspec",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
     ],
 )
 
@@ -404,13 +404,13 @@ py_test(
         ":generic_learner",
         ":learner_test_utils",
         ":specialized_learners",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # sklearn dep,
         "//ydf/model/tree:condition",
         "//ydf/model/tree:node",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//scikit_learn",
     ],
 )
 
@@ -426,15 +426,15 @@ py_test(
         ":generic_learner",
         ":specialized_learners",
         ":tuner",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # jax dep,
-        # numpy dep,
-        # pandas dep,
         "//ydf/dataset:dataspec",
         "//ydf/model:generic_model",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
     ],
 )
 
@@ -448,11 +448,11 @@ py_test(
         ":specialized_learners",
         ":tuner",
         ":worker",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # pandas dep,
-        # portpicker dep,
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//portpicker",
     ],
 )
 
@@ -461,13 +461,14 @@ py_test(
 py_test(
     name = "learner_with_tf_test",
     srcs = ["learner_with_tf_test.py"],
+    tags = ["tf_dep"],
     deps = [
         ":generic_learner",
         ":specialized_learners",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # pandas dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//pandas",
+        "@pypi_ydf//tensorflow:pkg",
     ],
 )
 
@@ -476,8 +477,8 @@ py_test(
     srcs = ["hyperparameters_test.py"],
     deps = [
         ":hyperparameters",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
     ],
 )
@@ -488,10 +489,10 @@ py_test(
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     deps = [
         ":specialized_learners",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # xarray dep,
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//xarray",
     ],
 )
 
@@ -504,16 +505,16 @@ py_test(
     deps = [
         ":specialized_learners",
         ":tuner",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
+        "//ydf/dataset:dataspec",
+        "//ydf/model:generic_model",
+        "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner:abstract_learner_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer:hyperparameters_optimizer_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/learner/hyperparameters_optimizer/optimizers:random_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model:hyperparameter_py_proto",
-        "//ydf/dataset:dataspec",
-        "//ydf/model:generic_model",
-        "//ydf/utils:test_utils",
         "@ydf_cc//yggdrasil_decision_forests/utils:fold_generator_py_proto",
     ],
 )
@@ -526,11 +527,11 @@ py_test(
     deps = [
         ":feature_selector",
         ":specialized_learners",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -539,9 +540,9 @@ py_test(
     srcs = ["custom_metric_test.py"],
     deps = [
         ":custom_metric_py",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
         "@ydf_cc//yggdrasil_decision_forests/model:abstract_model_py_proto",
     ],
 )

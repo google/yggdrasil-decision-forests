@@ -31,13 +31,13 @@ py_library(
     name = "gradient_boosted_trees_model",
     srcs = ["gradient_boosted_trees_model.py"],
     deps = [
-        # numpy dep,
-        "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_py_proto",
         "//ydf/cc:ydf",
         "//ydf/learner:custom_loss_py",
         "//ydf/metric",
         "//ydf/model:generic_model",
         "//ydf/model/decision_forest_model",
+        "@pypi_ydf//numpy",
+        "@ydf_cc//yggdrasil_decision_forests/model/gradient_boosted_trees:gradient_boosted_trees_py_proto",
     ],
 )
 
@@ -53,11 +53,6 @@ py_test(
     ],
     deps = [
         ":gradient_boosted_trees_model",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
-        # pandas dep,
         "//ydf/dataset:dataspec",
         "//ydf/learner:custom_loss_py",
         "//ydf/learner:custom_metric_py",
@@ -69,5 +64,10 @@ py_test(
         "//ydf/model/tree:node",
         "//ydf/model/tree:value",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//pandas",
     ],
 )

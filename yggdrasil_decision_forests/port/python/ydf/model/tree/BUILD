@@ -48,7 +48,7 @@ py_library(
     name = "value",
     srcs = ["value.py"],
     deps = [
-        # numpy dep,
+        "@pypi_ydf//numpy",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
     ],
 )
@@ -95,10 +95,10 @@ py_test(
         ":node",
         ":tree",
         ":value",
-        # absl/testing:absltest dep,
+        "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
-        "//ydf/utils:test_utils",
     ],
 )
 
@@ -107,9 +107,9 @@ py_test(
     srcs = ["value_test.py"],
     deps = [
         ":value",
-        # absl/testing:absltest dep,
-        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils:distribution_py_proto",
     ],
 )
@@ -121,7 +121,7 @@ py_test(
         ":condition",
         ":node",
         ":value",
-        # absl/testing:absltest dep,
+        "@abseil-py//absl/testing:absltest",
     ],
 )
 
@@ -130,11 +130,11 @@ py_test(
     srcs = ["condition_test.py"],
     deps = [
         ":condition",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
+        "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/model/decision_tree:decision_tree_py_proto",
-        "//ydf/utils:test_utils",
     ],
 )
 
@@ -144,7 +144,7 @@ py_test(
     data = ["assets"],
     deps = [
         ":plot",
-        # absl/testing:absltest dep,
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/testing:absltest",
     ],
 )

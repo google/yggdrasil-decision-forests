@@ -16,8 +16,8 @@ py_binary(
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     deps = [
         ":benchmark_train_speed",
-        # absl:app dep,
-        # absl/flags dep,
+        "@abseil-py//absl:app",
+        "@abseil-py//absl/flags",
     ],
 )
 
@@ -26,9 +26,9 @@ py_binary(
     srcs = ["benchmark_io_speed_main.py"],
     deps = [
         ":benchmark_io_speed",
-        # absl:app dep,
-        # absl/flags dep,
         "//ydf/utils:log",
+        "@abseil-py//absl:app",
+        "@abseil-py//absl/flags",
     ],
 )
 
@@ -39,10 +39,10 @@ py_library(
     name = "benchmark_io_speed",
     srcs = ["benchmark_io_speed.py"],
     deps = [
-        # numpy dep,
         "//ydf/dataset",
         "//ydf/util:tf_example",
         "//ydf/utils:log",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -51,22 +51,23 @@ py_library(
     srcs = ["benchmark_train_speed.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
     deps = [
-        # absl:app dep,
-        # absl/flags dep,
-        # pandas dep,
-        # ydf dep,
+        "//ydf:api",
+        "@abseil-py//absl:app",
+        "@abseil-py//absl/flags",
+        "@pypi_ydf//pandas",
     ],
 )
 
 py_library(
     name = "benchmark_inference_speed",
     srcs = ["benchmark_inference_speed.py"],
+    tags = ["tf_dep"],
     deps = [
-        # jax dep,
-        # numpy dep,
-        # tensorflow:tensorflow_no_contrib dep,
+        "@pypi_ydf//jax",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//tensorflow:pkg",
         # tensorflow_decision_forests dep,
-        # ydf dep,
+        "//ydf:api",
         "//ydf/dataset",
         "//ydf/learner:specialized_learners",
         "//ydf/model:export_jax",  # buildcleaner: keep
@@ -82,10 +83,11 @@ py_library(
 py_test(
     name = "benchmark_inference_speed_test",
     srcs = ["benchmark_inference_speed_test.py"],
+    tags = ["tf_dep"],
     deps = [
         ":benchmark_inference_speed",
-        # absl/testing:absltest dep,
-        # absl/testing:parameterized dep,
-        # numpy dep,
+        "@abseil-py//absl/testing:absltest",
+        "@abseil-py//absl/testing:parameterized",
+        "@pypi_ydf//numpy",
     ],
 )

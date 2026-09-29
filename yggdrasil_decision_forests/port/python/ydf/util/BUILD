@@ -26,8 +26,8 @@ py_library(
     srcs = ["tf_example_impl.py"],
     deps = [
         ":dataset_io",
-        # numpy dep,
         "//ydf/utils:log",
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -35,7 +35,7 @@ py_library(
     name = "dataset_io",
     srcs = ["dataset_io.py"],
     deps = [
-        # numpy dep,
+        "@pypi_ydf//numpy",
     ],
 )
 
@@ -55,7 +55,7 @@ py_library(
     name = "log_book",
     srcs = ["log_book.py"],
     deps = [
-        # # pandas dep,
+        # "@pypi_ydf//pandas",
     ],
 )
 
@@ -69,13 +69,14 @@ py_test(
         "//test_data",
         "@ydf_cc//yggdrasil_decision_forests/test_data",
     ],
+    tags = ["tf_dep"],
     deps = [
         ":tf_example",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # numpy dep,
-        # tensorflow dep,
         "//ydf/utils:test_utils",
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//numpy",
+        "@pypi_ydf//tensorflow",
     ],
 )
 
@@ -84,7 +85,7 @@ py_test(
     srcs = ["vertex_ai_test.py"],
     deps = [
         ":vertex_ai",
-        # absl/testing:absltest dep,
+        "@abseil-py//absl/testing:absltest",
     ],
 )
 
@@ -93,8 +94,8 @@ py_test(
     srcs = ["log_book_test.py"],
     deps = [
         ":log_book",
-        # absl/logging dep,
-        # absl/testing:absltest dep,
-        # pandas dep,
+        "@abseil-py//absl/logging",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//pandas",
     ],
 )
