@@ -109,7 +109,7 @@ ApplyModelFn = Callable[
     [ModelState, Batch, bool, jax.Array], Tuple[jax.Array, Optional[BatchState]]
 ]
 
-GenericJAXModelClass = Type[TypeVar("B", bound="GenericJAXModel")]  # pyrefly: ignore[not-a-type]
+GenericJAXModelClass = Type[TypeVar("B", bound="GenericJAXModel")]  # pyrefly: ignore[invalid-annotation, not-a-type]
 
 
 # Batch size used to generate model predictions

@@ -153,8 +153,8 @@ class TabularTransformerImpl(nn.Module):
             deterministic=not training,
             name=f"layer_{i}_selfattention",
         )(x)
-      x = x + save_x
-      assert len(x.shape) == 3
+      x = x + save_x  # pyrefly: ignore[unsupported-operation]
+      assert len(x.shape) == 3  # pyrefly: ignore[missing-attribute]
 
       with jax.profiler.TraceAnnotation("dense"):
         save_x = x
@@ -166,13 +166,13 @@ class TabularTransformerImpl(nn.Module):
         x = nn.Dense(  # pyrefly: ignore[bad-assignment]
             features=self.config.tokenizer.token_dim, name=f"layer_{i}_dense_2"
         )(x)
-        x = x + save_x
-        assert len(x.shape) == 3
+        x = x + save_x  # pyrefly: ignore[unsupported-operation]
+        assert len(x.shape) == 3  # pyrefly: ignore[missing-attribute]
 
     with jax.profiler.TraceAnnotation("final"):
       x = x[:, 0, :]  # pyrefly: ignore[bad-assignment, bad-index]
       x = batch_norm(x, name="final_layer_batchnorm")
-      x = nn.gelu(x)  # pyrefly: ignore[bad-assignment]
+      x = nn.gelu(x)  # pyrefly: ignore[bad-argument-type, bad-assignment]
       x = nn.Dense(features=self.model._output_dim(), name="final_layer")(x)  # pyrefly: ignore[bad-assignment]
     return x  # pyrefly: ignore[bad-return]
 
