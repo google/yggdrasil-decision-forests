@@ -111,6 +111,20 @@ SIMPLE_PARAMETERIZED_TEST(
     {
         // GBT
         {
+            "adult_binary_class_gbdt_calibrated",
+            "adult_binary_class_gbdt_calibrated.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+            68,
+        },
+        {
+            "adult_binary_class_gbdt_calibrated",
+            "adult_binary_class_gbdt_calibrated_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+            68,
+        },
+        {
             "adult_binary_class_gbdt_v2",
             "adult_binary_class_gbdt_v2_class.h.golden",
             proto::Algorithm::IF_ELSE,
@@ -325,6 +339,7 @@ SIMPLE_PARAMETERIZED_TEST(
   }
 
   proto::Options options;
+  options.set_enable_calibration(true);
   options.mutable_cpp();
   options.set_algorithm(test_case.algorithm);
   options.set_categorical_from_string(test_case.categorical_from_string);

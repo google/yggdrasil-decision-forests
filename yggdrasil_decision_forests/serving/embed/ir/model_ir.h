@@ -126,6 +126,8 @@ struct ModelIR {
 
   std::vector<float> oblique_weights;  // Always stored as float in the model.
   std::vector<FeatureIdx> oblique_features;
+
+  std::vector<float> binary_calibration_deltas;
 };
 }  // namespace yggdrasil_decision_forests::serving::embed::internal
 #endif  // YGGDRASIL_DECISION_FORESTS_SERVING_EMBED_IR_MODEL_IR_H_

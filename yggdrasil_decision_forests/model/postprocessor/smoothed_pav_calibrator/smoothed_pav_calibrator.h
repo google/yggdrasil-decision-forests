@@ -50,6 +50,10 @@ class SmoothedPavCalibrator : public AbstractPostprocessor {
                     proto.slope().begin(), proto.slope().end())),
             proto.n_grid())) {}
 
+  std::vector<float> GetDeltas() const {
+    return calibration_lookup_table_.raw_grid();
+  }
+
  private:
   void ProcessImpl(const dataset::VerticalDataset& dataset,
                    dataset::VerticalDataset::row_t row_idx,

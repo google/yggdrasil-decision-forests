@@ -55,6 +55,10 @@ message Options {
     Cpp cpp = 10;
     C c = 11;
   }
+
+  // If true, the model will include a calibration table if present. Note that
+  // this option is ignored for any output type other than PROBABILITY.
+  optional bool enable_calibration = 12 [default = true];
 }
 
 // Output of a classification model.
