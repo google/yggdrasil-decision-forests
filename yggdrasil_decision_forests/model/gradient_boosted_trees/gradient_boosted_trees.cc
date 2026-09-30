@@ -498,6 +498,7 @@ void GradientBoostedTreesModel::PredictImpl(
       DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
       absl::FixedArray<float> accumulator(num_trees_per_iter_);
       // Initialize accumulator with initial_predictions_.
+      CHECK_EQ(initial_predictions_.size(), num_trees_per_iter_);
       std::copy(initial_predictions_.begin(), initial_predictions_.end(),
                 accumulator.begin());
 
