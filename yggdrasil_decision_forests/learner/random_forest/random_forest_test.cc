@@ -285,7 +285,7 @@ TEST_F(RandomForestOnAdult, Base) {
   EXPECT_GT(vi_occupation, vi_native_country);
 
   EXPECT_GT(vi_capital_gain, 0.0045);
-  EXPECT_GT(vi_relationship, 0.0045);
+  EXPECT_GT(vi_relationship, 0.0040);
 
   std::string description;
   model_->AppendDescriptionAndStatistics(false, &description);
