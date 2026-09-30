@@ -54,6 +54,7 @@ absl::Status TryCloserThanCondition(
     const std::vector<float>& selected_weights, const int32_t attribute_idx,
     std::vector<UnsignedExampleIdx> dense_example_idxs,
     const InternalTrainConfig& internal_config, SplitterPerThreadCache* cache,
+    utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitSearchResult* result_flag,
     std::vector<float>* projections) {
   STATUS_CHECK(internal_config.vector_sequence_computer);
@@ -79,7 +80,7 @@ absl::Status TryCloserThanCondition(
         EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                            selected_weights, selected_labels, local_projection,
                            internal_config, attribute_idx, {}, 0, condition,
-                           cache));
+                           cache, random));
 
     if (*result_flag == SplitSearchResult::kInvalidAttribute &&
         local_result_flag == SplitSearchResult::kNoBetterSplitFound) {
@@ -113,9 +114,12 @@ absl::Status TryProjectedMoreThanCondition(
     const LabelType& label_stats, const Labels& selected_labels,
     const std::vector<float>& selected_weights, const int32_t attribute_idx,
     std::vector<UnsignedExampleIdx> dense_example_idxs,
-    const InternalTrainConfig& internal_config, SplitterPerThreadCache* cache,
+    const InternalTrainConfig& internal_config,
+    SplitterPerThreadCache* cache,
+    utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitSearchResult* result_flag,
     std::vector<float>* projections) {
+
   STATUS_CHECK(internal_config.vector_sequence_computer);
   projections->resize(selected_examples.size() * num_anchors);
   RETURN_IF_ERROR(
@@ -137,7 +141,7 @@ absl::Status TryProjectedMoreThanCondition(
         EvaluateProjection(dt_config, label_stats, dense_example_idxs,
                            selected_weights, selected_labels, local_projection,
                            internal_config, attribute_idx, {}, 0, condition,
-                           cache));
+                           cache, random));
 
     if (*result_flag == SplitSearchResult::kInvalidAttribute &&
         local_result_flag == SplitSearchResult::kNoBetterSplitFound) {
@@ -235,7 +239,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
         anchors, num_anchors, attribute, attribute_spec,
         effective_selected_examples, dt_config, label_stats,
         effective_selected_labels, effective_selected_weights, attribute_idx,
-        dense_example_idxs, internal_config, cache, effective_condition,
+        dense_example_idxs, internal_config, cache, random, effective_condition,
         &effective_result_flag, &projections);
   };
 
@@ -245,7 +249,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
         anchors, num_anchors, attribute, attribute_spec,
         effective_selected_examples, dt_config, label_stats,
         effective_selected_labels, effective_selected_weights, attribute_idx,
-        dense_example_idxs, internal_config, cache, effective_condition,
+        dense_example_idxs, internal_config, cache, random, effective_condition,
         &effective_result_flag, &projections);
   };
 
@@ -356,7 +360,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
           RETURN_IF_ERROR(TryCloserThanCondition(
               anchor, 1, attribute, attribute_spec, selected_examples,
               dt_config, label_stats, selected_labels, selected_weights,
-              attribute_idx, dense_example_idxs, internal_config, cache,
+              attribute_idx, dense_example_idxs, internal_config, cache, random,
               condition, &final_result_flag, &projections));
         } break;
 
@@ -371,7 +375,7 @@ FindSplitAnyLabelTemplateFeatureNumericalVectorSequence(
           RETURN_IF_ERROR(TryProjectedMoreThanCondition(
               anchor, 1, attribute, attribute_spec, selected_examples,
               dt_config, label_stats, selected_labels, selected_weights,
-              attribute_idx, dense_example_idxs, internal_config, cache,
+              attribute_idx, dense_example_idxs, internal_config, cache, random,
               condition, &final_result_flag, &projections));
         } break;
 
