@@ -495,9 +495,11 @@ void GradientBoostedTreesModel::PredictImpl(
     } break;
 
     case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
+      DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
       absl::FixedArray<float> accumulator(num_trees_per_iter_);
-      // Zero initial prediction for the MULTINOMIAL_LOG_LIKELIHOOD.
-      std::fill(accumulator.begin(), accumulator.end(), 0);
+      // Initialize accumulator with initial_predictions_.
+      std::copy(initial_predictions_.begin(), initial_predictions_.end(),
+                accumulator.begin());
 
       {
         int accumulator_cell_idx = 0;
@@ -574,7 +576,13 @@ void GradientBoostedTreesModel::PredictImpl(
                      [&accumulator](const decision_tree::proto::Node& node) {
                        accumulator += node.regressor().top_value();
                      });
-      prediction->mutable_regression()->set_value(accumulator);
+      if (task() == model::proto::RANKING) {
+        prediction->mutable_ranking()->set_relevance(accumulator);
+      } else if (task() == model::proto::REGRESSION) {
+        prediction->mutable_regression()->set_value(accumulator);
+      } else {
+        LOG(FATAL) << "Non supported task";
+      }
     } break;
 
     case proto::Loss::POISSON: {
@@ -584,11 +592,15 @@ void GradientBoostedTreesModel::PredictImpl(
                        accumulator += node.regressor().top_value();
                      });
       if (task() == model::proto::REGRESSION) {
-        float clamped_accumulator =
-            std::clamp(static_cast<float>(accumulator),
-                       -kPoissonLossClampBounds, kPoissonLossClampBounds);
-        prediction->mutable_regression()->set_value(
-            std::exp(clamped_accumulator));
+        if (output_logits_) {
+          prediction->mutable_regression()->set_value(accumulator);
+        } else {
+          float clamped_accumulator =
+              std::clamp(static_cast<float>(accumulator),
+                         -kPoissonLossClampBounds, kPoissonLossClampBounds);
+          prediction->mutable_regression()->set_value(
+              std::exp(clamped_accumulator));
+        }
       } else {
         LOG(FATAL) << "Only regression is supported with poison loss";
       }

@@ -736,6 +736,8 @@ void ExpectEqualPredictions(
 
   // Container of predictions from the ground truth engine.
   model::proto::Prediction generic_prediction;
+  model::proto::Prediction generic_prediction_from_example;
+  dataset::proto::Example example;
 
   const auto num_examples = end_example_idx - begin_example_idx;
 
@@ -758,6 +760,13 @@ void ExpectEqualPredictions(
     const dataset::VerticalDataset::row_t row_idx = begin_example_idx + i;
     // Compute the prediction with the generic engine.
     model.Predict(dataset, row_idx, &generic_prediction);
+
+    // The generic engine should agree on VerticalDataset and proto::Example.
+    dataset.ExtractExample(row_idx, &example);
+    model.Predict(example, &generic_prediction_from_example);
+    EXPECT_THAT(generic_prediction,
+                test::ApproximatelyEqualsProto(generic_prediction_from_example))
+        << "row_idx:" << row_idx;
 
     switch (model.task()) {
       case model::proto::Task::CLASSIFICATION: {

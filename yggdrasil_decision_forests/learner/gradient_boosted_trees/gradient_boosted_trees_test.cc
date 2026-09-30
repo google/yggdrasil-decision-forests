@@ -1950,6 +1950,16 @@ TEST_F(GradientBoostedTreesOnDNA, Base) {
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
+// Unlike on Iris, the class priors on DNA are not uniform.
+TEST_F(GradientBoostedTreesOnDNA, InitializeWithClassPriors) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_multinomial_loss_options()
+      ->set_initialize_with_class_priors(true);
+  gbt_config->set_num_trees(5);
+  TrainAndEvaluateModel();
+}
+
 TEST_F(GradientBoostedTreesOnDNA, Hessian) {
   auto* gbt_config = train_config_.MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
@@ -2981,6 +2991,14 @@ class GradientBoostedTreesOnSyntheticRanking
 TEST_F(GradientBoostedTreesOnSyntheticRanking, Base) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::NDCG(evaluation_), 0.7151, 0.025, 0.7255);
+}
+
+TEST_F(GradientBoostedTreesOnSyntheticRanking, SquaredError) {
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->set_loss(proto::Loss::SQUARED_ERROR);
+  gbt_config->set_num_trees(5);
+  TrainAndEvaluateModel();
 }
 
 TEST_F(GradientBoostedTreesOnSyntheticRanking,
