@@ -1350,10 +1350,13 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
   const auto& attribute = example.attributes(condition.attribute());
 
   // Handle NA values. Numerical attribute is the only attribute type than has
-  // two representation for NA.
-  if (attribute.type_case() ==
-          dataset::proto::Example::Attribute::TYPE_NOT_SET ||
-      (attribute.has_numerical() && std::isnan(attribute.numerical()))) {
+  // two representation for NA. Oblique conditions handle missing values
+  // per-attribute.
+  if (condition.condition().type_case() !=
+          proto::Condition::TypeCase::kObliqueCondition &&
+      (attribute.type_case() ==
+           dataset::proto::Example::Attribute::TYPE_NOT_SET ||
+       (attribute.has_numerical() && std::isnan(attribute.numerical())))) {
     if (condition.condition().type_case() ==
         proto::Condition::TypeCase::kNaCondition) {
       return true;

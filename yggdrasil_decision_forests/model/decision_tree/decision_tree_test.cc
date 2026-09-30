@@ -442,6 +442,62 @@ TEST_F(EvalConditions, EvalConditionOblique) {
       0, false);
 }
 
+TEST_F(EvalConditions, EvalConditionObliqueWithNaReplacements) {
+  CheckCondition(
+      R"(
+      attribute: 1
+      na_value: false
+      condition {
+        oblique_condition {
+          attributes: 1
+          attributes: 0
+          weights: 1
+          weights: 1
+          na_replacements: 3
+          na_replacements: 0
+          threshold: 3.5
+        }
+      }
+      )",
+      0, true);
+
+  CheckCondition(
+      R"(
+      attribute: 1
+      na_value: true
+      condition {
+        oblique_condition {
+          attributes: 1
+          attributes: 0
+          weights: 1
+          weights: 1
+          na_replacements: 3
+          na_replacements: 0
+          threshold: 4.5
+        }
+      }
+      )",
+      0, false);
+
+  CheckCondition(
+      R"(
+      attribute: 0
+      na_value: false
+      condition {
+        oblique_condition {
+          attributes: 0
+          attributes: 1
+          weights: 1
+          weights: 1
+          na_replacements: 0
+          na_replacements: 3
+          threshold: 3.5
+        }
+      }
+      )",
+      0, true);
+}
+
 TEST_F(EvalConditions, EvalConditionSequenceVectorCloserThan) {
   dataset_ = dataset::VerticalDataset();
   auto* col_spec = dataset::AddColumn(
