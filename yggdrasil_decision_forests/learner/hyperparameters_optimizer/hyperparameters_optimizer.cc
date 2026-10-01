@@ -16,6 +16,7 @@
 #include "yggdrasil_decision_forests/learner/hyperparameters_optimizer/hyperparameters_optimizer.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -641,6 +642,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
     model::proto::GenericHyperParameters candidate;
     std::unique_ptr<AbstractModel> model;
   };
+  std::atomic<bool> cancel_pending_candidates{false};
   utils::concurrency::StreamProcessor<model::proto::GenericHyperParameters,
                                       absl::StatusOr<Output>>
       async_evaluator(
@@ -649,6 +651,9 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
               -> absl::StatusOr<Output> {
             if (stop_training_trigger_ != nullptr && *stop_training_trigger_) {
               return absl::InternalError("Training interrupted");
+            }
+            if (cancel_pending_candidates) {
+              return absl::CancelledError("Hyperparameter search is done");
             }
 
             std::unique_ptr<AbstractModel> model;
@@ -695,6 +700,7 @@ HyperParameterOptimizerLearner::SearchBestHyperparameterInProcess(
   auto best_params =
       SearchBestHyperparameterLoop(spe_config, search_space_spec, search_space,
                                    logs, submit_candidate, get_next_result);
+  cancel_pending_candidates = true;
 
   return best_params;
 }
