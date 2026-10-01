@@ -91,7 +91,6 @@ py_library(
         "@ydf_cc//yggdrasil_decision_forests/utils/distribute:distribute_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils/distribute/implementations/grpc:grpc_py_proto",
         "@ydf_cc//yggdrasil_decision_forests/utils/distribute/implementations/multi_thread:multi_thread_py_proto",
-        "@ydf_cc//yggdrasil_decision_forests/utils/distribute_cli:distribute_cli_py_proto",
     ],
 )
 

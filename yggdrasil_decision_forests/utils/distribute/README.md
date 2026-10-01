@@ -155,9 +155,6 @@ manager->Done();
 -   [unit tests](https://source.corp.google.com/piper///depot/google3/third_party/yggdrasil_decision_forests/utils/distribute/distribute_test.cc):
     Distribute unit tests. Shows all features.
 
--   [distribute cli](https://source.corp.google.com/piper///depot/google3/third_party/yggdrasil_decision_forests/utils/distribute_cli/):
-    Distribute the execution of CLI commands.
-
 ### Intermediate
 
 -   [hyperparameter_sweep](https://source.corp.google.com/piper///depot/google3/third_party/yggdrasil_decision_forests/examples/hyperparameter_sweep/README.md):
