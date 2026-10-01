@@ -58,6 +58,14 @@ SIMPLE_PARAMETERIZED_TEST(
     {
         // GBT
         {
+            "adult_binary_class_gbdt_calibrated",
+            "adult_binary_class_gbdt_calibrated.java.golden",
+            "adult_binary_class_gbdt_calibrated_data.bin.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+            /*crop_num_trees=*/68,
+        },
+        {
             "adult_binary_class_gbdt_v2",
             "adult_binary_class_gbdt_v2_probability_routing.java.golden",
             "adult_binary_class_gbdt_v2_probability_routing_data.bin.golden",
@@ -92,6 +100,14 @@ SIMPLE_PARAMETERIZED_TEST(
             proto::Algorithm::ROUTING,
         },
         {
+            "adult_binary_class_rf_calibrated",
+            "adult_binary_class_rf_calibrated.java.golden",
+            "adult_binary_class_rf_calibrated_data.bin.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+            /*crop_num_trees=*/100,
+        },
+        {
             "adult_binary_class_rf_nwta_small",
             "adult_binary_class_rf_nwta_small_proba_routing.java.golden",
             "adult_binary_class_rf_nwta_small_proba_routing_data.bin.golden",
@@ -109,7 +125,6 @@ SIMPLE_PARAMETERIZED_TEST(
             /*categorical_from_string=*/false,
             /*use_runtime_derived_resource_path=*/true,
         },
-
     }) {
   const auto& test_case = GetParam();
 
@@ -128,7 +143,11 @@ SIMPLE_PARAMETERIZED_TEST(
   options.set_algorithm(test_case.algorithm);
   options.set_categorical_from_string(test_case.categorical_from_string);
   if (test_case.output.has_value()) {
+    options.set_enable_calibration(test_case.output.value() ==
+                                   proto::ClassificationOutput::PROBABILITY);
     options.set_classification_output(*test_case.output);
+  } else {
+    options.set_enable_calibration(false);
   }
   ASSERT_OK_AND_ASSIGN(const auto embed, EmbedModel(*model, options));
   EXPECT_EQ(embed.size(), 2);

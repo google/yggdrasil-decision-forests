@@ -174,6 +174,10 @@ ModelDataBank::ModelDataBank(
     leaf_values.emplace(
         NodeDataArray{.java_name = "leafValues", .java_type = "float"});
   }
+  if (internal_options.calibrate) {
+    cal_deltas.emplace(
+        NodeDataArray{.java_name = "calDeltas", .java_type = "float"});
+  }
 }
 
 absl::StatusOr<size_t> ModelDataBank::GetObliqueFeaturesSize() const {
@@ -256,6 +260,15 @@ absl::Status ModelDataBank::FinalizeJavaTypes() {
 absl::Status ModelDataBank::AddRootDelta(int64_t root_delta) {
   STATUS_CHECK(root_deltas.has_value());
   root_deltas->data.push_back(root_delta);
+  return absl::OkStatus();
+}
+
+absl::Status ModelDataBank::AddCalDeltas(
+    const std::vector<float>& new_cal_deltas) {
+  STATUS_CHECK(cal_deltas.has_value());
+  for (const float val : new_cal_deltas) {
+    cal_deltas->data.push_back(val);
+  }
   return absl::OkStatus();
 }
 
@@ -358,6 +371,19 @@ absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
         "    $0categoricalBank = new BitSet();\n"
         "  }\n",
         maybe_this);
+  }
+
+  // 3. Calibration data if needed.
+  if (internal_options.calibrate) {
+    absl::SubstituteAndAppend(&declarations, "private $0float[] calDeltas;\n",
+                              maybe_static_final);
+    absl::SubstituteAndAppend(&field_initialization_code,
+                              "  int calDeltasLength = dis.readInt();\n"
+                              "  $0calDeltas = new float[calDeltasLength];\n"
+                              "  for (int i = 0; i < calDeltasLength; i++) {\n"
+                              "    $0calDeltas[i] = dis.readFloat();\n"
+                              "  }\n",
+                              maybe_this);
   }
 
   std::string content = declarations;

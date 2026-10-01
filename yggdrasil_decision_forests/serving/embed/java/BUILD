@@ -19,6 +19,7 @@ cc_library_ydf(
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/decision_tree:decision_forest_interface",
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator",
         "//yggdrasil_decision_forests/model/random_forest",
         "//yggdrasil_decision_forests/serving/embed:common",
         "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",

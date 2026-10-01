@@ -190,6 +190,22 @@ SIMPLE_PARAMETERIZED_TEST(
         },
         // RF
         {
+            "adult_binary_class_rf_calibrated",
+            "adult_binary_class_rf_calibrated_if_else.h.golden",
+            proto::Algorithm::IF_ELSE,
+            proto::ClassificationOutput::PROBABILITY,
+            100,
+            false,
+        },
+        {
+            "adult_binary_class_rf_calibrated",
+            "adult_binary_class_rf_calibrated_routing.h.golden",
+            proto::Algorithm::ROUTING,
+            proto::ClassificationOutput::PROBABILITY,
+            100,
+            false,
+        },
+        {
             "adult_binary_class_rf_nwta_small",
             "adult_binary_class_rf_nwta_small_class_if_else.h.golden",
             proto::Algorithm::IF_ELSE,
@@ -339,7 +355,9 @@ SIMPLE_PARAMETERIZED_TEST(
   }
 
   proto::Options options;
-  options.set_enable_calibration(true);
+  options.set_enable_calibration(test_case.output.has_value() &&
+                                 *test_case.output ==
+                                     proto::ClassificationOutput::PROBABILITY);
   options.mutable_cpp();
   options.set_algorithm(test_case.algorithm);
   options.set_categorical_from_string(test_case.categorical_from_string);

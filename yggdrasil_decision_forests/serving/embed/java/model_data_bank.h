@@ -75,6 +75,8 @@ struct ModelDataBank {
   absl::Status AddConditionTypes(
       const std::vector<uint8_t>& new_condition_types);
 
+  absl::Status AddCalDeltas(const std::vector<float>& new_cal_deltas);
+
   absl::StatusOr<size_t> GetObliqueFeaturesSize() const;
 
   absl::StatusOr<size_t> GetLeafValuesSize() const;
@@ -167,6 +169,8 @@ struct ModelDataBank {
   //
   // This array is not serialized if the model uses single-output leaves.
   std::optional<NodeDataArray> leaf_values;
+  // Calibration deltas for binary classification models.
+  std::optional<NodeDataArray> cal_deltas;
 };
 
 }  // namespace yggdrasil_decision_forests::serving::embed::internal

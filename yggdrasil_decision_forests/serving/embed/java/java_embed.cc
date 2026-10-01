@@ -35,6 +35,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_forest_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/model/postprocessor/smoothed_pav_calibrator/smoothed_pav_calibrator.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
@@ -309,6 +310,26 @@ absl::StatusOr<std::string> GenInstanceStruct(
   }
 
   // Start
+  for (int i = 0; i < model.num_postprocessors(); ++i) {
+    if (internal_options.calibrate) {
+      const auto& postprocessor = model.postprocessor(i);
+
+      if (typeid(postprocessor) ==
+          typeid(model::postprocessor::SmoothedPavCalibrator)) {
+        const model::postprocessor::SmoothedPavCalibrator& sc =
+            dynamic_cast<const model::postprocessor::SmoothedPavCalibrator&>(
+                postprocessor);
+        const auto& calibration_deltas = sc.GetDeltas();
+        absl::SubstituteAndAppend(&content, R"(
+private static final int N_DELTAS = $0;
+private static final float INV_STEP = $1;
+)",
+                                  calibration_deltas.size(),     // $0
+                                  calibration_deltas.size() - 1  // $1
+        );
+      }
+    }
+  }
   absl::SubstituteAndAppend(&content, R"(
 private static final int NUM_FEATURES = $0;
 private static final int NUM_TREES = $1;
@@ -526,6 +547,9 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 )");
+  if (internal_options.calibrate) {
+    absl::StrAppend(&code, "import java.lang.Math;\n");
+  }
   if (internal_options.imports.bitset) {
     absl::StrAppend(&code, "import java.util.BitSet;\n");
   }
@@ -560,6 +584,29 @@ public final class $0 {
     return absl::UnimplementedError(
         absl::StrCat("Unsupported algorithm for tha Java export: ",
                      proto::Algorithm_Enum_Name(options.algorithm())));
+  }
+
+  if (internal_options.calibrate) {
+    absl::StrAppend(&model_code, R"(
+  private static float binaryCalibrate(float p) {
+    float pc = Math.max(0.0f, Math.min(p, 1.0f));
+
+    float pos = pc * INV_STEP; // fractional grid index
+
+    // In C++, std::modf splits a float into integer and fractional parts.
+    // In Java, we can achieve this simply using casting and basic arithmetic.
+    float integralPos = (float) Math.floor(pos);
+    float fracPos = pos - integralPos;
+
+    int i0 = (int) integralPos;
+    int i1 = Math.min(i0 + 1, N_DELTAS - 1);
+
+    // Linear Interpolation
+    float delta = calDeltas[i0] + fracPos * (calDeltas[i1] - calDeltas[i0]);
+
+    return Math.max(0.0f, Math.min(pc + delta, 1.0f));
+  }
+)");
   }
 
   // Predict method
@@ -660,6 +707,18 @@ absl::StatusOr<JavaInternalOptions> ComputeJavaInternalOptions(
       ComputeJavaInternalOptionsOutput(stats, options, &internal_options));
   RETURN_IF_ERROR(ComputeBaseInternalOptionsCategoricalDictionaries(
       model, stats, options, &internal_options));
+
+  const bool calibrate = options.enable_calibration() &&
+                         model.num_postprocessors() > 0 &&
+                         stats.is_binary_classification();
+  if (calibrate && options.classification_output() !=
+                       proto::ClassificationOutput::PROBABILITY) {
+    return absl::InvalidArgumentError(
+        "Calibration is only supported for the PROBABILITY output type. "
+        "Please disable calibration or change the output type.");
+  }
+  internal_options.calibrate = calibrate;
+
   return internal_options;
 }
 
@@ -822,8 +881,15 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
         case proto::ClassificationOutput::PROBABILITY:
           if (model.winner_take_all_inference()) {
             if (stats.is_binary_classification()) {
-              spec.return_prediction = absl::Substitute(
-                  "  return (float) accumulator / $0f;\n", stats.num_trees);
+              const std::string prob = absl::Substitute(
+                  "(float) accumulator / $0f", stats.num_trees);
+              if (internal_options.calibrate) {
+                spec.return_prediction =
+                    absl::Substitute("  return binaryCalibrate($0);\n", prob);
+              } else {
+                spec.return_prediction =
+                    absl::Substitute("  return $0;\n", prob);
+              }
             } else {
               spec.return_prediction = absl::Substitute(
                   R"(  float[] probas = new float[$0];
@@ -835,7 +901,13 @@ absl::StatusOr<SpecializedConversion> SpecializedConversionRandomForestJava(
                   stats.num_classification_classes, stats.num_trees);
             }
           } else {
-            spec.return_prediction = "  return accumulator;\n";
+            if (stats.is_binary_classification() &&
+                internal_options.calibrate) {
+              spec.return_prediction =
+                  "  return binaryCalibrate(accumulator);\n";
+            } else {
+              spec.return_prediction = "  return accumulator;\n";
+            }
           }
           break;
       }
@@ -925,9 +997,19 @@ SpecializedConversionGradientBoostedTreesJava(
           break;
         case proto::ClassificationOutput::PROBABILITY:
           if (stats.is_binary_classification()) {
-            spec.return_prediction = R"(  // Sigmoid
-  return 1.0f / (1.0f + (float) Math.exp(-accumulator));
-)";
+            const std::string prob =
+                R"(1.0f / (1.0f + (float) Math.exp(-accumulator)))";
+            if (internal_options.calibrate) {
+              spec.return_prediction = absl::Substitute(R"(  // Sigmoid
+  return binaryCalibrate($0);
+)",
+                                                        prob);
+            } else {
+              spec.return_prediction = absl::Substitute(R"(  // Sigmoid
+  return $0;
+)",
+                                                        prob);
+            }
           } else {
             spec.return_prediction =
                 absl::Substitute(R"(  // Softmax
@@ -1011,6 +1093,21 @@ absl::Status GenRoutingModelDataJava(
     ASSIGN_OR_RETURN(const auto condition_types,
                      GenRoutingModelDataConditionType(model, stats));
     RETURN_IF_ERROR(bank->AddConditionTypes(condition_types));
+  }
+
+  for (int i = 0; i < model.num_postprocessors(); ++i) {
+    const auto& postprocessor = model.postprocessor(i);
+
+    if (internal_options.calibrate) {
+      if (typeid(postprocessor) ==
+          typeid(model::postprocessor::SmoothedPavCalibrator)) {
+        const model::postprocessor::SmoothedPavCalibrator& sc =
+            dynamic_cast<const model::postprocessor::SmoothedPavCalibrator&>(
+                postprocessor);
+        const auto& calibration_deltas = sc.GetDeltas();
+        RETURN_IF_ERROR(bank->AddCalDeltas(sc.GetDeltas()));
+      }
+    }
   }
 
   RETURN_IF_ERROR(bank->FinalizeJavaTypes());
