@@ -1126,7 +1126,7 @@ absl::Status DistributedGradientBoostedTreesWorker::EndIterEvaluationWorker(
   RETURN_IF_ERROR(RunValidationThread(request.iter_idx()));
 
   // If the evaluation is blocking; wait for it to finish.
-  if (request.has_synchronous_validation()) {
+  if (request.synchronous_validation()) {
     RETURN_IF_ERROR(JoinValidationThread());
     *answer->add_validations() = validation_.evaluation;
   }
@@ -1273,6 +1273,13 @@ absl::Status DistributedGradientBoostedTreesWorker::RestoreCheckpoint(
 
   } else if (GetWorkerType() == WorkerType::kEVALUATOR) {
     // Evaluation worker.
+
+    // Discard any in-flight validation. It belongs to an iteration that is
+    // being rolled back: its result would be reported twice, and the thread
+    // would race with the reload of "validation_.predictions" below.
+    if (HasPendingValidationThread()) {
+      RETURN_IF_ERROR(JoinValidationThread());
+    }
 
     // Read the predictions of my worker only.
     const auto path = ValidationPredictionCheckpointPath(
