@@ -27,14 +27,12 @@ import numpy as np
 from ydf.util import dataset_io
 from ydf.utils import log
 
-# pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
 try:
-  import tensorflow as tf
+  import tensorflow as tf  # pyrefly: ignore[missing-source-for-stubs]
 except ImportError as exc:
   raise ImportError("Cannot import tensorflow") from exc
 # pylint: enable=g-import-not-at-top
-# pytype: enable=import-error
 
 
 @dataclasses.dataclass
@@ -98,7 +96,7 @@ def write_tf_record(
         ),
     ) as writer:
 
-      yield writer.write  # pytype: disable=attribute-error
+      yield writer.write
 
   write_tensorflow_examples(
       writer_generator=writer_generator,
@@ -375,7 +373,6 @@ def _dict_row_to_tf_example(
       # List of values
       if values:
         first_value = values[0]
-        # pytype: disable=attribute-error
         if isinstance(first_value, float):
           dst_feature.float_list.value.extend(values)
         elif isinstance(first_value, int):
@@ -389,7 +386,6 @@ def _dict_row_to_tf_example(
               f"Unsupported value {values!r} of type {type(values)} for key"
               f" {key!r}"
           )
-        # pytype: enable=attribute-error
     elif isinstance(feature_values, np.ndarray):
       if len(feature_values.shape) == 1:
         # Scalar values in numpy array
@@ -417,7 +413,6 @@ def _dict_row_to_tf_example(
               f"Unsupported value {values!r} of type {type(values)} for key"
               f" {key!r}"
           )
-        # pytype: enable=attribute-error
     elif isinstance(values, float):
       # Scalar python values
       dst_feature.float_list.value.append(values)

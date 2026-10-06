@@ -25,7 +25,7 @@ def read_tf_record(
     *,
     compressed: bool = True,
     process: Optional[
-        Callable[["tf.train.Example"], Optional["tf.train.Example"]]  # pytype: disable=name-error
+        Callable[["tf.train.Example"], Optional["tf.train.Example"]]  # pyrefly: ignore[unknown-name]
     ] = None,  # pylint: disable=bad-whitespace
     verbose: bool = False,
     threads: int = 20,
@@ -114,7 +114,7 @@ def write_tf_record(
     path: dataset_io.Path,
     compressed: bool = True,
     process: Optional[
-        Callable[["tf.train.Example"], "tf.train.Example"]  # pytype: disable=name-error
+        Callable[["tf.train.Example"], "tf.train.Example"]  # pyrefly: ignore[unknown-name]
     ] = None,  # pylint: disable=bad-whitespace
     verbose: bool = False,
     threads: int = 20,

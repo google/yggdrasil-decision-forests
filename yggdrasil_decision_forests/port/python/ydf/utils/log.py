@@ -311,7 +311,7 @@ def cc_log_context():
 
   # pylint: disable=g-import-not-at-top
   try:
-    from colabtools.googlelog import CaptureLog  # pytype: disable=import-error
+    from colabtools.googlelog import CaptureLog  # pyrefly: ignore[missing-import]
     # We are in a Google Colab
     with _show_cc_logs():
       with CaptureLog():
@@ -327,7 +327,7 @@ def cc_log_context():
       return
     try:
       # We are in a Notebook
-      from wurlitzer import sys_pipes  # pytype: disable=import-error
+      from wurlitzer import sys_pipes  # pyrefly: ignore[missing-source-for-stubs]
       # We are in a Notebook with Wurlitzer
       with _show_cc_logs():
         with sys_pipes():
@@ -357,9 +357,7 @@ def maybe_tqdm(iterable: Iterator[T], *args, **kwargs) -> Iterator[T]:
 
   try:
     # pylint: disable=g-import-not-at-top
-    # pytype: disable=import-error
-    import tqdm
-    # pytype: enable=import-error
+    import tqdm  # pyrefly: ignore[missing-source-for-stubs]
     # pylint: enable=g-import-not-at-top
     return tqdm.tqdm(iterable, *args, **kwargs)  # pyrefly: ignore[bad-return]
   except ImportError:

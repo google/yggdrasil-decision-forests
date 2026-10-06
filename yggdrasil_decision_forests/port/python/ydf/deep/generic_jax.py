@@ -109,7 +109,7 @@ ApplyModelFn = Callable[
     [ModelState, Batch, bool, jax.Array], Tuple[jax.Array, Optional[BatchState]]
 ]
 
-GenericJAXModelClass = Type[TypeVar("B", bound="GenericJAXModel")]  # pyrefly: ignore[invalid-annotation, not-a-type]
+GenericJAXModelClass = Type[TypeVar("B", bound="GenericJAXModel")]  # pyrefly: ignore[invalid-annotation]
 
 
 # Batch size used to generate model predictions
@@ -537,7 +537,7 @@ class GenericJAXModel(generic_model.GenericModel):
       input_model_signature_fn: Any = None,
       *,
       mode: Literal["keras", "tf"] = "tf",
-      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
+      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pyrefly: ignore[unknown-name]
       servo_api: bool = False,
       feed_example_proto: bool = False,
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
@@ -549,7 +549,7 @@ class GenericJAXModel(generic_model.GenericModel):
   ) -> None:
     raise NotImplementedError  # TODO: Implement.
 
-  def to_tensorflow_function(  # pytype: disable=name-error
+  def to_tensorflow_function(
       self,
       temp_dir: Optional[str] = None,
       can_be_saved: bool = True,
@@ -558,7 +558,7 @@ class GenericJAXModel(generic_model.GenericModel):
   ) -> Any:
     raise NotImplementedError  # TODO: Implement.
 
-  def to_jax_function(  # pytype: disable=name-error
+  def to_jax_function(
       self,
       jit: bool = True,
       apply_activation: bool = True,

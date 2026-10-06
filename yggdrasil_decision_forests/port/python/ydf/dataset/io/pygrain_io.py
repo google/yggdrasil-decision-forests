@@ -24,10 +24,9 @@ from ydf.dataset.io import dataset_io_types
 
 
 def import_pygrain():
-  # pytype: disable=import-error
   # pylint: disable=g-import-not-at-top
   try:
-    import grain.python as grain
+    import grain.python as grain  # pyrefly: ignore[missing-import]
 
     return grain
   except ImportError:
@@ -37,19 +36,17 @@ def import_pygrain():
     )
     raise
   # pylint: enable=g-import-not-at-top
-  # pytype: enable=import-error
 
 
 def import_map_structure():
-  # pytype: disable=import-error
   # pylint: disable=g-import-not-at-top
   try:
-    from jax import tree_util
+    from jax import tree_util  # pyrefly: ignore[missing-import]
 
     return tree_util.tree_map
   except ImportError:
     try:
-      import tree
+      import tree  # pyrefly: ignore[missing-import]
 
       return tree.map_structure
     except ImportError:
@@ -60,7 +57,6 @@ def import_map_structure():
       )
       raise
   # pylint: enable=g-import-not-at-top
-  # pytype: enable=import-error
 
 
 def is_pygrain(data: dataset_io_types.IODataset) -> bool:

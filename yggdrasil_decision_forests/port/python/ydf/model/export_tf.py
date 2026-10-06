@@ -31,14 +31,12 @@ from ydf.utils import log
 # Bypass the dependency checker + returns details explanations about why
 # importing tf or tf-df fails (e.g. missing dependency, missing or invalid .so
 # file).
-# pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
 try:
-  import tensorflow as tf
+  import tensorflow as tf  # pyrefly: ignore[missing-source-for-stubs]
 except ImportError as tf_exc:
   raise ImportError("Export to TensorFlow requires TensorFlow.") from tf_exc
 # pylint: enable=g-import-not-at-top
-# pytype: enable=import-error
 
 
 TFDType = Any  # TensorFlow DType e.g. tf.float32
@@ -162,7 +160,7 @@ def ydf_model_to_tensorflow_saved_model_keras_mode(
 ):  # pylint: disable=g-doc-args
 
   try:
-    import tensorflow_decision_forests as tfdf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype:disable=import-error
+    import tensorflow_decision_forests as tfdf  # pylint: disable=g-import-not-at-top,import-outside-toplevel  # pyrefly: ignore[missing-import]
   except ImportError as exc:
     raise ImportError(
         "Export to Keras is deprecated, will be removed soon and requires"
@@ -365,7 +363,7 @@ def ydf_model_to_tensorflow_saved_model_tf_mode(
       raise e
 
 
-def ydf_model_to_tf_function(  # pytype: disable=name-error
+def ydf_model_to_tf_function(
     ydf_model: "generic_model.GenericModel",
     temp_dir: Optional[str],
     can_be_saved: bool,
@@ -377,13 +375,13 @@ def ydf_model_to_tf_function(  # pytype: disable=name-error
   """
 
   try:
-    import ydf_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype:disable=import-error
+    import ydf_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel  # pyrefly: ignore[missing-import]
 
     tf_op = ydf_tf.tf_op
   except ImportError as exc:
     # Try to import tensorflow decision forests (legacy).
     try:
-      import tensorflow_decision_forests as tfdf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype:disable=import-error
+      import tensorflow_decision_forests as tfdf  # pylint: disable=g-import-not-at-top,import-outside-toplevel  # pyrefly: ignore[missing-import]
 
       tf_op = tfdf.keras.core.tf_op
       log.warning(

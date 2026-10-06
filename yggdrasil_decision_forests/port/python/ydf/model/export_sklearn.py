@@ -28,7 +28,6 @@ from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from ydf.model.isolation_forest_model import isolation_forest_model
 from ydf.model.random_forest_model import random_forest_model
 
-# pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
 try:
   from sklearn import base
@@ -38,7 +37,6 @@ try:
 except ImportError as exc:
   raise ImportError("Cannot import sklearn") from exc
 # pylint: enable=g-import-not-at-top
-# pytype: enable=import-error
 
 
 # The column idx=0 is reserved for the label in YDF models.
@@ -175,7 +173,7 @@ def _(
       {
           options.label_name: [0.0, 1.0],
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_  # pytype: disable=attribute-error
+              sklearn_model.n_features_in_  # pyrefly: ignore[missing-attribute]
           ),
       },
       verbose=0,
@@ -208,7 +206,7 @@ def _(
       {
           options.label_name: [str(c) for c in sklearn_model.classes_],
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_,  # pytype: disable=attribute-error
+              sklearn_model.n_features_in_,  # pyrefly: ignore[missing-attribute]
               len(sklearn_model.classes_),
           ),
       },
@@ -236,12 +234,12 @@ def _(
   ).train(
       {
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_  # pytype: disable=attribute-error
+              sklearn_model.n_features_in_  # pyrefly: ignore[missing-attribute]
           ),
       },
       verbose=0,
   )
-  sklearn_examples_per_tree: int = int(sklearn_model._max_samples)  # pylint: disable=protected-access  # pytype: disable=attribute-error
+  sklearn_examples_per_tree: int = int(sklearn_model._max_samples)  # pylint: disable=protected-access
   ydf_model._model.set_num_examples_per_tree(sklearn_examples_per_tree)  # pylint: disable=protected-access
   assert isinstance(ydf_model, isolation_forest_model.IsolationForestModel)
 
@@ -295,7 +293,7 @@ def _(
       {
           options.label_name: [0.0, 1.0],
           options.feature_name: _gen_fake_features(
-              sklearn_model.n_features_in_  # pytype: disable=attribute-error
+              sklearn_model.n_features_in_  # pyrefly: ignore[missing-attribute]
           ),
       },
       verbose=0,

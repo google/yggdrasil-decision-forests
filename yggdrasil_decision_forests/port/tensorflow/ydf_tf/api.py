@@ -536,7 +536,7 @@ class _InferenceArgsBuilder(AutoTrackable):  # pyrefly: ignore[invalid-inheritan
   ):
 
     super().__init__()
-    self._verbose: bool = verbose  # pytype: disable=annotation-type-mismatch
+    self._verbose: bool = verbose  # pyrefly: ignore[bad-assignment]
     self._header: Optional[abstract_model_pb2.AbstractModel] = None
     self._data_spec: Optional[data_spec_pb2.DataSpecification] = None
     self._feature_name_to_idx = None

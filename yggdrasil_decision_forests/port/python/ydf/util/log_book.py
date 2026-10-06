@@ -20,14 +20,12 @@ import os
 import sqlite3
 from typing import Dict, List, Optional, Set, Tuple, Union, Any
 
-# pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
 try:
-  import pandas as pd
+  import pandas as pd  # pyrefly: ignore[missing-import]
 except ImportError:
   pd = None
 # pylint: enable=g-import-not-at-top
-# pytype: enable=import-error
 
 
 # The values stored in an experiment.

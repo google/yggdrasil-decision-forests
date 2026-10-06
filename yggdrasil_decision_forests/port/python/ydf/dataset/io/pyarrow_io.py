@@ -24,10 +24,9 @@ from ydf.dataset.io import dataset_io_types
 
 
 def import_pyarrow():
-  # pytype: disable=import-error
   # pylint: disable=g-import-not-at-top
   try:
-    import pyarrow as pa
+    import pyarrow as pa  # pyrefly: ignore[missing-import]
 
     return pa
   except ImportError:
@@ -37,7 +36,6 @@ def import_pyarrow():
     )
     raise
   # pylint: enable=g-import-not-at-top
-  # pytype: enable=import-error
 
 
 def is_pyarrow_table(data: dataset_io_types.IODataset) -> bool:

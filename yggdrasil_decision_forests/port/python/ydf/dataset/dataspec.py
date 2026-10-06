@@ -598,7 +598,7 @@ def categorical_column_dictionary_to_list(
           f"in column {column_spec}"
       )
 
-  return items  # pytype: disable=bad-return-type
+  return items  # pyrefly: ignore[bad-return]
 
 
 def get_all_columns(

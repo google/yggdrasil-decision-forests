@@ -78,9 +78,9 @@ class LogBookTest(absltest.TestCase):
   def test_wrong_inputs(self):
     tmp_dir = self.create_tempdir().full_path
     with self.assertRaisesRegex(ValueError, "`key` is not a dictionary"):
-      LogBook(tmp_dir).add(1, {})  # pytype: disable=wrong-arg-types
+      LogBook(tmp_dir).add(1, {})  # pyrefly: ignore[bad-argument-type]
     with self.assertRaisesRegex(ValueError, "`result` is not a dictionary"):
-      LogBook(tmp_dir).add({}, 1)  # pytype: disable=wrong-arg-types
+      LogBook(tmp_dir).add({}, 1)  # pyrefly: ignore[bad-argument-type]
     with self.assertRaisesRegex(ValueError, "`key` contains a reserved key"):
       LogBook(tmp_dir).add({"id": 1}, {})
     with self.assertRaisesRegex(ValueError, "`result` contains a reserved key"):

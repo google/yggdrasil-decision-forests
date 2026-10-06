@@ -24,9 +24,7 @@ from ydf.dataset.io import dataset_io_types
 
 def import_pl():
   try:
-    # pytype:disable=import-error
-    import polars as pl  # pylint: disable=g-import-not-at-top
-    # pytype:enable=import-error
+    import polars as pl  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
 
     return pl
   except ImportError:

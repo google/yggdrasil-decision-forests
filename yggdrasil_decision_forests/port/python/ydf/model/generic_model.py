@@ -959,7 +959,7 @@ Use `model.describe()` for more details.
       input_model_signature_fn: Any = None,
       *,
       mode: Literal["keras", "tf"] = "tf",
-      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
+      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pyrefly: ignore[unknown-name]
       servo_api: bool = False,
       feed_example_proto: bool = False,
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
@@ -1185,7 +1185,7 @@ Use `model.describe()` for more details.
     raise NotImplementedError
 
   @abc.abstractmethod
-  def to_tensorflow_function(  # pytype: disable=name-error
+  def to_tensorflow_function(
       self,
       temp_dir: Optional[str] = None,
       can_be_saved: bool = True,
@@ -1237,7 +1237,7 @@ Use `model.describe()` for more details.
     raise NotImplementedError
 
   @abc.abstractmethod
-  def to_jax_function(  # pytype: disable=name-error
+  def to_jax_function(
       self,
       jit: bool = True,
       apply_activation: bool = True,
@@ -2130,7 +2130,7 @@ class GenericCCModel(GenericModel):
       input_model_signature_fn: Any = None,
       *,
       mode: Literal["keras", "tf"] = "tf",
-      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pytype: disable=name-error
+      feature_dtypes: Dict[str, "export_tf.TFDType"] = {},  # pyrefly: ignore[unknown-name]
       servo_api: bool = False,
       feed_example_proto: bool = False,
       pre_processing: Optional[Callable] = None,  # pylint: disable=g-bare-generic
@@ -2170,7 +2170,7 @@ class GenericCCModel(GenericModel):
         feature_specs=feature_specs,
     )
 
-  def to_tensorflow_function(  # pytype: disable=name-error
+  def to_tensorflow_function(
       self,
       temp_dir: Optional[str] = None,
       can_be_saved: bool = True,
@@ -2190,7 +2190,7 @@ class GenericCCModel(GenericModel):
         squeeze_binary_classification=squeeze_binary_classification,
     )
 
-  def to_jax_function(  # pytype: disable=name-error
+  def to_jax_function(
       self,
       jit: bool = True,
       apply_activation: bool = True,
@@ -2503,7 +2503,7 @@ def from_sklearn(
 
 def _get_export_jax():
   try:
-    from ydf.model import export_jax  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+    from ydf.model import export_jax  # pylint: disable=g-import-not-at-top,import-outside-toplevel  # pyrefly: ignore[missing-module-attribute]
 
     return export_jax
   except ImportError as exc:
@@ -2514,14 +2514,14 @@ def _get_export_jax():
 
 
 def _get_export_tf():
-  from ydf.model import export_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+  from ydf.model import export_tf  # pylint: disable=g-import-not-at-top,import-outside-toplevel  # pyrefly: ignore[missing-module-attribute]
 
   return export_tf
 
 
 def _get_export_sklearn():
   try:
-    from ydf.model import export_sklearn  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+    from ydf.model import export_sklearn  # pylint: disable=g-import-not-at-top,import-outside-toplevel  # pyrefly: ignore[missing-module-attribute]
 
     return export_sklearn
   except ImportError as exc:
@@ -2534,7 +2534,7 @@ def _get_export_sklearn():
 
 def _get_export_docker():
   try:
-    from ydf.model import export_docker  # pylint: disable=g-import-not-at-top,import-outside-toplevel # pytype: disable=import-error
+    from ydf.model import export_docker  # pylint: disable=g-import-not-at-top,import-outside-toplevel  # pyrefly: ignore[missing-module-attribute]
 
     return export_docker
   except ImportError as exc:
