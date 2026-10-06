@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
+#include "yggdrasil_decision_forests/serving/embed/utils.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 class ModelIRBuilder {
@@ -61,9 +62,9 @@ class ModelIRBuilder {
 
   absl::Status CompilePostprocessors();
 
-  // Converts a categorical mask (set of integers) into 32-bit chunks,
+  // Converts a categorical mask (set of integers) into 64-bit chunks,
   // adds them to bitset_bank.
-  absl::StatusOr<int32_t> AddToBitsetBank(const std::vector<int32_t>& items,
+  absl::StatusOr<int64_t> AddToBitsetBank(const std::vector<int32_t>& items,
                                           int num_unique_values,
                                           const std::string& name);
 

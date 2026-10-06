@@ -573,10 +573,10 @@ absl::Status ModelIRBuilder::HandleCondition(
   return absl::OkStatus();
 }
 
-absl::StatusOr<int32_t> ModelIRBuilder::AddToBitsetBank(
+absl::StatusOr<int64_t> ModelIRBuilder::AddToBitsetBank(
     const std::vector<int32_t>& items, const int num_unique_values,
     const std::string& column_name) {
-  const int32_t offset = ir_.bitset_bank.size();
+  const int64_t offset = ir_.bitset_bank.size();
   std::vector<bool> bitset(num_unique_values, false);
   for (const auto item : items) {
     if (item >= 0 && item < num_unique_values) {
