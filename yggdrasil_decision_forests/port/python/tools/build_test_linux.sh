@@ -22,11 +22,17 @@
 #  RUN_TESTS: Run the unit tests, 0 or 1 (default).
 #  PYTHON_VERSION: Python version to compile (and test) for, e.g. "3.11".
 #    Default: "3.12".
+#  BAZEL_FLAGS: Additional Bazel flags. Default: "".
+#
+# The C++ toolchain is hermetic (see MODULE.bazel) and ignores CC / CXX.
 #
 # Usage example:
 #
-#   # Compilation with Clang 14, without tests
-#   CC="clang-14" RUN_TESTS=0 ./tools/build_test_linux.sh
+#   # Compilation without tests
+#   RUN_TESTS=0 ./tools/build_test_linux.sh
+#
+#   # Compilation with the C++ compiler of the host
+#   BAZEL_FLAGS="--config=local_cc" RUN_TESTS=0 ./tools/build_test_linux.sh
 #
 #   # Compilation and tests with Python 3.11
 #   PYTHON_VERSION=3.11 ./tools/build_test_linux.sh
@@ -35,12 +41,12 @@ set -vex
 
 build_and_maybe_test () {
    echo "Building PYDF the following settings:"
-   echo "   Compiler : $CC"
+   echo "   Flags    : $BAZEL_FLAGS"
    echo "   Python   : $PYTHON_VERSION"
 
     bazel version
 
-    local flags="--config=linux_cpp17 --features=-fully_static_link --@rules_python//python/config_settings:python_version=${PYTHON_VERSION}"
+    local flags="--config=linux_cpp17 --features=-fully_static_link --@rules_python//python/config_settings:python_version=${PYTHON_VERSION} ${BAZEL_FLAGS}"
 
     if [[ "$RUN_TESTS" = 0 ]]; then
       # OSS builds don't check with Pytype, but we need to compile all targets

@@ -53,6 +53,7 @@ function install_dependencies() {
   python -m pip install build -U
   python -m pip install virtualenv -U
   python -m pip install auditwheel==6.0.0 --force-reinstall
+  python -m pip install patchelf
 }
 
 function check_is_build() {
@@ -100,7 +101,7 @@ function test_package() {
   if is_macos; then
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
   else
-    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*.manylinux_2_28_${ARCHITECTURE}.whl"
+    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl"
   fi
   ${PIP} install ${PACKAGEPATH} --force-reinstall
   ${PIP} install pandas
@@ -150,7 +151,8 @@ function e2e_native() {
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
   else
     PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-linux_${ARCHITECTURE}.whl"
-    python -m auditwheel repair --plat manylinux_2_28_${ARCHITECTURE} -w dist ${PACKAGEPATH}
+    python -m auditwheel repair --plat manylinux_2_27_${ARCHITECTURE} -w dist ${PACKAGEPATH}
+    python -m auditwheel show dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl
   fi
 
   test_package ${PACKAGE}

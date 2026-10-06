@@ -8,7 +8,7 @@
 
 ## Building files
 
--   release_linux.sh: Create the pips for linux (using dockers).
+-   release_linux.sh: Create the pips for linux.
 -   release_macos.sh: Create the pips for macos.
 -   release_windows.bat: Create the pips for windows.
 -   collect_pip_files.py: Colleche pip files. Used by other scripts, including

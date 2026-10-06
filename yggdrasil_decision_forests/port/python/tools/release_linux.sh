@@ -14,55 +14,51 @@
 # limitations under the License.
 
 
-# Builds all python versions for release on Pypi
+# Builds the pip packages of all the supported Python versions for release on
+# PyPI. The packages are in the dist/ directory.
+#
+# The C++ toolchain (see MODULE.bazel) and the Python interpreters are
+# hermetic, so the packages are manylinux_2_27 compatible when built on any
+# Linux x86_64 host (no Docker image needed).
+#
+# Requirements: Bazelisk (as `bazel`) and rsync.
+#
+# Usage example:
+#   # Release all the Python versions.
+#   ./tools/release_linux.sh
+#
+#   # Release some Python versions.
+#   PYTHON_VERSIONS="3.12 3.13" ./tools/release_linux.sh
+#
+#   # Run the unit tests before packaging.
+#   RUN_TESTS=1 ./tools/release_linux.sh
 
 set -vex
 
-if [[ "$INTERACTIVE" = 1 ]]; then
-  PYTHON_VERSIONS=( 3.12 )
-else
-  PYTHON_VERSIONS=( 3.10 3.11 3.12 3.13 3.14 )
-fi
+: "${PYTHON_VERSIONS:=3.10 3.11 3.12 3.13 3.14}"
+: "${RUN_TESTS:=0}"
+: "${VENV_ROOT:=/tmp/ydf_release_venv}"
 
 function build_py() {
-  VERSION=$1
-  echo "Build YDF for python $VERSION"
+  local version=$1
+  local venv="${VENV_ROOT}/${version}"
+  echo "Build YDF for Python ${version}"
 
-  VENV="bazel run --@rules_python//python/config_settings:python_version=$VERSION @rules_python//python/bin:python -- -m venv --clear /tmp/venv && source /tmp/venv/bin/activate && export PYTHON_VERSION=$VERSION"
+  # Virtual environment of the hermetic Python interpreter of the Bazel build.
+  bazel run --@rules_python//python/config_settings:python_version=${version} \
+    @rules_python//python/bin:python -- -m venv --clear "${venv}"
 
-  if [[ "$INTERACTIVE" = 1 ]]; then
-    # Start an interactive shell with:
-    CMD="$VENV && /bin/bash"
-    echo "In the interactive shell, you can run commands such as:"
-    echo "Run all the tests: RUN_TESTS=1 ./tools/build_test_linux.sh"
-    echo "or"
-    echo "Create a release: RUN_TESTS=0 ./tools/build_test_linux.sh && ./tools/package_linux.sh"
-  else
-    # Note: set RUN_TESTS=1 to run the tests.
-    CMD="$VENV && RUN_TESTS=0 ./tools/build_test_linux.sh && ./tools/package_linux.sh"
-  fi
-
-  # You can also start an interactive shell with:
-  # CMD="$VENV && /bin/bash"
-  # In the interactive shell, you can run commands such as "RUN_TESTS=1 ./tools/build_test_linux.sh"
-
-  docker run \
-    -v pydf_venv_cache_$VERSION:/tmp/venv \
-    -v pydf_bazel_cache_$VERSION:/root/.cache \
-    -v $(pwd)/../../../:/src \
-    -w /src/yggdrasil_decision_forests/port/python \
-    -it --rm \
-    build_pydf \
-    "${CMD}"
+  (
+    source "${venv}/bin/activate"
+    export PYTHON_VERSION=${version}
+    RUN_TESTS=${RUN_TESTS} ./tools/build_test_linux.sh
+    ./tools/package_linux.sh
+  )
 }
 
 function main() {
-  # Build docker image
-  docker build -t build_pydf .
-
-  # Build ydf for each compatible python version
-  for VERSION in ${PYTHON_VERSIONS[*]} ; do
-    build_py $VERSION 
+  for version in ${PYTHON_VERSIONS}; do
+    build_py "${version}"
   done
 }
 

@@ -46,6 +46,20 @@ build:linux --host_copt=-w
 build:macos --copt=-w
 build:windows --copt=/W0
 
+# Hermetic C++ toolchain on Linux x86_64 (see MODULE.bazel). The toolchain
+# ignores the CC / CXX environment variables. The sysroot determines the
+# manylinux tag of the wheels (linux_glibc_2_27 => manylinux_2_27).
+common:linux --repo_env=LLVM_VERSION=18
+common:linux --repo_env=SYSROOT_DIST=linux_glibc_2_27
+
+# If the libstdc++ of GCC 8 in the sysroot is too old, statically link libc++
+# instead:
+# build:linux --@rules_ml_toolchain//common:stdlib=libc++
+# build:linux --@rules_ml_toolchain//common:static_libcxx=true
+
+# Use the C++ compiler of the host instead of the hermetic toolchain.
+build:local_cc --@rules_ml_toolchain//common:enable_hermetic_cc=False
+
 # Build mode.
 build:linux_cpp17 --cxxopt=-std=c++17
 build:linux_cpp17 --host_cxxopt=-std=c++17
