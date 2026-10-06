@@ -194,8 +194,8 @@ public final class YdfModel {
   private static final int[] nodeCat;
   private static final short[] rootDeltas;
   private static final byte[] conditionTypes;
-  private static final BitSet categoricalBank;
   private static final float[] calDeltas;
+  private static final BitSet categoricalBank;
 
   static {
     try (InputStream is = YdfModel.class.getResourceAsStream("YdfModelData.bin");
@@ -235,6 +235,11 @@ public final class YdfModel {
     for (int i = 0; i < conditionTypesLength; i++) {
       conditionTypes[i] = dis.readByte();
     }
+    int calDeltasLength = dis.readInt();
+    calDeltas = new float[calDeltasLength];
+    for (int i = 0; i < calDeltasLength; i++) {
+      calDeltas[i] = dis.readFloat();
+    }
     int categoricalBankNumLongs = dis.readInt();
     if (categoricalBankNumLongs > 0) {
       long[] longs = new long[categoricalBankNumLongs];
@@ -244,11 +249,6 @@ public final class YdfModel {
       categoricalBank = BitSet.valueOf(longs);
     } else {
       categoricalBank = new BitSet();
-    }
-    int calDeltasLength = dis.readInt();
-    calDeltas = new float[calDeltasLength];
-    for (int i = 0; i < calDeltasLength; i++) {
-      calDeltas[i] = dis.readFloat();
     }
     } catch (IOException e) {
       throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);

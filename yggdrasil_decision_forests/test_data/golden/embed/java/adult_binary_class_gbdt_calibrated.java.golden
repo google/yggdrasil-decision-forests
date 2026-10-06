@@ -9,6 +9,11 @@ import java.util.BitSet;
 
 public final class YdfModel {
 
+  public enum Label {
+    LT50K,
+    GT50K,
+  };
+
   public enum FeatureWorkclass {
     OUT_OF_VOCABULARY,
     PRIVATE,
@@ -38,26 +43,6 @@ public final class YdfModel {
     V5TH_6TH,
     V1ST_4TH,
     PRESCHOOL,
-  };
-
-  public enum FeatureEducationNum {
-    OUT_OF_VOCABULARY,
-    V9,
-    V10,
-    V13,
-    V14,
-    V11,
-    V7,
-    V12,
-    V6,
-    V4,
-    V15,
-    V5,
-    V8,
-    V16,
-    V3,
-    V2,
-    V1,
   };
 
   public enum FeatureMaritalStatus {
@@ -135,31 +120,26 @@ public final class YdfModel {
     JAPAN,
     VIETNAM,
     TAIWAN,
-    POLAND,
     IRAN,
+    POLAND,
     HAITI,
     NICARAGUA,
-    PORTUGAL,
     GREECE,
-    PERU,
-    FRANCE,
+    PORTUGAL,
     ECUADOR,
+    FRANCE,
+    PERU,
     THAILAND,
     CAMBODIA,
-    LAOS,
     IRELAND,
+    LAOS,
     YUGOSLAVIA,
     TRINADADTOBAGO,
     HONDURAS,
-    HUNGARY,
     HONG,
+    HUNGARY,
     SCOTLAND,
     OUTLYING_USGUAM_USVI_ETC,
-  };
-
-  public enum Label {
-    LT50K,
-    GT50K,
   };
 
   private static final int N_DELTAS = 20000;
@@ -170,32 +150,24 @@ public final class YdfModel {
 
   public static class Instance {
 
-    private final float[] numericalFeatureValues;
+    private final int[] numericalFeatureValues;
     private final int[] categoricalOrBooleanFeatureValues;
 
-    public Instance(float age, FeatureWorkclass workclass, float fnlwgt, FeatureEducation education, FeatureEducationNum educationNum, FeatureMaritalStatus maritalStatus, FeatureOccupation occupation, FeatureRelationship relationship, FeatureRace race, FeatureSex sex, float capitalGain, float capitalLoss, float hoursPerWeek, FeatureNativeCountry nativeCountry) {
-      // NaN substitutions are required to handle missing values correctly.
-      // If no missing numerical values are used, this block can be removed.
-      age = Float.isNaN(age) ? 38.6153f : age;
-      fnlwgt = Float.isNaN(fnlwgt) ? 189879f : fnlwgt;
-      capitalGain = Float.isNaN(capitalGain) ? 1081.9f : capitalGain;
-      capitalLoss = Float.isNaN(capitalLoss) ? 87.2806f : capitalLoss;
-      hoursPerWeek = Float.isNaN(hoursPerWeek) ? 40.3955f : hoursPerWeek;
-
-      this.numericalFeatureValues = new float[] {age, 0, fnlwgt, 0, 0, 0, 0, 0, 0, 0, capitalGain, capitalLoss, hoursPerWeek, 0};
-      this.categoricalOrBooleanFeatureValues = new int[] {-1, workclass.ordinal(), -1, education.ordinal(), educationNum.ordinal(), maritalStatus.ordinal(), occupation.ordinal(), relationship.ordinal(), race.ordinal(), sex.ordinal(), -1, -1, -1, nativeCountry.ordinal()};
+    public Instance(int age, FeatureWorkclass workclass, int fnlwgt, FeatureEducation education, int educationNum, FeatureMaritalStatus maritalStatus, FeatureOccupation occupation, FeatureRelationship relationship, FeatureRace race, FeatureSex sex, int capitalGain, int capitalLoss, int hoursPerWeek, FeatureNativeCountry nativeCountry) {
+      this.numericalFeatureValues = new int[] {age, 0, fnlwgt, 0, educationNum, 0, 0, 0, 0, 0, capitalGain, capitalLoss, hoursPerWeek, 0};
+      this.categoricalOrBooleanFeatureValues = new int[] {-1, workclass.ordinal(), -1, education.ordinal(), -1, maritalStatus.ordinal(), occupation.ordinal(), relationship.ordinal(), race.ordinal(), sex.ordinal(), -1, -1, -1, nativeCountry.ordinal()};
     }
   }
 
   private static final byte[] nodePos;
   private static final float[] nodeVal;
   private static final byte[] nodeFeat;
-  private static final float[] nodeThr;
+  private static final int[] nodeThr;
   private static final short[] nodeCat;
   private static final byte[] rootDeltas;
   private static final byte[] conditionTypes;
-  private static final BitSet categoricalBank;
   private static final float[] calDeltas;
+  private static final BitSet categoricalBank;
 
   static {
     try (InputStream is = YdfModel.class.getResourceAsStream("YdfModelData.bin");
@@ -216,9 +188,9 @@ public final class YdfModel {
       nodeFeat[i] = dis.readByte();
     }
     int nodeThrLength = dis.readInt();
-    nodeThr = new float[nodeThrLength];
+    nodeThr = new int[nodeThrLength];
     for (int i = 0; i < nodeThrLength; i++) {
-      nodeThr[i] = dis.readFloat();
+      nodeThr[i] = dis.readInt();
     }
     int nodeCatLength = dis.readInt();
     nodeCat = new short[nodeCatLength];
@@ -235,6 +207,11 @@ public final class YdfModel {
     for (int i = 0; i < conditionTypesLength; i++) {
       conditionTypes[i] = dis.readByte();
     }
+    int calDeltasLength = dis.readInt();
+    calDeltas = new float[calDeltasLength];
+    for (int i = 0; i < calDeltasLength; i++) {
+      calDeltas[i] = dis.readFloat();
+    }
     int categoricalBankNumLongs = dis.readInt();
     if (categoricalBankNumLongs > 0) {
       long[] longs = new long[categoricalBankNumLongs];
@@ -244,11 +221,6 @@ public final class YdfModel {
       categoricalBank = BitSet.valueOf(longs);
     } else {
       categoricalBank = new BitSet();
-    }
-    int calDeltasLength = dis.readInt();
-    calDeltas = new float[calDeltasLength];
-    for (int i = 0; i < calDeltasLength; i++) {
-      calDeltas[i] = dis.readFloat();
     }
     } catch (IOException e) {
       throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);
@@ -284,8 +256,8 @@ public final class YdfModel {
         boolean conditionResult;
         byte featureIndex = nodeFeat[currentNodeIndex];
         if (conditionTypes[featureIndex] == 0) {
-          float numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
-          float threshold = nodeThr[currentNodeIndex];
+          int numericalFeatureValue = instance.numericalFeatureValues[featureIndex];
+          int threshold = nodeThr[currentNodeIndex];
           conditionResult = numericalFeatureValue >= threshold;
         } else if (conditionTypes[featureIndex] == 1) {
           int categoricalFeatureValue = instance.categoricalOrBooleanFeatureValues[featureIndex];

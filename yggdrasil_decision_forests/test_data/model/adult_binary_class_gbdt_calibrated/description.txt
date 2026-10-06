@@ -23,209 +23,323 @@ No weights
 Postprocessors:
 [1/1] - enabled
 Smoothed PAV calibrator
-Number of raw bins: 167
+Number of raw bins: 531
 Number of lookup table bins: 20000
 
 
 Variable Importance: INV_MEAN_MIN_DEPTH:
-    1.   "capital_gain"  0.348634 ################
-    2.            "age"  0.285433 ############
-    3.   "capital_loss"  0.131911 ###
-    4. "marital_status"  0.117577 ##
-    5. "hours_per_week"  0.102857 #
-    6.     "occupation"  0.096636 #
-    7.         "fnlwgt"  0.095548 #
-    8.      "education"  0.093344 #
-    9.  "education_num"  0.092694 #
-   10.   "relationship"  0.085777 
-   11.           "race"  0.080496 
-   12. "native_country"  0.076829 
-   13.      "workclass"  0.076388 
-   14.            "sex"  0.075220 
+    1.            "age"  0.226664 ################
+    2.     "occupation"  0.219688 #############
+    3.      "education"  0.218052 #############
+    4.   "capital_gain"  0.214876 ############
+    5. "marital_status"  0.212828 ###########
+    6.   "relationship"  0.205975 #########
+    7.         "fnlwgt"  0.203878 ########
+    8. "hours_per_week"  0.203735 ########
+    9.   "capital_loss"  0.196549 ######
+   10. "native_country"  0.190548 ####
+   11.      "workclass"  0.187810 ###
+   12.  "education_num"  0.181204 #
+   13.           "race"  0.180495 
+   14.            "sex"  0.177632 
 
 Variable Importance: NUM_AS_ROOT:
-    1.            "age" 31.000000 ################
-    2. "marital_status" 22.000000 ###########
-    3.   "capital_gain"  8.000000 ###
-    4.     "occupation"  3.000000 #
-    5.  "education_num"  2.000000 
-    6.      "education"  1.000000 
-    7.   "capital_loss"  1.000000 
+    1.            "age" 26.000000 ################
+    2.   "capital_gain" 26.000000 ################
+    3. "marital_status" 20.000000 ############
+    4.   "relationship" 17.000000 ##########
+    5.      "education" 15.000000 ########
+    6.   "capital_loss" 14.000000 ########
+    7. "hours_per_week" 14.000000 ########
+    8.         "fnlwgt" 10.000000 #####
+    9.           "race"  9.000000 #####
+   10.  "education_num"  4.000000 #
+   11.            "sex"  4.000000 #
+   12.     "occupation"  2.000000 
+   13.      "workclass"  1.000000 
+   14. "native_country"  1.000000 
 
 Variable Importance: NUM_NODES:
-    1.         "fnlwgt" 1038.000000 ################
-    2.            "age" 716.000000 ##########
-    3. "hours_per_week" 538.000000 #######
-    4.   "capital_gain" 496.000000 #######
-    5.   "capital_loss" 396.000000 #####
-    6.     "occupation" 267.000000 ###
-    7.      "education" 167.000000 ##
-    8.  "education_num" 160.000000 #
-    9. "marital_status" 126.000000 #
-   10.      "workclass" 118.000000 #
-   11. "native_country" 99.000000 
-   12.   "relationship" 81.000000 
-   13.            "sex" 42.000000 
-   14.           "race" 40.000000 
+    1.     "occupation" 722.000000 ################
+    2.         "fnlwgt" 515.000000 ###########
+    3.            "age" 483.000000 ##########
+    4.      "education" 459.000000 #########
+    5. "hours_per_week" 339.000000 #######
+    6.   "capital_gain" 325.000000 ######
+    7. "native_country" 306.000000 ######
+    8.   "capital_loss" 297.000000 ######
+    9.   "relationship" 262.000000 #####
+   10.      "workclass" 245.000000 #####
+   11. "marital_status" 210.000000 ####
+   12.  "education_num" 88.000000 #
+   13.            "sex" 41.000000 
+   14.           "race" 21.000000 
 
 Variable Importance: SUM_SCORE:
-    1. "marital_status" 530956984.119748 ################
-    2.   "capital_gain" 411123634.345114 ############
-    3.            "age" 354664186.766705 ##########
-    4. "hours_per_week" 240233774.133519 #######
-    5.   "capital_loss" 172591458.733243 #####
-    6.     "occupation" 112809328.090070 ###
-    7.         "fnlwgt" 104373733.635293 ###
-    8.      "education" 38044579.052098 #
-    9.  "education_num" 29986295.822112 
-   10.            "sex" 11084945.032449 
-   11.      "workclass" 9233258.450864 
-   12.   "relationship" 4745657.076093 
-   13.           "race" 3349279.550052 
-   14. "native_country" 3231785.561941 
+    1.   "relationship" 3018.761866 ################
+    2.   "capital_gain" 2065.521668 ##########
+    3.      "education" 1241.764059 ######
+    4. "marital_status" 1107.545372 #####
+    5.     "occupation" 1094.359168 #####
+    6.  "education_num" 699.517705 ###
+    7.   "capital_loss" 584.055066 ###
+    8.            "age" 582.292563 ###
+    9. "hours_per_week" 366.856509 #
+   10. "native_country" 263.872689 #
+   11.         "fnlwgt" 216.537764 #
+   12.      "workclass" 196.221850 #
+   13.            "sex" 46.986269 
+   14.           "race"  5.428727 
 
 
-Cannot compute model self evaluation:This model does not support evaluation reports.
 
 Loss: BINOMIAL_LOG_LIKELIHOOD
-Validation loss value: 0.573843
+Validation loss value: 0.576143
 Number of trees per iteration: 1
-Node format: BLOB_SEQUENCE
+Node format: BLOB_SEQUENCE_GZIP
 Early stopping triggered: NOT_SET
-Number of trees: 68
-Total number of nodes: 8636
+Number of trees: 163
+Total number of nodes: 8789
 
 Number of nodes by tree:
-Count: 68 Average: 127 StdDev: 0
-Min: 127 Max: 127 Ignored: 0
+Count: 163 Average: 53.9202 StdDev: 6.73147
+Min: 31 Max: 63 Ignored: 0
 ----------------------------------------------
-[ 127, 127] 68 100.00% 100.00% ##########
+[ 31, 32)  1   0.61%   0.61%
+[ 32, 34)  2   1.23%   1.84% #
+[ 34, 35)  0   0.00%   1.84%
+[ 35, 37)  1   0.61%   2.45%
+[ 37, 39)  1   0.61%   3.07%
+[ 39, 40)  4   2.45%   5.52% #
+[ 40, 42)  2   1.23%   6.75% #
+[ 42, 44)  3   1.84%   8.59% #
+[ 44, 45)  0   0.00%   8.59%
+[ 45, 47)  7   4.29%  12.88% ##
+[ 47, 49)  4   2.45%  15.34% #
+[ 49, 50) 15   9.20%  24.54% ####
+[ 50, 52) 14   8.59%  33.13% ####
+[ 52, 54) 11   6.75%  39.88% ###
+[ 54, 55)  0   0.00%  39.88%
+[ 55, 57) 23  14.11%  53.99% #######
+[ 57, 59) 18  11.04%  65.03% #####
+[ 59, 60) 34  20.86%  85.89% ##########
+[ 60, 62) 14   8.59%  94.48% ####
+[ 62, 63]  9   5.52% 100.00% ###
 
 Depth by leafs:
-Count: 4352 Average: 13.3146 StdDev: 8.74848
-Min: 1 Max: 54 Ignored: 0
+Count: 4476 Average: 4.8702 StdDev: 0.41894
+Min: 1 Max: 5 Ignored: 0
 ----------------------------------------------
-[  1,  3)  79   1.82%   1.82% #
-[  3,  6) 553  12.71%  14.52% ######
-[  6,  9) 881  20.24%  34.77% ##########
-[  9, 11) 578  13.28%  48.05% #######
-[ 11, 14) 669  15.37%  63.42% ########
-[ 14, 17) 427   9.81%  73.23% #####
-[ 17, 19) 204   4.69%  77.92% ##
-[ 19, 22) 242   5.56%  83.48% ###
-[ 22, 25) 203   4.66%  88.14% ##
-[ 25, 28) 137   3.15%  91.29% ##
-[ 28, 30)  92   2.11%  93.41% #
-[ 30, 33)  85   1.95%  95.36% #
-[ 33, 36)  72   1.65%  97.01% #
-[ 36, 38)  37   0.85%  97.86%
-[ 38, 41)  43   0.99%  98.85%
-[ 41, 44)  33   0.76%  99.61%
-[ 44, 46)   7   0.16%  99.77%
-[ 46, 49)   3   0.07%  99.84%
-[ 49, 52)   3   0.07%  99.91%
-[ 52, 54]   4   0.09% 100.00%
+[ 1, 2)    1   0.02%   0.02%
+[ 2, 3)   14   0.31%   0.34%
+[ 3, 4)   92   2.06%   2.39%
+[ 4, 5)  351   7.84%  10.23% #
+[ 5, 5] 4018  89.77% 100.00% ##########
 
 Number of training obs by leaf:
-Count: 4352 Average: 0 StdDev: 0
-Min: 0 Max: 0 Ignored: 0
+Count: 4476 Average: 747.739 StdDev: 2462.57
+Min: 5 Max: 20207 Ignored: 0
 ----------------------------------------------
-[ 0, 0] 4352 100.00% 100.00% ##########
+[     5,  1015) 3898  87.09%  87.09% ##########
+[  1015,  2025)  189   4.22%  91.31%
+[  2025,  3035)   98   2.19%  93.50%
+[  3035,  4045)   71   1.59%  95.08%
+[  4045,  5055)   37   0.83%  95.91%
+[  5055,  6065)   31   0.69%  96.60%
+[  6065,  7076)   17   0.38%  96.98%
+[  7076,  8086)   18   0.40%  97.39%
+[  8086,  9096)   14   0.31%  97.70%
+[  9096, 10106)   16   0.36%  98.06%
+[ 10106, 11116)   11   0.25%  98.30%
+[ 11116, 12126)   10   0.22%  98.53%
+[ 12126, 13136)   10   0.22%  98.75%
+[ 13136, 14147)    6   0.13%  98.88%
+[ 14147, 15157)   10   0.22%  99.11%
+[ 15157, 16167)    3   0.07%  99.17%
+[ 16167, 17177)    0   0.00%  99.17%
+[ 17177, 18187)    2   0.04%  99.22%
+[ 18187, 19197)   17   0.38%  99.60%
+[ 19197, 20207]   18   0.40% 100.00%
 
 Attribute in nodes:
-	1038 : fnlwgt [NUMERICAL]
-	716 : age [NUMERICAL]
-	538 : hours_per_week [NUMERICAL]
-	496 : capital_gain [NUMERICAL]
-	396 : capital_loss [NUMERICAL]
-	267 : occupation [CATEGORICAL]
-	167 : education [CATEGORICAL]
-	160 : education_num [CATEGORICAL]
-	126 : marital_status [CATEGORICAL]
-	118 : workclass [CATEGORICAL]
-	99 : native_country [CATEGORICAL]
-	81 : relationship [CATEGORICAL]
-	42 : sex [CATEGORICAL]
-	40 : race [CATEGORICAL]
+	722 : occupation [CATEGORICAL]
+	515 : fnlwgt [NUMERICAL]
+	483 : age [NUMERICAL]
+	459 : education [CATEGORICAL]
+	339 : hours_per_week [NUMERICAL]
+	325 : capital_gain [NUMERICAL]
+	306 : native_country [CATEGORICAL]
+	297 : capital_loss [NUMERICAL]
+	262 : relationship [CATEGORICAL]
+	245 : workclass [CATEGORICAL]
+	210 : marital_status [CATEGORICAL]
+	88 : education_num [NUMERICAL]
+	41 : sex [CATEGORICAL]
+	21 : race [CATEGORICAL]
 
 Attribute in nodes with depth <= 0:
-	31 : age [NUMERICAL]
-	22 : marital_status [CATEGORICAL]
-	8 : capital_gain [NUMERICAL]
-	3 : occupation [CATEGORICAL]
-	2 : education_num [CATEGORICAL]
-	1 : capital_loss [NUMERICAL]
-	1 : education [CATEGORICAL]
-
-Attribute in nodes with depth <= 1:
-	97 : capital_gain [NUMERICAL]
-	53 : age [NUMERICAL]
-	23 : marital_status [CATEGORICAL]
-	5 : occupation [CATEGORICAL]
-	3 : capital_loss [NUMERICAL]
-	3 : education_num [CATEGORICAL]
-	1 : hours_per_week [NUMERICAL]
-	1 : education [CATEGORICAL]
-
-Attribute in nodes with depth <= 2:
-	141 : capital_gain [NUMERICAL]
-	98 : age [NUMERICAL]
-	33 : marital_status [CATEGORICAL]
-	32 : capital_loss [NUMERICAL]
-	19 : hours_per_week [NUMERICAL]
-	19 : occupation [CATEGORICAL]
-	8 : education_num [CATEGORICAL]
-	5 : education [CATEGORICAL]
-	3 : race [CATEGORICAL]
-	2 : fnlwgt [NUMERICAL]
-	1 : relationship [CATEGORICAL]
-
-Attribute in nodes with depth <= 3:
-	180 : capital_gain [NUMERICAL]
-	133 : age [NUMERICAL]
-	87 : capital_loss [NUMERICAL]
-	56 : hours_per_week [NUMERICAL]
-	37 : marital_status [CATEGORICAL]
-	33 : occupation [CATEGORICAL]
-	22 : education [CATEGORICAL]
-	17 : education_num [CATEGORICAL]
-	16 : fnlwgt [NUMERICAL]
-	4 : race [CATEGORICAL]
-	2 : sex [CATEGORICAL]
-	2 : relationship [CATEGORICAL]
+	26 : capital_gain [NUMERICAL]
+	26 : age [NUMERICAL]
+	20 : marital_status [CATEGORICAL]
+	17 : relationship [CATEGORICAL]
+	15 : education [CATEGORICAL]
+	14 : hours_per_week [NUMERICAL]
+	14 : capital_loss [NUMERICAL]
+	10 : fnlwgt [NUMERICAL]
+	9 : race [CATEGORICAL]
+	4 : sex [CATEGORICAL]
+	4 : education_num [NUMERICAL]
+	2 : occupation [CATEGORICAL]
+	1 : native_country [CATEGORICAL]
 	1 : workclass [CATEGORICAL]
 
-Attribute in nodes with depth <= 5:
+Attribute in nodes with depth <= 1:
+	73 : capital_gain [NUMERICAL]
+	55 : capital_loss [NUMERICAL]
+	53 : age [NUMERICAL]
+	51 : marital_status [CATEGORICAL]
+	49 : fnlwgt [NUMERICAL]
+	41 : occupation [CATEGORICAL]
+	38 : education [CATEGORICAL]
+	34 : hours_per_week [NUMERICAL]
+	29 : relationship [CATEGORICAL]
+	17 : native_country [CATEGORICAL]
+	15 : workclass [CATEGORICAL]
+	13 : education_num [NUMERICAL]
+	11 : race [CATEGORICAL]
+	9 : sex [CATEGORICAL]
+
+Attribute in nodes with depth <= 2:
+	152 : capital_gain [NUMERICAL]
+	125 : occupation [CATEGORICAL]
+	122 : fnlwgt [NUMERICAL]
+	120 : capital_loss [NUMERICAL]
+	109 : age [NUMERICAL]
+	101 : education [CATEGORICAL]
+	87 : marital_status [CATEGORICAL]
+	73 : hours_per_week [NUMERICAL]
+	70 : relationship [CATEGORICAL]
+	63 : native_country [CATEGORICAL]
+	51 : workclass [CATEGORICAL]
+	23 : education_num [NUMERICAL]
+	15 : sex [CATEGORICAL]
+	13 : race [CATEGORICAL]
+
+Attribute in nodes with depth <= 3:
+	354 : occupation [CATEGORICAL]
+	268 : fnlwgt [NUMERICAL]
+	251 : age [NUMERICAL]
 	241 : capital_gain [NUMERICAL]
-	234 : age [NUMERICAL]
-	160 : capital_loss [NUMERICAL]
-	151 : hours_per_week [NUMERICAL]
-	80 : occupation [CATEGORICAL]
-	79 : fnlwgt [NUMERICAL]
-	58 : marital_status [CATEGORICAL]
-	56 : education [CATEGORICAL]
-	41 : education_num [CATEGORICAL]
-	21 : sex [CATEGORICAL]
-	14 : relationship [CATEGORICAL]
-	11 : workclass [CATEGORICAL]
-	6 : race [CATEGORICAL]
-	2 : native_country [CATEGORICAL]
+	230 : education [CATEGORICAL]
+	206 : capital_loss [NUMERICAL]
+	152 : hours_per_week [NUMERICAL]
+	138 : native_country [CATEGORICAL]
+	129 : relationship [CATEGORICAL]
+	129 : workclass [CATEGORICAL]
+	123 : marital_status [CATEGORICAL]
+	44 : education_num [NUMERICAL]
+	22 : sex [CATEGORICAL]
+	17 : race [CATEGORICAL]
+
+Attribute in nodes with depth <= 5:
+	722 : occupation [CATEGORICAL]
+	515 : fnlwgt [NUMERICAL]
+	483 : age [NUMERICAL]
+	459 : education [CATEGORICAL]
+	339 : hours_per_week [NUMERICAL]
+	325 : capital_gain [NUMERICAL]
+	306 : native_country [CATEGORICAL]
+	297 : capital_loss [NUMERICAL]
+	262 : relationship [CATEGORICAL]
+	245 : workclass [CATEGORICAL]
+	210 : marital_status [CATEGORICAL]
+	88 : education_num [NUMERICAL]
+	41 : sex [CATEGORICAL]
+	21 : race [CATEGORICAL]
 
 Condition type in nodes:
-	3184 : HigherCondition
-	1100 : ContainsBitmapCondition
+	2264 : ContainsBitmapCondition
+	2047 : HigherCondition
+	2 : ContainsCondition
 Condition type in nodes with depth <= 0:
-	40 : HigherCondition
-	28 : ContainsBitmapCondition
-Condition type in nodes with depth <= 1:
-	154 : HigherCondition
-	32 : ContainsBitmapCondition
-Condition type in nodes with depth <= 2:
-	292 : HigherCondition
+	94 : HigherCondition
 	69 : ContainsBitmapCondition
+Condition type in nodes with depth <= 1:
+	277 : HigherCondition
+	211 : ContainsBitmapCondition
+Condition type in nodes with depth <= 2:
+	599 : HigherCondition
+	525 : ContainsBitmapCondition
 Condition type in nodes with depth <= 3:
-	472 : HigherCondition
-	118 : ContainsBitmapCondition
+	1162 : HigherCondition
+	1140 : ContainsBitmapCondition
+	2 : ContainsCondition
 Condition type in nodes with depth <= 5:
-	865 : HigherCondition
-	289 : ContainsBitmapCondition
+	2264 : ContainsBitmapCondition
+	2047 : HigherCondition
+	2 : ContainsCondition
+
+Training logs:
+Number of iteration to final model: 163
+	Iter:1 train-loss:1.015263 valid-loss:1.069998  train-accuracy:0.761895 valid-accuracy:0.736609
+	Iter:2 train-loss:0.954158 valid-loss:1.005950  train-accuracy:0.761895 valid-accuracy:0.736609
+	Iter:3 train-loss:0.905791 valid-loss:0.956294  train-accuracy:0.761895 valid-accuracy:0.736609
+	Iter:4 train-loss:0.865922 valid-loss:0.915507  train-accuracy:0.802708 valid-accuracy:0.778663
+	Iter:5 train-loss:0.832547 valid-loss:0.880311  train-accuracy:0.816491 valid-accuracy:0.792386
+	Iter:6 train-loss:0.803634 valid-loss:0.850085  train-accuracy:0.816734 valid-accuracy:0.792386
+	Iter:16 train-loss:0.651520 valid-loss:0.687656  train-accuracy:0.864121 valid-accuracy:0.854360
+	Iter:26 train-loss:0.595837 valid-loss:0.635662  train-accuracy:0.870550 valid-accuracy:0.861000
+	Iter:36 train-loss:0.567251 valid-loss:0.612381  train-accuracy:0.875664 valid-accuracy:0.860558
+	Iter:46 train-loss:0.546733 valid-loss:0.599879  train-accuracy:0.881216 valid-accuracy:0.866313
+	Iter:56 train-loss:0.531772 valid-loss:0.592654  train-accuracy:0.883894 valid-accuracy:0.871182
+	Iter:66 train-loss:0.519639 valid-loss:0.588025  train-accuracy:0.886914 valid-accuracy:0.870297
+	Iter:76 train-loss:0.508524 valid-loss:0.584332  train-accuracy:0.888959 valid-accuracy:0.871625
+	Iter:86 train-loss:0.499619 valid-loss:0.581143  train-accuracy:0.891200 valid-accuracy:0.871625
+	Iter:96 train-loss:0.492438 valid-loss:0.580197  train-accuracy:0.892222 valid-accuracy:0.868969
+	Iter:106 train-loss:0.485893 valid-loss:0.580046  train-accuracy:0.894511 valid-accuracy:0.869854
+	Iter:116 train-loss:0.479146 valid-loss:0.579222  train-accuracy:0.895729 valid-accuracy:0.869854
+	Iter:126 train-loss:0.473333 valid-loss:0.578067  train-accuracy:0.897385 valid-accuracy:0.869854
+	Iter:136 train-loss:0.467836 valid-loss:0.576896  train-accuracy:0.899089 valid-accuracy:0.868083
+	Iter:146 train-loss:0.462477 valid-loss:0.577019  train-accuracy:0.900356 valid-accuracy:0.867198
+	Iter:156 train-loss:0.457704 valid-loss:0.576879  train-accuracy:0.901427 valid-accuracy:0.867198
+	Iter:166 train-loss:0.452869 valid-loss:0.576561  train-accuracy:0.902791 valid-accuracy:0.868526
+	Iter:176 train-loss:0.446772 valid-loss:0.578159  train-accuracy:0.903911 valid-accuracy:0.868526
+	Iter:186 train-loss:0.442635 valid-loss:0.577240  train-accuracy:0.904593 valid-accuracy:0.866755
+
+DATASPEC:
+
+Number of records: 22792
+Number of columns: 15
+
+Number of columns by type:
+	CATEGORICAL: 9 (60%)
+	NUMERICAL: 6 (40%)
+
+Columns:
+
+CATEGORICAL: 9 (60%)
+	0: "income" CATEGORICAL has-dict vocab-size:3 zero-ood-items most-frequent:"<=50K" 17308 (75.9389%) dtype:DTYPE_BYTES
+	2: "workclass" CATEGORICAL num-nas:1257 (5.51509%) has-dict vocab-size:8 num-oods:3 (0.0139308%) most-frequent:"Private" 15879 (73.7358%) dtype:DTYPE_BYTES
+	4: "education" CATEGORICAL has-dict vocab-size:17 zero-ood-items most-frequent:"HS-grad" 7340 (32.2043%) dtype:DTYPE_BYTES
+	6: "marital_status" CATEGORICAL has-dict vocab-size:8 zero-ood-items most-frequent:"Married-civ-spouse" 10431 (45.7661%) dtype:DTYPE_BYTES
+	7: "occupation" CATEGORICAL num-nas:1260 (5.52826%) has-dict vocab-size:14 num-oods:4 (0.018577%) most-frequent:"Prof-specialty" 2870 (13.329%) dtype:DTYPE_BYTES
+	8: "relationship" CATEGORICAL has-dict vocab-size:7 zero-ood-items most-frequent:"Husband" 9191 (40.3256%) dtype:DTYPE_BYTES
+	9: "race" CATEGORICAL has-dict vocab-size:6 zero-ood-items most-frequent:"White" 19467 (85.4115%) dtype:DTYPE_BYTES
+	10: "sex" CATEGORICAL has-dict vocab-size:3 zero-ood-items most-frequent:"Male" 15165 (66.5365%) dtype:DTYPE_BYTES
+	14: "native_country" CATEGORICAL num-nas:407 (1.78571%) has-dict vocab-size:41 num-oods:1 (0.00446728%) most-frequent:"United-States" 20436 (91.2933%) dtype:DTYPE_BYTES
+
+NUMERICAL: 6 (40%)
+	1: "age" NUMERICAL mean:38.6153 min:17 max:90 sd:13.661 dtype:DTYPE_INT64
+	3: "fnlwgt" NUMERICAL mean:189879 min:12285 max:1.4847e+06 sd:106423 dtype:DTYPE_INT64
+	5: "education_num" NUMERICAL mean:10.0927 min:1 max:16 sd:2.56427 dtype:DTYPE_INT64
+	11: "capital_gain" NUMERICAL mean:1081.9 min:0 max:99999 sd:7509.48 dtype:DTYPE_INT64
+	12: "capital_loss" NUMERICAL mean:87.2806 min:0 max:4356 sd:403.01 dtype:DTYPE_INT64
+	13: "hours_per_week" NUMERICAL mean:40.3955 min:1 max:99 sd:12.249 dtype:DTYPE_INT64
+
+Terminology:
+	nas: Number of non-available (i.e. missing) values.
+	ood: Out of dictionary.
+	manually-defined: Attribute whose type is manually defined by the user, i.e., the type was not automatically inferred.
+	tokenized: The attribute value is obtained through tokenization.
+	has-dict: The attribute is attached to a string dictionary e.g. a categorical attribute stored as a string.
+	vocab-size: Number of unique values.

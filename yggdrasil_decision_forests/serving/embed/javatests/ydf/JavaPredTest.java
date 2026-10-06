@@ -7,6 +7,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import ydf.models.TestModelAbaloneRegressionGBDTV2Routing;
 import ydf.models.TestModelAbaloneRegressionRFSmallRouting;
+import ydf.models.TestModelAdultBinaryClassGBDTCalibratedProbaRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ClassRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ProbaRouting;
 import ydf.models.TestModelAdultBinaryClassGBDTV2ScoreRouting;
@@ -117,6 +118,37 @@ public class JavaPredTest {
                 .UNITED_STATES);
     float expected = 0.01860435f;
     assertThat(TestModelAdultBinaryClassGBDTV2ProbaRouting.predict(instance))
+        .isWithin(0.00001f)
+        .of(expected);
+  }
+
+  @Test
+  public void testAdultBinaryClassGBDTCalibratedProbaRouting_knownOutput() {
+
+    var instance =
+        new TestModelAdultBinaryClassGBDTCalibratedProbaRouting.Instance(
+            /* age= */ 39,
+            /* workclass= */ TestModelAdultBinaryClassGBDTCalibratedProbaRouting.FeatureWorkclass
+                .STATE_GOV,
+            /* fnlwgt= */ 77516,
+            /* education= */ TestModelAdultBinaryClassGBDTCalibratedProbaRouting.FeatureEducation
+                .BACHELORS,
+            /* educationNum= */ 13,
+            TestModelAdultBinaryClassGBDTCalibratedProbaRouting.FeatureMaritalStatus
+                .NEVER_MARRIED, // maritalStatus
+            TestModelAdultBinaryClassGBDTCalibratedProbaRouting.FeatureOccupation
+                .ADM_CLERICAL, // occupation
+            TestModelAdultBinaryClassGBDTCalibratedProbaRouting.FeatureRelationship
+                .NOT_IN_FAMILY, // relationship
+            /* race= */ TestModelAdultBinaryClassGBDTCalibratedProbaRouting.FeatureRace.WHITE,
+            /* sex= */ TestModelAdultBinaryClassGBDTCalibratedProbaRouting.FeatureSex.MALE,
+            /* capitalGain= */ 2174,
+            /* capitalLoss= */ 0,
+            /* hoursPerWeek= */ 40,
+            /* nativeCountry= */ TestModelAdultBinaryClassGBDTCalibratedProbaRouting
+                .FeatureNativeCountry.UNITED_STATES);
+    float expected = 0.00770874f;
+    assertThat(TestModelAdultBinaryClassGBDTCalibratedProbaRouting.predict(instance))
         .isWithin(0.00001f)
         .of(expected);
   }

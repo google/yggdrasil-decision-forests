@@ -294,7 +294,7 @@ std::vector<const std::optional<NodeDataArray>*>
 ModelDataBank::GetOrderedNodeDataArrays() const {
   return {&node_pos,        &node_val,         &node_feat,   &node_thr,
           &node_cat,        &node_obl,         &root_deltas, &condition_types,
-          &oblique_weights, &oblique_features, &leaf_values};
+          &oblique_weights, &oblique_features, &leaf_values, &cal_deltas};
 }
 
 absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
@@ -371,19 +371,6 @@ absl::StatusOr<std::string> ModelDataBank::GenerateJavaCode(
         "    $0categoricalBank = new BitSet();\n"
         "  }\n",
         maybe_this);
-  }
-
-  // 3. Calibration data if needed.
-  if (internal_options.calibrate) {
-    absl::SubstituteAndAppend(&declarations, "private $0float[] calDeltas;\n",
-                              maybe_static_final);
-    absl::SubstituteAndAppend(&field_initialization_code,
-                              "  int calDeltasLength = dis.readInt();\n"
-                              "  $0calDeltas = new float[calDeltasLength];\n"
-                              "  for (int i = 0; i < calDeltasLength; i++) {\n"
-                              "    $0calDeltas[i] = dis.readFloat();\n"
-                              "  }\n",
-                              maybe_this);
   }
 
   std::string content = declarations;

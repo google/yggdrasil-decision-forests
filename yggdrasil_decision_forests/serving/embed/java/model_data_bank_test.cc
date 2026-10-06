@@ -579,6 +579,7 @@ TEST_F(ModelDataBankTest, GenerateJavaCodeWithMultiDimLeavesAndCalibration) {
                           .oblique_features = {10},
                           .leaf_values = {1.f, 2.f, 3.f}}));
   bank.categorical = {true, false, true};
+  ASSERT_OK(bank.AddCalDeltas({1.0, 2, 0, 3.0}));
   ASSERT_OK(bank.AddRootDelta(10));
   ASSERT_OK(bank.FinalizeJavaTypes());
 
@@ -598,8 +599,8 @@ private static final int[] rootDeltas;
 private static final float[] obliqueWeights;
 private static final short[] obliqueFeatures;
 private static final float[] leafValues;
-private static final BitSet categoricalBank;
 private static final float[] calDeltas;
+private static final BitSet categoricalBank;
 
 static {
   try (InputStream is = MyModel.class.getResourceAsStream("MyModelData.bin");
@@ -654,6 +655,11 @@ static {
   for (int i = 0; i < leafValuesLength; i++) {
     leafValues[i] = dis.readFloat();
   }
+  int calDeltasLength = dis.readInt();
+  calDeltas = new float[calDeltasLength];
+  for (int i = 0; i < calDeltasLength; i++) {
+    calDeltas[i] = dis.readFloat();
+  }
   int categoricalBankNumLongs = dis.readInt();
   if (categoricalBankNumLongs > 0) {
     long[] longs = new long[categoricalBankNumLongs];
@@ -663,11 +669,6 @@ static {
     categoricalBank = BitSet.valueOf(longs);
   } else {
     categoricalBank = new BitSet();
-  }
-  int calDeltasLength = dis.readInt();
-  calDeltas = new float[calDeltasLength];
-  for (int i = 0; i < calDeltasLength; i++) {
-    calDeltas[i] = dis.readFloat();
   }
   } catch (IOException e) {
     throw new RuntimeException("Failed to load model data resource: " + e.getMessage(), e);

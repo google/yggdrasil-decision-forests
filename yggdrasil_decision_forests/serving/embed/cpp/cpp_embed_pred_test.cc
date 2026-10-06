@@ -74,24 +74,6 @@ print(model.predict(ds[:1]))
 namespace yggdrasil_decision_forests::serving::embed {
 namespace {
 
-#define ADULT_EXAMPLE_V1                                     \
-  {                                                          \
-      .age = 39.f,                                           \
-      .workclass = FeatureWorkclass::kStateGov,              \
-      .fnlwgt = 77516.f,                                     \
-      .education = FeatureEducation::kBachelors,             \
-      .education_num = FeatureEducationNum::k13,             \
-      .marital_status = FeatureMaritalStatus::kNeverMarried, \
-      .occupation = FeatureOccupation::kAdmClerical,         \
-      .relationship = FeatureRelationship::kNotInFamily,     \
-      .race = FeatureRace::kWhite,                           \
-      .sex = FeatureSex::kMale,                              \
-      .capital_gain = 2174.f,                                \
-      .capital_loss = 0.f,                                   \
-      .hours_per_week = 40.f,                                \
-      .native_country = FeatureNativeCountry::kUnitedStates, \
-  }
-
 #define ADULT_EXAMPLE                                        \
   {                                                          \
       .age = 39,                                             \
@@ -226,14 +208,14 @@ TEST(Embed, test_model_adult_binary_class_gbdt_v2_proba_routing) {
 
 TEST(Embed, test_model_adult_binary_class_gbdt_calibrated) {
   using namespace test_model_adult_binary_class_gbdt_calibrated;
-  const float pred = Predict(ADULT_EXAMPLE_V1);
-  EXPECT_NEAR(pred, 0.00728484, eps);
+  const float pred = Predict(ADULT_EXAMPLE);
+  EXPECT_NEAR(pred, 0.00770874, eps);
 }
 
 TEST(Embed, test_model_adult_binary_class_gbdt_calibrated_routing) {
   using namespace test_model_adult_binary_class_gbdt_calibrated_routing;
-  const float pred = Predict(ADULT_EXAMPLE_V1);
-  EXPECT_NEAR(pred, 0.00728484, eps);
+  const float pred = Predict(ADULT_EXAMPLE);
+  EXPECT_NEAR(pred, 0.00770874, eps);
 }
 
 TEST(Embed,
