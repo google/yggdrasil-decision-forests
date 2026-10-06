@@ -20,12 +20,12 @@ remember to update `CHANGELOG.md`.
 After changing `requirements.txt` or `dev_requirements.txt`, update the lock
 file with `bazel run //:requirements.update`.
 
-#### Docker
+#### Release script
 
-For building manylinux_2_28-compatible packages, you can use an appropriate
-Docker image. The pre-configured build script at `tools/release_linux.sh`
-starts a container and builds the wheels end-to-end. You can find the wheels in
-the `dist/`subdirectory.
+The C++ toolchain (Clang with a glibc 2.27 sysroot) and the Python interpreters
+are hermetic. The script `tools/release_linux.sh` builds the wheels of all the
+supported Python versions end-to-end. You can find the wheels in the `dist/`
+subdirectory.
 
 #### Manual build
 
@@ -35,8 +35,7 @@ Note that we may not be able to help with issues during manual builds.
 
 *   Bazel - version as specified in `.bazelversion`,
     [Bazelisk](https://github.com/bazelbuild/bazelisk) recommended
-*   GCC >= 9 or Clang >= 14
-*   rsync
+
 
 **Steps**
 
@@ -47,7 +46,9 @@ Note that we may not be able to help with issues during manual builds.
     PYTHON_VERSION=3.12 RUN_TESTS=1 ./tools/build_test_linux.sh
     ```
 
-    Substitute for your compiler name / version
+    To use the C++ compiler of the host instead of the hermetic toolchain (e.g.
+    for debugging), set `BAZEL_FLAGS=--config=local_cc`. The resulting wheels
+    are not manylinux-compatible.
 
 1.  Build the Pip package
 

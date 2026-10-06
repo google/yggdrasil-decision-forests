@@ -60,7 +60,7 @@ for f in [
     "config/MANIFEST.in",
     "README.md",
     "CHANGELOG.md",
-    "bazel-python/external/yggdrasil_decision_forests~/LICENSE",
+    "../../../LICENSE",
 ]:
   s.copy(f, DST_PK)
 

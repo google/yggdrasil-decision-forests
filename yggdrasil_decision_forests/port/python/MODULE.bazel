@@ -20,6 +20,23 @@ local_path_override(
     path = "../../../",
 )
 
+# Hermetic C++ toolchain for Linux x86_64: LLVM (Clang) with an Ubuntu 18.04
+# sysroot (glibc 2.27, libstdc++ of GCC 8). The binaries only depend on glibc
+# <= 2.27, so the wheels are manylinux_2_27 compatible when built on any Linux
+# host, without a manylinux Docker image. See .bazelrc for the configuration.
+#
+# Not on the BCR yet (except release candidates). The commit is the one used by
+# JAX.
+bazel_dep(name = "rules_ml_toolchain")
+archive_override(
+    module_name = "rules_ml_toolchain",
+    integrity = "sha256-Z38HhfFL91M5oxh8un+pXhofiIoYVo7cLl+sh9UT/Hw=",
+    strip_prefix = "rules_ml_toolchain-f56a19573fec3543050a5f4bcd9a07a1de08e8ee",
+    urls = ["https://github.com/google-ml-infra/rules_ml_toolchain/archive/f56a19573fec3543050a5f4bcd9a07a1de08e8ee.tar.gz"],
+)
+
+register_toolchains("@rules_ml_toolchain//cc:linux_x86_64_linux_x86_64")
+
 # The protobuf module compiles `@com_google_protobuf//python:proto_api` (used by
 # pybind11_protobuf) against `@system_python//:python_headers`, which protobuf
 # maps to the Python 3.12 headers whatever the selected Python version. This
@@ -27,10 +44,14 @@ local_path_override(
 # headers of the selected Python toolchain instead, like protobuf does at HEAD
 # (https://github.com/protocolbuffers/protobuf/commit/720e5468cebb). Remove the
 # patch once YDF uses a protobuf release that includes this change.
+#
+# The version is pinned because rules_ml_toolchain depends on protobuf 33.0,
+# which would otherwise be selected.
 single_version_override(
     module_name = "protobuf",
     patch_strip = 1,
     patches = ["//:protobuf_hermetic_python_headers.patch"],
+    version = "31.1",
 )
 
 # Hermetic Python toolchains (python-build-standalone).

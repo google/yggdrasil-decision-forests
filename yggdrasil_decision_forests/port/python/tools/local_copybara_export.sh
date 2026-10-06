@@ -43,7 +43,12 @@ function local_export () {
 
 build_and_test() {
   cd "${LOCAL_DIR}/yggdrasil_decision_forests/port/python"
-  sudo INTERACTIVE=$INTERACTIVE tools/release_linux.sh
+  if [[ "$INTERACTIVE" = 1 ]]; then
+    # Build and test a single Python version.
+    PYTHON_VERSIONS=3.12 RUN_TESTS=1 tools/release_linux.sh
+  else
+    tools/release_linux.sh
+  fi
 }
 
 local_export
