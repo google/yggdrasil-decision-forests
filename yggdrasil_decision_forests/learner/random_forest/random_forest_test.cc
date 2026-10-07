@@ -713,6 +713,18 @@ TEST_F(RandomForestOnAbalone, SparseOblique) {
   EXPECT_NEAR(metric::RMSE(evaluation_), 2.054, 0.01);
 }
 
+TEST_F(RandomForestOnAbalone, SparseObliqueWithAxisAlignedSplits) {
+  auto* rf_config = train_config_.MutableExtension(
+      random_forest::proto::random_forest_config);
+  rf_config->mutable_decision_tree()
+      ->mutable_sparse_oblique_split()
+      ->set_include_axis_aligned_splits(true);
+  // Unlike classical sparse oblique splits, pre-sorting is used.
+  SetExpectedSortingStrategy(Internal::PRESORTED, &train_config_);
+  TrainAndEvaluateModel();
+  EXPECT_LT(metric::RMSE(evaluation_), 2.15);
+}
+
 TEST(RandomForest, SetHyperParameters) {
   RandomForestLearner learner{model::proto::TrainingConfig()};
   const auto hparam_spec =

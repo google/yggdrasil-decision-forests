@@ -293,6 +293,13 @@ message DecisionTreeTrainingConfig {
     // otherwise prefer `projection_density_factor` for controlling the number
     // of features per projection.
     optional int32 max_num_features = 11 [default = -1];
+
+    // If true, numerical features are also tested with the classical
+    // axis-aligned splitter. Enabling this option increases the training time,
+    // and can improve quality.
+    //
+    // This option is not supported by Isolation Forests.
+    optional bool include_axis_aligned_splits = 12 [default = false];
   }
 
   message MHLDObliqueSplit {

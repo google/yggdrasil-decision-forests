@@ -1790,6 +1790,46 @@ TEST_F(GradientBoostedTreesOnAbalone, SparseOblique) {
   utils::ExpectEqualGoldenModel(*model_, "gbt_abalone_sparse_oblique");
 }
 
+TEST_F(GradientBoostedTreesOnAbalone, SparseObliqueWithAxisAlignedSplits) {
+  deployment_config_.set_num_threads(5);
+  auto* gbt_config = train_config_.MutableExtension(
+      gradient_boosted_trees::proto::gradient_boosted_trees_config);
+  gbt_config->mutable_decision_tree()
+      ->mutable_sparse_oblique_split()
+      ->set_include_axis_aligned_splits(true);
+  TrainAndEvaluateModel();
+  EXPECT_LT(metric::RMSE(evaluation_), 2.2);
+
+  int num_higher = 0;
+  int num_oblique = 0;
+  int num_single_feature_oblique = 0;
+  const auto* gbt_model =
+      dynamic_cast<const GradientBoostedTreesModel*>(model_.get());
+  ASSERT_NE(gbt_model, nullptr);
+  for (const auto& tree : gbt_model->decision_trees()) {
+    tree->IterateOnNodes(
+        [&](const decision_tree::NodeWithChildren& node, const int depth) {
+          if (node.IsLeaf()) {
+            return;
+          }
+          const auto& condition = node.node().condition().condition();
+          if (condition.has_higher_condition()) {
+            num_higher++;
+          }
+          if (condition.has_oblique_condition()) {
+            num_oblique++;
+            if (condition.oblique_condition().attributes_size() < 2) {
+              num_single_feature_oblique++;
+            }
+          }
+        });
+  }
+
+  EXPECT_GT(num_higher, 0);
+  EXPECT_GT(num_oblique, 0);
+  EXPECT_EQ(num_single_feature_oblique, 0);
+}
+
 TEST_F(GradientBoostedTreesOnAbalone, PoissonLoss) {
   deployment_config_.set_num_threads(5);
   auto* gbt_config = train_config_.MutableExtension(

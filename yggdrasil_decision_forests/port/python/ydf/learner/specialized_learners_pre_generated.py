@@ -362,6 +362,10 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       the training. This solution is faster but consumes much more memory than
       IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
       IN_NODE. . Default: "PRESORT".
+    sparse_oblique_include_axis_aligned_splits: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. If true, numerical features are also tested
+      with the axis-aligned splitter. This increases training time, but may
+      improve model quality. Default: None.
     sparse_oblique_max_num_features: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls the maximum number of features in a
       split.Set to -1 for no maximum. Use only if a hard maximum on the number
@@ -543,6 +547,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
       random_seed: int = 123456,
       sampling_with_replacement: bool = True,
       sorting_strategy: str = "PRESORT",
+      sparse_oblique_include_axis_aligned_splits: Optional[bool] = None,
       sparse_oblique_max_num_features: Optional[int] = None,
       sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
@@ -630,6 +635,9 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
         "random_seed": random_seed,
         "sampling_with_replacement": sampling_with_replacement,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_include_axis_aligned_splits": (
+            sparse_oblique_include_axis_aligned_splits
+        ),
         "sparse_oblique_max_num_features": sparse_oblique_max_num_features,
         "sparse_oblique_max_num_projections": (
             sparse_oblique_max_num_projections
@@ -1586,8 +1594,12 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       are tested. Default: None.
     min_examples: Minimum number of examples in a node. Default: 5.
     min_sum_hessian_in_leaf: Minimum value of the sum of the hessians in the
-      leafs. Splits that would violate this constraint are ignored. Only used
-      when "use_hessian_gain" is true. Default: None.
+      leafs. Splits that would violate this constraint are ignored. For some
+      regression losses, this is equal to the minimum number of examples in a
+      leaf, since all hessians are 1.0. Setting this to a value larger than 0.0
+      makes splitting less aggressive.Only used when `use_hessian_gain` is true.
+      Independently of this constraint, the hessian used in the Newton step
+      denominator is clamped to 0.001 for numerical stability. Default: None.
     missing_value_policy: Method used to handle missing attribute values. -
       `GLOBAL_IMPUTATION`: Missing attribute values are imputed, with the mean
       (in case of numerical attribute) or the most-frequent-item (in case of
@@ -1681,6 +1693,10 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       the training. This solution is faster but consumes much more memory than
       IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
       IN_NODE. . Default: "PRESORT".
+    sparse_oblique_include_axis_aligned_splits: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. If true, numerical features are also tested
+      with the axis-aligned splitter. This increases training time, but may
+      improve model quality. Default: None.
     sparse_oblique_max_num_features: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls the maximum number of features in a
       split.Set to -1 for no maximum. Use only if a hard maximum on the number
@@ -1789,7 +1805,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         Default: "KULLBACK_LEIBLER".
     use_hessian_gain: If true, uses a formulation of split gain with a hessian
       term i.e. optimizes the splits to minimize the variance of "gradient /
-      hessian. Available for all losses except regression. Default: False.
+      hessian. Default: False.
     validation_interval_in_trees: Evaluate the model on the validation set every
       "validation_interval_in_trees" trees. Increasing this value reduces the
       cost of validation and can impact the early stopping policy (as early
@@ -1918,6 +1934,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       selective_gradient_boosting_ratio: float = 0.01,
       shrinkage: float = 0.1,
       sorting_strategy: str = "PRESORT",
+      sparse_oblique_include_axis_aligned_splits: Optional[bool] = None,
       sparse_oblique_max_num_features: Optional[int] = None,
       sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
@@ -2032,6 +2049,9 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         "selective_gradient_boosting_ratio": selective_gradient_boosting_ratio,
         "shrinkage": shrinkage,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_include_axis_aligned_splits": (
+            sparse_oblique_include_axis_aligned_splits
+        ),
         "sparse_oblique_max_num_features": sparse_oblique_max_num_features,
         "sparse_oblique_max_num_projections": (
             sparse_oblique_max_num_projections
@@ -2402,7 +2422,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       Fixed to 1.0 for DART models. Default: 0.1.
     use_hessian_gain: If true, uses a formulation of split gain with a hessian
       term i.e. optimizes the splits to minimize the variance of "gradient /
-      hessian. Available for all losses except regression. Default: False.
+      hessian. Default: False.
     worker_logs: If true, workers will print training logs. Default: True.
     workers: If set, enable distributed training. "workers" is the list of IP
       addresses of the workers. A worker is a process running
@@ -2905,6 +2925,10 @@ class CartLearner(generic_learner.GenericCCLearner):
       the training. This solution is faster but consumes much more memory than
       IN_NODE. - PRESORT: Automatically choose between FORCE_PRESORT and
       IN_NODE. . Default: "IN_NODE".
+    sparse_oblique_include_axis_aligned_splits: For sparse oblique splits i.e.
+      `split_axis=SPARSE_OBLIQUE`. If true, numerical features are also tested
+      with the axis-aligned splitter. This increases training time, but may
+      improve model quality. Default: None.
     sparse_oblique_max_num_features: For sparse oblique splits i.e.
       `split_axis=SPARSE_OBLIQUE`. Controls the maximum number of features in a
       split.Set to -1 for no maximum. Use only if a hard maximum on the number
@@ -3077,6 +3101,7 @@ class CartLearner(generic_learner.GenericCCLearner):
       pure_serving_model: bool = False,
       random_seed: int = 123456,
       sorting_strategy: str = "IN_NODE",
+      sparse_oblique_include_axis_aligned_splits: Optional[bool] = None,
       sparse_oblique_max_num_features: Optional[int] = None,
       sparse_oblique_max_num_projections: Optional[int] = None,
       sparse_oblique_normalization: Optional[str] = None,
@@ -3152,6 +3177,9 @@ class CartLearner(generic_learner.GenericCCLearner):
         "pure_serving_model": pure_serving_model,
         "random_seed": random_seed,
         "sorting_strategy": sorting_strategy,
+        "sparse_oblique_include_axis_aligned_splits": (
+            sparse_oblique_include_axis_aligned_splits
+        ),
         "sparse_oblique_max_num_features": sparse_oblique_max_num_features,
         "sparse_oblique_max_num_projections": (
             sparse_oblique_max_num_projections

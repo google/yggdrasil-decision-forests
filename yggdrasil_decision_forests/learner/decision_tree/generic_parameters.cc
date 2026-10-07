@@ -444,6 +444,24 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does n
   }
 
   {
+    ASSIGN_OR_RETURN(
+        auto param,
+        get_params(kHParamSplitAxisSparseObliqueIncludeAxisAlignedSplits));
+    param->mutable_categorical()->set_default_value(
+        config.sparse_oblique_split().include_axis_aligned_splits() ? kTrue
+                                                                    : kFalse);
+    param->mutable_categorical()->add_possible_values(kTrue);
+    param->mutable_categorical()->add_possible_values(kFalse);
+    param->mutable_documentation()->set_proto_field(
+        "include_axis_aligned_splits");
+    param->mutable_conditional()->set_control_field(kHParamSplitAxis);
+    param->mutable_conditional()->mutable_categorical()->add_values(
+        kHParamSplitAxisSparseOblique);
+    param->mutable_documentation()->set_description(
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. If true, numerical features are also tested with the axis-aligned splitter. This increases training time, but may improve model quality.)");
+  }
+
+  {
     ASSIGN_OR_RETURN(auto param,
                      get_params(kHParamSplitAxisMhldObliqueMaxNumAttributes));
     param->mutable_integer()->set_default_value(
@@ -886,6 +904,23 @@ absl::Status SetHyperParameters(
       } else {
         return absl::InvalidArgumentError(
             absl::StrCat(kHParamSplitAxisSparseObliqueMaxNumProjections,
+                         " only works with sparse oblique trees "
+                         "(split_axis=SPARSE_OBLIQUE)"));
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        kHParamSplitAxisSparseObliqueIncludeAxisAlignedSplits);
+    if (hparam.has_value()) {
+      const auto hparam_value = hparam.value().value().categorical();
+      if (dt_config->has_sparse_oblique_split()) {
+        dt_config->mutable_sparse_oblique_split()
+            ->set_include_axis_aligned_splits(hparam_value == kTrue);
+      } else {
+        return absl::InvalidArgumentError(
+            absl::StrCat(kHParamSplitAxisSparseObliqueIncludeAxisAlignedSplits,
                          " only works with sparse oblique trees "
                          "(split_axis=SPARSE_OBLIQUE)"));
       }

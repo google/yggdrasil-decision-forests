@@ -60,6 +60,28 @@ using Projection = internal::Projection;
 using ProjectionEvaluator = internal::ProjectionEvaluator;
 using LDACache = internal::LDACache;
 
+// Sample the number of features to use in the condition. If
+// `exclude_single_feature` is true, use rejection sampling to make sure
+// at least 2 features are used.
+size_t SampleNumSelectedFeatures(std::binomial_distribution<size_t>& binom,
+                                 const bool exclude_single_feature,
+                                 utils::RandomEngine* random) {
+  if (!exclude_single_feature) {
+    return binom(*random);
+  }
+  // Note: Simply cutting the distribution at 2 creates unwanted concentration
+  // around 2.
+  constexpr size_t kMinNumFeatures = 2;
+  DCHECK_GE(binom.t(), kMinNumFeatures);
+  constexpr int kMaxNumAttempts = 100;
+  for (int attempt_idx = 0; attempt_idx < kMaxNumAttempts; attempt_idx++) {
+    if (const size_t k = binom(*random); k >= kMinNumFeatures) {
+      return k;
+    }
+  }
+  return kMinNumFeatures;
+}
+
 }  // namespace
 
 template <typename T>
@@ -169,20 +191,27 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
   if (config_link.numerical_features().empty()) {
     return false;
   }
+  const auto& oblique_config = dt_config.sparse_oblique_split();
+  const size_t num_numerical_features = config_link.numerical_features_size();
+
+  if (oblique_config.include_axis_aligned_splits() &&
+      (num_numerical_features == 1 || oblique_config.max_num_features() == 1)) {
+    // Each oblique split can only have a single feature; this is already
+    // covered by the axis-aligned splits.
+    return false;
+  }
 
   // Effective number of projections to test.
   int num_projections;
   if (override_num_projections.has_value()) {
     num_projections = override_num_projections.value();
   } else {
-    num_projections =
-        GetNumProjections(dt_config, config_link.numerical_features_size());
+    num_projections = GetNumProjections(dt_config, num_numerical_features);
   }
 
-  const float projection_density =
-      std::clamp(dt_config.sparse_oblique_split().projection_density_factor() /
-                     config_link.numerical_features_size(),
-                 0.f, 1.f);
+  const float projection_density = std::clamp(
+      oblique_config.projection_density_factor() / num_numerical_features, 0.f,
+      1.f);
 
   // Best and current projections.
   Projection best_projection;
@@ -209,7 +238,9 @@ absl::StatusOr<bool> FindBestConditionSparseObliqueTemplate(
     int8_t monotonic_direction;
     SampleProjection(config_link.numerical_features(), dt_config,
                      train_dataset.data_spec(), config_link, projection_density,
-                     &current_projection, &monotonic_direction, random);
+                     &current_projection, &monotonic_direction, random,
+                     /*exclude_single_feature=*/
+                     oblique_config.include_axis_aligned_splits());
 
     // Pre-compute the result of the current_projection.
     RETURN_IF_ERROR(projection_evaluator.Evaluate(
@@ -1072,8 +1103,8 @@ void SampleProjection(const absl::Span<const int>& features,
                       const model::proto::TrainingConfigLinking& config_link,
                       const float projection_density,
                       internal::Projection* projection,
-                      int8_t* monotonic_direction,
-                      utils::RandomEngine* random) {
+                      int8_t* monotonic_direction, utils::RandomEngine* random,
+                      const bool exclude_single_feature) {
   *monotonic_direction = 0;
   projection->clear();
   std::uniform_real_distribution<float> unif01;
@@ -1149,7 +1180,8 @@ void SampleProjection(const absl::Span<const int>& features,
   std::binomial_distribution<size_t> binom(features.size(), projection_density);
 
   // Expectation[Binomial(p,projection_density)] = num_selected_features
-  const size_t num_selected_features = binom(*random);
+  const size_t num_selected_features =
+      SampleNumSelectedFeatures(binom, exclude_single_feature, random);
 
   // TODO: Try std::bitmap
   absl::btree_set<size_t> picked_idx;

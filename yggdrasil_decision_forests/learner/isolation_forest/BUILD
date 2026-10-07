@@ -78,6 +78,7 @@ cc_test(
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner:abstract_learner_cc_proto",
         "//yggdrasil_decision_forests/learner:learner_library",
+        "//yggdrasil_decision_forests/learner/decision_tree:generic_parameters",
         "//yggdrasil_decision_forests/learner/decision_tree:training",
         "//yggdrasil_decision_forests/learner/hyperparameters_optimizer",
         "//yggdrasil_decision_forests/metric",

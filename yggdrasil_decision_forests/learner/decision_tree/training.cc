@@ -391,6 +391,14 @@ proto::DecisionTreeTrainingConfig::Internal::SortingStrategy EffectiveStrategy(
   };
 }
 
+bool NumericalAxisAlignedSplitsEnabled(
+    const proto::DecisionTreeTrainingConfig& dt_config) {
+  // TODO: Enable for Guided Oblique.
+  return dt_config.has_axis_aligned_split() ||
+         (dt_config.has_sparse_oblique_split() &&
+          dt_config.sparse_oblique_split().include_axis_aligned_splits());
+}
+
 }  // namespace
 
 // Specialization in the case of classification.
@@ -422,7 +430,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionClassification(
 
   switch (train_dataset.column(attribute_idx)->type()) {
     case dataset::proto::ColumnType::NUMERICAL: {
-      if (!dt_config.has_axis_aligned_split()) {
+      if (!NumericalAxisAlignedSplitsEnabled(dt_config)) {
         return SplitSearchResult::kNoBetterSplitFound;
       }
 
@@ -452,7 +460,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionClassification(
     } break;
 
     case dataset::proto::ColumnType::DISCRETIZED_NUMERICAL: {
-      if (!dt_config.has_axis_aligned_split()) {
+      if (!NumericalAxisAlignedSplitsEnabled(dt_config)) {
         return SplitSearchResult::kNoBetterSplitFound;
       }
 
@@ -610,7 +618,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegressionHessianGain(
 
   switch (train_dataset.column(attribute_idx)->type()) {
     case dataset::proto::ColumnType::NUMERICAL: {
-      if (!dt_config.has_axis_aligned_split()) {
+      if (!NumericalAxisAlignedSplitsEnabled(dt_config)) {
         return SplitSearchResult::kNoBetterSplitFound;
       }
 
@@ -652,7 +660,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegressionHessianGain(
     } break;
 
     case dataset::proto::ColumnType::DISCRETIZED_NUMERICAL: {
-      if (!dt_config.has_axis_aligned_split()) {
+      if (!NumericalAxisAlignedSplitsEnabled(dt_config)) {
         return SplitSearchResult::kNoBetterSplitFound;
       }
 
@@ -842,7 +850,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegression(
 
   switch (train_dataset.column(attribute_idx)->type()) {
     case dataset::proto::ColumnType::NUMERICAL: {
-      if (!dt_config.has_axis_aligned_split()) {
+      if (!NumericalAxisAlignedSplitsEnabled(dt_config)) {
         return SplitSearchResult::kNoBetterSplitFound;
       }
 
@@ -894,7 +902,7 @@ absl::StatusOr<SplitSearchResult> FindBestConditionRegression(
     } break;
 
     case dataset::proto::ColumnType::DISCRETIZED_NUMERICAL: {
-      if (!dt_config.has_axis_aligned_split()) {
+      if (!NumericalAxisAlignedSplitsEnabled(dt_config)) {
         return SplitSearchResult::kNoBetterSplitFound;
       }
 
@@ -1551,7 +1559,9 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   int num_oblique_projections;
   int num_oblique_projections_per_oblique_job;
 
-  if (config_link.numerical_features_size() > 0) {
+  if (config_link.numerical_features_size() > 0 &&
+      (!dt_config.sparse_oblique_split().include_axis_aligned_splits() ||
+       dt_config.sparse_oblique_split().max_num_features() != 1)) {
     if (dt_config.split_axis_case() ==
             proto::DecisionTreeTrainingConfig::kSparseObliqueSplit ||
         dt_config.split_axis_case() ==
@@ -1565,7 +1575,7 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
         // is not efficient to create a request with too little work to do.
         //
         // In most real cases, this parameter does not matter as the limit is
-        // effectively constraint by the number of threads.
+        // effectively constrained by the number of threads.
         const int min_projections_per_request = 10;
 
         DCHECK_GE(num_threads, 1);
@@ -1595,8 +1605,11 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
 
   const int num_jobs = candidate_attributes.size() + num_oblique_jobs;
   // All the oblique jobs need to be done.
-  // Note: When do look for oblique splits, we also run the classical numerical
-  // splitter.
+  // Note: When looking for oblique splits, the attribute jobs do not run the
+  // classical splitter on numerical features (the numerical splitters return
+  // early if `axis_aligned_split` is not set), unless
+  // `sparse_oblique_split.include_axis_aligned_splits` is true. Non-numerical
+  // features are still evaluated by the attribute jobs.
   min_num_jobs_to_test += num_oblique_jobs;
 
   cache->durable_response_list.resize(num_jobs);
@@ -4490,6 +4503,17 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
       sorting_strategy == Internal::FORCE_PRESORTED) {
     switch (config->split_axis_case()) {
       case proto::DecisionTreeTrainingConfig::kSparseObliqueSplit:
+        if (config->sparse_oblique_split().include_axis_aligned_splits()) {
+          // The axis-aligned splitter can use pre-sorting. The oblique
+          // projections are always evaluated with the IN_NODE strategy.
+          if (config->missing_value_policy() !=
+              proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION) {
+            sorting_strategy = Internal::IN_NODE;
+          }
+        } else {
+          sorting_strategy = Internal::IN_NODE;
+        }
+        break;
       case proto::DecisionTreeTrainingConfig::kMhldObliqueSplit:
       case proto::DecisionTreeTrainingConfig::kGuidedObliqueSplit:
         sorting_strategy = Internal::IN_NODE;

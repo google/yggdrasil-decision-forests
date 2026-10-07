@@ -275,13 +275,16 @@ void SubtractTransposeMultiplyAdd(
 // dimension, the weight is guaranteed to be 1. If the projection contains an
 // input feature with monotonic constraint, monotonic_direction is set to 1
 // (i.e. the projection should be monotonically increasing).
+// If `exclude_single_feature`, the projection is sampled conditioned on having
+// at least two features (requires `features.size() >= 2`).
 void SampleProjection(const absl::Span<const int>& features,
                       const proto::DecisionTreeTrainingConfig& dt_config,
                       const dataset::proto::DataSpecification& data_spec,
                       const model::proto::TrainingConfigLinking& config_link,
                       float projection_density,
                       internal::Projection* projection,
-                      int8_t* monotonic_direction, utils::RandomEngine* random);
+                      int8_t* monotonic_direction, utils::RandomEngine* random,
+                      bool exclude_single_feature = false);
 
 // Randomly generates a projection guided by the provided feature and label
 // values.

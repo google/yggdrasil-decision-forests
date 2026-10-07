@@ -117,6 +117,13 @@ absl::StatusOr<internal::Configuration> BuildConfig(
     return absl::InvalidArgumentError(
         "Isolation forest does not support weights");
   }
+
+  if (config.if_config->decision_tree()
+          .sparse_oblique_split()
+          .include_axis_aligned_splits()) {
+    return absl::InvalidArgumentError(
+        "Isolation forests do not support including axis-aligned splits.");
+  }
   return config;
 }
 
@@ -799,6 +806,7 @@ IsolationForestLearner::GetGenericHyperParameterSpecification() const {
       decision_tree::kHParamCategoricalSetSplitGreedyMaximumMaskSize,
       decision_tree::kHParamSplitAxisSparseObliqueNumProjectionsExponent,
       decision_tree::kHParamSplitAxisSparseObliqueMaxNumProjections,
+      decision_tree::kHParamSplitAxisSparseObliqueIncludeAxisAlignedSplits,
       decision_tree::kHParamSplitAxisMhldObliqueMaxNumAttributes,
       decision_tree::kHParamSplitAxisMhldObliqueSampleAttributes,
       decision_tree::kHParamCategoricalAlgorithm,
