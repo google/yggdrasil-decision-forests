@@ -1356,8 +1356,8 @@ SplitSearchResult ScanSplitsPresortedSparseDuplicateExampleTemplate(
   // Statistics of the best split found so far.
   double best_score =
       std::max<double>(condition->split_score(), initializer.MinimumScore());
-  SignedExampleIdx best_num_pos_training_examples_without_weight;
-  SignedExampleIdx best_num_pos_training_examples_with_weight;
+  SignedExampleIdx best_num_pos_training_examples_without_weight = 0;
+  double best_num_pos_training_examples_with_weight = 0;
   SignedExampleIdx best_sorted_example_idx = -1;
   SignedExampleIdx best_previous_sorted_example_idx = -1;
 
