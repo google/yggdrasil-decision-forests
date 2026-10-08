@@ -1364,7 +1364,7 @@ Use `model.describe()` for more details.
 
     # Get a specific VI, sorted by importance.
     vi = model.variable_importances()["MEAN_DECREASE_IN_ACCURACY"]
-    # [('bill_length_mm', 0.0713), ('island', 0.0072), ...]
+    # [(0.0713, 'bill_length_mm'), (0.0072, 'island'), ...]
     ```
 
     Returns:
