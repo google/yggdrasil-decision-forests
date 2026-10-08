@@ -46,17 +46,17 @@ inline Label PredictUnsafe(const Instance& instance) {
   std::array<uint8_t, 3> accumulator {0, 0, 0};
 
   // Tree #0
-  if (instance.petal_width >= 0.75) {
-    if (instance.petal_width >= 1.65) {
-      if (instance.petal_length >= 4.85) {
+  if (instance.petal_width >= 0.75f) {
+    if (instance.petal_width >= 1.6500001f) {
+      if (instance.petal_length >= 4.8500004f) {
         accumulator[2]++;
       } else {
         accumulator[1]++;
       }
     } else {
-      if (instance.petal_width >= 1.35) {
-        if (instance.sepal_width >= 2.65) {
-          if (instance.sepal_length >= 6.65) {
+      if (instance.petal_width >= 1.3499999f) {
+        if (instance.sepal_width >= 2.65f) {
+          if (instance.sepal_length >= 6.6499996f) {
             accumulator[1]++;
           } else {
             accumulator[1]++;
@@ -73,15 +73,15 @@ inline Label PredictUnsafe(const Instance& instance) {
   }
 
   // Tree #1
-  if (instance.petal_width >= 0.8) {
-    if (instance.petal_length >= 4.95) {
-      if (instance.petal_width >= 1.75) {
+  if (instance.petal_width >= 0.8f) {
+    if (instance.petal_length >= 4.95f) {
+      if (instance.petal_width >= 1.75f) {
         accumulator[2]++;
       } else {
         accumulator[2]++;
       }
     } else {
-      if (instance.petal_width >= 1.65) {
+      if (instance.petal_width >= 1.6500001f) {
         accumulator[2]++;
       } else {
         accumulator[1]++;
@@ -92,11 +92,11 @@ inline Label PredictUnsafe(const Instance& instance) {
   }
 
   // Tree #2
-  if (instance.petal_length >= 2.6) {
-    if (instance.petal_width >= 1.75) {
+  if (instance.petal_length >= 2.6f) {
+    if (instance.petal_width >= 1.75f) {
       accumulator[2]++;
     } else {
-      if (instance.petal_width >= 1.55) {
+      if (instance.petal_width >= 1.55f) {
         accumulator[1]++;
       } else {
         accumulator[1]++;

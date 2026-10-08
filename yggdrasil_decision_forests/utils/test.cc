@@ -103,8 +103,11 @@ void ExpectEqualGolden(
         absl::StrSplit(expected_content, '\n');
     std::vector<absl::string_view> actual_lines = absl::StrSplit(content, '\n');
 
-    const size_t n = expected_lines.size();
-    const int m = actual_lines.size();
+    // Limit the number of lines for the diff, s.t. this still works on large
+    // files.
+    const size_t max_lines = 1000;
+    const size_t n = std::min(expected_lines.size(), max_lines);
+    const int m = std::min(actual_lines.size(), max_lines);
 
     // Compute LCS table
     std::vector<std::vector<int>> lcs_table(n + 1, std::vector<int>(m + 1, 0));

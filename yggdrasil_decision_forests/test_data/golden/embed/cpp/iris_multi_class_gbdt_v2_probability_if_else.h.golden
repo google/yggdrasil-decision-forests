@@ -46,8 +46,8 @@ inline Label PredictUnsafe(const Instance& instance) {
   std::array<float, 3> accumulator {0, 0, 0};
 
   // Tree #0
-  if (instance.petal_width >= 0.8) {
-    if (instance.petal_length >= 3.65) {
+  if (instance.petal_width >= 0.8f) {
+    if (instance.petal_length >= 3.65f) {
       accumulator[0] += -0.15;
     } else {
       accumulator[0] += -0.15;
@@ -57,10 +57,10 @@ inline Label PredictUnsafe(const Instance& instance) {
   }
 
   // Tree #1
-  if (instance.petal_width >= 0.8) {
-    if (instance.petal_width >= 1.75) {
-      if (instance.petal_length >= 4.95) {
-        if (instance.sepal_length >= 7.25) {
+  if (instance.petal_width >= 0.8f) {
+    if (instance.petal_width >= 1.75f) {
+      if (instance.petal_length >= 4.95f) {
+        if (instance.sepal_length >= 7.25f) {
           accumulator[1] += -0.15;
         } else {
           accumulator[1] += -0.15;
@@ -69,10 +69,10 @@ inline Label PredictUnsafe(const Instance& instance) {
         accumulator[1] += -0.06;
       }
     } else {
-      if (instance.petal_length >= 4.95) {
+      if (instance.petal_length >= 4.95f) {
         accumulator[1] += 0.03;
       } else {
-        if (instance.sepal_length >= 5.3) {
+        if (instance.sepal_length >= 5.3f) {
           accumulator[1] += 0.3;
         } else {
           accumulator[1] += 0.21;
@@ -80,7 +80,7 @@ inline Label PredictUnsafe(const Instance& instance) {
       }
     }
   } else {
-    if (instance.petal_length >= 1.45) {
+    if (instance.petal_length >= 1.45f) {
       accumulator[1] += -0.15;
     } else {
       accumulator[1] += -0.15;
@@ -88,20 +88,20 @@ inline Label PredictUnsafe(const Instance& instance) {
   }
 
   // Tree #2
-  if (instance.petal_width >= 1.65) {
-    if (instance.petal_length >= 5.05) {
+  if (instance.petal_width >= 1.6500001f) {
+    if (instance.petal_length >= 5.05f) {
       accumulator[2] += 0.3;
     } else {
       accumulator[2] += 0.2;
     }
   } else {
-    if (instance.petal_length >= 4.85) {
+    if (instance.petal_length >= 4.8500004f) {
       accumulator[2] += 0.075;
     } else {
-      if (instance.petal_width >= 0.35) {
+      if (instance.petal_width >= 0.35000002f) {
         accumulator[2] += -0.15;
       } else {
-        if (instance.sepal_width >= 3.45) {
+        if (instance.sepal_width >= 3.45f) {
           accumulator[2] += -0.15;
         } else {
           accumulator[2] += -0.15;

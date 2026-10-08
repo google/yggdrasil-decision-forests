@@ -26,10 +26,13 @@
 #include <vector>
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/serving/embed/common.h"
@@ -48,6 +51,26 @@ bool IsZero(const DoubleOrInt64 val) {
   } else {
     return AsInt(val) == 0;
   }
+}
+
+// Formats a value as a C++ float literal in fixed notation with the fewest
+// decimals (at least one) that round-trip to the same float (e.g. "0.13f",
+// "2.0f", "0.00001f"), so the generated code compares against the exact same
+// float threshold as YDF.
+std::string FormatFloatLiteral(const double value) {
+  const float float_value = static_cast<float>(value);
+  DCHECK(std::isfinite(float_value));
+  // Every finite float is a multiple of 2^-149 and therefore has an exact
+  // decimal representation with at most 149 decimals.
+  std::string str;
+  for (int precision = 1; precision <= 149; ++precision) {
+    str = absl::StrFormat("%.*f", precision, float_value);
+    float parsed;
+    if (absl::SimpleAtof(str, &parsed) && parsed == float_value) {
+      break;
+    }
+  }
+  return absl::StrCat(str, "f");
 }
 
 }  // namespace
@@ -388,7 +411,7 @@ absl::Status CppTargetLowering::LowerActivation() {
         } else {
           if (model_ir_.model_type == ModelIR::ModelType::kRandomForest) {
             cpp_ir_.activation_statement =
-                "return static_cast<Label>(accumulator > 1);";
+                "return static_cast<Label>(accumulator > 0.5f);";
 
           } else if (model_ir_.model_type ==
                      ModelIR::ModelType::kGradientBoostedTrees) {
@@ -597,9 +620,15 @@ absl::Status CppTargetLowering::LowerConditionNode(const Node& ir_node,
       DoubleOrInt64 val = ir_node.threshold_or_offset;
       STATUS_CHECK(IsDouble(val));
       // For if-else, the legacy implementation always uses
-      // floating-points.
+      // floating-points. For float features, the threshold must be a float
+      // literal (not a double) so that the comparison is done in float
+      // precision, like in YDF. Otherwise, a feature value equal to the
+      // threshold can be rounded below the double threshold (e.g. 0.13f <
+      // 0.13).
       cpp_node->if_else_condition =
-          absl::Substitute("$0 >= $1", var_name, AsDouble(val));
+          absl::Substitute("$0 >= $1", var_name,
+                           is_float ? FormatFloatLiteral(AsDouble(val))
+                                    : absl::StrCat(AsDouble(val)));
 
       // For routing, convert thresholds to the nearest integer, rounded up.
       if (!is_float) {

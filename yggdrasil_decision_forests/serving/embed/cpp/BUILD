@@ -21,9 +21,11 @@ cc_library_ydf(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
     ],
 )
 
@@ -129,6 +131,7 @@ cc_test(
 cc_test(
     name = "cpp_embed_pred_test",
     srcs = ["cpp_embed_pred_test.cc"],
+    data = ["//yggdrasil_decision_forests/test_data"],
     deps = [
         ":test_model_abalone_regression_gbdt_v2",
         ":test_model_abalone_regression_gbdt_v2_routing",
@@ -165,6 +168,22 @@ cc_test(
         ":test_model_iris_multi_class_rf_wta_small_proba",
         ":test_model_iris_multi_class_rf_wta_small_proba_routing",
         ":test_model_iris_multi_class_rf_wta_small_score",
+        "//yggdrasil_decision_forests/dataset:csv_example_reader",
+        "//yggdrasil_decision_forests/dataset:data_spec",
+        "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset_io",
+        "//yggdrasil_decision_forests/model:abstract_model",
+        "//yggdrasil_decision_forests/model:all_models",
+        "//yggdrasil_decision_forests/model:model_library",
+        "//yggdrasil_decision_forests/model:prediction_cc_proto",
+        "//yggdrasil_decision_forests/model/gradient_boosted_trees",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:test",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status:status_matchers",
+        "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",
     ],
 )

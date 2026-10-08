@@ -48,31 +48,31 @@ inline float PredictUnsafe(const Instance& instance) {
   float accumulator {9.94246};
 
   // Tree #0
-  if (instance.shellweight >= 0.16775) {
-    if (instance.shellweight >= 0.35975) {
-      if (instance.shuckedweight >= 0.552) {
-        if (instance.shellweight >= 0.56875) {
-          if (instance.shuckedweight >= 0.77) {
+  if (instance.shellweight >= 0.16775f) {
+    if (instance.shellweight >= 0.35975f) {
+      if (instance.shuckedweight >= 0.55200005f) {
+        if (instance.shellweight >= 0.56875f) {
+          if (instance.shuckedweight >= 0.77f) {
             accumulator += 0.312421;
           } else {
             accumulator += 0.705754;
           }
         } else {
-          if (instance.shellweight >= 0.4445) {
+          if (instance.shellweight >= 0.4445f) {
             accumulator += 0.227469;
           } else {
             accumulator += 0.108071;
           }
         }
       } else {
-        if (instance.shellweight >= 0.5075) {
-          if (instance.diameter >= 0.495) {
+        if (instance.shellweight >= 0.5075f) {
+          if (instance.diameter >= 0.495f) {
             accumulator += 0.680754;
           } else {
             accumulator += 1.04861;
           }
         } else {
-          if (instance.shuckedweight >= 0.41475) {
+          if (instance.shuckedweight >= 0.41474998f) {
             accumulator += 0.323402;
           } else {
             accumulator += 0.580223;
@@ -80,23 +80,23 @@ inline float PredictUnsafe(const Instance& instance) {
         }
       }
     } else {
-      if (instance.shellweight >= 0.24925) {
-        if (instance.shuckedweight >= 0.39975) {
-          if (instance.shellweight >= 0.29375) {
+      if (instance.shellweight >= 0.24925f) {
+        if (instance.shuckedweight >= 0.39975f) {
+          if (instance.shellweight >= 0.29375f) {
             accumulator += 0.0718944;
           } else {
             accumulator += -0.0212617;
           }
         } else {
-          if (instance.shuckedweight >= 0.34475) {
+          if (instance.shuckedweight >= 0.34475f) {
             accumulator += 0.184504;
           } else {
             accumulator += 0.334164;
           }
         }
       } else {
-        if (instance.shuckedweight >= 0.30025) {
-          if (instance.shuckedweight >= 0.37975) {
+        if (instance.shuckedweight >= 0.30025f) {
+          if (instance.shuckedweight >= 0.37975f) {
             accumulator += -0.111661;
           } else {
             accumulator += -0.0446622;
@@ -113,32 +113,32 @@ inline float PredictUnsafe(const Instance& instance) {
       }
     }
   } else {
-    if (instance.shellweight >= 0.05875) {
+    if (instance.shellweight >= 0.05875f) {
       if (instance.type == FeatureType::kOutOfVocabulary ||
           instance.type == FeatureType::kM ||
           instance.type == FeatureType::kF) {
-        if (instance.shuckedweight >= 0.22975) {
-          if (instance.visceraweight >= 0.1685) {
+        if (instance.shuckedweight >= 0.22975f) {
+          if (instance.visceraweight >= 0.1685f) {
             accumulator += -0.0275789;
           } else {
             accumulator += -0.211129;
           }
         } else {
-          if (instance.height >= 0.1225) {
+          if (instance.height >= 0.1225f) {
             accumulator += 0.0376989;
           } else {
             accumulator += -0.0900595;
           }
         }
       } else {
-        if (instance.shellweight >= 0.112) {
-          if (instance.shuckedweight >= 0.217) {
+        if (instance.shellweight >= 0.112f) {
+          if (instance.shuckedweight >= 0.21700001f) {
             accumulator += -0.216028;
           } else {
             accumulator += -0.117735;
           }
         } else {
-          if (instance.shuckedweight >= 0.09575) {
+          if (instance.shuckedweight >= 0.095750004f) {
             accumulator += -0.295431;
           } else {
             accumulator += -0.244246;
@@ -146,8 +146,8 @@ inline float PredictUnsafe(const Instance& instance) {
         }
       }
     } else {
-      if (instance.shellweight >= 0.0265) {
-        if (instance.diameter >= 0.2225) {
+      if (instance.shellweight >= 0.026500002f) {
+        if (instance.diameter >= 0.2225f) {
           if (instance.type == FeatureType::kOutOfVocabulary ||
               instance.type == FeatureType::kM) {
             accumulator += -0.188982;
@@ -155,21 +155,21 @@ inline float PredictUnsafe(const Instance& instance) {
             accumulator += -0.351388;
           }
         } else {
-          if (instance.height >= 0.0625) {
+          if (instance.height >= 0.0625f) {
             accumulator += -0.405056;
           } else {
             accumulator += -0.471169;
           }
         }
       } else {
-        if (instance.visceraweight >= 0.01025) {
-          if (instance.shellweight >= 0.0175) {
+        if (instance.visceraweight >= 0.01025f) {
+          if (instance.shellweight >= 0.0175f) {
             accumulator += -0.484489;
           } else {
             accumulator += -0.541304;
           }
         } else {
-          if (instance.shuckedweight >= 0.00725) {
+          if (instance.shuckedweight >= 0.00725f) {
             accumulator += -0.575641;
           } else {
             accumulator += -0.678861;
@@ -180,31 +180,31 @@ inline float PredictUnsafe(const Instance& instance) {
   }
 
   // Tree #1
-  if (instance.shellweight >= 0.16775) {
-    if (instance.shellweight >= 0.37475) {
-      if (instance.shuckedweight >= 0.552) {
-        if (instance.shellweight >= 0.69275) {
-          if (instance.diameter >= 0.5425) {
+  if (instance.shellweight >= 0.16775f) {
+    if (instance.shellweight >= 0.37475002f) {
+      if (instance.shuckedweight >= 0.55200005f) {
+        if (instance.shellweight >= 0.69275f) {
+          if (instance.diameter >= 0.5425f) {
             accumulator += 0.604846;
           } else {
             accumulator += 1.07518;
           }
         } else {
-          if (instance.shellweight >= 0.4445) {
+          if (instance.shellweight >= 0.4445f) {
             accumulator += 0.2356;
           } else {
             accumulator += 0.104998;
           }
         }
       } else {
-        if (instance.wholeweight >= 1.40125) {
-          if (instance.height >= 0.1775) {
+        if (instance.wholeweight >= 1.40125f) {
+          if (instance.height >= 0.17750001f) {
             accumulator += 0.777669;
           } else {
             accumulator += 0.443813;
           }
         } else {
-          if (instance.shuckedweight >= 0.415) {
+          if (instance.shuckedweight >= 0.41500002f) {
             accumulator += 0.295249;
           } else {
             accumulator += 0.626055;
@@ -212,29 +212,29 @@ inline float PredictUnsafe(const Instance& instance) {
         }
       }
     } else {
-      if (instance.shellweight >= 0.24925) {
-        if (instance.shuckedweight >= 0.44375) {
-          if (instance.shellweight >= 0.2905) {
+      if (instance.shellweight >= 0.24925f) {
+        if (instance.shuckedweight >= 0.44375002f) {
+          if (instance.shellweight >= 0.2905f) {
             accumulator += 0.0440641;
           } else {
             accumulator += -0.0460116;
           }
         } else {
-          if (instance.shellweight >= 0.28975) {
+          if (instance.shellweight >= 0.28974998f) {
             accumulator += 0.300157;
           } else {
             accumulator += 0.147129;
           }
         }
       } else {
-        if (instance.shuckedweight >= 0.24325) {
-          if (instance.shuckedweight >= 0.30025) {
+        if (instance.shuckedweight >= 0.24325f) {
+          if (instance.shuckedweight >= 0.30025f) {
             accumulator += -0.0658736;
           } else {
             accumulator += 0.0342866;
           }
         } else {
-          if (instance.wholeweight >= 0.61675) {
+          if (instance.wholeweight >= 0.61675f) {
             accumulator += 0.481939;
           } else {
             accumulator += 0.09369;
@@ -243,32 +243,32 @@ inline float PredictUnsafe(const Instance& instance) {
       }
     }
   } else {
-    if (instance.shellweight >= 0.05875) {
+    if (instance.shellweight >= 0.05875f) {
       if (instance.type == FeatureType::kOutOfVocabulary ||
           instance.type == FeatureType::kM ||
           instance.type == FeatureType::kF) {
-        if (instance.shuckedweight >= 0.233) {
-          if (instance.visceraweight >= 0.1685) {
+        if (instance.shuckedweight >= 0.233f) {
+          if (instance.visceraweight >= 0.1685f) {
             accumulator += -0.0248209;
           } else {
             accumulator += -0.193403;
           }
         } else {
-          if (instance.shellweight >= 0.11825) {
+          if (instance.shellweight >= 0.11825f) {
             accumulator += -0.00385521;
           } else {
             accumulator += -0.10375;
           }
         }
       } else {
-        if (instance.shellweight >= 0.112) {
-          if (instance.shuckedweight >= 0.217) {
+        if (instance.shellweight >= 0.112f) {
+          if (instance.shuckedweight >= 0.21700001f) {
             accumulator += -0.194425;
           } else {
             accumulator += -0.105962;
           }
         } else {
-          if (instance.shellweight >= 0.06875) {
+          if (instance.shellweight >= 0.06875f) {
             accumulator += -0.245637;
           } else {
             accumulator += -0.300007;
@@ -276,8 +276,8 @@ inline float PredictUnsafe(const Instance& instance) {
         }
       }
     } else {
-      if (instance.shellweight >= 0.0265) {
-        if (instance.diameter >= 0.2225) {
+      if (instance.shellweight >= 0.026500002f) {
+        if (instance.diameter >= 0.2225f) {
           if (instance.type == FeatureType::kOutOfVocabulary ||
               instance.type == FeatureType::kM) {
             accumulator += -0.170084;
@@ -285,21 +285,21 @@ inline float PredictUnsafe(const Instance& instance) {
             accumulator += -0.31625;
           }
         } else {
-          if (instance.shuckedweight >= 0.058) {
+          if (instance.shuckedweight >= 0.058f) {
             accumulator += -0.434957;
           } else {
             accumulator += -0.364538;
           }
         }
       } else {
-        if (instance.visceraweight >= 0.01025) {
-          if (instance.shuckedweight >= 0.02325) {
+        if (instance.visceraweight >= 0.01025f) {
+          if (instance.shuckedweight >= 0.023249999f) {
             accumulator += -0.466778;
           } else {
             accumulator += -0.413043;
           }
         } else {
-          if (instance.diameter >= 0.1025) {
+          if (instance.diameter >= 0.1025f) {
             accumulator += -0.527219;
           } else {
             accumulator += -0.666359;
@@ -310,31 +310,31 @@ inline float PredictUnsafe(const Instance& instance) {
   }
 
   // Tree #2
-  if (instance.shellweight >= 0.15375) {
-    if (instance.shellweight >= 0.3545) {
-      if (instance.shuckedweight >= 0.552) {
-        if (instance.shellweight >= 0.56875) {
-          if (instance.shuckedweight >= 0.77) {
+  if (instance.shellweight >= 0.15375f) {
+    if (instance.shellweight >= 0.3545f) {
+      if (instance.shuckedweight >= 0.55200005f) {
+        if (instance.shellweight >= 0.56875f) {
+          if (instance.shuckedweight >= 0.77f) {
             accumulator += 0.252696;
           } else {
             accumulator += 0.591352;
           }
         } else {
-          if (instance.shellweight >= 0.4445) {
+          if (instance.shellweight >= 0.4445f) {
             accumulator += 0.181162;
           } else {
             accumulator += 0.0831095;
           }
         }
       } else {
-        if (instance.shellweight >= 0.414) {
-          if (instance.wholeweight >= 1.40125) {
+        if (instance.shellweight >= 0.41399997f) {
+          if (instance.wholeweight >= 1.40125f) {
             accumulator += 0.633271;
           } else {
             accumulator += 0.418284;
           }
         } else {
-          if (instance.shuckedweight >= 0.42525) {
+          if (instance.shuckedweight >= 0.42525f) {
             accumulator += 0.146606;
           } else {
             accumulator += 0.44689;
@@ -342,29 +342,29 @@ inline float PredictUnsafe(const Instance& instance) {
         }
       }
     } else {
-      if (instance.shellweight >= 0.2395) {
-        if (instance.shuckedweight >= 0.34475) {
-          if (instance.shuckedweight >= 0.44375) {
+      if (instance.shellweight >= 0.23949999f) {
+        if (instance.shuckedweight >= 0.34475f) {
+          if (instance.shuckedweight >= 0.44375002f) {
             accumulator += 0.00736695;
           } else {
             accumulator += 0.105116;
           }
         } else {
-          if (instance.diameter >= 0.4275) {
+          if (instance.diameter >= 0.4275f) {
             accumulator += 0.179296;
           } else {
             accumulator += 0.317869;
           }
         }
       } else {
-        if (instance.shuckedweight >= 0.23275) {
-          if (instance.height >= 0.1525) {
+        if (instance.shuckedweight >= 0.23275f) {
+          if (instance.height >= 0.1525f) {
             accumulator += 0.070624;
           } else {
             accumulator += -0.0583499;
           }
         } else {
-          if (instance.wholeweight >= 0.57275) {
+          if (instance.wholeweight >= 0.57275f) {
             accumulator += 0.297453;
           } else {
             accumulator += 0.0518753;
@@ -373,32 +373,32 @@ inline float PredictUnsafe(const Instance& instance) {
       }
     }
   } else {
-    if (instance.shellweight >= 0.0475) {
+    if (instance.shellweight >= 0.0475f) {
       if (instance.type == FeatureType::kOutOfVocabulary ||
           instance.type == FeatureType::kM ||
           instance.type == FeatureType::kF) {
-        if (instance.shuckedweight >= 0.233) {
-          if (instance.visceraweight >= 0.15125) {
+        if (instance.shuckedweight >= 0.233f) {
+          if (instance.visceraweight >= 0.15125f) {
             accumulator += -0.0838989;
           } else {
             accumulator += -0.197271;
           }
         } else {
-          if (instance.diameter >= 0.3075) {
+          if (instance.diameter >= 0.3075f) {
             accumulator += -0.0222674;
           } else {
             accumulator += -0.120292;
           }
         }
       } else {
-        if (instance.shellweight >= 0.112) {
-          if (instance.shuckedweight >= 0.21625) {
+        if (instance.shellweight >= 0.112f) {
+          if (instance.shuckedweight >= 0.21625f) {
             accumulator += -0.199929;
           } else {
             accumulator += -0.123039;
           }
         } else {
-          if (instance.shellweight >= 0.06875) {
+          if (instance.shellweight >= 0.06875f) {
             accumulator += -0.221073;
           } else {
             accumulator += -0.26881;
@@ -406,29 +406,29 @@ inline float PredictUnsafe(const Instance& instance) {
         }
       }
     } else {
-      if (instance.shellweight >= 0.02175) {
-        if (instance.shellweight >= 0.0395) {
-          if (instance.shuckedweight >= 0.046) {
+      if (instance.shellweight >= 0.02175f) {
+        if (instance.shellweight >= 0.039499998f) {
+          if (instance.shuckedweight >= 0.046f) {
             accumulator += -0.30408;
           } else {
             accumulator += -0.152861;
           }
         } else {
-          if (instance.visceraweight >= 0.01375) {
+          if (instance.visceraweight >= 0.01375f) {
             accumulator += -0.350878;
           } else {
             accumulator += -0.253653;
           }
         }
       } else {
-        if (instance.wholeweight >= 0.02325) {
-          if (instance.shellweight >= 0.01525) {
+        if (instance.wholeweight >= 0.023249999f) {
+          if (instance.shellweight >= 0.015249999f) {
             accumulator += -0.415872;
           } else {
             accumulator += -0.457507;
           }
         } else {
-          if (instance.diameter >= 0.1025) {
+          if (instance.diameter >= 0.1025f) {
             accumulator += -0.516069;
           } else {
             accumulator += -0.599723;
