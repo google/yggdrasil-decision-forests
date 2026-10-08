@@ -8,7 +8,7 @@
 -   Learners and models are extensively tested, including integration testing on
     real datasets; and, there exists no execution path in the serving code that
     crashes as a result of an error; Instead, in case of failure (e.g.,
-    malformed input example), the inference code returns a util::Status.
+    malformed input example), the inference code returns a absl::Status.
 
 ## Training
 
