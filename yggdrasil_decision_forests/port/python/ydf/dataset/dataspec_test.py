@@ -117,42 +117,50 @@ class DataspecTest(parameterized.TestCase):
     self.assertFalse(
         dataspec_lib.column_defs_contains_column(column_name, None)
     )
-    str_defs_positive = ["foo", "target", "bar", "", "*"]
+    str_defs_positive: list[dataspec_lib.ColumnDef] = [
+        "foo", "target", "bar", "", "*"
+    ]
     self.assertTrue(
-        dataspec_lib.column_defs_contains_column(column_name, str_defs_positive)  # pyrefly: ignore[bad-argument-type]
+        dataspec_lib.column_defs_contains_column(column_name, str_defs_positive)
     )
-    str_defs_negative = ["foo", "tar", "bar", "", "*"]
+    str_defs_negative: list[dataspec_lib.ColumnDef] = [
+        "foo", "tar", "bar", "", "*"
+    ]
     self.assertFalse(
-        dataspec_lib.column_defs_contains_column(column_name, str_defs_negative)  # pyrefly: ignore[bad-argument-type]
+        dataspec_lib.column_defs_contains_column(column_name, str_defs_negative)
     )
-    tuple_defs_positive = [
+    tuple_defs_positive: list[dataspec_lib.ColumnDef] = [
         ("foo", Semantic.NUMERICAL),
         ("target", Semantic.CATEGORICAL),
     ]
     self.assertTrue(
         dataspec_lib.column_defs_contains_column(
-            column_name, tuple_defs_positive  # pyrefly: ignore[bad-argument-type]
+            column_name, tuple_defs_positive
         )
     )
-    tuple_defs_negative = [
+    tuple_defs_negative: list[dataspec_lib.ColumnDef] = [
         ("foo", Semantic.NUMERICAL),
         ("tar", Semantic.CATEGORICAL),
     ]
     self.assertFalse(
         dataspec_lib.column_defs_contains_column(
-            column_name, tuple_defs_negative  # pyrefly: ignore[bad-argument-type]
+            column_name, tuple_defs_negative
         )
     )
-    column_defs_positive = [Column("foo"), Column("target")]
+    column_defs_positive: list[dataspec_lib.ColumnDef] = [
+        Column("foo"), Column("target")
+    ]
     self.assertTrue(
         dataspec_lib.column_defs_contains_column(
-            column_name, column_defs_positive  # pyrefly: ignore[bad-argument-type]
+            column_name, column_defs_positive
         )
     )
-    column_defs_negative = [Column("foo"), Column("tar")]
+    column_defs_negative: list[dataspec_lib.ColumnDef] = [
+        Column("foo"), Column("tar")
+    ]
     self.assertFalse(
         dataspec_lib.column_defs_contains_column(
-            column_name, column_defs_negative  # pyrefly: ignore[bad-argument-type]
+            column_name, column_defs_negative
         )
     )
 

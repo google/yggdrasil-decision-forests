@@ -492,9 +492,9 @@ class VerticalDataset:
     self._dataset.PopulateColumnCategoricalIntegerizedNPInt32(
         column.name,
         column_data,
-        ydf_dtype=ydf_dtype,  # pyrefly: ignore[bad-argument-type]
+        ydf_dtype=ydf_dtype,
         max_val=max_val,
-        most_frequent_value=most_frequent_value,  # pyrefly: ignore[bad-argument-type]
+        most_frequent_value=most_frequent_value,
         num_missing=num_missing,
         column_idx=column_idx,  # May be None.
     )
@@ -810,7 +810,7 @@ def create_vertical_dataset_with_spec_or_args(
       and all(isinstance(s, str) for s in data)
   ):
     return create_vertical_dataset_from_path(
-        data, required_columns, inference_args, data_spec  # pyrefly: ignore[bad-argument-type]
+        data, required_columns, inference_args, data_spec
     )
   else:
     # Ignore unrolling for list or set features.
@@ -852,7 +852,7 @@ def create_vertical_dataset_with_spec_or_args(
 
 
 def create_vertical_dataset_from_path(
-    path: Union[str, List[str]],
+    path: Union[str, Sequence[str]],
     required_columns: Optional[Sequence[str]],
     inference_args: Optional[dataspec_lib.DataSpecInferenceArgs],
     data_spec: Optional[data_spec_pb2.DataSpecification],
@@ -860,7 +860,7 @@ def create_vertical_dataset_from_path(
   """Returns a VerticalDataset from (list of) path using YDF dataset reading."""
   assert (data_spec is None) != (inference_args is None)
   if not isinstance(path, str):
-    path = paths.normalize_list_of_paths(path)
+    path = paths.normalize_list_of_paths(list(path))
   dataset = VerticalDataset()
   if data_spec is not None:
     dataset._dataset.CreateFromPathWithDataSpec(  # pylint: disable=protected-access
@@ -1019,13 +1019,14 @@ def create_vertical_dataset_from_dict_of_values(
   assert (data_spec is None) != (inference_args is None)
   dataset = VerticalDataset()
   if data_spec is None:
+    assert inference_args is not None
     # If `required_columns` is None, only check if the columns mentioned in the
     # `inference_args` are required. This is checked by
     # dataspec.get_all_columns()
     normalized_columns, effective_unroll_feature_info = (
         dataspec_lib.get_all_columns(
             available_columns=list(data.keys()),
-            inference_args=inference_args,  # pyrefly: ignore[bad-argument-type]
+            inference_args=inference_args,
             required_columns=required_columns,
             unroll_feature_info=unroll_feature_info,
         )
@@ -1273,7 +1274,7 @@ def infer_dataspec_types(
 
     # Dtyping
     column_data = batch[py_column.name]
-    column.dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)  # pyrefly: ignore[bad-assignment]
+    column.dtype = dataspec_lib.np_dtype_to_ydf_dtype(column_data.dtype)
 
     # Copy filter configs
     if column.type == data_spec_pb2.ColumnType.CATEGORICAL:
@@ -1396,8 +1397,8 @@ class NumericalDataSpecAccumulator(DataSpecAccumulator):
     self._sum_values = 0.0
     self._sum_square_values = 0.0
     self._count_values = 0
-    self._max_value = None
-    self._min_value = None
+    self._max_value = float("-inf")
+    self._min_value = float("inf")
     self._count_missing_values = 0
     self._num_quantiles = num_quantiles
     if self._num_quantiles is not None:
@@ -1407,17 +1408,17 @@ class NumericalDataSpecAccumulator(DataSpecAccumulator):
 
   def visit(self, value: np.ndarray):
     num_values = np.size(value)
-    num_missing = np.count_nonzero(np.isnan(value))
-    self._count_values += num_values - num_missing  # pyrefly: ignore[bad-assignment]
-    self._count_missing_values += num_missing  # pyrefly: ignore[bad-assignment]
+    num_missing = int(np.count_nonzero(np.isnan(value)))
+    self._count_values += num_values - num_missing
+    self._count_missing_values += num_missing
 
     if num_values == num_missing:
       return
 
     self._sum_values += np.nansum(value, dtype=np.float64)
     self._sum_square_values += np.nansum(value**2, dtype=np.float64)
-    self._max_value = np.nanmax(value, initial=self._max_value)  # pyrefly: ignore[no-matching-overload]
-    self._min_value = np.nanmin(value, initial=self._min_value)  # pyrefly: ignore[no-matching-overload]
+    self._max_value = max(self._max_value, float(np.nanmax(value)))
+    self._min_value = min(self._min_value, float(np.nanmin(value)))
     if self._reservoir is not None:
       self._reservoir.add(value.ravel())
 
@@ -1460,7 +1461,7 @@ class NumericalDataSpecAccumulator(DataSpecAccumulator):
       boundaries = np.unique(quantiles).tolist()
       if len(boundaries) < 2:
         if self._min_value == self._max_value:
-          boundaries = [self._min_value - 1, self._min_value + 1]  # pyrefly: ignore[unsupported-operation]
+          boundaries = [self._min_value - 1, self._min_value + 1]
         else:
           boundaries = [self._min_value, self._max_value]
       column.discretized_numerical.CopyFrom(
@@ -1581,4 +1582,4 @@ class BatchReservoirSampling:
     # when returning "num_quantiles" quantiles is possible.
     thresholds = np.linspace(0, 1, num_quantiles)
     quantiles = np.nanquantile(self._samples[: self._num_in_cache], thresholds)
-    return quantiles.tolist(), thresholds.tolist()  # pyrefly: ignore[bad-return]
+    return quantiles, thresholds

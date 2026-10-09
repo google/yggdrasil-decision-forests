@@ -109,7 +109,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_pos",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(np.dtype(dtype)),
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=2,
@@ -121,7 +121,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_neg",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(np.dtype(dtype)),
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=-2,
@@ -133,7 +133,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_zero",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(np.dtype(dtype)),
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=0,
@@ -162,7 +162,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_single_nan",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(np.dtype(dtype)),
                 count_nas=1,
                 numerical=ds_pb.NumericalSpec(
                     mean=1.5,
@@ -174,7 +174,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="col_nan_only",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(np.dtype(dtype)),
                 count_nas=3,
                 numerical=ds_pb.NumericalSpec(),
             ),
@@ -201,7 +201,7 @@ class GenericDatasetTest(parameterized.TestCase):
             ds_pb.Column(
                 name="feature",
                 type=ds_pb.ColumnType.NUMERICAL,
-                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(np.dtype(dtype)),
                 count_nas=0,
                 numerical=ds_pb.NumericalSpec(
                     mean=2,
@@ -612,12 +612,12 @@ class GenericDatasetTest(parameterized.TestCase):
         "col_float": [1.1, 2.2, 3.3, 4.4],
         "col_bool": [True, True, False, False],
     })
-    feature_definitions = [
+    feature_definitions: list[dataspec_lib.ColumnDef] = [
         Column("col_str", Semantic.CATEGORICAL, min_vocab_frequency=1),
         Column("col_int_cat", Semantic.CATEGORICAL, min_vocab_frequency=1),
     ]
     ds = dataset_lib.create_vertical_dataset(
-        df, columns=feature_definitions, include_all_columns=True  # pyrefly: ignore[bad-argument-type]
+        df, columns=feature_definitions, include_all_columns=True
     )
     expected_dataset_content = """col_str,col_int_cat,col_int,col_float,col_bool
 A,1,5,1.1,1
@@ -1612,7 +1612,7 @@ B,3""")
         "col_int_cat": [1, 2, 3, 4],
         "col_float": [1.1, 2.2, 3.3, 4.4],
     })
-    feature_definitions = [
+    feature_definitions: list[dataspec_lib.ColumnDef] = [
         Column("col_str", Semantic.CATEGORICAL, min_vocab_frequency=1),
         Column("col_int_cat", Semantic.CATEGORICAL, min_vocab_frequency=1),
     ]
@@ -1624,7 +1624,7 @@ B,3""")
 
     ds = dataset_lib.create_vertical_dataset(
         ["csv:" + path1, "csv:" + path2],
-        columns=feature_definitions,  # pyrefly: ignore[bad-argument-type]
+        columns=feature_definitions,
         include_all_columns=True,
     )
 
@@ -1927,7 +1927,7 @@ feature.0_of_3,feature.1_of_3,feature.2_of_3
             ds_pb.Column(
                 name="f1",
                 type=ds_pb.ColumnType.CATEGORICAL,
-                dtype=dataspec_lib.np_dtype_to_ydf_dtype(dtype),
+                dtype=dataspec_lib.np_dtype_to_ydf_dtype(np.dtype(dtype)),
                 count_nas=2,
                 categorical=ds_pb.CategoricalSpec(
                     most_frequent_value=2,

@@ -16,7 +16,7 @@
 
 import dataclasses
 import enum
-from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterator, List, Literal, Optional, Sequence, Tuple, Union, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -77,27 +77,15 @@ NP_SUPPORTED_FLOAT_DTYPE = [
 ]
 
 
-def np_dtype_to_ydf_dtype(np_dtype: np.dtype) -> Optional["ds_pb.DType"]:
-  """Converts a Numpy dtype to a YDF dtype.
+def np_dtype_to_ydf_dtype(np_dtype: np.dtype) -> "ds_pb.DType":
+  """Converts a Numpy dtype to a YDF dtype."""
 
-  If the numpy dtype has no matching ydf dtype, returns None.
-
-  Args:
-    np_dtype: Numpy dtype.
-
-  Returns:
-    YDF dtype.
-  """
-
-  if hasattr(np_dtype, "type"):
-    ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype.type)
-  else:
-    ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype)  # pyrefly: ignore[bad-argument-type]
-
+  ydf_dtype = _NP_DTYPE_TO_YDF_DTYPE.get(np_dtype.type)
   if ydf_dtype is None:
     raise ValueError(f"ydf_dtype: {ydf_dtype!r} {np_dtype!r}")
 
   return ydf_dtype
+
 
 # pyformat: disable
 class Semantic(enum.Enum):
@@ -564,12 +552,12 @@ def categorical_column_dictionary_to_list(
     column_spec: Dataspec column.
   """
 
+  num_items = column_spec.categorical.number_of_unique_values
   if column_spec.categorical.is_already_integerized:
-    return [
-        str(i) for i in range(column_spec.categorical.number_of_unique_values)
-    ]
+    return [str(i) for i in range(num_items)]
 
-  items = [None] * column_spec.categorical.number_of_unique_values
+  # `None` marks the indices not yet seen in the dictionary.
+  items: List[Optional[str]] = [None] * num_items
 
   # Warn for every column every time. Poor encodings could lead to surprising
   # behaviour.
@@ -589,16 +577,15 @@ def categorical_column_dictionary_to_list(
         )
         shown_unicode_warning = True
       decoded_key = key.decode(encoding="utf-8", errors="ignore")
-    items[value.index] = decoded_key  # pyrefly: ignore[unsupported-operation]
+    items[value.index] = decoded_key
 
-  for index, value in enumerate(items):
-    if value is None:
-      raise ValueError(
-          f"Invalid dictionary. No value for index {index} "
-          f"in column {column_spec}"
-      )
-
-  return items  # pyrefly: ignore[bad-return]
+  if None in items:
+    raise ValueError(
+        f"Invalid dictionary. No value for index {items.index(None)} "
+        f"in column {column_spec}"
+    )
+  # Safe: the check above guarantees that all the items are set.
+  return cast(List[str], items)
 
 
 def get_all_columns(
