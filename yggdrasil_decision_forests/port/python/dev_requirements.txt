@@ -3,7 +3,6 @@ xarray
 pydantic
 requests
 urllib3
-fastapi[standard]>=0.112.0,<0.113.0
 tensorflow; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.13'
 portpicker
 matplotlib
@@ -21,3 +20,6 @@ pyarrow
 flax; platform_machine != 'aarch64' and platform_system != 'Windows'
 tqdm
 safetensors
+# For FastAPI Tests.
+fastapi
+httpx2

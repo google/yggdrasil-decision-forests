@@ -433,6 +433,7 @@ py_test(
         "@abseil-py//absl/testing:absltest",
         "@abseil-py//absl/testing:parameterized",
         "@pypi_ydf//fastapi",  # buildcleaner: keep
+        "@pypi_ydf//httpx2",  # buildcleaner: keep
         "@pypi_ydf//pydantic",  # buildcleaner: keep
         "@pypi_ydf//requests",  # buildcleaner: keep
     ],

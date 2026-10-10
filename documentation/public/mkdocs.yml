@@ -96,6 +96,7 @@ nav:
     - Tuning: tutorial/tuning.ipynb
     - Distributed training: tutorial/distributed_training.ipynb
     - Feature selection: tutorial/feature_selection.ipynb
+    - Calibration: tutorial/binary_calibration.ipynb
   - Evaluation:
     - Train & test: tutorial/train_and_test.ipynb
     - Cross-validation: tutorial/cross_validation.ipynb
@@ -105,6 +106,7 @@ nav:
     - Inspecting trees: tutorial/inspecting_trees.ipynb
     - Editing trees: tutorial/editing_trees.ipynb
     - Custom loss: tutorial/custom_loss.ipynb
+    - Calibration Theory: tutorial/pav_calibration_theory.ipynb
   - Other APIs:
     - CLI quickstart: cli_quickstart.md
     - JavaScript: javascript.md

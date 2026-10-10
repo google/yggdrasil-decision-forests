@@ -37,6 +37,15 @@ When optimizing for quality, both algorithms should be tested.
     algorithm and must be tuned accordingly. For example, the max_depth of a GBT is
     typically between 3 and 8, while for an RF, it is rarely less than 16.
 
+## Calibration
+
+Binary classifiers can be
+[calibrated](https://en.wikipedia.org/wiki/Calibration_(statistics)) using
+[PAV](tutorial/binary_calibration.ipynb).
+This uses a combination of isotonic regression and piecewise polynomial
+interpolation to ensure that the predicted probabilities are well-calibrated to
+observed frequencies while preserving quality metrics.
+
 ## Optimizing Model Quality
 
 ### Automated Hyperparameter Tuning

@@ -1758,8 +1758,8 @@ class GenericCCModel(GenericModel):
   def calibrate(
       self,
       data: dataset.InputDataset,
-      config: CalibrationConfig,
       *,
+      config: Optional[CalibrationConfig] = None,
       weighted: Optional[bool] = None,
       num_threads: Optional[int] = None,
   ) -> None:
@@ -1771,6 +1771,9 @@ class GenericCCModel(GenericModel):
       weighted: Whether to use weighted calibration.
       num_threads: The number of threads to use.
     """
+    if config is None:
+      config = CalibrationConfig()
+
     if weighted is None:
       weighted = False
 
