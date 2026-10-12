@@ -82,6 +82,143 @@ size_t SampleNumSelectedFeatures(std::binomial_distribution<size_t>& binom,
   return kMinNumFeatures;
 }
 
+// Computes the "Sb" (between-class) and "Sw" (within-class) scatter matrices
+// used to solve a multi-class LDA (Linear Discriminant Analysis).
+//
+// "labels[i]" and "weights[i]" (if "weights" is not empty) are the label and
+// weight of the example "selected_examples[i]" in the dataset referenced by
+// "projection_evaluator". If "selected_examples" is empty, "labels[i]" and
+// "weights[i]" refer to example "i". Missing feature values are replaced in the
+// same way as in "ProjectionEvaluator::Evaluate".
+//
+// "sb" and "sw" are column-major square matrices of size
+// "selected_features.size()".
+absl::Status ComputeLDAScatterMatrices(
+    const ProjectionEvaluator& projection_evaluator,
+    const std::vector<int>& selected_features,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const int num_classes, const std::vector<int32_t>& labels,
+    const std::vector<float>& weights, std::vector<double>* sb,
+    std::vector<double>* sw) {
+  // Based on the section 2 of "Revisiting Classical Multiclass Linear
+  // Discriminant Analysis with a Novel Prototype-based Interpretable
+  // Solution".
+  if (!selected_examples.empty() && selected_examples.size() != labels.size()) {
+    return absl::InternalError(
+        "Mismatch between the number of selected examples and labels");
+  }
+  if (!weights.empty() && weights.size() != labels.size()) {
+    return absl::InternalError(
+        "Mismatch between the number of weights and labels");
+  }
+
+  const int num_features = selected_features.size();
+
+  // Feature columns and missing value replacements.
+  std::vector<const std::vector<float>*> columns(num_features);
+  std::vector<float> na_replacements(num_features);
+  for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
+    const int attribute_idx = selected_features[feature_idx];
+    columns[feature_idx] = &projection_evaluator.AttributeValues(attribute_idx);
+    na_replacements[feature_idx] =
+        projection_evaluator.NaReplacementValue(attribute_idx);
+  }
+
+  // Extracts the feature values of the "local_idx"-th example into "row".
+  const auto get_row = [&](const std::size_t local_idx,
+                           std::vector<double>* row) {
+    const std::size_t example_idx =
+        selected_examples.empty() ? local_idx : selected_examples[local_idx];
+    for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
+      float value = (*columns[feature_idx])[example_idx];
+      if (std::isnan(value)) {
+        value = na_replacements[feature_idx];
+      }
+      (*row)[feature_idx] = value;
+    }
+  };
+
+  // Compute the mean of the features (globally and per class).
+  const int shifted_num_classes = num_classes - 1;  // Ignore class 0.
+  DCHECK_GE(shifted_num_classes, 2);
+  std::vector<double> mean_per_feature(num_features, 0);
+  std::vector<double> mean_per_feature_and_class(
+      num_features * shifted_num_classes, 0);
+  std::vector<double> weight_per_class(shifted_num_classes, 0);
+  std::vector<double> row(num_features);
+  double sum_weights = 0;
+
+  for (std::size_t local_idx = 0; local_idx < labels.size(); local_idx++) {
+    const int32_t shifted_class = labels[local_idx] - 1;
+    DCHECK_GE(shifted_class, 0);
+    DCHECK_LT(shifted_class, shifted_num_classes);
+    const float weight = (weights.empty()) ? 1.f : weights[local_idx];
+
+    sum_weights += weight;
+    weight_per_class[shifted_class] += weight;
+
+    get_row(local_idx, &row);
+    for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
+      mean_per_feature[feature_idx] += row[feature_idx] * weight;
+      mean_per_feature_and_class[feature_idx + shifted_class * num_features] +=
+          row[feature_idx] * weight;
+    }
+  }
+
+  if (sum_weights == 0) {
+    return absl::InvalidArgumentError("Null weight");
+  }
+
+  // Normalize the sums into means.
+  DCHECK_GT(sum_weights, 0);
+  const double inv_sum_weights = 1. / sum_weights;
+  for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
+    mean_per_feature[feature_idx] *= inv_sum_weights;
+
+    for (int shifted_class = 0; shifted_class < shifted_num_classes;
+         shifted_class++) {
+      if (weight_per_class[shifted_class] == 0) {
+        continue;
+      }
+      mean_per_feature_and_class[feature_idx + shifted_class * num_features] /=
+          weight_per_class[shifted_class];
+    }
+  }
+
+  // Compute Sb
+  sb->assign(num_features * num_features, 0);
+  for (int shifted_class = 0; shifted_class < shifted_num_classes;
+       shifted_class++) {
+    internal::SubtractTransposeMultiplyAdd(
+        weight_per_class[shifted_class],
+        absl::MakeSpan(mean_per_feature_and_class)
+            .subspan(shifted_class * num_features, num_features),
+        absl::MakeSpan(mean_per_feature), *sb);
+  }
+
+  // Compute Sw
+  sw->assign(num_features * num_features, 0);
+  for (std::size_t local_idx = 0; local_idx < labels.size(); local_idx++) {
+    const int shifted_class = labels[local_idx] - 1;
+    DCHECK_GE(shifted_class, 0);
+    const float weight = (weights.empty()) ? 1.f : weights[local_idx];
+
+    get_row(local_idx, &row);
+    internal::SubtractTransposeMultiplyAdd(
+        weight, absl::MakeSpan(row),
+        absl::MakeSpan(mean_per_feature_and_class)
+            .subspan(shifted_class * num_features, num_features),
+        *sw);
+  }
+
+  // Help the matrix to be invertible.
+  for (int i = 0; i < num_features; i++) {
+    (*sw)[i + num_features * i] += 0.001;
+  }
+
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 template <typename T>
@@ -401,19 +538,24 @@ absl::StatusOr<bool> FindBestConditionGuidedObliqueTemplate(
   return false;
 }
 
-absl::Status SolveLDA(const proto::DecisionTreeTrainingConfig& dt_config,
-                      const ProjectionEvaluator& projection_evaluator,
-                      const std::vector<int>& selected_features,
-                      const int num_classes, const std::vector<int32_t>& labels,
-                      const std::vector<float>& weights, Projection* projection,
-                      utils::RandomEngine* random) {
+// Computes the LDA projection of "selected_features".
+//
+// "labels[i]" and "weights[i]" (if "weights" is not empty) are the label and
+// weight of the example "selected_examples[i]".
+absl::Status SolveLDA(
+    const proto::DecisionTreeTrainingConfig& dt_config,
+    const ProjectionEvaluator& projection_evaluator,
+    const std::vector<int>& selected_features,
+    const absl::Span<const UnsignedExampleIdx> selected_examples,
+    const int num_classes, const std::vector<int32_t>& labels,
+    const std::vector<float>& weights, Projection* projection,
+    utils::RandomEngine* random) {
   // TODO: Cache.
-  LDACache lda_cache;
-  RETURN_IF_ERROR(lda_cache.ComputeClassification(
-      dt_config, projection_evaluator, selected_features, num_classes, labels,
-      weights));
-  const auto& sb = lda_cache.FullSB();
-  const auto& sw = lda_cache.FullSW();
+  std::vector<double> sb;
+  std::vector<double> sw;
+  RETURN_IF_ERROR(ComputeLDAScatterMatrices(
+      projection_evaluator, selected_features, selected_examples, num_classes,
+      labels, weights, &sb, &sw));
   const int num_features = selected_features.size();
   const Eigen::Map<const Eigen::MatrixXd> eg_sw(sw.data(), num_features,
                                                 num_features);
@@ -714,6 +856,7 @@ absl::Status EvaluateMHLDCandidates(
       Projection projection;
       if constexpr (is_same<LabelStats, ClassificationLabelStats>::value) {
         RETURN_IF_ERROR(SolveLDA(dt_config, projection_evaluator, candidate,
+                                 selected_examples,
                                  label_stats.num_label_classes, selected_labels,
                                  selected_weights, &projection, random));
       } else {
@@ -1270,92 +1413,18 @@ absl::Status LDACache::ComputeClassification(
   // Discriminant Analysis with a Novel Prototype-based Interpretable
   // Solution".
   //
+  // "labels[i]" and "weights[i]" are the label and weight of the i-th example
+  // of the dataset referenced by "projection_evaluator".
+  //
   // TODO: Experiment with other approaches. For instance, the singular
   // value decomposition approach.
 
   const int num_features = selected_features.size();
   size_ = num_features;
 
-  // Compute the mean of the features (globally and per class).
-  const int shifted_num_classes = num_classes - 1;  // Ignore class 0.
-  DCHECK_GE(shifted_num_classes, 2);
-  // TODO: Cache.
-  std::vector<double> mean_per_feature(selected_features.size(), 0);
-  std::vector<double> mean_per_feature_and_class(
-      selected_features.size() * shifted_num_classes, 0);
-  std::vector<double> weight_per_class(shifted_num_classes, 0);
-  double sum_weights = 0;
-
-  for (std::size_t example_idx = 0; example_idx < labels.size();
-       example_idx++) {
-    const int32_t shifted_class = labels[example_idx] - 1;
-    DCHECK_GE(shifted_class, 0);
-    DCHECK_LT(shifted_class, shifted_num_classes);
-    const float weight = (weights.empty()) ? 1.f : weights[example_idx];
-
-    sum_weights += weight;
-    weight_per_class[shifted_class] += weight;
-
-    for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
-      const float feature_value = projection_evaluator.AttributeValues(
-          selected_features[feature_idx])[example_idx];
-
-      mean_per_feature[feature_idx] += feature_value * weight;
-      mean_per_feature_and_class[feature_idx + shifted_class * num_features] +=
-          feature_value * weight;
-    }
-  }
-
-  if (sum_weights == 0) {
-    return absl::InvalidArgumentError("Null weight");
-  }
-
-  // Normalize the sums into means.
-  DCHECK_GT(sum_weights, 0);
-  const double inv_sum_weights = 1. / sum_weights;
-  for (int feature_idx = 0; feature_idx < num_features; feature_idx++) {
-    mean_per_feature[feature_idx] *= inv_sum_weights;
-
-    for (int shifted_class = 0; shifted_class < shifted_num_classes;
-         shifted_class++) {
-      if (weight_per_class[shifted_class] == 0) {
-        continue;
-      }
-      mean_per_feature_and_class[feature_idx + shifted_class * num_features] /=
-          weight_per_class[shifted_class];
-    }
-  }
-
-  // Compute Sb
-  sb_.assign(num_features * num_features, 0);
-  for (int shifted_class = 0; shifted_class < shifted_num_classes;
-       shifted_class++) {
-    internal::SubtractTransposeMultiplyAdd(
-        weight_per_class[shifted_class],
-        absl::MakeSpan(mean_per_feature_and_class)
-            .subspan(shifted_class * num_features, num_features),
-        absl::MakeSpan(mean_per_feature), sb_);
-  }
-
-  // Compute Sw
-  sw_.assign(num_features * num_features, 0);
-  for (std::size_t example_idx = 0; example_idx < labels.size();
-       example_idx++) {
-    const int shifted_class = labels[example_idx] - 1;
-    DCHECK_GE(shifted_class, 0);
-    const float weight = (weights.empty()) ? 1.f : weights[example_idx];
-
-    internal::SubtractTransposeMultiplyAdd(
-        weight, example_idx, selected_features, projection_evaluator,
-        absl::MakeSpan(mean_per_feature_and_class)
-            .subspan(shifted_class * num_features, num_features),
-        sw_);
-  }
-
-  // Help the matrix to be invertible.
-  for (int i = 0; i < num_features; i++) {
-    sw_[i + num_features * i] += 0.001;
-  }
+  RETURN_IF_ERROR(ComputeLDAScatterMatrices(
+      projection_evaluator, selected_features, /*selected_examples=*/{},
+      num_classes, labels, weights, &sb_, &sw_));
 
   if (index_features) {
     // Index features.
@@ -1494,26 +1563,6 @@ void SubtractTransposeMultiplyAdd(double weight, absl::Span<double> a,
   for (int i = 0; i < n; i++) {
     for (int j = 0; j < n; j++) {
       output[j + i * n] += weight * (a[i] - b[i]) * (a[j] - b[j]);
-    }
-  }
-}
-
-void SubtractTransposeMultiplyAdd(
-    double weight, std::size_t example_idx,
-    const std::vector<int>& selected_features,
-    const ProjectionEvaluator& projection_evaluator, absl::Span<double> b,
-    std::vector<double>& output) {
-  DCHECK_EQ(selected_features.size(), b.size());
-  DCHECK_EQ(b.size() * b.size(), output.size());
-
-  const int n = b.size();
-  for (int i = 0; i < n; i++) {
-    const double x_i =
-        projection_evaluator.AttributeValues(selected_features[i])[example_idx];
-    for (int j = 0; j < n; j++) {
-      const double x_j = projection_evaluator.AttributeValues(
-          selected_features[j])[example_idx];
-      output[j + i * n] += weight * (x_i - b[i]) * (x_j - b[j]);
     }
   }
 }

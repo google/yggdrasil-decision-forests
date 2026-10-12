@@ -526,6 +526,79 @@ TEST(MHLDTOblique, Classification) {
   EXPECT_NEAR(best_condition.split_score(), 0.693, 0.001);
 }
 
+// Same as "Classification", but the examples of the node are not the first
+// examples of the dataset. Checks that the LDA uses the features of the
+// selected examples (and not those of the first examples of the dataset).
+TEST(MHLDTOblique, ClassificationOnSubsetOfExamples) {
+  const model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(0);
+  config_link.add_numerical_features(1);
+  config_link.add_numerical_features(2);
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_mhld_oblique_split();
+  dt_config.set_min_examples(1);
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+
+  dataset::VerticalDataset dataset;
+  ASSERT_OK_AND_ASSIGN(
+      auto label_col,
+      dataset.AddColumn("l", dataset::proto::ColumnType::CATEGORICAL));
+  label_col->mutable_categorical()->set_is_already_integerized(true);
+  label_col->mutable_categorical()->set_number_of_unique_values(3);
+  EXPECT_OK(
+      dataset.AddColumn("f1", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(
+      dataset.AddColumn("f2", dataset::proto::ColumnType::NUMERICAL).status());
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+
+  // Examples not in the node. If paired with the labels of the node, the LDA
+  // finds a projection that does not separate the classes of the node.
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.1"}, {"f2", "1.1"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.1"}, {"f2", "1.15"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.9"}, {"f2", "1.9"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.9"}, {"f2", "1.95"}});
+  // Examples in the node. Same as in the "Classification" test.
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.1"}, {"f2", "1.1"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.9"}, {"f2", "1.9"}});
+  dataset.AppendExample({{"l", "2"}, {"f1", "0.1"}, {"f2", "1.15"}});
+  dataset.AppendExample({{"l", "2"}, {"f1", "0.9"}, {"f2", "1.95"}});
+
+  ASSERT_OK_AND_ASSIGN(auto* label_data,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(0));
+
+  const std::vector<UnsignedExampleIdx> selected_examples = {4, 5, 6, 7};
+  const std::vector<float> weights(dataset.nrow(), 1.f);
+
+  ClassificationLabelStats label_stats(label_data->values());
+  label_stats.num_label_classes = 3;
+  label_stats.label_distribution.SetNumClasses(3);
+  for (const auto example_idx : selected_examples) {
+    label_stats.label_distribution.Add(label_data->values()[example_idx],
+                                       weights[example_idx]);
+  }
+
+  proto::Node parent;
+  InternalTrainConfig internal_config;
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  ASSERT_OK_AND_ASSIGN(
+      const bool result,
+      FindBestConditionOblique(dataset, selected_examples, weights, config,
+                               config_link, dt_config, parent, internal_config,
+                               label_stats, 50, &best_condition, &random,
+                               &cache));
+
+  EXPECT_TRUE(result);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(), 2);
+  EXPECT_EQ(best_condition.num_training_examples_without_weight(), 4);
+  EXPECT_NEAR(best_condition.split_score(), 0.693, 0.001);
+}
+
 TEST(MHLDTOblique, Classification_Again) {
   const model::proto::TrainingConfig config;
   model::proto::TrainingConfigLinking config_link;
