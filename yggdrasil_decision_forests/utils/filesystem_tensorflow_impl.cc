@@ -18,7 +18,6 @@
 #include <cstring>
 #include <initializer_list>
 #include <memory>
-#include <regex>  // NOLINT
 #include <string>
 #include <vector>
 
@@ -31,6 +30,7 @@
 #include "src/google/protobuf/message.h"
 #include "src/google/protobuf/message_lite.h"
 #include "src/google/protobuf/text_format.h"
+#include "re2/re2.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system.h"
 #include "tensorflow/core/platform/path.h"
@@ -225,18 +225,14 @@ class FileSystemImplementation : public FileSystemInterface {
 
   bool GenerateShardedFilenames(absl::string_view spec,
                                 std::vector<std::string>* names) override {
-    std::regex num_shard_pattern(R"((.*)\@(\*|[0-9]+)(?:(\..+))?)");
-    std::smatch match;
+    static const LazyRE2 num_shard_pattern = {
+        R"((.*)\@(\*|[0-9]+)(?:(\..+))?)"};
+    std::string prefix, count, suffix;
     std::string str_spec(spec);
-    if (!std::regex_match(str_spec, match, num_shard_pattern)) {
+    if (!RE2::FullMatch(str_spec, *num_shard_pattern, &prefix, &count,
+                        &suffix)) {
       return false;
     }
-    if (match.size() != 4) {
-      return false;
-    }
-    const auto prefix = match[1].str();
-    const auto count = match[2].str();
-    const auto suffix = match[3].str();
 
     int int_count;
     if (count == "*") {

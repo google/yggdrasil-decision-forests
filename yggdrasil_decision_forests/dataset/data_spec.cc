@@ -43,6 +43,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/span.h"
+#include "re2/re2.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -703,12 +704,23 @@ absl::Status Tokenize(const absl::string_view text,
           absl::StrSplit(cased_text, absl::ByAnyChar(tokenizer.separator()));
       break;
     case proto::Tokenizer::REGEX_MATCH: {
-      std::string remaining = cased_text;
-      std::regex re(tokenizer.regex());
-      std::smatch sm;
-      while (std::regex_search(remaining, sm, re)) {
-        unit_tokens.emplace_back(sm.str());
-        remaining = sm.suffix();
+      RE2 re(tokenizer.regex());
+      if (!re.ok()) {
+        return absl::InvalidArgumentError(
+            absl::StrCat("Invalid regular expression: ", tokenizer.regex()));
+      }
+      absl::string_view sp(cased_text);
+      size_t startpos = 0;
+      absl::string_view submatch;
+      while (re.Match(sp, startpos, sp.size(), RE2::UNANCHORED, &submatch, 1)) {
+        unit_tokens.emplace_back(submatch.data(), submatch.size());
+        startpos = (submatch.data() - sp.data()) + submatch.size();
+        if (submatch.empty()) {
+          startpos++;
+        }
+        if (startpos > sp.size()) {
+          break;
+        }
       }
     } break;
     case proto::Tokenizer::CHARACTER:
