@@ -244,6 +244,19 @@ func (e *genericEngine) addNode(srcNode *dt.Node, buildMap *example.FeatureConst
 		dstNode.condition = math.Float32bits(condition.GetHigherCondition().GetThreshold())
 		dstNode.conditionType = numericalIsHigherConditionType
 
+	case condition.GetDiscretizedHigherCondition() != nil:
+		featureID, found := buildMap.NumericalFeatures[attributeIdx]
+		if !found {
+			return fmt.Errorf("Cannot find column %v in the input features", attributeIdx)
+		}
+		if featureID > math.MaxUint16 {
+			return fmt.Errorf("Too many features in the model")
+		}
+		dstNode.featureIdx = uint16(featureID)
+		thresholdFloat := float32(condition.GetDiscretizedHigherCondition().GetThreshold())
+		dstNode.condition = math.Float32bits(thresholdFloat)
+		dstNode.conditionType = numericalIsHigherConditionType
+
 	case condition.GetContainsCondition() != nil:
 		featureID, found := buildMap.CategoricalFeatures[attributeIdx]
 		if !found {
