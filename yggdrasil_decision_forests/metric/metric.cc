@@ -813,12 +813,20 @@ std::pair<double, double> GetQuantiles(
     const std::vector<proto::Roc>& samples,
     const std::function<double(const proto::Roc&)>& getter,
     const float quantile_1, const float quantile_2) {
-  const auto n = samples.size();
-  DCHECK_GT(n, 0);
-  std::vector<double> extracted_samples(n);
-  for (size_t sample_idx = 0; sample_idx < n; sample_idx++) {
-    extracted_samples[sample_idx] = getter(samples[sample_idx]);
+  DCHECK_GT(samples.size(), 0);
+  std::vector<double> extracted_samples;
+  extracted_samples.reserve(samples.size());
+  for (const auto& sample : samples) {
+    const double value = getter(sample);
+    if (!std::isnan(value)) {
+      extracted_samples.push_back(value);
+    }
   }
+  if (extracted_samples.empty()) {
+    return {std::numeric_limits<double>::quiet_NaN(),
+            std::numeric_limits<double>::quiet_NaN()};
+  }
+  const auto n = extracted_samples.size();
   std::sort(extracted_samples.begin(), extracted_samples.end());
   const auto quantile_1_idx =
       std::min(static_cast<size_t>(quantile_1 * n), n - 1);

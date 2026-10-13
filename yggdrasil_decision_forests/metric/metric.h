@@ -18,7 +18,6 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_METRIC_METRIC_H_
 #define YGGDRASIL_DECISION_FORESTS_METRIC_METRIC_H_
 
-#include <cstddef>
 #include <functional>
 #include <string>
 #include <unordered_map>

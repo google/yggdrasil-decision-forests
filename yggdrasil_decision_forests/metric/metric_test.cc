@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -675,6 +676,36 @@ TEST(Metric, GetQuantiles) {
       0.975f);
   EXPECT_NEAR(quantiles.first, 0.5f, 0.01);
   EXPECT_NEAR(quantiles.second, 0.975f, 0.01);
+}
+
+TEST(Metric, GetQuantilesIgnoresNaN) {
+  std::vector<proto::Roc> samples;
+  const int n = 1000;
+  for (int i = 0; i < n; i++) {
+    proto::Roc roc;
+    roc.set_auc(static_cast<float>(i) / n);
+    samples.push_back(roc);
+    proto::Roc nan_roc;
+    nan_roc.set_auc(std::numeric_limits<double>::quiet_NaN());
+    samples.push_back(nan_roc);
+  }
+  const auto quantiles = internal::GetQuantiles(
+      samples, [](const proto::Roc& roc) -> double { return roc.auc(); }, 0.5f,
+      0.975f);
+  EXPECT_NEAR(quantiles.first, 0.5f, 0.01);
+  EXPECT_NEAR(quantiles.second, 0.975f, 0.01);
+}
+
+TEST(Metric, GetQuantilesAllNaN) {
+  std::vector<proto::Roc> samples(10);
+  for (auto& roc : samples) {
+    roc.set_auc(std::numeric_limits<double>::quiet_NaN());
+  }
+  const auto quantiles = internal::GetQuantiles(
+      samples, [](const proto::Roc& roc) -> double { return roc.auc(); }, 0.5f,
+      0.975f);
+  EXPECT_TRUE(std::isnan(quantiles.first));
+  EXPECT_TRUE(std::isnan(quantiles.second));
 }
 
 TEST(Metric, ComputeRocConfidenceIntervalsUsingBootstrapping) {
