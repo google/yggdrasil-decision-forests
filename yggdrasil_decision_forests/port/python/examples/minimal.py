@@ -23,6 +23,8 @@ Usage example:
   python minimal.py
 """
 
+import os
+
 from absl import app
 import pandas as pd
 import ydf
@@ -32,9 +34,14 @@ def main(argv):
   if len(argv) > 1:
     raise app.UsageError("Too many command-line arguments.")
 
-  # Download the Adult dataset, load in a Pandas dataframe.
-  train_path = "https://raw.githubusercontent.com/google/yggdrasil-decision-forests/main/yggdrasil_decision_forests/test_data/dataset/adult_train.csv"
-  test_path = "https://raw.githubusercontent.com/google/yggdrasil-decision-forests/main/yggdrasil_decision_forests/test_data/dataset/adult_train.csv"
+  # Load the Adult dataset in Pandas dataframes.
+  dataset_dir = os.path.join(
+      os.path.dirname(os.path.abspath(__file__)), "../../../test_data/dataset"
+  )
+  if not os.path.isdir(dataset_dir):
+    dataset_dir = "https://raw.githubusercontent.com/google/yggdrasil-decision-forests/main/yggdrasil_decision_forests/test_data/dataset"
+  train_path = f"{dataset_dir}/adult_train.csv"
+  test_path = f"{dataset_dir}/adult_test.csv"
   train_df = pd.read_csv(train_path)
   test_df = pd.read_csv(test_path)
 

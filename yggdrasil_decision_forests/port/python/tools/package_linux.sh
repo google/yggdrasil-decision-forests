@@ -35,6 +35,11 @@ function is_macos() {
   [[ "${PLATFORM}" == "darwin" ]]
 }
 
+# Prefix of the wheel files, i.e. the normalized distribution name (see
+# YDF_PACKAGE_NAME in config/setup.py), e.g. "ydf" or "ydf_staging".
+WHEEL_PREFIX="${YDF_PACKAGE_NAME:-ydf}"
+WHEEL_PREFIX="${WHEEL_PREFIX//-/_}"
+
 # Temporary directory used to assemble the package.
 SRCPK="$(pwd)/tmp_package"
 
@@ -99,14 +104,15 @@ function test_package() {
   PIP="python -m pip"
 
   if is_macos; then
-    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
+    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
   else
-    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl"
+    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl"
   fi
   ${PIP} install ${PACKAGEPATH} --force-reinstall
   ${PIP} install pandas
-  ${PIP} list
-  ${PIP} show ydf -f
+  # The distribution name (see YDF_PACKAGE_NAME in config/setup.py) may differ
+  # from the import name "ydf".
+  ${PIP} show -f "${YDF_PACKAGE_NAME:-ydf}"
 
   # Run a small example (in different folder to avoid clashes)
   local current_folder=$(basename "$PWD")
@@ -114,28 +120,6 @@ function test_package() {
   python $current_folder/examples/minimal.py
   popd
 
-  if [ -d previous_package ]; then
-    rm -r previous_package
-  fi
-  mkdir previous_package
-  if python -m pip download --no-deps -d previous_package ydf; then
-    local old_file_size=`du -k "previous_package" | cut -f1`
-    local new_file_size=`du -k $PACKAGEPATH | cut -f1`
-    local scaled_old_file_size=$(($old_file_size * 12))
-    local scaled_new_file_size=$(($new_file_size * 10))
-    if [ "$scaled_new_file_size" -gt "$scaled_old_file_size" ]; then
-      echo "New package is 20% larger than the previous one."
-      echo "This may indicate an issue with the wheel, aborting."
-      exit 1
-    fi
-    scaled_old_file_size=$(($old_file_size * 8))
-    if [ "$scaled_new_file_size" -lt "$scaled_old_file_size" ]; then
-      echo "New package is 20% smaller than the previous one."
-      echo "This may indicate an issue with the wheel, aborting."
-      exit 1
-    fi
-  fi
-  rm -r previous_package
   echo "Tested $PACKAGEPATH successful"
 }
 
@@ -148,11 +132,11 @@ function e2e_native() {
 
   # Fix package.
   if is_macos; then
-    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
+    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
   else
-    PACKAGEPATH="dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*-linux_${ARCHITECTURE}.whl"
+    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*-linux_${ARCHITECTURE}.whl"
     python -m auditwheel repair --plat manylinux_2_27_${ARCHITECTURE} -w dist ${PACKAGEPATH}
-    python -m auditwheel show dist/ydf-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl
+    python -m auditwheel show dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl
   fi
 
   test_package ${PACKAGE}

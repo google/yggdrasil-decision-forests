@@ -51,6 +51,14 @@ def _get_version() -> str:
 
 _VERSION = _get_version()
 
+# Staging builds (e.g. for TestPyPI, where the "ydf" name is not available) set
+# a different distribution name and a version suffix, since a version cannot be
+# uploaded twice to a package index. The import name remains "ydf".
+#   YDF_PACKAGE_NAME: Distribution name, e.g. "ydf-staging". Default: "ydf".
+#   YDF_VERSION_SUFFIX: Appended to the version, e.g. ".dev202610141400".
+_PACKAGE_NAME = os.environ.get("YDF_PACKAGE_NAME", "ydf")
+_VERSION += os.environ.get("YDF_VERSION_SUFFIX", "")
+
 with open("README.md", "r", encoding="utf-8") as fh:
   long_description = fh.read()
 
@@ -103,7 +111,7 @@ setuptools.setup(
     cmdclass={
         "install": InstallPlatlib,
     },
-    name="ydf",
+    name=_PACKAGE_NAME,
     version=_VERSION,
     author="Mathieu Guillame-Bert, Richard Stotz, Jan Pfeifer",
     author_email="decision-forests-contact@google.com",
