@@ -106,3 +106,13 @@ uv.configure(version = "0.11.2")
 
 # Use the PyPI protobuf package as the runtime of `py_proto_library`.
 register_toolchains("//:python_proto_toolchain")
+
+# Name, version and license of the pip package (see the `wheel` target in
+# BUILD).
+ydf_wheel_config = use_repo_rule("//tools:wheel_config.bzl", "ydf_wheel_config")
+
+ydf_wheel_config(
+    name = "ydf_wheel_config",
+    cc_repo_marker = "@ydf_cc//yggdrasil_decision_forests:BUILD",
+    version_file = "//ydf:version.py",
+)

@@ -14,133 +14,48 @@
 # limitations under the License.
 
 
-# Packaged already compiled (i.e. build) YDF into a pip package.
+# Builds and tests the YDF pip package (wheel) with Bazel, and copies it to the
+# dist/ directory.
 #
-# Must run in a virtual environment of the hermetic Python interpreter of the
-# same version as the Bazel build (i.e. PYTHON_VERSION of build_test_linux.sh).
+# The wheel is the `//:wheel` target (see BUILD). `//tools:wheel_test` checks
+# its content, imports it and checks its manylinux tag with auditwheel.
+#
+# Options:
+#  PYTHON_VERSION: Python version of the wheel, e.g. "3.11". Default: "3.12".
+#  BAZEL_FLAGS: Additional Bazel flags. Default: "".
+#  YDF_PACKAGE_NAME: Distribution name, e.g. "ydf-staging". Default: "ydf".
+#  YDF_VERSION_SUFFIX: Appended to the version, e.g. ".dev202610141400".
 #
 # Usage example:
 #   # Generate the pip package for Python 3.11
-#   bazel run --@rules_python//python/config_settings:python_version=3.11 \
-#     @rules_python//python/bin:python -- -m venv --clear /tmp/venv
-#   source /tmp/venv/bin/activate
-#   PYTHON_VERSION=3.11 RUN_TESTS=0 ./tools/build_test_linux.sh
 #   PYTHON_VERSION=3.11 ./tools/package_linux.sh
 
 set -vex
 
-PLATFORM="$(uname -s | tr 'A-Z' 'a-z')"
-ARCHITECTURE=$(uname -m)
-function is_macos() {
-  [[ "${PLATFORM}" == "darwin" ]]
-}
+: "${PYTHON_VERSION:=3.12}"
 
-# Prefix of the wheel files, i.e. the normalized distribution name (see
-# YDF_PACKAGE_NAME in config/setup.py), e.g. "ydf" or "ydf_staging".
-WHEEL_PREFIX="${YDF_PACKAGE_NAME:-ydf}"
-WHEEL_PREFIX="${WHEEL_PREFIX//-/_}"
-
-# Temporary directory used to assemble the package.
-SRCPK="$(pwd)/tmp_package"
-
-# Pypi package version compatible with a given version of python.
-# Example: Python3.8.2 => Package version: "38"
-function python_to_package_version() {
-
-  python -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")'
-}
-
-# Installs dependency requirement for build the Pip package.
-function install_dependencies() {
-  python -m ensurepip -U || true
-  python -m pip install pip -U
-  python -m pip install setuptools -U
-  python -m pip install build -U
-  python -m pip install virtualenv -U
-  python -m pip install auditwheel==6.0.0 --force-reinstall
-  python -m pip install patchelf
-}
-
-function check_is_build() {
-  # Check the correct location of the current directory.
+function check_directory() {
   local cur_dir=${PWD##*/}
-  if [ ! -d "bazel-bin" ] || [ $cur_dir != "python" ]; then
-    echo "This script should be run from the root directory of the Python port of Yggdrasil Decision Forests (i.e. probably under port/python) of a compiled Bazel export (i.e. containing a bazel-bin directory)"
+  if [ ! -f "MODULE.bazel" ] || [ "${cur_dir}" != "python" ]; then
+    echo "This script should be run from the root directory of the Python port of Yggdrasil Decision Forests (i.e. probably under port/python)."
     exit 1
   fi
 }
 
-# The native extension is compiled for the Python version of the Bazel build,
-# while the pip package is tagged with the version of the active Python.
-function check_python_version() {
-  local active_version=$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-  if [[ "${active_version}" != "${PYTHON_VERSION:=3.12}" ]]; then
-    echo "The active Python (${active_version}) does not match the Python version of the Bazel build (PYTHON_VERSION=${PYTHON_VERSION})."
-    exit 1
-  fi
+function main() {
+  check_directory
+
+  local flags="--config=linux_cpp17 --features=-fully_static_link --@rules_python//python/config_settings:python_version=${PYTHON_VERSION} ${BAZEL_FLAGS}"
+
+  # Builds and tests the wheel.
+  bazel test ${flags} --test_output=errors //tools:wheel_test
+
+  # Copies the wheel to dist/.
+  local wheel=$(bazel cquery ${flags} --output=files //:wheel 2>/dev/null)
+  mkdir -p dist
+  cp -f "${wheel}" dist/
+  chmod u+w "dist/$(basename "${wheel}")"
+  echo "Created dist/$(basename "${wheel}")"
 }
 
-# Collects the library files into ${SRCPK}
-function assemble_files() {
-  check_is_build
-  check_python_version
-  python tools/collect_pip_files.py
-}
-
-# Build a pip package.
-function build_package() {
-
-  pushd ${SRCPK}
-  python -m build
-  popd
-
-  cp -R ${SRCPK}/dist .
-}
-
-# Tests a pip package.
-function test_package() {
-  PACKAGE="$1"
-
-  PIP="python -m pip"
-
-  if is_macos; then
-    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
-  else
-    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl"
-  fi
-  ${PIP} install ${PACKAGEPATH} --force-reinstall
-  ${PIP} install pandas
-  # The distribution name (see YDF_PACKAGE_NAME in config/setup.py) may differ
-  # from the import name "ydf".
-  ${PIP} show -f "${YDF_PACKAGE_NAME:-ydf}"
-
-  # Run a small example (in different folder to avoid clashes)
-  local current_folder=$(basename "$PWD")
-  pushd ..
-  python $current_folder/examples/minimal.py
-  popd
-
-  echo "Tested $PACKAGEPATH successful"
-}
-
-# Builds and tests a pip package in a given version of python
-function e2e_native() {
-  PACKAGE=$(python_to_package_version python)
-
-  install_dependencies
-  build_package
-
-  # Fix package.
-  if is_macos; then
-    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*-*.whl"
-  else
-    PACKAGEPATH="dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*-linux_${ARCHITECTURE}.whl"
-    python -m auditwheel repair --plat manylinux_2_27_${ARCHITECTURE} -w dist ${PACKAGEPATH}
-    python -m auditwheel show dist/${WHEEL_PREFIX}-*-cp${PACKAGE}-cp${PACKAGE}*manylinux_2_27_${ARCHITECTURE}*.whl
-  fi
-
-  test_package ${PACKAGE}
-}
-
-assemble_files
-e2e_native
+main

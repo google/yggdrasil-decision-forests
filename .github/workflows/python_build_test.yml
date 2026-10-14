@@ -144,20 +144,17 @@ jobs:
             --test_output=errors \
             --output_groups=+test_xml
 
-      # Checks that the wheel is manylinux_2_27 compliant (auditwheel repair
-      # fails otherwise) and that it works.
+      # Builds the wheel with Bazel, and checks its content, that it works and
+      # that it is manylinux_2_27 compliant (see //tools:wheel_test).
       - name: Package Python
         working-directory: yggdrasil_decision_forests/port/python
-        env:
-          PYTHON_VERSION: ${{ inputs.python_version }}
-        # The default shell of container jobs is sh, which has no `source`.
-        shell: bash
         # BAZEL_PY_FLAGS is intentionally unquoted so it is split into separate flags.
         run: |
-          bazel run $BAZEL_PY_FLAGS \
-            @rules_python//python/bin:python -- -m venv --clear /tmp/venv
-          source /tmp/venv/bin/activate
-          ./tools/package_linux.sh
+          bazel test //tools:wheel_test \
+            $BAZEL_PY_FLAGS \
+            --test_output=errors
+          mkdir -p dist
+          cp "$(bazel cquery $BAZEL_PY_FLAGS --output=files //:wheel)" dist/
 
       - name: Upload wheel
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

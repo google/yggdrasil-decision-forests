@@ -26,6 +26,18 @@ py_binary(
     ],
 )
 
+# The source of `:worker_main` as a library, to include it in the pip package
+# (see //:wheel_files) without the launcher of the binary.
+py_library(
+    name = "worker_main_lib",
+    srcs = ["worker_main.py"],
+    deps = [
+        "//ydf:api",
+        "@abseil-py//absl:app",
+        "@abseil-py//absl/flags",
+    ],
+)
+
 # Libraries
 # =========
 

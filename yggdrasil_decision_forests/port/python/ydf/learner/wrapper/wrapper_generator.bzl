@@ -84,5 +84,7 @@ def py_wrap_yggdrasil_learners(
             "//ydf/model/random_forest_model",
             "//ydf/utils:func_helpers",
         ],
-        data = [":" + run_wrapper_name, ":" + wrapper_name],
+        # Note: The wrapper generator binary must not be a runtime dependency
+        # (e.g. in `data`). Otherwise, it would be packaged in the pip package
+        # (see the `wheel_files` target in port/python/BUILD).
     )
