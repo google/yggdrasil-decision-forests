@@ -15,10 +15,10 @@
 """Definitions for Generic learners."""
 
 import abc
-import copy
+import dataclasses
 import datetime
 import re
-from typing import Dict, List, Optional, Sequence, Set, Union
+from typing import Dict, List, Optional, Sequence, Set, Tuple, Union
 
 from yggdrasil_decision_forests.dataset import data_spec_pb2
 from yggdrasil_decision_forests.dataset import weight_pb2
@@ -142,7 +142,6 @@ class GenericLearner(abc.ABC):
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset],
-      verbose: Optional[Union[int, bool]],
   ) -> generic_model.ModelType:
     """Trains a model."""
     raise NotImplementedError
@@ -313,27 +312,16 @@ class GenericLearner(abc.ABC):
     """
 
     # Check arguments
-    if valid is not None:
-      if (
-          self._feature_selector is None
-          and not self.__class__._capabilities().support_validation_dataset
-      ):
-        raise ValueError(
-            f"The learner {self.__class__.__name__!r} does not use a"
-            " validation dataset. If you can, add the validation examples to"
-            " the training dataset."
-        )
-
-      if isinstance(ds, str) and not isinstance(valid, str):
-        raise ValueError(
-            "If the training dataset is a path, the validation dataset must"
-            " also be a path."
-        )
-      if not isinstance(ds, str) and isinstance(valid, str):
-        raise ValueError(
-            "The validation dataset may only be a path if the training dataset"
-            " is a path."
-        )
+    if (
+        valid is not None
+        and self._feature_selector is None
+        and not self.__class__._capabilities().support_validation_dataset
+    ):
+      raise ValueError(
+          f"The learner {self.__class__.__name__!r} does not use a"
+          " validation dataset. If you can, add the validation examples to"
+          " the training dataset."
+      )
     self.validate_hyperparameters()
 
     if self._feature_selector is not None:
@@ -344,7 +332,7 @@ class GenericLearner(abc.ABC):
     # Training
     saved_verbose = log.verbose(verbose) if verbose is not None else None
     try:
-      return self._train_imp(ds, valid, verbose)
+      return self._train_imp(ds, valid)
     finally:
       if saved_verbose is not None:
         log.verbose(saved_verbose)
@@ -373,118 +361,97 @@ Hyper-parameters: {self._hyperparameters}
   def __repr__(self) -> str:
     return f"<ydf.{self.__class__.__name__}>"
 
-  def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
-    """Builds DS args with user inputs and guides for labels / special columns.
-
-    Create a copy of self._data_spec_args and adds column definitions for the
-    columns label / weights / ranking group / uplift treatment with the correct
-    semantic and dataspec inference arguments.
-
-    Returns:
-      A copy of the data spec arguments with information about the special
-      columns added.
-
-    Raises:
-      ValueError: If the label / weights / ranking group / uplift treatment
-      column are specified as features.
-    """
-
-    def create_label_column(
-        name: Optional[str], task: Task
-    ) -> Optional[dataspec.Column]:
-      if task in [Task.CLASSIFICATION, Task.CATEGORICAL_UPLIFT]:
-        return dataspec.Column(
-            name=name,  # pyrefly: ignore[bad-argument-type]
-            semantic=dataspec.Semantic.CATEGORICAL,
-            max_vocab_count=-1,
-            min_vocab_frequency=1,
-            vocabulary=self._data_spec_args.label_classes,
-            vocabulary_must_be_complete=self._data_spec_args.label_classes
-            is not None,
-        )
-      elif task in [
-          Task.REGRESSION,
-          Task.RANKING,
-          Task.NUMERICAL_UPLIFT,
-          Task.SURVIVAL_ANALYSIS,
-      ]:
-        return dataspec.Column(name=name, semantic=dataspec.Semantic.NUMERICAL)  # pyrefly: ignore[bad-argument-type]
-      elif task in [Task.ANOMALY_DETECTION]:
-        if name is None:
-          # No label column
-          return None
-        else:
-          return dataspec.Column(
-              name=name,
-              semantic=dataspec.Semantic.CATEGORICAL,
-              max_vocab_count=-1,
-              min_vocab_frequency=1,
-          )
-      else:
-        raise ValueError(f"Unsupported task {task.name} for label column")
-
-    data_spec_args = copy.deepcopy(self._data_spec_args)
-    # If no columns have been specified, make sure that all columns are used,
-    # since this function will specify some.
-    #
-    # TODO: If `label` becomes an optional argument, this function needs
-    # to be adapted.
-    if data_spec_args.columns is None:
-      data_spec_args.include_all_columns = True
-      data_spec_args.columns = []
-    column_defs = data_spec_args.columns
-    if dataspec.column_defs_contains_column(self._label, column_defs):  # pyrefly: ignore[bad-argument-type]
-      raise ValueError(
-          f"Label column {self._label} is also an input feature. A column"
-          " cannot be both a label and input feature."
+  def _label_column(self) -> Optional[dataspec.Column]:
+    """Returns the label column, or None for anomaly detection without label."""
+    if self._label is None:
+      if self._task == Task.ANOMALY_DETECTION:
+        return None
+      raise ValueError("All tasks except ANOMALY_DETECTION require a label.")
+    if self._task in (
+        Task.CLASSIFICATION,
+        Task.CATEGORICAL_UPLIFT,
+        Task.ANOMALY_DETECTION,
+    ):
+      return dataspec.Column(
+          name=self._label,
+          semantic=dataspec.Semantic.CATEGORICAL,
+          max_vocab_count=-1,
+          min_vocab_frequency=1,
+          vocabulary=self._data_spec_args.label_classes,
+          vocabulary_must_be_complete=(
+              self._data_spec_args.label_classes is not None
+          ),
       )
-    if (
-        label_column := create_label_column(self._label, self._task)
-    ) is not None:
-      column_defs.append(label_column)
+    if self._task in (
+        Task.REGRESSION,
+        Task.RANKING,
+        Task.NUMERICAL_UPLIFT,
+        Task.SURVIVAL_ANALYSIS,
+    ):
+      return dataspec.Column(
+          name=self._label, semantic=dataspec.Semantic.NUMERICAL
+      )
+    raise ValueError(f"Unsupported task {self._task.name}")
+
+  def _special_columns(self) -> List[Tuple[str, dataspec.Column]]:
+    """Returns (role, spec) for constructor-specified non-feature columns."""
+    columns = []
+    if (label := self._label_column()) is not None:
+      columns.append(("label", label))
     if self._weights is not None:
-      if dataspec.column_defs_contains_column(self._weights, column_defs):  # pyrefly: ignore[bad-argument-type]
-        raise ValueError(
-            f"Weights column {self._weights} is also an input feature. A column"
-            " cannot be both a weights and input feature."
-        )
-      column_defs.append(
+      columns.append((
+          "weights",
           dataspec.Column(
               name=self._weights, semantic=dataspec.Semantic.NUMERICAL
-          )
-      )
+          ),
+      ))
     if self._ranking_group is not None:
       assert self._task == Task.RANKING
-
-      if dataspec.column_defs_contains_column(self._ranking_group, column_defs):  # pyrefly: ignore[bad-argument-type]
-        raise ValueError(
-            f"Ranking group column {self._ranking_group} is also an input"
-            " feature. A column cannot be both a ranking group and input"
-            " feature."
-        )
-      column_defs.append(
+      columns.append((
+          "ranking group",
           dataspec.Column(
               name=self._ranking_group, semantic=dataspec.Semantic.HASH
-          )
-      )
+          ),
+      ))
     if self._uplift_treatment is not None:
-      assert self._task in [Task.NUMERICAL_UPLIFT, Task.CATEGORICAL_UPLIFT]
-
-      if dataspec.column_defs_contains_column(
-          self._uplift_treatment, column_defs  # pyrefly: ignore[bad-argument-type]
-      ):
-        raise ValueError(
-            "The uplift_treatment column should not be specified as a feature"
-        )
-      column_defs.append(
+      assert self._task in (Task.NUMERICAL_UPLIFT, Task.CATEGORICAL_UPLIFT)
+      columns.append((
+          "uplift treatment",
           dataspec.Column(
               name=self._uplift_treatment,
               semantic=dataspec.Semantic.CATEGORICAL,
               max_vocab_count=-1,
               min_vocab_frequency=1,
-          )
-      )
-    return data_spec_args
+          ),
+      ))
+    return columns
+
+  def _inference_columns(self) -> List[dataspec.Column]:
+    """Returns the user-specified columns followed by the special columns."""
+    columns = list(self._data_spec_args.columns or [])
+    roles = {column.name: "input feature" for column in columns}
+    for role, column in self._special_columns():
+      if column.name in roles:
+        raise ValueError(
+            f"The {role} column {column.name!r} cannot also be the"
+            f" {roles[column.name]} column"
+        )
+      roles[column.name] = role
+      columns.append(column)
+    return columns
+
+  def _build_data_spec_args(self) -> dataspec.DataSpecInferenceArgs:
+    """Builds DS args with user inputs and guides."""
+    user_args = self._data_spec_args
+    return dataclasses.replace(
+        user_args,
+        columns=self._inference_columns(),
+        # If no columns have been specified, make sure that all columns are
+        # used, since this function will specify some.
+        include_all_columns=(
+            user_args.include_all_columns or user_args.columns is None
+        ),
+    )
 
 
 class GenericCCLearner(GenericLearner):
@@ -501,12 +468,20 @@ class GenericCCLearner(GenericLearner):
       self,
       ds: dataset.InputDataset,
       valid: Optional[dataset.InputDataset],
-      verbose: Optional[Union[int, bool]],
   ) -> generic_model.ModelType:
     if isinstance(ds, str):
-      return self._train_from_path(ds, valid)  # pyrefly: ignore[bad-argument-type]
-    else:
-      return self._train_from_dataset(ds, valid)
+      if valid is not None and not isinstance(valid, str):
+        raise ValueError(
+            "The training and validation datasets must either both be paths or"
+            " both be in-memory datasets."
+        )
+      return self._train_from_path(ds, valid)
+    if isinstance(valid, str):
+      raise ValueError(
+          "The training and validation datasets must either both be paths or"
+          " both be in-memory datasets."
+      )
+    return self._train_from_dataset(ds, valid)
 
   def validate_hyperparameters(self) -> None:
     return hp_lib.validate_hyperparameters(
@@ -547,8 +522,8 @@ class GenericCCLearner(GenericLearner):
           distributed=True,
           discretize_numerical_columns=self._data_spec_args.discretize_numerical_columns,
       )
-      if self._tuner:
-        self._tuner._validate_data_spec(self._label, model.data_spec(), raise_error=False)  # pylint:disable=protected-access  # pyrefly: ignore[bad-argument-type]
+      if self._tuner and self._label is not None:
+        self._tuner._validate_data_spec(self._label, model.data_spec(), raise_error=False)  # pylint:disable=protected-access
       return model
 
   def _train_from_dataset(
@@ -562,8 +537,8 @@ class GenericCCLearner(GenericLearner):
       train_ds = self._get_vertical_dataset(ds)._dataset  # pylint: disable=protected-access
 
       dataspec.print_common_dataspec_issues_for_training(train_ds.data_spec())
-      if self._tuner:
-        self._tuner._validate_data_spec(self._label, train_ds.data_spec(), raise_error=True)  # pylint:disable=protected-access  # pyrefly: ignore[bad-argument-type]
+      if self._tuner and self._label is not None:
+        self._tuner._validate_data_spec(self._label, train_ds.data_spec(), raise_error=True)  # pylint:disable=protected-access
 
       train_args = {"dataset": train_ds}
 
@@ -722,18 +697,12 @@ class GenericCCLearner(GenericLearner):
 
       required_columns = None  # All columns in the dataspec are required.
       if self._task == Task.ANOMALY_DETECTION:
-        if self._data_spec is not None:
-          required_columns = [
-              col.name
-              for col in self._data_spec.columns
-              if col.name != self._label
-          ]
-        if effective_data_spec_args is not None:
-          required_columns = [
-              col.name
-              for col in effective_data_spec_args.columns  # pyrefly: ignore[not-iterable]
-              if col is not None and col.name != self._label
-          ]
+        columns = (
+            self._data_spec.columns
+            if self._data_spec is not None
+            else self._inference_columns()
+        )
+        required_columns = [c.name for c in columns if c.name != self._label]
       return dataset.create_vertical_dataset_with_spec_or_args(
           ds,
           data_spec=self._data_spec,

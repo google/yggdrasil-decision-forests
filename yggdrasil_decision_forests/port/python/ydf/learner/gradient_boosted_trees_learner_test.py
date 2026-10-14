@@ -312,8 +312,8 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
   def test_failure_train_path_validation_pd(self):
     with self.assertRaisesRegex(
         ValueError,
-        "If the training dataset is a path, the validation dataset must also be"
-        " a path.",
+        "The training and validation datasets must either both be paths or both"
+        " be in-memory datasets.",
     ):
       specialized_learners.GradientBoostedTreesLearner(
           label="income", num_trees=50
@@ -322,8 +322,8 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
   def test_failure_train_pd_validation_path(self):
     with self.assertRaisesRegex(
         ValueError,
-        "The validation dataset may only be a path if the training dataset is"
-        " a path.",
+        "The training and validation datasets must either both be paths or both"
+        " be in-memory datasets.",
     ):
       specialized_learners.GradientBoostedTreesLearner(
           label="income", num_trees=50

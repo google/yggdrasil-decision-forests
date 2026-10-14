@@ -775,7 +775,6 @@ class GenericJaxLearner(generic_learner.GenericLearner):
       self,
       ds: dataset_lib.InputDataset,
       valid: Optional[dataset_lib.InputDataset],
-      verbose: Optional[Union[int, bool]],
   ) -> generic_model.ModelType:
 
     if _DEBUG_PRINT:
