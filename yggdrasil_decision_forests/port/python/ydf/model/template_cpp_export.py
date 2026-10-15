@@ -248,7 +248,6 @@ inline absl::StatusOr<ServingModel> Load(absl::string_view path) {{
 // Print all the features of the model in debug mode.
 // This is for debugging only, remove before deployment.
 #ifndef NDEBUG
-  // Note that feature "constant" is NOT in the list.
   for (const auto& feature_def : m.features->input_features()) {{
     LOG(INFO) << "Feature " << feature_def.name
               << ": internal index: " << feature_def.internal_idx
