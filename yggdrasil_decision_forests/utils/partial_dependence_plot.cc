@@ -692,13 +692,18 @@ absl::StatusOr<BinsDefinition> GetBinsForOneAttribute(
         dataset.ColumnWithCastWithStatus<
             dataset::VerticalDataset::NumericalColumn>(attribute_idx));
 
-    const auto unique_values_and_counts_vector =
+    auto unique_values_and_counts_vector =
         SortedUniqueCounts(column_data->values());
 
     ASSIGN_OR_RETURN(auto bounds,
                      dataset::GenDiscretizedBoundaries(
                          unique_values_and_counts_vector, num_numerical_bins,
                          /*min_obs_in_bins=*/5, {}));
+    if (unique_values_and_counts_vector.empty()) {
+      unique_values_and_counts_vector.push_back({column.numerical().mean(), 0});
+      LOG(INFO) << "Feature " << column.name()
+                << " only contains NaN values and will not be plotted.";
+    }
     if (bounds.empty()) {
       bounds.push_back(column.numerical().mean());
     }

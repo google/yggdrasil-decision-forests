@@ -1477,6 +1477,96 @@ TEST_F(PartialDependencePlotTest, UpdateCEPSetRegression) {
   EXPECT_THAT(cep_set_, EqualsProto(expected_cep_set));
 }
 
+TEST(PDPWithNanTest, Base) {
+  dataset::proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns {
+          type: NUMERICAL
+          name: "Num_Nan"
+          numerical { mean: nan min_value: nan max_value: nan }
+          count_nas: 10
+        }
+        columns {
+          type: CATEGORICAL
+          name: "Label"
+          categorical {
+            number_of_unique_values: 2
+            is_already_integerized: true  # Better looking for debug
+          }
+        }
+      )pb");
+  dataset::VerticalDataset dataset;
+  *dataset.mutable_data_spec() = data_spec;
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+
+  for (int i = 0; i < 10; i++) {
+    ASSERT_OK(dataset.AppendExampleWithStatus({
+        {"Num_Nan", "nan"},
+        {"Label", absl::StrCat(i % 2)},
+    }));
+  }
+  auto model = std::make_unique<RandomForestModel>();
+  auto tree = std::make_unique<DecisionTree>();
+  tree->CreateRoot();
+  tree->mutable_root()->mutable_node()->mutable_classifier()->set_top_value(0);
+
+  model->AddTree(std::move(tree));
+
+  model->set_task(model::proto::CLASSIFICATION);
+  model->set_label_col_idx(1);
+  model->set_data_spec(data_spec);
+  model->mutable_input_features()->push_back(0);
+
+  proto::PartialDependencePlotSet pdp_set;
+  ASSERT_OK_AND_ASSIGN(
+      pdp_set, InitializePartialDependencePlotSet(
+                   data_spec, {{0}}, model::proto::Task::CLASSIFICATION,
+                   /*label_col_idx=*/1, /*num_numerical_bins=*/2, dataset));
+  dataset::proto::Example example = PARSE_TEST_PROTO(R"pb(
+    attributes { numerical: 1.0 }
+    attributes { categorical: 0 }
+    example_idx: 1
+  )pb");
+  EXPECT_OK(UpdatePartialDependencePlotSet(*model, example, &pdp_set));
+
+  ASSERT_EQ(pdp_set.pdps_size(), 1);
+  auto* pdp = pdp_set.mutable_pdps(0);
+  ASSERT_EQ(pdp->attribute_info_size(), 1);
+  ASSERT_EQ(pdp->attribute_info(0).numerical_boundaries_size(), 1);
+  EXPECT_TRUE(std::isnan(pdp->attribute_info(0).numerical_boundaries(0)));
+  pdp->mutable_attribute_info(0)->clear_numerical_boundaries();
+  for (auto& bin : *pdp->mutable_pdp_bins()) {
+    ASSERT_EQ(bin.center_input_feature_values_size(), 1);
+    EXPECT_TRUE(std::isnan(bin.center_input_feature_values(0).numerical()));
+    bin.clear_center_input_feature_values();
+  }
+
+  const proto::PartialDependencePlotSet expected_pdp_set = PARSE_TEST_PROTO(
+      R"pb(
+        pdps {
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 1 counts: 0 sum: 1 }
+            }
+          }
+          pdp_bins {
+            prediction {
+              classification_class_distribution { counts: 1 counts: 0 sum: 1 }
+            }
+          }
+          attribute_info {
+            num_bins_per_input_feature: 2
+            attribute_idx: 0
+            num_observations_per_bins: 0
+            num_observations_per_bins: 1
+          }
+          num_observations: 1
+          type: PDP
+        }
+      )pb");
+  EXPECT_THAT(pdp_set, EqualsProto(expected_pdp_set));
+}
+
 }  // namespace
 }  // namespace utils
 }  // namespace yggdrasil_decision_forests
