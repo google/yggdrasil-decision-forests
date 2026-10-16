@@ -109,9 +109,12 @@ absl::StatusOr<bool> FindBestConditionOblique(
     proto::NodeCondition* best_condition, utils::RandomEngine* random,
     SplitterPerThreadCache* cache);
 
-// Computes the number of projections to test i.e.
-// num_projections = min(max_num_projections,
-// ceil(num_features ^ num_projections_exponent)).
+// Computes the number of projections to test at a node. For sparse oblique
+// splits:
+//   num_projections = max(min(ceil(p ^ num_projections_exponent),
+//                             max_num_projections),
+//                         min(min_num_projections, p))
+// where p = num_numerical_features.
 int GetNumProjections(const proto::DecisionTreeTrainingConfig& dt_config,
                       int num_numerical_features);
 
@@ -271,10 +274,8 @@ void SubtractTransposeMultiplyAdd(
     std::vector<double>& output);
 
 // Randomly generates a projection from `features`. `features` should only be
-// numerical. A projection cannot be empty. If the projection contains only one
-// dimension, the weight is guaranteed to be 1. If the projection contains an
-// input feature with monotonic constraint, monotonic_direction is set to 1
-// (i.e. the projection should be monotonically increasing).
+// numerical. Each feature is selected independently with probability
+// `projection_density` (in [0, 1]). A projection cannot be empty.
 // If `exclude_single_feature`, the projection is sampled conditioned on having
 // at least two features (requires `features.size() >= 2`).
 void SampleProjection(const absl::Span<const int>& features,

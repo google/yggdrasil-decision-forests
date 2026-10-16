@@ -148,7 +148,7 @@ message DecisionTreeTrainingConfig {
     // "classical" way to train a tree. Default value.
     AxisAlignedSplit axis_aligned_split = 19;
 
-    // Sparse oblique splits (i.e. splits one a small number of features) from
+    // Sparse oblique splits (i.e. splits on a small number of features) from
     // "Sparse Projection Oblique Random Forests", Tomita et al., 2020. These
     // splits are tested iif. "sparse_oblique_split" is set.
     SparseObliqueSplit sparse_oblique_split = 20;
@@ -173,15 +173,18 @@ message DecisionTreeTrainingConfig {
   message SparseObliqueSplit {
     // Controls of the number of random projections to test at each node.
     //
-    // Increasing this value very likely improves the quality of the model,
-    // drastically increases the training time, and doe not impact the
-    // inference time.
+    // Increasing this value can improve the quality of the model (though it
+    // can also lead to overfitting on small datasets), drastically increases
+    // the training time, and does not impact the inference time.
     //
-    // Oblique splits try out max(p^num_projections_exponent,
-    // max_num_projections) random projections for choosing a split, where p is
-    // the number of numerical features. Therefore, increasing this
-    // `num_projections_exponent` and possibly `max_num_projections` may improve
-    // model quality, but will also significantly increase training time.
+    // At each node, oblique splits try out
+    //   max(min(ceil(p^num_projections_exponent), max_num_projections),
+    //       min(min_num_projections, p))
+    // random projections for choosing a split, where p is the number of
+    // numerical features. If p == 1, a (single) axis-aligned split is tested.
+    // Therefore, increasing `num_projections_exponent` and possibly
+    // `max_num_projections` may improve model quality, but will also
+    // significantly increase training time.
     //
     // Note that the complexity of (classic) Random Forests is roughly
     // proportional to `num_projections_exponent=0.5`, since it considers
@@ -194,32 +197,41 @@ message DecisionTreeTrainingConfig {
     optional float num_projections_exponent = 1 [default = 2];
 
     // Maximum number of projections (applied after the
-    // "num_projections_exponent").
+    // "num_projections_exponent"). See `num_projections_exponent` for the
+    // exact number of tested projections.
     //
-    // Oblique splits try out max(p^num_projections_exponent,
-    // max_num_projections) random projections for choosing a split, where p is
-    // the number of numerical features. Increasing "max_num_projections"
-    // increases the training time but not the inference time. In late stage
-    // model development, if every bit of accuracy if important, increase this
-    // value.
+    // Increasing "max_num_projections" increases the training time but not the
+    // inference time. In late stage model training, if every bit of accuracy is
+    // important, increase this value.
     //
     // The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020)
     // does not define this hyperparameter.
     optional int32 max_num_projections = 2 [default = 6000];
 
-    // Minimum number of projections.
+    // Minimum number of projections. See `num_projections_exponent` for the
+    // exact number of tested projections.
     //
-    // In a dataset with very few numerical features, increasing this parameter
-    // might improve model quality.
+    // This value is capped to the number of numerical features p, i.e. it can
+    // only increase the number of projections up to p. It takes precedence
+    // over `max_num_projections`.
     //
     // The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020)
     // does not define this hyperparameter.
     optional int32 min_num_projections = 6 [default = 1];
 
-    // Density of the projections as an exponent of the number of features.
-    // Independently for each projection, each feature has a probability
-    // "projection_density_factor / num_features" to be considered in the
-    // projection.
+    // Density of the projections as a factor of the inverse of the number of
+    // numerical features p. Independently for each projection, each numerical
+    // feature has a probability min(1, projection_density_factor / p) to be
+    // considered in the projection, i.e. on average a projection contains
+    // min(p, projection_density_factor) features. If
+    // projection_density_factor >= p, all the projections contain all the
+    // numerical features.
+    //
+    // If no feature is selected, the projection contains a single feature
+    // selected uniformly at random. If a single feature is selected, its
+    // weight is 1, i.e. the projection is equivalent to an axis-aligned split.
+    // Note that if include_axis_aligned_splits is true, all trials use at
+    // least 2 features.
     //
     // The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020)
     // calls this parameter `lambda` and recommends values in [1, 5].
@@ -235,9 +247,16 @@ message DecisionTreeTrainingConfig {
     // weight will be sampled in [-1,1].
     optional bool binary_weight = 4 [default = true, deprecated = true];
 
-    // Weights to apply to the projections.
+    // Weights to apply to the projections. If not set, binary weights are used
+    // (or the weights defined by the deprecated `binary_weight`).
     //
-    // Continuous weights generally give better performance.
+    // The best weight type depends on the dataset. For example, binary weights
+    // with `normalization=NONE` can express exact relations between features
+    // expressed in the same unit (e.g. x_i - x_j >= threshold).
+    //
+    // If a feature has a monotonic constraint, the sign of its weight is
+    // chosen so that the projection is increasing (resp. decreasing) in this
+    // feature for an increasing (resp. decreasing) constraint.
     oneof weights {
       BinaryWeights binary = 7;
       ContinuousWeights continuous = 8;
@@ -249,11 +268,10 @@ message DecisionTreeTrainingConfig {
     // Forests" (Tomita et al, 2020))).
     message BinaryWeights {}
 
-    // Weights sampled in [-1, 1]. Consistently gives better quality models than
-    // binary weights.
+    // Weights sampled uniformly in [-1, 1].
     message ContinuousWeights {}
 
-    // Weights sampled uniformly in the exponend space, i.e. the weights are of
+    // Weights sampled uniformly in the exponent space, i.e. the weights are of
     // the form $s * 2^i$ with the integer exponent $i$ sampled uniformly in
     // [min_exponent, max_exponent] and the sign $s$ sampled uniformly in {-1,
     // 1}.
@@ -262,34 +280,42 @@ message DecisionTreeTrainingConfig {
       optional int32 max_exponent = 2 [default = 3];
     }
 
-    // Weights sampled in uniformly in the integer range [minimum, maximum].
+    // Weights sampled uniformly in the integer range [minimum, maximum]. Note
+    // that if the range contains 0, a feature can be sampled with a weight of
+    // 0 (i.e. the feature is ignored by the projection).
     message IntegerWeights {
       optional int32 minimum = 1 [default = -5];
       optional int32 maximum = 2 [default = 5];
     }
 
-    // Normalization applied on the features, before applying the sparse oblique
-    // projections.
+    // Normalization strategy.
+    //
+    // Normalization may or may not help in finding good oblique splits.
+    // Currently, all normalization stratgies are based on global feature
+    // statistics.
     optional Normalization normalization = 5 [default = NONE];
 
     enum Normalization {
-      // No normalization. Logic used in the  "Sparse Projection Oblique Random
+      // No normalization. Logic used in the "Sparse Projection Oblique Random
       // Forests" (Tomita et al, 2020).
       NONE = 0;
 
-      // Normalize the feature by the estimated standard deviation on the entire
-      // train dataset. Also known as Z-Score normalization.
+      // Divide the weights by the standard deviation of the feature estimated
+      // on the entire training dataset. Unlike a Z-Score normalization, the
+      // features are not centered.
       STANDARD_DEVIATION = 1;
 
-      // Normalize the feature by the range (i.e. max-min) estimated on the
-      // entire train dataset.
+      // Divide the weights by the range (i.e. max-min) of the feature
+      // estimated on the entire training dataset. Unlike a classical min-max
+      // normalization, the features are not shifted.
       MIN_MAX = 2;
     }
 
     // Maximum number of features in a projection. Set to -1 or not provided for
-    // no maximum.
+    // no maximum. If a sampled projection contains more features, a random
+    // subset of `max_num_features` features (and their weights) is kept.
     //
-    // Use only if a hard maximum on the number of variables is  needed,
+    // Use only if a hard maximum on the number of variables is needed,
     // otherwise prefer `projection_density_factor` for controlling the number
     // of features per projection.
     optional int32 max_num_features = 11 [default = -1];

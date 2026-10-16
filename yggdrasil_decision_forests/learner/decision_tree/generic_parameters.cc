@@ -273,8 +273,8 @@ absl::Status GetGenericHyperParameterSpecification(
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
         R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Controls of the number of random projections to test at each node.
-Increasing this value very likely improves the quality of the model, drastically increases the training time, and does not impact the inference time.
-Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Therefore, increasing this `num_projections_exponent` and possibly `max_num_projections` may improve model quality, but will also significantly increase training time.
+Increasing this value can improve the quality of the model (though it can also lead to overfitting on small datasets), drastically increases the training time, and does not impact the inference time.
+At each node, oblique splits try out max(min(ceil(p^num_projections_exponent), max_num_projections), min(min_num_projections, p)) random projections for choosing a split, where p is the number of numerical features. If p <= 1, a single projection is tested. Therefore, increasing this `num_projections_exponent` and possibly `max_num_projections` may improve model quality, but will also significantly increase training time.
 Note that the complexity of (classic) Random Forests is roughly proportional to `num_projections_exponent=0.5`, since it considers sqrt(num_features) for a split. The complexity of (classic) GBDT is roughly proportional to `num_projections_exponent=1`, since it considers all features for a split.
 The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) recommends values in [1/4, 2].)");
   }
@@ -291,7 +291,7 @@ The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) recomm
     param->mutable_conditional()->mutable_categorical()->add_values(
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
-        R"(Density of the projections as an exponent of the number of features. Independently for each projection, each feature has a probability "projection_density_factor / num_features" to be considered in the projection.
+        R"(Density of the projections as a factor of the inverse of the number of numerical features p. Independently for each projection, each numerical feature has a probability min(1, projection_density_factor / p), where p = num_numerical_features.
 The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) calls this parameter `lambda` and recommends values in [1, 5].
 Increasing this value increases training and inference time (on average). This value is best tuned for each dataset.)");
   }
@@ -312,10 +312,10 @@ Increasing this value increases training and inference time (on average). This v
     param->mutable_conditional()->mutable_categorical()->add_values(
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
-        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Normalization applied on the features, before applying the sparse oblique projections.
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Normalization of the projection weights. The sampled weight of each feature is divided by a statistic of this feature estimated on the entire training dataset. This is equivalent to scaling the features before applying the projection.
 - `NONE`: No normalization.
-- `STANDARD_DEVIATION`: Normalize the feature by the estimated standard deviation on the entire train dataset. Also known as Z-Score normalization.
-- `MIN_MAX`: Normalize the feature by the range (i.e. max-min) estimated on the entire train dataset.)");
+- `STANDARD_DEVIATION`: Divide the weights by the standard deviation of the feature estimated on the entire train dataset (Z-Score without centering).
+- `MIN_MAX`: Divide the weights by the range (i.e. max-min) of the feature estimated on the entire train dataset.)");
   }
 
   {
@@ -341,7 +341,7 @@ binary weights are only guaranteed binary if normalization is NONE.
 
 Possible values:
 - `BINARY`: The oblique weights are sampled in {-1,1} (default).
-- `CONTINUOUS`: The oblique weights are be sampled in [-1,1].
+- `CONTINUOUS`: The oblique weights are sampled uniformly in [-1,1].
 - `POWER_OF_TWO`: The oblique weights are powers of two. The exponents are sampled
                   uniformly in [$0, $1], the sign is uniformly sampled.
 - `INTEGER`: The weights are integers sampled uniformly from the range [$2, $3].)",
@@ -423,7 +423,7 @@ integer weights i.e. `sparse_oblique_weights=INTEGER`. Maximum value of the weig
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
         R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. 
-Controls the maximum number of features in a split.Set to -1 for no maximum.
+Controls the maximum number of features in a split. Set to -1 for no maximum.
 Use only if a hard maximum on the number of variables is needed, otherwise prefer `projection_density_factor` for controlling the number of features per projection.)");
   }
 
@@ -438,8 +438,8 @@ Use only if a hard maximum on the number of variables is needed, otherwise prefe
     param->mutable_conditional()->mutable_categorical()->add_values(
         kHParamSplitAxisSparseOblique);
     param->mutable_documentation()->set_description(
-        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after the num_projections_exponent).
-Oblique splits try out max(p^num_projections_exponent, max_num_projections) random projections for choosing a split, where p is the number of numerical features. Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy is important, increase this value.
+        R"(For sparse oblique splits i.e. `split_axis=SPARSE_OBLIQUE`. Maximum number of projections (applied after the num_projections_exponent). See `sparse_oblique_num_projections_exponent` for the exact number of tested projections.
+Increasing "max_num_projections" increases the training time but not the inference time. In late stage model development, if every bit of accuracy is important, increase this value.
 The paper "Sparse Projection Oblique Random Forests" (Tomita et al, 2020) does not define this hyperparameter.)");
   }
 
