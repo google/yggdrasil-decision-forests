@@ -103,7 +103,7 @@ absl::Status ComputeShapFeatureImportance(
 
 // Builds a copy of the dataset with the values of the columns in
 // "shuffle_column_idxs" are shuffled randomly.
-dataset::VerticalDataset ShuffleDatasetColumns(
+absl::StatusOr<dataset::VerticalDataset> ShuffleDatasetColumns(
     const dataset::VerticalDataset& dataset,
     const std::vector<int>& shuffle_column_idxs, utils::RandomEngine* rnd);
 

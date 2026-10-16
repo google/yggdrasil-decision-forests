@@ -19,7 +19,9 @@
 #include <atomic>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <random>
@@ -36,6 +38,7 @@
 #include "absl/strings/substitute.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -55,7 +58,38 @@ namespace yggdrasil_decision_forests {
 namespace utils {
 namespace {
 
+using row_t = dataset::VerticalDataset::row_t;
 constexpr char kFeatureImportanceShape[] = "SHAP_VALUE";
+
+// Algorithm 5 in "Fast Random Integer Generation in an Interval", D. Lemire
+// (https://arxiv.org/abs/1805.10941).
+inline uint32_t UniformUint32(const uint32_t bound, utils::RandomEngine* rnd) {
+  uint64_t m = uint64_t{static_cast<uint32_t>((*rnd)())} * bound;
+  uint32_t low = static_cast<uint32_t>(m);
+  if (low < bound) {
+    const uint32_t threshold = (0u - bound) % bound;
+    while (low < threshold) {
+      m = uint64_t{static_cast<uint32_t>((*rnd)())} * bound;
+      low = static_cast<uint32_t>(m);
+    }
+  }
+  return static_cast<uint32_t>(m >> 32);
+}
+
+// Consider moving this to its own library.
+template <class T>
+void TextbookShuffleVec(absl::Span<T> vec, utils::RandomEngine* rnd) {
+  const size_t size = vec.size();
+  if (size > std::numeric_limits<uint32_t>::max()) {
+    // Very unlikely fallback.
+    std::shuffle(vec.begin(), vec.end(), *rnd);
+    return;
+  }
+  for (uint32_t i = static_cast<uint32_t>(size); i > 1; i--) {
+    const uint32_t new_pos = UniformUint32(i, rnd);
+    std::swap(vec[i - 1], vec[new_pos]);
+  }
+}
 
 // Generates the permutation feature importance names.
 std::vector<std::string> BuildPermutationVariableImportanceName(
@@ -95,32 +129,78 @@ void FeatureImportanceToProto(const ResultFeatureImportance& src,
   }
 }
 
+template <typename ColumnType>
+absl::Status PermuteScalarColumn(
+    const dataset::VerticalDataset& dataset, const int column_idx,
+    absl::Span<const row_t> permutation,
+    dataset::VerticalDataset::AbstractColumn* dst) {
+  ASSIGN_OR_RETURN(const ColumnType* src_column,
+                   dataset.ColumnWithCastWithStatus<ColumnType>(column_idx));
+  ASSIGN_OR_RETURN(ColumnType * dst_column,
+                   dst->MutableCastWithStatus<ColumnType>());
+  const auto& src_values = src_column->values();
+  auto& dst_values = *dst_column->mutable_values();
+  dst_values.resize(permutation.size());
+  for (size_t row = 0; row < permutation.size(); row++) {
+    dst_values[row] = src_values[permutation[row]];
+  }
+  return absl::OkStatus();
+}
+
+void PermuteColumnGeneric(const dataset::VerticalDataset::AbstractColumn& src,
+                          absl::Span<const row_t> permutation,
+                          dataset::VerticalDataset::AbstractColumn* dst) {
+  dataset::proto::Example::Attribute value;
+  for (size_t row = 0; row < permutation.size(); row++) {
+    value.Clear();
+    src.ExtractExample(permutation[row], &value);
+    dst->Set(row, value);
+  }
+}
+
+absl::Status PermuteColumn(const dataset::VerticalDataset& dataset,
+                           const int column_idx,
+                           absl::Span<const row_t> permutation,
+                           dataset::VerticalDataset::AbstractColumn* dst) {
+  using VerticalDataset = dataset::VerticalDataset;
+  switch (dataset.column(column_idx)->type()) {
+    case dataset::proto::NUMERICAL:
+      return PermuteScalarColumn<VerticalDataset::NumericalColumn>(
+          dataset, column_idx, permutation, dst);
+    case dataset::proto::CATEGORICAL:
+      return PermuteScalarColumn<VerticalDataset::CategoricalColumn>(
+          dataset, column_idx, permutation, dst);
+    case dataset::proto::BOOLEAN:
+      return PermuteScalarColumn<VerticalDataset::BooleanColumn>(
+          dataset, column_idx, permutation, dst);
+    case dataset::proto::DISCRETIZED_NUMERICAL:
+      return PermuteScalarColumn<VerticalDataset::DiscretizedNumericalColumn>(
+          dataset, column_idx, permutation, dst);
+    case dataset::proto::HASH:
+      return PermuteScalarColumn<VerticalDataset::HashColumn>(
+          dataset, column_idx, permutation, dst);
+    default:
+      PermuteColumnGeneric(*dataset.column(column_idx), permutation, dst);
+      return absl::OkStatus();
+  }
+}
+
 }  // namespace
 
-dataset::VerticalDataset ShuffleDatasetColumns(
+absl::StatusOr<dataset::VerticalDataset> ShuffleDatasetColumns(
     const dataset::VerticalDataset& dataset,
     const std::vector<int>& shuffle_column_idxs, utils::RandomEngine* rnd) {
   auto permuted_dataset = dataset.ShallowNonOwningClone();
-  for (auto& column_idx : shuffle_column_idxs) {
-    auto* dst_permuted_column =
-        permuted_dataset
-            .ReplaceColumn(column_idx, dataset.data_spec().columns(column_idx))
-            .value();
-    const auto src_column = dataset.column(column_idx);
+  std::vector<row_t> permutation(dataset.nrow());
+  for (const int column_idx : shuffle_column_idxs) {
+    std::iota(permutation.begin(), permutation.end(), 0);
+    TextbookShuffleVec(absl::MakeSpan(permutation), rnd);
 
-    // Compute the permutation of the indices.
-    std::vector<dataset::VerticalDataset::row_t> permitted_indices(
-        dataset.nrow());
-    std::iota(permitted_indices.begin(), permitted_indices.end(), 0);
-    std::shuffle(permitted_indices.begin(), permitted_indices.end(), *rnd);
-
-    // Permute the values.
-    for (dataset::VerticalDataset::row_t example_idx = 0;
-         example_idx < dataset.nrow(); example_idx++) {
-      dataset::proto::Example::Attribute value;
-      src_column->ExtractExample(example_idx, &value);
-      dst_permuted_column->Set(permitted_indices[example_idx], value);
-    }
+    ASSIGN_OR_RETURN(auto* permuted_column,
+                     permuted_dataset.ReplaceColumn(
+                         column_idx, dataset.data_spec().columns(column_idx)));
+    RETURN_IF_ERROR(
+        PermuteColumn(dataset, column_idx, permutation, permuted_column));
   }
   return permuted_dataset;
 }
@@ -313,8 +393,9 @@ absl::Status ComputePermutationFeatureImportance(
       utils::concurrency::MutexLock lock(rng_mutex);
       sub_rng.seed(rng());
     }
-    const auto perturbed_dataset =
-        utils::ShuffleDatasetColumns(dataset, {feature_idx}, &sub_rng);
+    ASSIGN_OR_RETURN(
+        const auto perturbed_dataset,
+        utils::ShuffleDatasetColumns(dataset, {feature_idx}, &sub_rng));
 
     return evaluate(perturbed_dataset, &sub_rng);
   };
