@@ -37,23 +37,15 @@ set -vex
 
 : "${PYTHON_VERSIONS:=3.10 3.11 3.12 3.13 3.14}"
 : "${RUN_TESTS:=0}"
-: "${VENV_ROOT:=/tmp/ydf_release_venv}"
 
 function build_py() {
   local version=$1
-  local venv="${VENV_ROOT}/${version}"
   echo "Build YDF for Python ${version}"
 
-  # Virtual environment of the hermetic Python interpreter of the Bazel build.
-  bazel run --@rules_python//python/config_settings:python_version=${version} \
-    @rules_python//python/bin:python -- -m venv --clear "${venv}"
-
-  (
-    source "${venv}/bin/activate"
-    export PYTHON_VERSION=${version}
-    RUN_TESTS=${RUN_TESTS} ./tools/build_test_linux.sh
-    ./tools/package_linux.sh
-  )
+  if [[ "${RUN_TESTS}" = 1 ]]; then
+    PYTHON_VERSION=${version} RUN_TESTS=1 ./tools/build_test_linux.sh
+  fi
+  PYTHON_VERSION=${version} ./tools/package_linux.sh
 }
 
 function main() {

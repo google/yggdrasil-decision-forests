@@ -23,3 +23,5 @@ safetensors
 # For FastAPI Tests.
 fastapi
 httpx2
+# For the manylinux compliance check of the wheel (see //:wheel_test).
+auditwheel; platform_system == "Linux"

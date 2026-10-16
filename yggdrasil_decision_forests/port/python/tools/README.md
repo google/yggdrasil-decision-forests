@@ -11,10 +11,12 @@
 -   release_linux.sh: Create the pips for linux.
 -   release_macos.sh: Create the pips for macos.
 -   release_windows.bat: Create the pips for windows.
--   collect_pip_files.py: Collect pip files. Used by other scripts, including
-    package_linux.sh.
--   package_linux.sh: Packaged already compiled (i.e. build) YDF into a pip
-    package.
+-   collect_pip_files.py: Collect pip files. Used by release_windows.bat (with
+    config/setup.py).
+-   package_linux.sh: Build and test the pip package with Bazel (`//:wheel`
+    and `//tools:wheel_test`), and copy it to dist/.
+-   wheel.bzl, wheel_config.bzl: Bazel rules for the pip package.
+-   wheel_test.py: Test of the pip package built by Bazel.
 
 ## Support files
 
