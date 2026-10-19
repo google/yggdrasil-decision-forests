@@ -4896,8 +4896,11 @@ absl::Status DecisionTreeTrain(
 
   // If oblique splits are enabled, build the projection evaluator once for the
   // entire tree. Without it, oblique splitters each build a node-local
-  // evaluator, each costing O(number of features).
+  // evaluator, each costing O(number of features). Without numerical features
+  // the oblique splitters return early and never use an evaluator (and the
+  // evaluator cannot be built on an empty feature set).
   if (internal_config.projection_evaluator == nullptr &&
+      !config_link.numerical_features().empty() &&
       internal::ProjectionEvaluator::CanBeCached(dt_config)) {
     projection_evaluator.emplace(train_dataset,
                                  config_link.numerical_features());

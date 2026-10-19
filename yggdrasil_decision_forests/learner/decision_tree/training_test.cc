@@ -1196,6 +1196,77 @@ INSTANTIATE_TEST_SUITE_P(
             proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION,
             proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION)));
 
+// Oblique splits enabled but no numerical features: the oblique splitters
+// return early without an evaluator, and DecisionTreeTrain must not build the
+// shared one (it requires at least one numerical feature).
+TEST(CachedProjectionEvaluator, NoNumericalFeatures) {
+  dataset::VerticalDataset dataset;
+  ASSERT_OK_AND_ASSIGN(auto label_col,
+                       dataset.AddColumn("l", ColumnType::CATEGORICAL));
+  label_col->mutable_categorical()->set_is_already_integerized(true);
+  label_col->mutable_categorical()->set_number_of_unique_values(3);
+  ASSERT_OK_AND_ASSIGN(auto feature_col,
+                       dataset.AddColumn("c", ColumnType::CATEGORICAL));
+  feature_col->mutable_categorical()->set_is_already_integerized(true);
+  feature_col->mutable_categorical()->set_number_of_unique_values(5);
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  constexpr int kNumExamples = 100;
+  for (int example_idx = 0; example_idx < kNumExamples; example_idx++) {
+    const int c = 1 + (example_idx * 7) % 4;
+    dataset.AppendExample(
+        {{"l", (c >= 3) ? "1" : "2"}, {"c", absl::StrCat(c)}});
+  }
+
+  std::vector<UnsignedExampleIdx> selected_examples(kNumExamples);
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights = {};
+  model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  proto::DecisionTreeTrainingConfig dt_config;
+  const model::proto::DeploymentConfig deployment;
+
+  config.set_task(model::proto::Task::CLASSIFICATION);
+  config_link.set_label(0);
+  config_link.add_features(1);
+  ASSERT_TRUE(config_link.numerical_features().empty());
+  dt_config.set_min_examples(1);
+  dt_config.mutable_sparse_oblique_split();
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  dt_config.mutable_growing_strategy_local();
+  dt_config.set_num_candidate_attributes(-1);
+  ASSERT_TRUE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+
+  ASSERT_OK_AND_ASSIGN(const auto preprocessing,
+                       decision_tree::PreprocessTrainingDataset(
+                           dataset, config, config_link, dt_config, 1));
+  const InternalTrainConfig internal_config{
+      .preprocessing = &preprocessing,
+      .duplicated_selected_examples = false,
+  };
+
+  utils::RandomEngine random_shared(42);
+  DecisionTree tree_shared;
+  ASSERT_OK(DecisionTreeTrain(dataset, selected_examples, config, config_link,
+                              dt_config, deployment, weights, &random_shared,
+                              &tree_shared, internal_config));
+
+  utils::RandomEngine random_per_node(42);
+  DecisionTree tree_per_node;
+  std::vector<UnsignedExampleIdx> working_selected_examples = selected_examples;
+  ASSERT_OK(DecisionTreeCoreTrain(dataset, config, config_link, dt_config,
+                                  deployment, weights, &random_per_node,
+                                  internal_config, &tree_per_node,
+                                  absl::MakeSpan(working_selected_examples),
+                                  std::nullopt));
+
+  std::string description_shared, description_per_node;
+  tree_shared.AppendModelStructure(dataset.data_spec(), 0, &description_shared);
+  tree_per_node.AppendModelStructure(dataset.data_spec(), 0,
+                                     &description_per_node);
+  EXPECT_EQ(description_shared, description_per_node);
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model
