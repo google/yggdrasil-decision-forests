@@ -361,6 +361,12 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> AbstractLearner::TrainWithStatus(
                                 train_dataset.nrow());
   const auto begin_training = absl::Now();
 
+  // Check if both the training and validation dataset have legal values.
+  RETURN_IF_ERROR(train_dataset.CheckCategoricalValuesInRange());
+  if (valid_dataset.has_value()) {
+    RETURN_IF_ERROR(valid_dataset->get().CheckCategoricalValuesInRange());
+  }
+
   std::unique_ptr<AbstractModel> model;
   bool model_altered = false;
   // TODO: Branch on a proto field for continuous training.

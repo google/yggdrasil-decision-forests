@@ -69,6 +69,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/base/optimization.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
@@ -439,6 +440,10 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
     return fixed_length_feature_missing_values_;
   }
 
+  const std::vector<int>& fixed_length_categorical_upper_bounds() const {
+    return fixed_length_categorical_upper_bounds_;
+  }
+
   // Initialize the object.
   absl::Status Initialize(const std::vector<int>& input_features,
                           const DataSpecification& dataspec,
@@ -463,6 +468,8 @@ class FeaturesDefinitionNumericalOrCategoricalFlat {
   // Specified in the same order as "fixed_length_features". Should have the
   // same size as "fixed_length_features".
   std::vector<NumericalOrCategoricalValue> fixed_length_feature_missing_values_;
+
+  std::vector<int> fixed_length_categorical_upper_bounds_;
 
   // The name and order of the categorical-set input features expected by the
   // model.
@@ -795,24 +802,17 @@ class ExampleSetNumericalOrCategoricalFlat : public AbstractExampleSet {
   }
 
   // Set the value of an integer categorical feature.
+  //
+  // Values outside of [-1, number_of_unique_values) (e.g. integerized values
+  // larger than any value seen during training) are treated as OOV.
   void SetCategorical(const int example_idx,
-                      const CategoricalFeatureId feature_id, const int value,
+                      const CategoricalFeatureId feature_id, int value,
                       const FeaturesDefinition& features) override {
-#ifndef NDEBUG
-    const auto* feature = FindFeatureDefFromInternalIndex(
-        features.fixed_length_features(), feature_id.index);
-    DCHECK(feature != nullptr);
-    const auto& spec =
-        features.data_spec().columns(feature->spec_idx).categorical();
-    DCHECK_GE(value, -1) << "The categorical integer feature \""
-                         << feature->name << "\" should be in [-1,"
-                         << spec.number_of_unique_values() << "). Got "
-                         << value;
-    DCHECK_LT(value, spec.number_of_unique_values())
-        << "The categorical integer feature \"" << feature->name
-        << "\" should be in [-1," << spec.number_of_unique_values() << "). Got "
-        << value;
-#endif
+    const int upper_bound =
+        features.fixed_length_categorical_upper_bounds()[feature_id.index];
+    if (ABSL_PREDICT_FALSE(value < -1 || value >= upper_bound)) {
+      value = dataset::kOutOfDictionaryItemIndex;
+    }
 
     const auto index =
         FixedLengthIndex(example_idx, feature_id.index, features);

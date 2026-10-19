@@ -99,6 +99,22 @@ const FeatureDef* FindFeatureDefFromInternalIndex(
   return nullptr;
 }
 
+namespace {
+
+// Exclusive upper bound of the values of a fixed length feature.
+int CategoricalUpperBound(const dataset::proto::Column& col_spec) {
+  if (col_spec.type() != ColumnType::CATEGORICAL) {
+    return std::numeric_limits<int>::max();
+  }
+  const int64_t num_values = col_spec.categorical().number_of_unique_values();
+  if (num_values <= 0) {
+    return std::numeric_limits<int>::max();
+  }
+  return static_cast<int>(num_values);
+}
+
+}  // namespace
+
 std::vector<std::string> FeatureNames(const std::vector<FeatureDef>& defs) {
   std::vector<std::string> names;
   names.reserve(defs.size());
@@ -189,6 +205,8 @@ FeaturesDefinitionNumericalOrCategoricalFlat::InitializeNormalFeatures(
                          GetDefaultValue<NumericalOrCategoricalValue>(
                              col_spec, missing_numerical_is_na));
         fixed_length_feature_missing_values_.push_back(default_value);
+        fixed_length_categorical_upper_bounds_.push_back(
+            CategoricalUpperBound(col_spec));
       } break;
       case ColumnType::CATEGORICAL_SET: {
         const int internal_idx = categorical_set_features_.size();
@@ -273,6 +291,8 @@ FeaturesDefinitionNumericalOrCategoricalFlat::InitializeUnstackedFeatures(
                        GetDefaultValue<NumericalOrCategoricalValue>(
                            col_spec, missing_numerical_is_na));
       fixed_length_feature_missing_values_.push_back(default_value);
+      fixed_length_categorical_upper_bounds_.push_back(
+          CategoricalUpperBound(col_spec));
     }
   }
 

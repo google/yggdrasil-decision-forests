@@ -79,6 +79,18 @@ void AppendMargin(const int num_tabs, std::string* dst,
   absl::StrAppend(dst, std::string(num_tabs * tab_width, ' '));
 }
 
+// Tests if the categorical value "value" is set in the bitmap of a
+// "ContainsBitmap" condition.
+inline bool GetCategoricalBitmapValue(const std::string& bitmap,
+                                      const int32_t value) {
+  const size_t num_bits = bitmap.size() * 8;
+  if (ABSL_PREDICT_FALSE(static_cast<uint32_t>(value) >= num_bits)) {
+    return num_bits > 0 && utils::bitmap::GetValueBit(
+                               bitmap, dataset::kOutOfDictionaryItemIndex);
+  }
+  return utils::bitmap::GetValueBit(bitmap, value);
+}
+
 // Append a human readable description of a node value (i.e. output).
 void AppendValueDescription(const dataset::proto::DataSpecification& data_spec,
                             const int label_col_idx, const proto::Node& node,
@@ -769,7 +781,7 @@ struct EvalConditionContainsBitmapCategorical {
             value == dataset::VerticalDataset::CategoricalColumn::kNaValue)) {
       return na_value;
     }
-    return utils::bitmap::GetValueBit(mask_bitmap, value);
+    return GetCategoricalBitmapValue(mask_bitmap, value);
   }
   std::string mask_bitmap;
 };
@@ -788,7 +800,7 @@ struct EvalConditionContainsBitmapCategoricalSet {
     for (size_t bank_idx = data.values()[example_idx].first;
          bank_idx < data.values()[example_idx].second; bank_idx++) {
       const int32_t value = data.bank()[bank_idx];
-      if (utils::bitmap::GetValueBit(mask_bitmap, value)) {
+      if (GetCategoricalBitmapValue(mask_bitmap, value)) {
         return true;
       }
     }
@@ -1227,7 +1239,7 @@ absl::StatusOr<bool> EvalConditionFromColumn(
         const auto value = categorical_column->values()[example_idx];
         const std::string& bitmap =
             condition.condition().contains_bitmap_condition().elements_bitmap();
-        return utils::bitmap::GetValueBit(bitmap, value);
+        return GetCategoricalBitmapValue(bitmap, value);
       } else if (column_data->type() ==
                  dataset::proto::ColumnType::CATEGORICAL_SET) {
         const auto* categorical_column = static_cast<
@@ -1237,10 +1249,10 @@ absl::StatusOr<bool> EvalConditionFromColumn(
              bank_idx < categorical_column->values()[example_idx].second;
              bank_idx++) {
           const int32_t value = categorical_column->bank()[bank_idx];
-          if (utils::bitmap::GetValueBit(condition.condition()
-                                             .contains_bitmap_condition()
-                                             .elements_bitmap(),
-                                         value)) {
+          if (GetCategoricalBitmapValue(condition.condition()
+                                            .contains_bitmap_condition()
+                                            .elements_bitmap(),
+                                        value)) {
             return true;
           }
         }
@@ -1408,13 +1420,13 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
       if (attribute.has_categorical()) {
         const std::string& bitmap =
             condition.condition().contains_bitmap_condition().elements_bitmap();
-        return utils::bitmap::GetValueBit(bitmap, attribute.categorical());
+        return GetCategoricalBitmapValue(bitmap, attribute.categorical());
       } else if (attribute.has_categorical_set()) {
         for (const auto value : attribute.categorical_set().values()) {
-          if (utils::bitmap::GetValueBit(condition.condition()
-                                             .contains_bitmap_condition()
-                                             .elements_bitmap(),
-                                         value)) {
+          if (GetCategoricalBitmapValue(condition.condition()
+                                            .contains_bitmap_condition()
+                                            .elements_bitmap(),
+                                        value)) {
             return true;
           }
         }

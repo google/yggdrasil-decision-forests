@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -128,6 +129,27 @@ absl::Status CheckCompatibleCategocialColumnSpec(
                     src_spec.categorical().number_of_unique_values());
   }
   return absl::OkStatus();
+}
+
+// Returns the index of the first value outside of [begin_value, end_value), or
+// -1 if all the values are in range. The common case (all values in range) is
+// a branch-free reduction that the compiler can vectorize.
+int64_t FindFirstValueOutOfRange(const absl::Span<const int32_t> values,
+                                 const int32_t begin_value,
+                                 const int32_t end_value) {
+  bool out_of_range = false;
+  for (const int32_t value : values) {
+    out_of_range |= (value < begin_value) | (value >= end_value);
+  }
+  if (ABSL_PREDICT_TRUE(!out_of_range)) {
+    return -1;
+  }
+  for (size_t idx = 0; idx < values.size(); idx++) {
+    if (values[idx] < begin_value || values[idx] >= end_value) {
+      return idx;
+    }
+  }
+  return -1;
 }
 
 }  // namespace
@@ -1082,6 +1104,70 @@ void VerticalDataset::ShrinkToFit() {
   for (int col_idx = 0; col_idx < ncol(); col_idx++) {
     mutable_column(col_idx)->ShrinkToFit();
   }
+}
+
+absl::Status VerticalDataset::CheckCategoricalValuesInRange(
+    const std::optional<std::vector<int>>& column_idxs) const {
+  const auto check_column = [&](const int col_idx) -> absl::Status {
+    if (col_idx < 0 || col_idx >= ncol() ||
+        col_idx >= data_spec_.columns_size()) {
+      return absl::OkStatus();
+    }
+    const AbstractColumn* col = column(col_idx);
+    absl::Span<const int32_t> values;
+    int32_t begin_value;
+    switch (col->type()) {
+      case proto::ColumnType::CATEGORICAL: {
+        ASSIGN_OR_RETURN(const auto* cat_col,
+                         ColumnWithCastWithStatus<CategoricalColumn>(col_idx));
+        values = cat_col->values();
+        begin_value = CategoricalColumn::kNaValue;
+      } break;
+      case proto::ColumnType::CATEGORICAL_SET: {
+        ASSIGN_OR_RETURN(
+            const auto* cat_set_col,
+            ColumnWithCastWithStatus<CategoricalSetColumn>(col_idx));
+        // Missing values are encoded in the row ranges, not in the bank.
+        values = cat_set_col->bank();
+        begin_value = 0;
+      } break;
+      default:
+        return absl::OkStatus();
+    }
+    if (values.empty()) {
+      return absl::OkStatus();
+    }
+
+    const auto& col_spec = data_spec_.columns(col_idx);
+    const int64_t num_unique_values =
+        col_spec.categorical().number_of_unique_values();
+    const int32_t end_value = static_cast<int32_t>(std::min<int64_t>(
+        num_unique_values, std::numeric_limits<int32_t>::max()));
+    const int64_t bad_idx =
+        FindFirstValueOutOfRange(values, begin_value, end_value);
+    if (ABSL_PREDICT_FALSE(bad_idx >= 0)) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Column \"", col_spec.name(), "\" contains the categorical value ",
+          values[bad_idx], ", which is outside of the range [0, ",
+          num_unique_values,
+          ") defined by the dataspec (\"number_of_unique_values\"). For "
+          "integerized categorical columns, values not seen during training "
+          "should be replaced by ",
+          kOutOfDictionaryItemIndex, " (out-of-vocabulary)."));
+    }
+    return absl::OkStatus();
+  };
+
+  if (column_idxs.has_value()) {
+    for (const int col_idx : *column_idxs) {
+      RETURN_IF_ERROR(check_column(col_idx));
+    }
+  } else {
+    for (int col_idx = 0; col_idx < ncol(); col_idx++) {
+      RETURN_IF_ERROR(check_column(col_idx));
+    }
+  }
+  return absl::OkStatus();
 }
 
 absl::StatusOr<const VerticalDataset::CategoricalColumn*>

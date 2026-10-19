@@ -623,6 +623,39 @@ class GradientBoostedTreesLearnerTest(learner_test_utils.LearnerTest):
     self.assertEqual(model.label_col_idx(), 0)
     self.assertEqual(model.label(), "label")
 
+  def test_validation_dataset_catint_range(self):
+    ds = {
+        "f_str": np.array(["a", "b", "c", "d"] * 50),
+        "f_int": np.array([0, 1, 2, 3] * 50, dtype=np.int64),
+        "label": np.array([0, 1, 0, 1] * 50),
+    }
+    valid_values = [f"unseen_{i}" for i in range(20)]
+    valid_ds = {
+        "f_str": np.array(valid_values * 5),
+        "f_int": np.array(list(range(50, 70)) * 5, dtype=np.int64),
+        "label": np.array([0, 1] * 50),
+    }
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        features=[
+            ("f_str", dataspec.Semantic.CATEGORICAL),
+            dataspec.Column(
+                name="f_int",
+                semantic=dataspec.Semantic.CATEGORICAL,
+                is_already_integerized=True,
+            ),
+        ],
+        label="label",
+        min_examples=1,
+        num_trees=20,
+        early_stopping="NONE",
+    ).train(ds, valid=valid_ds)
+
+    # Unseen values are treated as out-of-vocabulary during inference.
+    predictions = model.predict(valid_ds)
+    self.assertEqual(predictions.shape, (100,))
+    _ = model.evaluate(valid_ds)
+
 
 if __name__ == "__main__":
   absltest.main()

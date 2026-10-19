@@ -20,6 +20,7 @@
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/utils/test.h"
@@ -333,6 +334,28 @@ TEST_P(ExampleSetTest, GetValue) {
   EXPECT_EQ(nvs_value.vector_length, 2);
   EXPECT_THAT(nvs_value.vector_values,
               testing::ElementsAre(1.f, 2.f, 3.f, 4.f, 5.f, 6.f));
+}
+
+TEST(ExampleSetTest, OutOfRangeCategoricalIsOutOfVocabulary) {
+  ToyModel model(/*enable_na_conditions=*/false);
+  ToyModel::ExampleSet example_set(5, model);
+  ASSERT_OK_AND_ASSIGN(
+      const auto feature_b,
+      ToyModel::ExampleSet::GetCategoricalFeatureId("b", model));
+
+  // "b" has number_of_unique_values=3 i.e. valid values are [-1, 3).
+  example_set.SetCategorical(0, feature_b, 2, model);
+  example_set.SetCategorical(1, feature_b, 3, model);
+  example_set.SetCategorical(2, feature_b, 1000, model);
+  example_set.SetCategorical(3, feature_b, -5, model);
+
+  EXPECT_EQ(example_set.GetCategoricalInt(0, feature_b, model), 2);
+  EXPECT_EQ(example_set.GetCategoricalInt(1, feature_b, model),
+            dataset::kOutOfDictionaryItemIndex);
+  EXPECT_EQ(example_set.GetCategoricalInt(2, feature_b, model),
+            dataset::kOutOfDictionaryItemIndex);
+  EXPECT_EQ(example_set.GetCategoricalInt(3, feature_b, model),
+            dataset::kOutOfDictionaryItemIndex);
 }
 
 TEST(ExampleSetTest, IsMissing) {

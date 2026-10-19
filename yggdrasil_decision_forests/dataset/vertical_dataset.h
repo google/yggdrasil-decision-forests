@@ -929,6 +929,11 @@ class VerticalDataset {
   // Calls "shrink_to_fit" on the std::vectors.
   void ShrinkToFit();
 
+  // Checks that the values of the categorical and categorical-set columns are
+  // consistent with the dataspec.
+  absl::Status CheckCategoricalValuesInRange(
+      const std::optional<std::vector<int>>& column_idxs = {}) const;
+
   // Human readable representation of the dataset to be printed in the terminal
   // or in a file. The printing format can change and should not be relied on.
   //

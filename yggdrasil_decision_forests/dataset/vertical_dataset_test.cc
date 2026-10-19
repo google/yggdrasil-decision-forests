@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -22,6 +23,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -40,6 +42,7 @@ namespace dataset {
 namespace {
 
 using test::EqualsProto;
+using test::StatusIs;
 using ::testing::ElementsAre;
 
 std::string DatasetDir() {
@@ -524,6 +527,67 @@ TEST(VerticalDataset, Reset) {
   EXPECT_EQ(dataset.nrow(), 2);
   EXPECT_EQ(dataset.ValueToString(0, 0), "0.1");
   EXPECT_EQ(dataset.ValueToString(0, 1), "AAA");
+}
+
+TEST(VerticalDataset, CheckCategoricalValuesInRange) {
+  VerticalDataset dataset;
+  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "a"
+      categorical { number_of_unique_values: 3 is_already_integerized: true }
+    }
+    columns {
+      type: CATEGORICAL_SET
+      name: "b"
+      categorical { number_of_unique_values: 3 is_already_integerized: true }
+    }
+    columns { type: NUMERICAL name: "c" }
+  )pb");
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(auto* col_a, dataset.MutableColumnWithCastWithStatus<
+                                        VerticalDataset::CategoricalColumn>(0));
+  ASSERT_OK_AND_ASSIGN(auto* col_b,
+                       dataset.MutableColumnWithCastWithStatus<
+                           VerticalDataset::CategoricalSetColumn>(1));
+  ASSERT_OK_AND_ASSIGN(
+      auto* col_c,
+      dataset.MutableColumnWithCastWithStatus<VerticalDataset::NumericalColumn>(
+          2));
+  col_a->Add(0);
+  col_a->Add(2);
+  col_a->AddNA();
+  col_b->AddVector({0, 2});
+  col_b->AddNA();
+  col_b->AddVector({});
+  col_c->Add(-10.f);
+  col_c->Add(10.f);
+  col_c->AddNA();
+  dataset.set_nrow(3);
+  EXPECT_OK(dataset.CheckCategoricalValuesInRange());
+
+  // Categorical value larger than the dataspec allows.
+  col_a->Set(0, 3);
+  EXPECT_THAT(dataset.CheckCategoricalValuesInRange(),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Column \"a\" contains the categorical value 3"));
+  // Only the selected columns are checked.
+  EXPECT_OK(dataset.CheckCategoricalValuesInRange(std::vector<int>{1, 2}));
+
+  // Negative values other than the missing value are invalid.
+  col_a->Set(0, -2);
+  EXPECT_THAT(dataset.CheckCategoricalValuesInRange(),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Column \"a\" contains the categorical value -2"));
+  col_a->Set(0, 1);
+  EXPECT_OK(dataset.CheckCategoricalValuesInRange());
+
+  // Categorical-set value larger than the dataspec allows.
+  const std::vector<int32_t> invalid_set = {1, 5};
+  col_b->SetIter(2, invalid_set.begin(), invalid_set.end());
+  EXPECT_THAT(dataset.CheckCategoricalValuesInRange(),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Column \"b\" contains the categorical value 5"));
 }
 
 TEST(VerticalDataset, ResizeLarger) {

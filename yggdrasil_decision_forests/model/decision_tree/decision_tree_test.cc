@@ -361,6 +361,73 @@ TEST_F(EvalConditions, EvalConditionContainsBitmapSet) {
       0, false);
 }
 
+TEST(DecisionTree, EvalConditionContainsBitmapOutOfRangeIsOutOfVocabulary) {
+  const DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "a"
+      categorical { number_of_unique_values: 4 is_already_integerized: true }
+    }
+  )pb");
+  dataset::VerticalDataset dataset;
+  dataset.set_data_spec(dataspec);
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  ASSERT_OK_AND_ASSIGN(auto* col,
+                       dataset.MutableColumnWithCastWithStatus<
+                           dataset::VerticalDataset::CategoricalColumn>(0));
+  col->Add(2);   // In range, in the condition.
+  col->Add(3);   // In range, not in the condition.
+  col->Add(50);  // Larger than the bitmap: treated as out-of-vocabulary.
+  col->Add(-5);  // Invalid negative value: treated as out-of-vocabulary.
+  dataset.set_nrow(4);
+
+  for (const bool oov_in_condition : {false, true}) {
+    SCOPED_TRACE(absl::StrCat("oov_in_condition=", oov_in_condition));
+    proto::NodeCondition condition;
+    condition.set_attribute(0);
+    condition.set_na_value(false);
+    // The condition is "a in {2}" or "a in {OOV, 2}".
+    condition.mutable_condition()
+        ->mutable_contains_bitmap_condition()
+        ->set_elements_bitmap(oov_in_condition ? "\x05" : "\x04");
+    const std::vector<bool> expected = {true, false, oov_in_condition,
+                                        oov_in_condition};
+
+    for (int row = 0; row < dataset.nrow(); row++) {
+      SCOPED_TRACE(absl::StrCat("row=", row));
+      // Evaluate on single example on dataset.
+      ASSERT_OK_AND_ASSIGN(const bool dataset_result,
+                           EvalCondition(condition, dataset, row));
+      EXPECT_EQ(dataset_result, expected[row]);
+
+      // Evaluate on single proto example.
+      dataset::proto::Example example;
+      dataset.ExtractExample(row, &example);
+      ASSERT_OK_AND_ASSIGN(const bool example_result,
+                           EvalCondition(condition, example));
+      EXPECT_EQ(example_result, expected[row]);
+    }
+
+    // Evaluate on full dataset.
+    std::vector<UnsignedExampleIdx> selected_examples = {0, 1, 2, 3};
+    std::vector<UnsignedExampleIdx> selected_examples_buffer;
+    auto selected_example_rb = SelectedExamplesRollingBuffer::Create(
+        absl::MakeSpan(selected_examples), &selected_examples_buffer);
+    ExampleSplitRollingBuffer example_split;
+    ASSERT_OK(EvalConditionOnDataset(dataset, selected_example_rb, condition,
+                                     /*dataset_is_dense=*/false,
+                                     &example_split));
+    std::vector<UnsignedExampleIdx> positive_examples(
+        example_split.positive_examples.active.begin(),
+        example_split.positive_examples.active.end());
+    if (oov_in_condition) {
+      EXPECT_THAT(positive_examples, ElementsAre(0, 2, 3));
+    } else {
+      EXPECT_THAT(positive_examples, ElementsAre(0));
+    }
+  }
+}
+
 TEST_F(EvalConditions, EvalConditionOblique) {
   CheckCondition(
       R"(

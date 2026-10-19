@@ -669,6 +669,7 @@ absl::Status PopulateColumnCategoricalIntegerizedNPInt32(
     std::optional<int> column_idx) {
   StridedSpanInt32 src_values(data);
   CategoricalColumn* column;
+  std::optional<int32_t> num_unique_values;
   if (!column_idx.has_value()) {
     // Create column spec
     ASSIGN_OR_RETURN(auto column_spec,
@@ -690,13 +691,23 @@ absl::Status PopulateColumnCategoricalIntegerizedNPInt32(
     ASSIGN_OR_RETURN(column,
                      self.MutableColumnWithCastWithStatus<CategoricalColumn>(
                          column_idx.value()));
+    num_unique_values = self.data_spec()
+                            .columns(column_idx.value())
+                            .categorical()
+                            .number_of_unique_values();
   }
 
   std::vector<int32_t>& dst_values = *column->mutable_values();
   const size_t offset = dst_values.size();
   dst_values.resize(offset + src_values.size());
   for (size_t i = 0; i < src_values.size(); i++) {
-    dst_values[i + offset] = src_values[i];
+    int32_t value = src_values[i];
+    if (num_unique_values.has_value() && value >= *num_unique_values) {
+      // Values larger than the largest value seen during training are
+      // out-of-vocabulary.
+      value = dataset::kOutOfDictionaryItemIndex;
+    }
+    dst_values[i + offset] = value;
   }
 
   return absl::OkStatus();
