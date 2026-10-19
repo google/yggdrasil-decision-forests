@@ -343,7 +343,7 @@ struct InternalTrainConfig {
   // Non-owning pointer to a projection evaluator shared by all the oblique
   // split searches of a tree. Set by DecisionTreeTrain when
   // "ProjectionEvaluator::CanBeCached" is true. If null, oblique splitters
-  // each build a per-node evaluator instead (cost: O(number of features)
+  // each build a per-node evaluator instead (cost: O(number of features)).
   const internal::ProjectionEvaluator* projection_evaluator = nullptr;
 
   decision_tree::gpu::VectorSequenceComputer* vector_sequence_computer =

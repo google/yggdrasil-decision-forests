@@ -178,17 +178,21 @@ class ProjectionEvaluator {
   ProjectionEvaluator(const dataset::VerticalDataset& train_dataset,
                       const google::protobuf::RepeatedField<int32_t>& numerical_features);
 
-  // Whether an evaluator can be cached i.e. built once per tree (by
-  // DecisionTreeTrain) and shared. The evaluator holds pointers into
-  // the dataset's columns, so the dataset must not change.
-  // Currently only guaranteed with GLOBAL_IMPUTATION (default policy).
-  // TODO: Likely also safe with LOCAL_IMPUTATION: verify
+  // Whether an evaluator can be built once per tree (by DecisionTreeTrain) and
+  // shared by all the nodes. The evaluator holds pointers into the columns of
+  // the dataset it was built on, so every node must be trained on that same
+  // dataset. This holds with GLOBAL_IMPUTATION and LOCAL_IMPUTATION: the
+  // oblique splitters always replace missing values with the global column
+  // mean ("na_replacement_value_"), independently of the policy. It does not
+  // hold with RANDOM_LOCAL_IMPUTATION, where NodeTrain trains each node on a
+  // per-node imputed copy of the dataset.
   static bool CanBeCached(const proto::DecisionTreeTrainingConfig& dt_config) {
     const bool use_oblique_splits = dt_config.has_sparse_oblique_split() ||
-                                    dt_config.has_mhld_oblique_split();
+                                    dt_config.has_mhld_oblique_split() ||
+                                    dt_config.has_guided_oblique_split();
     return use_oblique_splits &&
-           dt_config.missing_value_policy() ==
-               proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION;
+           dt_config.missing_value_policy() !=
+               proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION;
   }
 
   // Evaluates a projection of a set of selected examples.

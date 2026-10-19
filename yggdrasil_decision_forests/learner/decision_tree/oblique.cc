@@ -219,57 +219,6 @@ absl::Status ComputeLDAScatterMatrices(
   return absl::OkStatus();
 }
 
-}  // namespace
-
-namespace internal {
-
-// Per-thread reusable ProjectionEvaluator. The evaluator only depends on
-// (dataset, numerical_features); under GLOBAL_IMPUTATION both are constant
-// across every node of every tree.
-// RANDOM_LOCAL_IMPUTATION trains each node on a fresh per-node dataset whose address
-// could alias a freed one -> can't cache there (reusable_dataset=false always 
-// rebuilds and clears the identity keys).
-class ProjectionEvaluatorCache {
- public:
-  ProjectionEvaluator& Get(
-      const dataset::VerticalDataset& train_dataset,
-      const google::protobuf::RepeatedField<int32_t>& numerical_features,
-      const bool reusable_dataset) {
-    const bool cache_hit =
-        reusable_dataset && evaluator_.has_value() &&
-        train_dataset_ == &train_dataset &&
-        nrow_ == static_cast<int64_t>(train_dataset.nrow()) &&
-        numerical_features_.size() ==
-            static_cast<size_t>(numerical_features.size()) &&
-        std::equal(numerical_features_.begin(), numerical_features_.end(),
-                   numerical_features.begin());
-    if (!cache_hit) {
-      evaluator_.emplace(train_dataset, numerical_features);
-      if (reusable_dataset) {
-        train_dataset_ = &train_dataset;
-        nrow_ = static_cast<int64_t>(train_dataset.nrow());
-        numerical_features_.assign(numerical_features.begin(),
-                                   numerical_features.end());
-      } else {
-        train_dataset_ = nullptr;
-        nrow_ = -1;
-        numerical_features_.clear();
-      }
-    }
-    return *evaluator_;
-  }
-
- private:
-  std::optional<ProjectionEvaluator> evaluator_;
-  const dataset::VerticalDataset* train_dataset_ = nullptr;
-  SignedExampleIdx nrow_ = -1;
-  std::vector<int32_t> numerical_features_;
-};
-
-}  // namespace internal
-
-namespace {
-
 // Returns the tree-wide projection evaluator provided by internal_config
 // If none, builds a node-local evaluator and returns it.
 const ProjectionEvaluator& GetProjectionEvaluator(
@@ -513,8 +462,10 @@ absl::StatusOr<bool> FindBestConditionGuidedObliqueTemplate(
   float current_threshold = 0;
   auto& projection_values = cache->projection_values;
 
-  ProjectionEvaluator projection_evaluator(train_dataset,
-                                           config_link.numerical_features());
+  std::optional<ProjectionEvaluator> local_projection_evaluator;
+  const ProjectionEvaluator& projection_evaluator =
+      GetProjectionEvaluator(train_dataset, config_link, internal_config,
+                             &local_projection_evaluator);
 
   // TODO: Cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
