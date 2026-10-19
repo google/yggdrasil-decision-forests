@@ -5745,62 +5745,62 @@ line: {
         }
     }
 })();
-</script></div></div></div><div id="my_report_body_pva" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="my_report_variable_importance_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('my_report_variable_importance_vi')"><option value="MEAN_DECREASE_IN_ACCURACY">MEAN_DECREASE_IN_ACCURACY</option><option value="MEAN_DECREASE_IN_AP_>50K_VS_OTHERS">MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS</option><option value="SHAP_VALUE">SHAP_VALUE</option></select><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_ACCURACY" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.051694 ################
-    2. &quot;marital_status&quot;  0.048111 ##############
-    3.            &quot;age&quot;  0.026001 ########
-    4.     &quot;occupation&quot;  0.021599 ######
-    5.   &quot;capital_loss&quot;  0.016481 #####
-    6.      &quot;education&quot;  0.010851 ###
-    7. &quot;hours_per_week&quot;  0.007780 ##
-    8.  &quot;education_num&quot;  0.006040 #
-    9.         &quot;fnlwgt&quot;  0.003276 #
-   10.   &quot;relationship&quot;  0.002047 
-   11.      &quot;workclass&quot;  0.000819 
+</script></div></div></div><div id="my_report_body_pva" class="tab_content"><p><a target="_blank" href="https://ydf.readthedocs.io/en/latest/cli_user_manual#variable-importances">Variable importances</a> measure the importance of an input feature for a model.</p><div id="my_report_variable_importance_vi" class="variable_importance"><select onchange="ydfShowVariableImportance('my_report_variable_importance_vi')"><option value="MEAN_DECREASE_IN_ACCURACY">MEAN_DECREASE_IN_ACCURACY</option><option value="MEAN_DECREASE_IN_AP_>50K_VS_OTHERS">MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_AUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS</option><option value="MEAN_DECREASE_IN_PRAUC_>50K_VS_OTHERS">MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS</option><option value="SHAP_VALUE">SHAP_VALUE</option></select><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_ACCURACY" class="content selected"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.053741 ################
+    2. &quot;marital_status&quot;  0.042891 ############
+    3.            &quot;age&quot;  0.022930 ######
+    4.     &quot;occupation&quot;  0.022008 ######
+    5.   &quot;capital_loss&quot;  0.016378 ####
+    6.      &quot;education&quot;  0.010134 ###
+    7.  &quot;education_num&quot;  0.007882 ##
+    8. &quot;hours_per_week&quot;  0.004299 #
+    9.      &quot;workclass&quot;  0.003890 #
+   10.         &quot;fnlwgt&quot;  0.002150 
+   11.   &quot;relationship&quot;  0.002150 
    12.           &quot;race&quot;  0.000717 
-   13. &quot;native_country&quot;  0.000614 
-   14.            &quot;sex&quot; -0.000307 
-</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.254855 ################
-    2. &quot;marital_status&quot;  0.134753 ########
-    3.            &quot;age&quot;  0.082474 #####
-    4.   &quot;capital_loss&quot;  0.046534 ##
-    5.     &quot;occupation&quot;  0.034888 ##
-    6. &quot;hours_per_week&quot;  0.023707 #
-    7.      &quot;education&quot;  0.021360 #
-    8.  &quot;education_num&quot;  0.010981 
-    9.   &quot;relationship&quot;  0.006034 
-   10.      &quot;workclass&quot;  0.004566 
-   11.         &quot;fnlwgt&quot;  0.002219 
-   12.            &quot;sex&quot;  0.002180 
-   13. &quot;native_country&quot;  0.000545 
-   14.           &quot;race&quot;  0.000413 
-</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1. &quot;marital_status&quot;  0.086126 ################
-    2.            &quot;age&quot;  0.079609 ##############
-    3.   &quot;capital_gain&quot;  0.063182 ###########
-    4.     &quot;occupation&quot;  0.016851 ###
-    5.   &quot;capital_loss&quot;  0.015947 ##
-    6. &quot;hours_per_week&quot;  0.015676 ##
-    7.      &quot;education&quot;  0.010585 #
-    8.  &quot;education_num&quot;  0.005066 
-    9.   &quot;relationship&quot;  0.003286 
-   10.      &quot;workclass&quot;  0.002349 
-   11.            &quot;sex&quot;  0.001903 
-   12. &quot;native_country&quot;  0.000435 
-   13.         &quot;fnlwgt&quot;  0.000306 
-   14.           &quot;race&quot;  0.000045 
-</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.254550 ################
-    2. &quot;marital_status&quot;  0.134732 ########
-    3.            &quot;age&quot;  0.082464 #####
-    4.   &quot;capital_loss&quot;  0.046518 ##
-    5.     &quot;occupation&quot;  0.034881 ##
-    6. &quot;hours_per_week&quot;  0.023704 #
-    7.      &quot;education&quot;  0.021356 #
-    8.  &quot;education_num&quot;  0.010979 
-    9.   &quot;relationship&quot;  0.006033 
-   10.      &quot;workclass&quot;  0.004567 
-   11.         &quot;fnlwgt&quot;  0.002219 
-   12.            &quot;sex&quot;  0.002180 
-   13. &quot;native_country&quot;  0.000545 
-   14.           &quot;race&quot;  0.000413 
+   13.            &quot;sex&quot;  0.000000 
+   14. &quot;native_country&quot; -0.000205 
+</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_AP_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.253205 ################
+    2. &quot;marital_status&quot;  0.130179 ########
+    3.            &quot;age&quot;  0.079143 ####
+    4.   &quot;capital_loss&quot;  0.046629 ##
+    5.     &quot;occupation&quot;  0.037515 ##
+    6.      &quot;education&quot;  0.018914 #
+    7. &quot;hours_per_week&quot;  0.015088 
+    8.  &quot;education_num&quot;  0.010928 
+    9.      &quot;workclass&quot;  0.006847 
+   10.   &quot;relationship&quot;  0.004548 
+   11.         &quot;fnlwgt&quot;  0.001998 
+   12.            &quot;sex&quot;  0.001964 
+   13. &quot;native_country&quot;  0.000833 
+   14.           &quot;race&quot;  0.000829 
+</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_AUC_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1. &quot;marital_status&quot;  0.082298 ################
+    2.            &quot;age&quot;  0.075935 ##############
+    3.   &quot;capital_gain&quot;  0.061513 ###########
+    4.     &quot;occupation&quot;  0.017858 ###
+    5.   &quot;capital_loss&quot;  0.015166 ##
+    6. &quot;hours_per_week&quot;  0.010998 ##
+    7.      &quot;education&quot;  0.009785 #
+    8.  &quot;education_num&quot;  0.005049 
+    9.   &quot;relationship&quot;  0.002986 
+   10.      &quot;workclass&quot;  0.002625 
+   11.            &quot;sex&quot;  0.001937 
+   12. &quot;native_country&quot;  0.000536 
+   13.         &quot;fnlwgt&quot;  0.000363 
+   14.           &quot;race&quot;  0.000348 
+</pre></div><div id="my_report_variable_importance_vi_body_MEAN_DECREASE_IN_PRAUC_&gt;50K_VS_OTHERS" class="content"><pre class="ydf_pre">    1.   &quot;capital_gain&quot;  0.252883 ################
+    2. &quot;marital_status&quot;  0.130157 ########
+    3.            &quot;age&quot;  0.079133 ####
+    4.   &quot;capital_loss&quot;  0.046612 ##
+    5.     &quot;occupation&quot;  0.037509 ##
+    6.      &quot;education&quot;  0.018911 #
+    7. &quot;hours_per_week&quot;  0.015086 
+    8.  &quot;education_num&quot;  0.010926 
+    9.      &quot;workclass&quot;  0.006846 
+   10.   &quot;relationship&quot;  0.004547 
+   11.         &quot;fnlwgt&quot;  0.001997 
+   12.            &quot;sex&quot;  0.001964 
+   13. &quot;native_country&quot;  0.000833 
+   14.           &quot;race&quot;  0.000829 
 </pre></div><div id="my_report_variable_importance_vi_body_SHAP_VALUE" class="content"><pre class="ydf_pre">    1. &quot;marital_status&quot;  1.218327 ################
     2.            &quot;age&quot;  1.039380 #############
     3.   &quot;capital_gain&quot;  0.551696 #######
