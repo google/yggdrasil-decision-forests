@@ -180,6 +180,20 @@ TEST(Utils, ConcurrentForLoopFewItemsManyBlocks) {
   EXPECT_EQ(sum, items.size() * 2);
 }
 
+TEST(Utils, ConcurrentForLoopNoItems) {
+  int num_calls = 0;
+  {
+    ThreadPool pool(5, {.name_prefix = std::string("")});
+    ConcurrentForLoop(
+        4, &pool, /*num_items=*/0,
+        [&num_calls](size_t block_idx, size_t begin_idx, size_t end_idx) {
+          EXPECT_EQ(begin_idx, end_idx);
+          num_calls++;
+        });
+  }
+  EXPECT_LE(num_calls, 1);
+}
+
 TEST(Utils, ConcurrentForLoopWithStatus) {
   std::atomic<int> sum{0};
   std::vector<int> items(500, 2);

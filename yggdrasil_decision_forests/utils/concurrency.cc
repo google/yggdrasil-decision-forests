@@ -32,7 +32,9 @@ void ConcurrentForLoop(
     const std::function<void(size_t block_idx, size_t begin_item_idx,
                              size_t end_item_idx)>& function) {
   DCHECK(thread_pool != nullptr);
-  if (num_blocks <= 1) {
+  if (num_blocks <= 1 || num_items == 0) {
+    // Note: With "num_items == 0", the work is done in a single (empty) block
+    // to avoid a division by zero below.
     function(0, 0, num_items);
     return;
   }
