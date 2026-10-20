@@ -22,7 +22,9 @@ _PORT = flags.DEFINE_integer("port", None, "IP port to run the worker")
 
 
 def main(argv) -> None:
-  ydf.start_worker(_PORT.value)  # pyrefly: ignore[bad-argument-type]
+  if _PORT.value is None:
+    raise ValueError("No port given.")
+  ydf.start_worker(_PORT.value)
 
 
 if __name__ == "__main__":
