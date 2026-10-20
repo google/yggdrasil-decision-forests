@@ -59,6 +59,7 @@
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/usage.h"
 
+using namespace std;
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
@@ -73,7 +74,7 @@ constexpr char kNodeBaseFilename[] = "nodes";
 // Filename containing the gradient boosted trees header.
 constexpr char kHeaderBaseFilename[] = "gradient_boosted_trees_header.pb";
 
-}  // namespace
+} // namespace
 
 proto::Header GradientBoostedTreesModel::BuildHeaderProto() const {
   proto::Header header;
@@ -85,14 +86,15 @@ proto::Header GradientBoostedTreesModel::BuildHeaderProto() const {
   if (early_stopping_triggered_.has_value()) {
     header.set_early_stopping_triggered(early_stopping_triggered_.value());
   }
-  *header.mutable_initial_predictions() = google::protobuf::RepeatedField<float>(
-      initial_predictions_.begin(), initial_predictions_.end());
+  *header.mutable_initial_predictions() =
+      google::protobuf::RepeatedField<float>(initial_predictions_.begin(),
+                                             initial_predictions_.end());
   *header.mutable_training_logs() = training_logs_;
   header.mutable_loss_configuration()->CopyFrom(loss_config_);
   return header;
 }
 
-void GradientBoostedTreesModel::ApplyHeaderProto(const proto::Header& header) {
+void GradientBoostedTreesModel::ApplyHeaderProto(const proto::Header &header) {
   loss_ = header.loss();
   initial_predictions_.assign(header.initial_predictions().begin(),
                               header.initial_predictions().end());
@@ -108,8 +110,9 @@ void GradientBoostedTreesModel::ApplyHeaderProto(const proto::Header& header) {
   }
 }
 
-absl::Status GradientBoostedTreesModel::Save(
-    absl::string_view directory, const ModelIOOptions& io_options) const {
+absl::Status
+GradientBoostedTreesModel::Save(absl::string_view directory,
+                                const ModelIOOptions &io_options) const {
   RETURN_IF_ERROR(file::RecursivelyCreateDir(directory, file::Defaults()));
   RETURN_IF_ERROR(ValidateModelIOOptions(io_options));
 
@@ -139,7 +142,7 @@ absl::Status GradientBoostedTreesModel::Save(
 }
 
 absl::Status GradientBoostedTreesModel::Load(absl::string_view directory,
-                                             const ModelIOOptions& io_options) {
+                                             const ModelIOOptions &io_options) {
   RETURN_IF_ERROR(ValidateModelIOOptions(io_options));
 
   proto::Header header;
@@ -159,8 +162,8 @@ absl::Status GradientBoostedTreesModel::Load(absl::string_view directory,
 }
 
 absl::Status GradientBoostedTreesModel::SerializeModelImpl(
-    model::proto::SerializedModel* dst_proto, std::string* dst_raw) const {
-  const auto& specialized_proto = dst_proto->MutableExtension(
+    model::proto::SerializedModel *dst_proto, std::string *dst_raw) const {
+  const auto &specialized_proto = dst_proto->MutableExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_serialized_model);
   *specialized_proto->mutable_header() = BuildHeaderProto();
   if (node_format_.has_value()) {
@@ -171,8 +174,8 @@ absl::Status GradientBoostedTreesModel::SerializeModelImpl(
 }
 
 absl::Status GradientBoostedTreesModel::DeserializeModelImpl(
-    const model::proto::SerializedModel& src_proto, absl::string_view src_raw) {
-  const auto& specialized_proto = src_proto.GetExtension(
+    const model::proto::SerializedModel &src_proto, absl::string_view src_raw) {
+  const auto &specialized_proto = src_proto.GetExtension(
       gradient_boosted_trees::proto::gradient_boosted_trees_serialized_model);
   ApplyHeaderProto(specialized_proto.header());
   if (specialized_proto.header().has_node_format()) {
@@ -186,14 +189,14 @@ absl::Status GradientBoostedTreesModel::Validate() const {
   RETURN_IF_ERROR(AbstractModel::Validate());
 
   const auto validate_leaf =
-      [](const decision_tree::proto::Node& node) -> absl::Status {
+      [](const decision_tree::proto::Node &node) -> absl::Status {
     if (!node.has_regressor()) {
       return absl::InvalidArgumentError("Regressor missing");
     }
     return absl::OkStatus();
   };
 
-  for (const auto& tree : decision_trees_) {
+  for (const auto &tree : decision_trees_) {
     RETURN_IF_ERROR(tree->Validate(data_spec(), validate_leaf));
   }
 
@@ -207,29 +210,29 @@ absl::Status GradientBoostedTreesModel::Validate() const {
 
   int expected_initial_predictions_size = -1;
   switch (task()) {
-    case model::proto::Task::CLASSIFICATION:
-      if (loss_ == proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD) {
-        expected_initial_predictions_size =
-            label_col_spec().categorical().number_of_unique_values() - 1;
-      } else if (loss_ == proto::Loss::BINOMIAL_LOG_LIKELIHOOD ||
-                 loss_ == proto::Loss::BINARY_FOCAL_LOSS) {
-        expected_initial_predictions_size = 1;
-      } else {
-        return absl::InvalidArgumentError("Invalid loss in GBDT");
-      }
-      break;
-    case model::proto::Task::REGRESSION:
-    case model::proto::Task::SURVIVAL_ANALYSIS:
+  case model::proto::Task::CLASSIFICATION:
+    if (loss_ == proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD) {
+      expected_initial_predictions_size =
+          label_col_spec().categorical().number_of_unique_values() - 1;
+    } else if (loss_ == proto::Loss::BINOMIAL_LOG_LIKELIHOOD ||
+               loss_ == proto::Loss::BINARY_FOCAL_LOSS) {
       expected_initial_predictions_size = 1;
-      break;
-    case model::proto::Task::RANKING:
-      expected_initial_predictions_size = 1;
-      if (ranking_group_col_idx() == -1) {
-        return absl::InvalidArgumentError("Invalid ranking_group_col in GBDT");
-      }
-      break;
-    default:
-      return absl::InvalidArgumentError("Unknown task in GBDT");
+    } else {
+      return absl::InvalidArgumentError("Invalid loss in GBDT");
+    }
+    break;
+  case model::proto::Task::REGRESSION:
+  case model::proto::Task::SURVIVAL_ANALYSIS:
+    expected_initial_predictions_size = 1;
+    break;
+  case model::proto::Task::RANKING:
+    expected_initial_predictions_size = 1;
+    if (ranking_group_col_idx() == -1) {
+      return absl::InvalidArgumentError("Invalid ranking_group_col in GBDT");
+    }
+    break;
+  default:
+    return absl::InvalidArgumentError("Unknown task in GBDT");
   }
   if (initial_predictions_.size() != expected_initial_predictions_size) {
     return absl::InvalidArgumentError("Invalid initial_predictions in GBDT");
@@ -253,13 +256,13 @@ int64_t GradientBoostedTreesModel::NumNodes() const {
 }
 
 void GradientBoostedTreesModel::set_loss(
-    const proto::Loss loss, const proto::LossConfiguration& loss_config) {
+    const proto::Loss loss, const proto::LossConfiguration &loss_config) {
   loss_ = loss;
   loss_config_.CopyFrom(loss_config);
 }
 
 bool GradientBoostedTreesModel::CheckStructure(
-    const decision_tree::CheckStructureOptions& options) const {
+    const decision_tree::CheckStructureOptions &options) const {
   if (options.global_imputation_is_higher &&
       testing_.force_fail_check_structure_global_imputation_is_higher) {
     return false;
@@ -274,20 +277,20 @@ void GradientBoostedTreesModel::AddTree(
 }
 
 void GradientBoostedTreesModel::CountFeatureUsage(
-    std::unordered_map<int32_t, int64_t>* feature_usage) const {
-  for (const auto& tree : decision_trees_) {
+    std::unordered_map<int32_t, int64_t> *feature_usage) const {
+  for (const auto &tree : decision_trees_) {
     tree->CountFeatureUsage(feature_usage);
   }
 }
 
 absl::Status GradientBoostedTreesModel::PredictGetLeaves(
-    const dataset::VerticalDataset& dataset,
+    const dataset::VerticalDataset &dataset,
     dataset::VerticalDataset::row_t row_idx, absl::Span<int32_t> leaves) const {
   if (leaves.size() != num_trees()) {
     return absl::InvalidArgumentError("Wrong number of trees");
   }
   for (int tree_idx = 0; tree_idx < decision_trees_.size(); tree_idx++) {
-    auto& leaf = decision_trees_[tree_idx]->GetLeafAlt(dataset, row_idx);
+    auto &leaf = decision_trees_[tree_idx]->GetLeafAlt(dataset, row_idx);
     if (leaf.leaf_idx() < 0) {
       return absl::InvalidArgumentError("Leaf idx not set");
     }
@@ -297,379 +300,375 @@ absl::Status GradientBoostedTreesModel::PredictGetLeaves(
 }
 
 void GradientBoostedTreesModel::PredictImpl(
-    const dataset::VerticalDataset& dataset,
+    const dataset::VerticalDataset &dataset,
     dataset::VerticalDataset::row_t row_idx,
-    model::proto::Prediction* prediction) const {
+    model::proto::Prediction *prediction) const {
   utils::usage::OnInference(1, metadata());
   switch (loss_) {
-    case proto::Loss::BINOMIAL_LOG_LIKELIHOOD:
-    case proto::Loss::BINARY_FOCAL_LOSS: {
-      double accumulator = initial_predictions_[0];
+  case proto::Loss::BINOMIAL_LOG_LIKELIHOOD:
+  case proto::Loss::BINARY_FOCAL_LOSS: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(dataset, row_idx,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+
+    prediction->mutable_classification()->set_value(accumulator > 0.f ? 2 : 1);
+    auto *dist = prediction->mutable_classification()->mutable_distribution();
+    dist->mutable_counts()->Resize(3, 0.f);
+    dist->set_sum(1.f);
+    // Sigmoid.
+    const float proba_true = 1.f / (1.f + std::exp(-accumulator));
+    dist->set_counts(1, 1.f - proba_true);
+    dist->set_counts(2, proba_true);
+
+    if (output_logits_) {
+      auto *logits = prediction->mutable_classification()->mutable_logits();
+      logits->mutable_counts()->Resize(3, 0.f);
+      logits->set_counts(1, -accumulator);
+      logits->set_counts(2, accumulator);
+      logits->set_sum(0.f);
+    }
+  } break;
+
+  case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
+    DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
+    absl::FixedArray<float> accumulator(num_trees_per_iter_);
+    // Initialize accumulator with initial_predictions_.
+    std::copy(initial_predictions_.begin(), initial_predictions_.end(),
+              accumulator.begin());
+
+    {
+      int accumulator_cell_idx = 0;
       CallOnAllLeafs(dataset, row_idx,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
+                     [&accumulator, &accumulator_cell_idx,
+                      this](const decision_tree::proto::Node &node) {
+                       accumulator[accumulator_cell_idx] +=
+                           node.regressor().top_value();
+                       accumulator_cell_idx++;
+                       if (accumulator_cell_idx == num_trees_per_iter_) {
+                         accumulator_cell_idx = 0;
+                       }
                      });
+    }
 
-      prediction->mutable_classification()->set_value(accumulator > 0.f ? 2
-                                                                        : 1);
-      auto* dist = prediction->mutable_classification()->mutable_distribution();
-      dist->mutable_counts()->Resize(3, 0.f);
-      dist->set_sum(1.f);
-      // Sigmoid.
-      const float proba_true = 1.f / (1.f + std::exp(-accumulator));
-      dist->set_counts(1, 1.f - proba_true);
-      dist->set_counts(2, proba_true);
+    auto *dist = prediction->mutable_classification()->mutable_distribution();
+    dist->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
 
-      if (output_logits_) {
-        auto* logits = prediction->mutable_classification()->mutable_logits();
-        logits->mutable_counts()->Resize(3, 0.f);
-        logits->set_counts(1, -accumulator);
-        logits->set_counts(2, accumulator);
-        logits->set_sum(0.f);
-      }
-    } break;
-
-    case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
-      DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
-      absl::FixedArray<float> accumulator(num_trees_per_iter_);
-      // Initialize accumulator with initial_predictions_.
-      std::copy(initial_predictions_.begin(), initial_predictions_.end(),
-                accumulator.begin());
-
-      {
-        int accumulator_cell_idx = 0;
-        CallOnAllLeafs(dataset, row_idx,
-                       [&accumulator, &accumulator_cell_idx,
-                        this](const decision_tree::proto::Node& node) {
-                         accumulator[accumulator_cell_idx] +=
-                             node.regressor().top_value();
-                         accumulator_cell_idx++;
-                         if (accumulator_cell_idx == num_trees_per_iter_) {
-                           accumulator_cell_idx = 0;
-                         }
-                       });
-      }
-
-      auto* dist = prediction->mutable_classification()->mutable_distribution();
-      dist->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
-
-      // Top class.
-      if (output_logits_) {
-        auto* logits = prediction->mutable_classification()->mutable_logits();
-        logits->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
-        float sum_logit = 0;
-        int highest_cell_idx = 0;
-        float highest_cell_value = 0;
-        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-             accumulator_idx++) {
-          auto value = accumulator[accumulator_idx];
-          sum_logit += value;
-          logits->set_counts(accumulator_idx + 1, value);
-          if (value > highest_cell_value) {
-            highest_cell_value = value;
-            highest_cell_idx = accumulator_idx;
-          }
-        }
-        prediction->mutable_classification()->set_value(highest_cell_idx + 1);
-        logits->set_sum(sum_logit);
-      }
+    // Top class.
+    if (output_logits_) {
+      auto *logits = prediction->mutable_classification()->mutable_logits();
+      logits->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
+      float sum_logit = 0;
       int highest_cell_idx = 0;
       float highest_cell_value = 0;
-      // Sum logits.
-      float sum_exp = 0;
-      // After this loop, `accumulator` holds the exponential of its previous
-      // values.
       for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
            accumulator_idx++) {
-        const float exp_val = std::exp(accumulator[accumulator_idx]);
-        sum_exp += exp_val;
-        accumulator[accumulator_idx] = exp_val;
-
-        if (exp_val > highest_cell_value) {
-          highest_cell_value = exp_val;
+        auto value = accumulator[accumulator_idx];
+        sum_logit += value;
+        logits->set_counts(accumulator_idx + 1, value);
+        if (value > highest_cell_value) {
+          highest_cell_value = value;
           highest_cell_idx = accumulator_idx;
         }
       }
-      // Softmax
-      const float normalization = (sum_exp > 0) ? (1.f / sum_exp) : 0.f;
-      for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-           accumulator_idx++) {
-        dist->set_counts(accumulator_idx + 1,
-                         accumulator[accumulator_idx] * normalization);
-      }
       prediction->mutable_classification()->set_value(highest_cell_idx + 1);
-      dist->set_sum(1.f);
+      logits->set_sum(sum_logit);
+    }
+    int highest_cell_idx = 0;
+    float highest_cell_value = 0;
+    // Sum logits.
+    float sum_exp = 0;
+    // After this loop, `accumulator` holds the exponential of its previous
+    // values.
+    for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+         accumulator_idx++) {
+      const float exp_val = std::exp(accumulator[accumulator_idx]);
+      sum_exp += exp_val;
+      accumulator[accumulator_idx] = exp_val;
 
-    } break;
-    case proto::Loss::MEAN_AVERAGE_ERROR:
-    case proto::Loss::SQUARED_ERROR: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(dataset, row_idx,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      if (task() == model::proto::RANKING) {
-        prediction->mutable_ranking()->set_relevance(accumulator);
-      } else if (task() == model::proto::REGRESSION) {
+      if (exp_val > highest_cell_value) {
+        highest_cell_value = exp_val;
+        highest_cell_idx = accumulator_idx;
+      }
+    }
+    // Softmax
+    const float normalization = (sum_exp > 0) ? (1.f / sum_exp) : 0.f;
+    for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+         accumulator_idx++) {
+      dist->set_counts(accumulator_idx + 1,
+                       accumulator[accumulator_idx] * normalization);
+    }
+    prediction->mutable_classification()->set_value(highest_cell_idx + 1);
+    dist->set_sum(1.f);
+
+  } break;
+  case proto::Loss::MEAN_AVERAGE_ERROR:
+  case proto::Loss::SQUARED_ERROR: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(dataset, row_idx,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    if (task() == model::proto::RANKING) {
+      prediction->mutable_ranking()->set_relevance(accumulator);
+    } else if (task() == model::proto::REGRESSION) {
+      prediction->mutable_regression()->set_value(accumulator);
+    } else {
+      LOG(FATAL) << "Non supported task";
+    }
+  } break;
+
+  case proto::Loss::POISSON: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(dataset, row_idx,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    if (task() == model::proto::REGRESSION) {
+      if (output_logits_) {
         prediction->mutable_regression()->set_value(accumulator);
       } else {
-        LOG(FATAL) << "Non supported task";
+        float clamped_accumulator =
+            std::clamp(static_cast<float>(accumulator),
+                       -kPoissonLossClampBounds, kPoissonLossClampBounds);
+        prediction->mutable_regression()->set_value(
+            std::exp(clamped_accumulator));
       }
-    } break;
+    } else {
+      LOG(FATAL) << "Only regression is supported with poison loss";
+    }
+  } break;
 
-    case proto::Loss::POISSON: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(dataset, row_idx,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      if (task() == model::proto::REGRESSION) {
-        if (output_logits_) {
-          prediction->mutable_regression()->set_value(accumulator);
-        } else {
-          float clamped_accumulator =
-              std::clamp(static_cast<float>(accumulator),
-                         -kPoissonLossClampBounds, kPoissonLossClampBounds);
-          prediction->mutable_regression()->set_value(
-              std::exp(clamped_accumulator));
-        }
-      } else {
-        LOG(FATAL) << "Only regression is supported with poison loss";
-      }
-    } break;
+  case proto::Loss::LAMBDA_MART_NDCG:
+  case proto::Loss::LAMBDA_MART_NDCG5:
+  case proto::Loss::XE_NDCG_MART: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(dataset, row_idx,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    prediction->mutable_ranking()->set_relevance(accumulator);
+  } break;
 
-    case proto::Loss::LAMBDA_MART_NDCG:
-    case proto::Loss::LAMBDA_MART_NDCG5:
-    case proto::Loss::XE_NDCG_MART: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(dataset, row_idx,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      prediction->mutable_ranking()->set_relevance(accumulator);
-    } break;
+  case proto::Loss::COX_PROPORTIONAL_HAZARD: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(dataset, row_idx,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    prediction->mutable_survival_analysis()->set_log_hazard_ratio(accumulator);
+  } break;
 
-    case proto::Loss::COX_PROPORTIONAL_HAZARD: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(dataset, row_idx,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      prediction->mutable_survival_analysis()->set_log_hazard_ratio(
-          accumulator);
-    } break;
-
-    case proto::Loss::DEFAULT:
-      LOG(FATAL) << "Loss not set";
+  case proto::Loss::DEFAULT:
+    LOG(FATAL) << "Loss not set";
   }
 }
 
 void GradientBoostedTreesModel::PredictImpl(
-    const dataset::proto::Example& example,
-    model::proto::Prediction* prediction) const {
+    const dataset::proto::Example &example,
+    model::proto::Prediction *prediction) const {
   utils::usage::OnInference(1, metadata());
   switch (loss_) {
-    case proto::Loss::BINARY_FOCAL_LOSS:
-    case proto::Loss::BINOMIAL_LOG_LIKELIHOOD: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(example,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      const float proba_true = 1. / (1. + std::exp(-accumulator));
-      prediction->mutable_classification()->set_value(accumulator > 0.f ? 2
-                                                                        : 1);
-      auto* dist = prediction->mutable_classification()->mutable_distribution();
-      dist->mutable_counts()->Resize(3, 0.f);
-      dist->set_sum(1.f);
-      dist->set_counts(1, 1.f - proba_true);
-      dist->set_counts(2, proba_true);
+  case proto::Loss::BINARY_FOCAL_LOSS:
+  case proto::Loss::BINOMIAL_LOG_LIKELIHOOD: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(example,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    const float proba_true = 1. / (1. + std::exp(-accumulator));
+    prediction->mutable_classification()->set_value(accumulator > 0.f ? 2 : 1);
+    auto *dist = prediction->mutable_classification()->mutable_distribution();
+    dist->mutable_counts()->Resize(3, 0.f);
+    dist->set_sum(1.f);
+    dist->set_counts(1, 1.f - proba_true);
+    dist->set_counts(2, proba_true);
 
-      if (output_logits_) {
-        auto* logits = prediction->mutable_classification()->mutable_logits();
-        logits->mutable_counts()->Resize(3, 0.f);
-        logits->set_counts(1, -accumulator);
-        logits->set_counts(2, accumulator);
-        logits->set_sum(0.f);
-      }
-    } break;
+    if (output_logits_) {
+      auto *logits = prediction->mutable_classification()->mutable_logits();
+      logits->mutable_counts()->Resize(3, 0.f);
+      logits->set_counts(1, -accumulator);
+      logits->set_counts(2, accumulator);
+      logits->set_sum(0.f);
+    }
+  } break;
 
-    case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
-      DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
-      absl::FixedArray<float> accumulator(num_trees_per_iter_);
-      // Initialize accumulator with initial_predictions_.
-      CHECK_EQ(initial_predictions_.size(), num_trees_per_iter_);
-      std::copy(initial_predictions_.begin(), initial_predictions_.end(),
-                accumulator.begin());
+  case proto::Loss::MULTINOMIAL_LOG_LIKELIHOOD: {
+    DCHECK_EQ(num_trees_per_iter_, initial_predictions_.size());
+    absl::FixedArray<float> accumulator(num_trees_per_iter_);
+    // Initialize accumulator with initial_predictions_.
+    CHECK_EQ(initial_predictions_.size(), num_trees_per_iter_);
+    std::copy(initial_predictions_.begin(), initial_predictions_.end(),
+              accumulator.begin());
 
-      {
-        int accumulator_cell_idx = 0;
-        CallOnAllLeafs(example, [&accumulator, &accumulator_cell_idx,
-                                 this](const decision_tree::proto::Node& node) {
-          accumulator[accumulator_cell_idx] += node.regressor().top_value();
-          accumulator_cell_idx++;
-          if (accumulator_cell_idx == num_trees_per_iter_) {
-            accumulator_cell_idx = 0;
-          }
-        });
-        CHECK_EQ(accumulator_cell_idx, 0);
-      }
-
-      // Note: Why the "+1"? : "prediction" reserves the first value for the
-      // out of vocabulary which is not taken into account in "accumulator'.
-
-      if (output_logits_) {
-        auto* logits = prediction->mutable_classification()->mutable_logits();
-        logits->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
-        float sum_logit = 0;
-        int highest_cell_idx = 0;
-        float highest_cell_value = 0;
-        for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-             accumulator_idx++) {
-          auto value = accumulator[accumulator_idx];
-          sum_logit += value;
-          logits->set_counts(accumulator_idx + 1, value);
-          if (value > highest_cell_value) {
-            highest_cell_value = value;
-            highest_cell_idx = accumulator_idx;
-          }
+    {
+      int accumulator_cell_idx = 0;
+      CallOnAllLeafs(example, [&accumulator, &accumulator_cell_idx,
+                               this](const decision_tree::proto::Node &node) {
+        accumulator[accumulator_cell_idx] += node.regressor().top_value();
+        accumulator_cell_idx++;
+        if (accumulator_cell_idx == num_trees_per_iter_) {
+          accumulator_cell_idx = 0;
         }
-        prediction->mutable_classification()->set_value(highest_cell_idx + 1);
-        logits->set_sum(sum_logit);
-      }
-      auto* dist = prediction->mutable_classification()->mutable_distribution();
-      dist->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
+      });
+      CHECK_EQ(accumulator_cell_idx, 0);
+    }
 
-      // TODO: Use a more numerically stable method for softmax.
-      // https://www.deeplearningbook.org/contents/numerical.html
-      float sum_exp = 0;
-      float highest_cell_value = 0;
+    // Note: Why the "+1"? : "prediction" reserves the first value for the
+    // out of vocabulary which is not taken into account in "accumulator'.
+
+    if (output_logits_) {
+      auto *logits = prediction->mutable_classification()->mutable_logits();
+      logits->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
+      float sum_logit = 0;
       int highest_cell_idx = 0;
-      // After this loop, `accumulator` holds the exponential of its previous
-      // values.
+      float highest_cell_value = 0;
       for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
            accumulator_idx++) {
-        const float exp_val = std::exp(accumulator[accumulator_idx]);
-        sum_exp += exp_val;
-        accumulator[accumulator_idx] = exp_val;
-
-        if (exp_val > highest_cell_value) {
-          highest_cell_value = exp_val;
+        auto value = accumulator[accumulator_idx];
+        sum_logit += value;
+        logits->set_counts(accumulator_idx + 1, value);
+        if (value > highest_cell_value) {
+          highest_cell_value = value;
           highest_cell_idx = accumulator_idx;
         }
       }
-
-      const float normalization = 1.f / sum_exp;
-
-      for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
-           accumulator_idx++) {
-        dist->set_counts(accumulator_idx + 1,
-                         accumulator[accumulator_idx] * normalization);
-      }
-      dist->set_sum(1.f);
       prediction->mutable_classification()->set_value(highest_cell_idx + 1);
-    } break;
+      logits->set_sum(sum_logit);
+    }
+    auto *dist = prediction->mutable_classification()->mutable_distribution();
+    dist->mutable_counts()->Resize(num_trees_per_iter_ + 1, 0.f);
 
-    case proto::Loss::MEAN_AVERAGE_ERROR:
-    case proto::Loss::SQUARED_ERROR: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(example,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      if (task() == model::proto::RANKING) {
-        prediction->mutable_ranking()->set_relevance(accumulator);
-      } else if (task() == model::proto::REGRESSION) {
+    // TODO: Use a more numerically stable method for softmax.
+    // https://www.deeplearningbook.org/contents/numerical.html
+    float sum_exp = 0;
+    float highest_cell_value = 0;
+    int highest_cell_idx = 0;
+    // After this loop, `accumulator` holds the exponential of its previous
+    // values.
+    for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+         accumulator_idx++) {
+      const float exp_val = std::exp(accumulator[accumulator_idx]);
+      sum_exp += exp_val;
+      accumulator[accumulator_idx] = exp_val;
+
+      if (exp_val > highest_cell_value) {
+        highest_cell_value = exp_val;
+        highest_cell_idx = accumulator_idx;
+      }
+    }
+
+    const float normalization = 1.f / sum_exp;
+
+    for (int accumulator_idx = 0; accumulator_idx < num_trees_per_iter_;
+         accumulator_idx++) {
+      dist->set_counts(accumulator_idx + 1,
+                       accumulator[accumulator_idx] * normalization);
+    }
+    dist->set_sum(1.f);
+    prediction->mutable_classification()->set_value(highest_cell_idx + 1);
+  } break;
+
+  case proto::Loss::MEAN_AVERAGE_ERROR:
+  case proto::Loss::SQUARED_ERROR: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(example,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    if (task() == model::proto::RANKING) {
+      prediction->mutable_ranking()->set_relevance(accumulator);
+    } else if (task() == model::proto::REGRESSION) {
+      prediction->mutable_regression()->set_value(accumulator);
+    } else {
+      LOG(FATAL) << "Non supported task";
+    }
+  } break;
+
+  case proto::Loss::POISSON: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(example,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    if (task() == model::proto::REGRESSION) {
+      if (output_logits_) {
         prediction->mutable_regression()->set_value(accumulator);
       } else {
-        LOG(FATAL) << "Non supported task";
+        float clamped_accumulator =
+            std::clamp(static_cast<float>(accumulator),
+                       -kPoissonLossClampBounds, kPoissonLossClampBounds);
+        prediction->mutable_regression()->set_value(
+            std::exp(clamped_accumulator));
       }
-    } break;
+    } else {
+      LOG(FATAL) << "Only regression is supported with poison loss";
+    }
+  } break;
 
-    case proto::Loss::POISSON: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(example,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      if (task() == model::proto::REGRESSION) {
-        if (output_logits_) {
-          prediction->mutable_regression()->set_value(accumulator);
-        } else {
-          float clamped_accumulator =
-              std::clamp(static_cast<float>(accumulator),
-                         -kPoissonLossClampBounds, kPoissonLossClampBounds);
-          prediction->mutable_regression()->set_value(
-              std::exp(clamped_accumulator));
-        }
-      } else {
-        LOG(FATAL) << "Only regression is supported with poison loss";
-      }
-    } break;
+  case proto::Loss::LAMBDA_MART_NDCG:
+  case proto::Loss::LAMBDA_MART_NDCG5:
+  case proto::Loss::XE_NDCG_MART: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(example,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    prediction->mutable_ranking()->set_relevance(accumulator);
+  } break;
 
-    case proto::Loss::LAMBDA_MART_NDCG:
-    case proto::Loss::LAMBDA_MART_NDCG5:
-    case proto::Loss::XE_NDCG_MART: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(example,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      prediction->mutable_ranking()->set_relevance(accumulator);
-    } break;
+  case proto::Loss::COX_PROPORTIONAL_HAZARD: {
+    double accumulator = initial_predictions_[0];
+    CallOnAllLeafs(example,
+                   [&accumulator](const decision_tree::proto::Node &node) {
+                     accumulator += node.regressor().top_value();
+                   });
+    prediction->mutable_survival_analysis()->set_log_hazard_ratio(accumulator);
+  } break;
 
-    case proto::Loss::COX_PROPORTIONAL_HAZARD: {
-      double accumulator = initial_predictions_[0];
-      CallOnAllLeafs(example,
-                     [&accumulator](const decision_tree::proto::Node& node) {
-                       accumulator += node.regressor().top_value();
-                     });
-      prediction->mutable_survival_analysis()->set_log_hazard_ratio(
-          accumulator);
-    } break;
-
-    case proto::Loss::DEFAULT:
-      LOG(FATAL) << "Loss not set";
+  case proto::Loss::DEFAULT:
+    LOG(FATAL) << "Loss not set";
   }
 }
 
 void GradientBoostedTreesModel::CallOnAllLeafs(
-    const dataset::VerticalDataset& dataset,
+    const dataset::VerticalDataset &dataset,
     dataset::VerticalDataset::row_t row_idx,
-    const std::function<void(const decision_tree::proto::Node& node)>& callback)
+    const std::function<void(const decision_tree::proto::Node &node)> &callback)
     const {
-  for (const auto& tree : decision_trees_) {
+  for (const auto &tree : decision_trees_) {
     callback(tree->GetLeaf(dataset, row_idx));
   }
 }
 
 void GradientBoostedTreesModel::CallOnAllLeafs(
-    const dataset::proto::Example& example,
-    const std::function<void(const decision_tree::proto::Node& node)>& callback)
+    const dataset::proto::Example &example,
+    const std::function<void(const decision_tree::proto::Node &node)> &callback)
     const {
-  for (const auto& tree : decision_trees_) {
+  for (const auto &tree : decision_trees_) {
     callback(tree->GetLeaf(example));
   }
 }
 
 void GradientBoostedTreesModel::IterateOnNodes(
-    const std::function<void(const decision_tree::NodeWithChildren& node,
-                             const int depth)>& call_back) const {
-  for (auto& tree : decision_trees_) {
+    const std::function<void(const decision_tree::NodeWithChildren &node,
+                             const int depth)> &call_back) const {
+  for (auto &tree : decision_trees_) {
     tree->IterateOnNodes(call_back);
   }
 }
 
 void GradientBoostedTreesModel::IterateOnMutableNodes(
-    const std::function<void(decision_tree::NodeWithChildren* node,
-                             const int depth)>& call_back) const {
-  for (auto& tree : decision_trees_) {
+    const std::function<void(decision_tree::NodeWithChildren *node,
+                             const int depth)> &call_back) const {
+  for (auto &tree : decision_trees_) {
     tree->IterateOnMutableNodes(call_back);
   }
 }
 
 void GradientBoostedTreesModel::AppendModelStructure(
-    std::string* description) const {
+    std::string *description) const {
   decision_tree::AppendModelStructure(decision_trees_, data_spec(),
                                       label_col_idx_, description);
 }
@@ -689,7 +688,7 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
 
   // Older models don't have a full evaluation stored inside the model. We can
   // still recover some information from the last training logs.
-  for (const auto& log : training_logs_.entries()) {
+  for (const auto &log : training_logs_.entries()) {
     // The log entry corresponding to the final model is identified with the
     // number of trees in the final model.
     if (log.number_of_trees() !=
@@ -714,7 +713,7 @@ GradientBoostedTreesModel::ValidationEvaluation() const {
 }
 
 void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
-    bool full_definition, std::string* description) const {
+    bool full_definition, std::string *description) const {
   AbstractModel::AppendDescriptionAndStatistics(full_definition, description);
   absl::StrAppend(description, "\n");
 
@@ -745,7 +744,7 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
                     training_logs_.number_of_trees_in_final_model(), "\n");
     int entry_idx = 0;
     while (entry_idx < training_logs_.entries().size()) {
-      const auto& entry = training_logs_.entries(entry_idx);
+      const auto &entry = training_logs_.entries(entry_idx);
       absl::StrAppendFormat(description,
                             "\tIter:%d train-loss:%f valid-loss:%f ",
                             entry.number_of_trees(), entry.training_loss(),
@@ -754,7 +753,7 @@ void GradientBoostedTreesModel::AppendDescriptionAndStatistics(
            metric_idx < training_logs_.secondary_metric_names_size();
            metric_idx++) {
         // Metric name.
-        const auto& metric_name =
+        const auto &metric_name =
             training_logs_.secondary_metric_names(metric_idx);
 
         // Metric values.
@@ -843,12 +842,12 @@ GradientBoostedTreesModel::GetVariableImportance(absl::string_view key) const {
 
 absl::Status GradientBoostedTreesModel::MakePureServing() {
   training_logs_.Clear();
-  for (auto& tree : decision_trees_) {
+  for (auto &tree : decision_trees_) {
     tree->IterateOnMutableNodes(
-        [](decision_tree::NodeWithChildren* node, const int depth) {
+        [](decision_tree::NodeWithChildren *node, const int depth) {
           if (node->IsLeaf()) {
             // Remove the unused information.
-            auto* output = node->mutable_node()->mutable_regressor();
+            auto *output = node->mutable_node()->mutable_regressor();
             output->clear_sum_gradients();
             output->clear_sum_hessians();
             output->clear_sum_weights();
@@ -880,16 +879,16 @@ GradientBoostedTreesModel::PlotTrainingLogs() const {
           1 + training_logs_.secondary_metric_names_size(), 1, &multiplot));
 
   // Setup loss plot
-  ASSIGN_OR_RETURN(auto* loss_plot, placer.NewPlot());
+  ASSIGN_OR_RETURN(auto *loss_plot, placer.NewPlot());
   loss_plot->x_axis.label = "iteration";
   loss_plot->y_axis.label = "loss";
-  auto* training_loss = loss_plot->AddCurve();
-  auto* validation_loss = loss_plot->AddCurve();
+  auto *training_loss = loss_plot->AddCurve();
+  auto *validation_loss = loss_plot->AddCurve();
   training_loss->label = "training";
   validation_loss->label = "validation";
 
   // Fill loss plot
-  for (const auto& entry : training_logs_.entries()) {
+  for (const auto &entry : training_logs_.entries()) {
     training_loss->xs.push_back(entry.number_of_trees());
     validation_loss->xs.push_back(entry.number_of_trees());
     training_loss->ys.push_back(entry.training_loss());
@@ -900,17 +899,17 @@ GradientBoostedTreesModel::PlotTrainingLogs() const {
   for (int metric_idx = 0;
        metric_idx < training_logs_.secondary_metric_names().size();
        metric_idx++) {
-    ASSIGN_OR_RETURN(auto* metric_plot, placer.NewPlot());
+    ASSIGN_OR_RETURN(auto *metric_plot, placer.NewPlot());
     metric_plot->x_axis.label = "iteration";
     metric_plot->y_axis.label =
         training_logs_.secondary_metric_names(metric_idx);
 
-    auto* training_metric = metric_plot->AddCurve();
-    auto* validation_metric = metric_plot->AddCurve();
+    auto *training_metric = metric_plot->AddCurve();
+    auto *validation_metric = metric_plot->AddCurve();
     training_metric->label = "training";
     validation_metric->label = "validation";
 
-    for (const auto& entry : training_logs_.entries()) {
+    for (const auto &entry : training_logs_.entries()) {
       // Training loss
       training_metric->xs.push_back(entry.number_of_trees());
       training_metric->ys.push_back(
@@ -931,21 +930,21 @@ GradientBoostedTreesModel::PlotTrainingLogs() const {
   return multiplot;
 }
 
-absl::Status GradientBoostedTreesModel::Distance(
-    const dataset::VerticalDataset& dataset1,
-    const dataset::VerticalDataset& dataset2,
-    absl::Span<float> distances) const {
-  std::vector<float> tree_weights;
+absl::Status
+GradientBoostedTreesModel::Distance(const dataset::VerticalDataset &dataset1,
+                                    const dataset::VerticalDataset &dataset2,
+                                    absl::Span<float> distances) const {
+  vector<float> tree_weights;
   tree_weights.reserve(decision_trees_.size());
   double sum_values = 0;
-  for (const auto& tree : decision_trees_) {
+  for (const auto &tree : decision_trees_) {
     const double value = internal::WeightedMeanAbsLeafValue(*tree);
     sum_values += value;
     tree_weights.push_back(value);
   }
   // Normalize the tree weights.
   if (sum_values > 0) {
-    for (auto& v : tree_weights) {
+    for (auto &v : tree_weights) {
       v /= sum_values;
     }
   }
@@ -953,14 +952,14 @@ absl::Status GradientBoostedTreesModel::Distance(
                                  distances, tree_weights);
 }
 
-std::string GradientBoostedTreesModel::DebugCompare(
-    const AbstractModel& other) const {
+string
+GradientBoostedTreesModel::DebugCompare(const AbstractModel &other) const {
   if (const auto parent_compare = AbstractModel::DebugCompare(other);
       !parent_compare.empty()) {
     return parent_compare;
   }
-  const auto* other_cast =
-      dynamic_cast<const GradientBoostedTreesModel*>(&other);
+  const auto *other_cast =
+      dynamic_cast<const GradientBoostedTreesModel *>(&other);
   if (!other_cast) {
     return "Non matching types";
   }
@@ -984,13 +983,13 @@ std::string GradientBoostedTreesModel::GetLossName() const {
 
 namespace internal {
 
-float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree& tree) {
+float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree &tree) {
   double sum = 0;
   double total_weight = 0;
   tree.IterateOnNodes(
-      [&](const decision_tree::NodeWithChildren& node, const int depth) {
+      [&](const decision_tree::NodeWithChildren &node, const int depth) {
         if (node.IsLeaf()) {
-          const auto& regressor = node.node().regressor();
+          const auto &regressor = node.node().regressor();
           double leaf_weight;
           if (regressor.has_sum_weights()) {
             leaf_weight = regressor.sum_weights();
@@ -1012,10 +1011,10 @@ float WeightedMeanAbsLeafValue(const decision_tree::DecisionTree& tree) {
 }
 
 metric::proto::EvaluationResults TrainingLogToEvaluationResults(
-    const proto::TrainingLogs::Entry& log_entry,
-    const proto::TrainingLogs& training_logs, const model::proto::Task& task,
-    const dataset::proto::Column& label_col_spec,
-    const proto::LossConfiguration& loss_config, const std::string& loss_name,
+    const proto::TrainingLogs::Entry &log_entry,
+    const proto::TrainingLogs &training_logs, const model::proto::Task &task,
+    const dataset::proto::Column &label_col_spec,
+    const proto::LossConfiguration &loss_config, const std::string &loss_name,
     const TrainingLogEvaluationSet eval_set) {
   metric::proto::EvaluationResults evaluation;
   evaluation.set_task(task);
@@ -1031,7 +1030,7 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
                                    training_logs.secondary_metric_names_size());
 
   for (int metrix_idx = 0; metrix_idx < secondary_metric_size; metrix_idx++) {
-    const auto& metric_name = training_logs.secondary_metric_names(metrix_idx);
+    const auto &metric_name = training_logs.secondary_metric_names(metrix_idx);
     const auto metric_value =
         eval_set == TrainingLogEvaluationSet::kValidation
             ? log_entry.validation_secondary_metrics(metrix_idx)
@@ -1061,11 +1060,11 @@ metric::proto::EvaluationResults TrainingLogToEvaluationResults(
   return evaluation;
 }
 
-}  // namespace internal
+} // namespace internal
 
 REGISTER_AbstractModel(GradientBoostedTreesModel,
                        GradientBoostedTreesModel::kRegisteredName);
 
-}  // namespace gradient_boosted_trees
-}  // namespace model
-}  // namespace yggdrasil_decision_forests
+} // namespace gradient_boosted_trees
+} // namespace model
+} // namespace yggdrasil_decision_forests
