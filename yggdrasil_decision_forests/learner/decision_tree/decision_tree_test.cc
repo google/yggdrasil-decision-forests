@@ -3334,6 +3334,94 @@ TEST(Hessian,
   }
 }
 
+TEST(Hessian, FindSplitLabelHessianRegressionFeatureNumericalCartWeighted) {
+  // Same data as above, but with (small) example weights. The parent
+  // statistics are weighted (as computed by SetLeafValueWithNewtonRaphsonStep).
+  const std::vector<float> weights{0.01f, 0.01f, 0.01f, 0.01f};
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  const std::vector<float> attributes{1, 2, 3, 4};
+  const std::vector<float> gradients{-10, -10, 10, 10};
+  const std::vector<float> hessians{1, 1, 1, 1};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  double sum_gradient = 0, sum_hessian = 0, sum_weights = 0;
+  for (int i = 0; i < 4; i++) {
+    sum_gradient += weights[i] * gradients[i];
+    sum_hessian += weights[i] * hessians[i];
+    sum_weights += weights[i];
+  }
+
+  {
+    // Expected split at 2.5. Each child: |sum_g| = 0.2, sum_h = 0.02.
+    InternalTrainConfig internal_config;
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<true>(
+                  selected_examples, weights, attributes, gradients, hessians,
+                  /*na_replacement=*/2, /*min_num_obs=*/1, dt_config,
+                  sum_gradient, sum_hessian, sum_weights, -1, internal_config,
+                  {}, 0, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kBetterSplitFound);
+    EXPECT_EQ(best_condition.condition().higher_condition().threshold(), 2.5f);
+    EXPECT_NEAR(best_condition.split_score(), 2 * 0.2 * 0.2 / 0.02, 1e-3);
+  }
+  {
+    // min_sum_hessian_in_leaf = 0.01 <= 0.02 -> split found.
+    InternalTrainConfig internal_config;
+    internal_config.min_sum_hessian_in_leaf = 0.01;
+    proto::NodeCondition best_condition;
+    SplitterPerThreadCache cache;
+    EXPECT_EQ(FindSplitLabelHessianRegressionFeatureNumericalCart<true>(
+                  selected_examples, weights, attributes, gradients, hessians,
+                  /*na_replacement=*/2, /*min_num_obs=*/1, dt_config,
+                  sum_gradient, sum_hessian, sum_weights, -1, internal_config,
+                  {}, 0, &best_condition, &cache)
+                  .value(),
+              SplitSearchResult::kBetterSplitFound);
+  }
+}
+
+TEST(Hessian,
+     FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCartWeighted) {
+  // Non-uniform example weights. The parent statistics are weighted (as
+  // computed by SetLeafValueWithNewtonRaphsonStep).
+  const std::vector<float> weights{0.01f, 0.03f, 0.02f, 0.02f};
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  const std::vector<dataset::DiscretizedNumericalIndex> attributes{0, 1, 2, 3};
+  const std::vector<float> gradients{-10, -10, 10, 10};
+  const std::vector<float> hessians{1, 1, 1, 1};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  double sum_gradient = 0, sum_hessian = 0, sum_weights = 0;
+  for (int i = 0; i < 4; i++) {
+    sum_gradient += weights[i] * gradients[i];
+    sum_hessian += weights[i] * hessians[i];
+    sum_weights += weights[i];
+  }
+
+  // Best split between bins 1 and 2. Each child: |sum_g| = 0.4, sum_h = 0.04.
+  InternalTrainConfig internal_config;
+  internal_config.min_sum_hessian_in_leaf = 0.01;
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(
+      FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<true>(
+          selected_examples, weights, attributes, /*num_bins=*/4, gradients,
+          hessians, /*na_replacement=*/0, /*min_num_obs=*/1, dt_config,
+          sum_gradient, sum_hessian, sum_weights, -1, internal_config, {}, 0,
+          &best_condition, &cache)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
+  EXPECT_EQ(
+      best_condition.condition().discretized_higher_condition().threshold(), 2);
+  EXPECT_NEAR(best_condition.split_score(), 2 * 0.4 * 0.4 / 0.04, 1e-3);
+  EXPECT_NEAR(best_condition.num_pos_training_examples_with_weight(), 0.04,
+              1e-6);
+}
+
 TEST(Hessian,
      FindSplitLabelHessianRegressionFeatureNumericalCartWithAsymmetricHessian) {
   std::vector<float> weights;

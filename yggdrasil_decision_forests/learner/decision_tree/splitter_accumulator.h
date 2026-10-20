@@ -829,6 +829,20 @@ struct LabelHessianNumericalScoreAccumulator {
     sum_weights -= weights;
   }
 
+  template <typename T>
+  void AddExample(const T gradient, const T hessian, const T weight) {
+    sum_gradient += static_cast<double>(gradient) * weight;
+    sum_hessian += static_cast<double>(hessian) * weight;
+    sum_weights += weight;
+  }
+
+  template <typename T>
+  void SubExample(const T gradient, const T hessian, const T weight) {
+    sum_gradient -= static_cast<double>(gradient) * weight;
+    sum_hessian -= static_cast<double>(hessian) * weight;
+    sum_weights -= weight;
+  }
+
   double sum_gradient;
   double sum_hessian;
   double sum_weights;
@@ -1039,7 +1053,7 @@ struct LabelHessianNumericalOneValueBucket {
 
   void AddToScoreAcc(LabelHessianNumericalScoreAccumulator* acc) const {
     if constexpr (weighted) {
-      acc->Add(content.gradient, content.hessian, content.weight);
+      acc->AddExample(content.gradient, content.hessian, content.weight);
     } else {
       acc->Add(content.gradient, content.hessian, 1.f);
     }
@@ -1047,7 +1061,7 @@ struct LabelHessianNumericalOneValueBucket {
 
   void SubToScoreAcc(LabelHessianNumericalScoreAccumulator* acc) const {
     if constexpr (weighted) {
-      acc->Sub(content.gradient, content.hessian, content.weight);
+      acc->SubExample(content.gradient, content.hessian, content.weight);
     } else {
       acc->Sub(content.gradient, content.hessian, 1.f);
     }
@@ -1167,8 +1181,8 @@ struct LabelHessianNumericalOneValueBucket {
       const float hessian_val = hessians_[example_idx];
       if constexpr (weighted) {
         const float weight_val = weights_[example_idx];
-        pos->Sub(gradient_val, hessian_val, weight_val);
-        neg->Add(gradient_val, hessian_val, weight_val);
+        pos->SubExample(gradient_val, hessian_val, weight_val);
+        neg->AddExample(gradient_val, hessian_val, weight_val);
       } else {
         pos->Sub(gradient_val, hessian_val, 1.f);
         neg->Add(gradient_val, hessian_val, 1.f);
@@ -1183,15 +1197,12 @@ struct LabelHessianNumericalOneValueBucket {
         LabelHessianNumericalScoreAccumulator* neg) const {
       const float gradient_val = gradients_[example_idx];
       const float hessian_val = hessians_[example_idx];
+      float weight_val = static_cast<float>(num_duplicates);
       if constexpr (weighted) {
-        const float weight_val = weights_[example_idx] * num_duplicates;
-        pos->Sub(gradient_val, hessian_val, weight_val);
-        neg->Add(gradient_val, hessian_val, weight_val);
-      } else {
-        const float weight_val = static_cast<float>(num_duplicates);
-        pos->Sub(gradient_val, hessian_val, weight_val);
-        neg->Add(gradient_val, hessian_val, weight_val);
+        weight_val *= weights_[example_idx];
       }
+      pos->SubExample(gradient_val, hessian_val, weight_val);
+      neg->AddExample(gradient_val, hessian_val, weight_val);
     }
 
    private:
@@ -1845,10 +1856,14 @@ struct LabelHessianNumericalBucket {
 
     void ConsumeExample(const UnsignedExampleIdx example_idx,
                         LabelHessianNumericalBucket* acc) const {
-      acc->content.sum_gradient += gradients_[example_idx];
-      acc->content.sum_hessian += hessians_[example_idx];
       if constexpr (weighted) {
-        acc->content.sum_weight += weights_[example_idx];
+        const float weight = weights_[example_idx];
+        acc->content.sum_gradient += gradients_[example_idx] * weight;
+        acc->content.sum_hessian += hessians_[example_idx] * weight;
+        acc->content.sum_weight += weight;
+      } else {
+        acc->content.sum_gradient += gradients_[example_idx];
+        acc->content.sum_hessian += hessians_[example_idx];
       }
       acc->count++;
     }
