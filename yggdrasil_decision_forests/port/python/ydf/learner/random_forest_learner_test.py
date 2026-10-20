@@ -174,7 +174,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
     learner = specialized_learners.RandomForestLearner(
         label="income",
         num_trees=100,
-        winner_take_all=False,
+        winner_takes_all=False,
         data_spec=data_spec,
     )
     model = learner.train(self.adult.train_pd)
@@ -603,7 +603,7 @@ class RandomForestLearnerTest(learner_test_utils.LearnerTest):
         label="label",
         weights="weights",
         num_trees=300,
-        winner_take_all=False,
+        winner_takes_all=False,
     ).train(gen_ds(0, 10000, include_weight_column=True))
 
     test_ds = gen_ds(1, 10000, include_weight_column=weight_column_in_test)
