@@ -147,7 +147,11 @@ struct SplitterPerThreadCache {
   std::vector<bool> catset_positive_selected_example_bitmap;
   std::vector<int64_t> catset_count_examples_without_weights_by_attribute_class;
   std::vector<utils::NormalDistributionDouble>
-      catset_stats_examples_containing_attr_value;
+      catset_stats_examples_containing_attr_value_regression;
+  std::vector<utils::IntegerDistributionDouble>
+      catset_stats_examples_containing_attr_value_classification;
+  std::vector<utils::BinaryToIntegerConfusionMatrixDouble>
+      catset_attribute_distributions_classification;
   std::vector<utils::BinaryToNormalDistributionDouble>
       catset_attribute_distributions_regression;
 
@@ -859,7 +863,7 @@ FindSplitLabelClassificationFeatureCategoricalSetGreedyForward(
     const proto::DecisionTreeTrainingConfig& dt_config,
     const utils::IntegerDistributionDouble& label_distribution,
     int32_t attribute_idx, proto::NodeCondition* condition,
-    utils::RandomEngine* random);
+    SplitterPerThreadCache* cache, utils::RandomEngine* random);
 
 // Similar as the previous
 // "FindSplitLabelClassificationFeatureCategoricalSetGreedyForward", but for
