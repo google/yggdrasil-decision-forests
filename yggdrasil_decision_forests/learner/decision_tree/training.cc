@@ -204,7 +204,6 @@ void LocalImputationForBooleanAttribute(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
     const std::vector<float>& weights, const std::vector<int8_t>& attributes,
     bool* na_replacement) {
-  DCHECK(!weights.empty());
   utils::IntegerDistributionDouble attribute_distribution;
   attribute_distribution.SetNumClasses(2);
   for (const auto example_idx : selected_examples) {
