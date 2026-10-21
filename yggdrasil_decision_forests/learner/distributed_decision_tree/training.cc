@@ -1213,7 +1213,6 @@ absl::Status EvaluateSplitsPerBooleanFeature(
   for (const auto node_idx : active_node_idxs) {
     node_idx_to_active_node_idx[node_idx] = active_nodes.size();
 
-    std::string elements_bitmap;
     const auto& condition = splits[node_idx].condition.condition();
     switch (condition.type_case()) {
       case decision_tree::proto::Condition::kTrueValueCondition:

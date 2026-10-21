@@ -791,7 +791,6 @@ std::string VerticalDataset::NumericalSetColumn::ToStringWithDigitPrecision(
   if (indices.first == indices.second) {
     return kEmptySymbol;
   }
-  const std::string format_mask = absl::StrCat("%.", digit_precision, "g");
   std::string rep;
   for (size_t bank_idx = indices.first; bank_idx < indices.second; bank_idx++) {
     if (bank_idx != indices.first) {
