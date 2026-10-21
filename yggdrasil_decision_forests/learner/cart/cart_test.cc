@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/learner/cart/cart.h"
 
+#include <array>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -29,6 +31,7 @@
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/random_forest/random_forest.h"
@@ -59,6 +62,22 @@ absl::StatusOr<dataset::VerticalDataset> CreateConstantLabelDataset() {
   RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
   for (int i = 0; i < num_examples; i++) {
     RETURN_IF_ERROR(dataset.AppendExampleWithStatus({{"label", "1"}}));
+  }
+  return dataset;
+}
+
+absl::StatusOr<dataset::VerticalDataset> CreateWeightedRegressionDataset(
+    const std::vector<std::array<std::string, 3>>& rows) {
+  dataset::VerticalDataset dataset;
+  *dataset.mutable_data_spec() = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "x" }
+    columns { type: NUMERICAL name: "y" }
+    columns { type: NUMERICAL name: "w" }
+  )pb");
+  RETURN_IF_ERROR(dataset.CreateColumnsFromDataspec());
+  for (const auto& [x, y, w] : rows) {
+    RETURN_IF_ERROR(
+        dataset.AppendExampleWithStatus({{"x", x}, {"y", y}, {"w", w}}));
   }
   return dataset;
 }
@@ -285,6 +304,52 @@ TEST_F(CartPruningTest, PruneTree) {
 
   // Note: There is only one way to prune the tree and make it having 3 nodes.
   EXPECT_EQ(tree_.NumNodes(), 3);
+}
+
+TEST(Cart, PruningUsesValidationWeights) {
+  // The tree trained on this dataset is: (x>=1.5) ? 10 : 0, with a root
+  // value of 5.
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset train_dataset,
+                       CreateWeightedRegressionDataset({{"0", "0", "1"},
+                                                        {"1", "0", "1"},
+                                                        {"2", "10", "1"},
+                                                        {"3", "10", "1"}}));
+  // On the first validation example, the split is better than the root (error
+  // of 0 vs. 5). On the second validation example, the root is better than the
+  // split (error of 5 vs. 10).
+  //
+  // Weighted MSE as a leaf: 25.
+  // Weighted MSE as a non-leaf: (10 * 0 + 1 * 100) / 11 ~= 9.1.
+  // => The split should be kept.
+  //
+  // Without weights (or with the weights of the training examples), the MSE as
+  // a non-leaf is 50 and the split would be pruned.
+  ASSERT_OK_AND_ASSIGN(
+      const dataset::VerticalDataset valid_dataset,
+      CreateWeightedRegressionDataset({{"0", "0", "10"}, {"3", "0", "1"}}));
+
+  model::proto::TrainingConfig train_config;
+  train_config.set_learner(CartLearner::kRegisteredName);
+  train_config.set_task(model::proto::Task::REGRESSION);
+  train_config.set_label("y");
+  train_config.add_features("x");
+  train_config.mutable_weight_definition()->set_attribute("w");
+  train_config.mutable_weight_definition()->mutable_numerical();
+  train_config.MutableExtension(cart::proto::cart_config)
+      ->mutable_decision_tree()
+      ->set_min_examples(1);
+
+  std::unique_ptr<model::AbstractLearner> learner;
+  ASSERT_OK(model::GetLearner(train_config, &learner));
+  ASSERT_OK_AND_ASSIGN(
+      const std::unique_ptr<AbstractModel> model,
+      learner->TrainWithStatus(train_dataset, std::cref(valid_dataset)));
+
+  const auto* rf_model =
+      dynamic_cast<const random_forest::RandomForestModel*>(model.get());
+  ASSERT_NE(rf_model, nullptr);
+  EXPECT_EQ(rf_model->num_pruned_nodes().value(), 0);
+  EXPECT_EQ(rf_model->NumNodes(), 3);
 }
 
 class CartOnSimPTE : public utils::TrainAndTestTester {

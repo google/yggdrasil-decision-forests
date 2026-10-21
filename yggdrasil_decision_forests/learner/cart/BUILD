@@ -72,6 +72,7 @@ cc_test(
         "//yggdrasil_decision_forests/learner:abstract_learner",
         "//yggdrasil_decision_forests/learner:learner_library",
         "//yggdrasil_decision_forests/metric",
+        "//yggdrasil_decision_forests/model:abstract_model",
         "//yggdrasil_decision_forests/model:abstract_model_cc_proto",
         "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/model/random_forest",

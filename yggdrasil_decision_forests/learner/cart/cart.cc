@@ -284,6 +284,9 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
       decision_tree, internal_config));
 
   if (effective_valid_dataset) {
+    std::vector<float> validation_weights;
+    RETURN_IF_ERROR(dataset::GetWeights(*effective_valid_dataset, config_link,
+                                        &validation_weights));
     std::vector<UnsignedExampleIdx> valid_examples_in_valid_ds;
     valid_examples_in_valid_ds.resize(effective_valid_dataset->nrow());
     std::iota(valid_examples_in_valid_ds.begin(),
@@ -301,9 +304,9 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> CartLearner::TrainWithStatusImpl(
               valid_examples_in_valid_ds.size());
     // Prune the tree.
     const auto num_nodes_pre_pruning = decision_tree->NumNodes();
-    RETURN_IF_ERROR(internal::PruneTree(*effective_valid_dataset, weights,
-                                        valid_examples_in_valid_ds_rb, config,
-                                        config_link, decision_tree));
+    RETURN_IF_ERROR(internal::PruneTree(
+        *effective_valid_dataset, validation_weights,
+        valid_examples_in_valid_ds_rb, config, config_link, decision_tree));
     mdl->set_num_pruned_nodes(num_nodes_pre_pruning -
                               decision_tree->NumNodes());
 
