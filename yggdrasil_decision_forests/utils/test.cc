@@ -34,9 +34,21 @@
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/testing_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"  // IWYU pragma: keep
+#include "yggdrasil_decision_forests/utils/usage.h"
 
 namespace yggdrasil_decision_forests {
 namespace test {
+
+namespace {
+// Disables usage logging in all the tests linking this library. This library
+// is "alwayslink" to make sure this initializer always runs. Tests checking the
+// usage logging (e.g. usage_google_test.cc) should re-enable it with
+// `utils::usage::EnableUsage(true)`.
+[[maybe_unused]] const bool kUsageDisabledInTests = [] {
+  utils::usage::EnableUsage(false);
+  return true;
+}();
+}  // namespace
 
 std::string DataRootDirectory() { return ""; }
 

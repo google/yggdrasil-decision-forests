@@ -245,11 +245,15 @@ cc_library_ydf(
         ":logging",
         ":testing_macros",
         ":uid",
+        ":usage",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest",
         "@com_google_protobuf//:protobuf",
     ],
+    # Ensures the static initializer disabling usage logging in tests always
+    # runs, even if the test does not reference any symbol of "test.cc".
+    alwayslink = 1,
 )
 
 cc_library_ydf(
