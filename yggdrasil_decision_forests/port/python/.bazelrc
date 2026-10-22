@@ -61,9 +61,9 @@ common:linux --repo_env=SYSROOT_DIST=linux_glibc_2_27
 build:local_cc --@rules_ml_toolchain//common:enable_hermetic_cc=False
 
 # Build mode.
-build:linux_cpp17 --cxxopt=-std=c++17
-build:linux_cpp17 --host_cxxopt=-std=c++17
-build:linux_cpp17 --config=linux
+build:linux --cxxopt=-std=c++17
+build:linux --host_cxxopt=-std=c++17
+build:linux --features=-fully_static_link
 
 build:macos --cxxopt=-std=c++17
 build:macos --host_cxxopt=-std=c++17
@@ -78,10 +78,6 @@ common:macos --host_linkopt=-Wl,-undefined,dynamic_lookup
 build:windows_cpp20 --cxxopt=/std:c++20
 build:windows_cpp20 --host_cxxopt=/std:c++20
 build:windows_cpp20 --config=windows
-
-# Instruction set optimizations
-build:linux_avx2 --copt=-mavx2
-build:windows_avx2 --copt=/arch:AVX2
 
 # Misc build options we need for windows.
 build:windows --copt=/Zc:__cplusplus

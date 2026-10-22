@@ -58,6 +58,11 @@ single_version_override(
 #
 # Select the Python version with
 #   --@rules_python//python/config_settings:python_version=3.X
+#
+# PYTHON_VERSIONS are the supported Python versions. The `ydf_wheel_config`
+# repository (see below) exposes them to tools/BUILD (i.e. the tags and
+# metadata of the wheel). When changing them, also update the defaults of
+# tools/release.sh and the `requirements` lock target (see BUILD).
 PYTHON_VERSIONS = [
     "3.10",
     "3.11",
@@ -106,3 +111,12 @@ uv.configure(version = "0.11.2")
 
 # Use the PyPI protobuf package as the runtime of `py_proto_library`.
 register_toolchains("//:python_proto_toolchain")
+
+ydf_wheel_config = use_repo_rule("//tools:wheel_config.bzl", "ydf_wheel_config")
+
+ydf_wheel_config(
+    name = "ydf_wheel_config",
+    cc_build_file = "@ydf_cc//yggdrasil_decision_forests:BUILD",
+    python_versions = PYTHON_VERSIONS,
+    version_file = "//ydf:version.py",
+)

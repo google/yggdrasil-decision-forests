@@ -23,3 +23,4 @@ safetensors
 # For FastAPI Tests.
 fastapi
 httpx2
+auditwheel; platform_system == "Linux"

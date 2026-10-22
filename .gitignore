@@ -1,6 +1,5 @@
 bazel*
 dist
 .vscode
-tmp_package
 __pycache__
 no_sync*

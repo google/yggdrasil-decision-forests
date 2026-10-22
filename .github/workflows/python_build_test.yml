@@ -33,9 +33,6 @@ jobs:
       BAZEL_PY_FLAGS: >-
         --repository_cache=../../../.bazel-cache/repository
         --disk_cache=../../../.bazel-cache/disk
-        --config=linux_cpp17
-        --config=linux_avx2
-        --features=-fully_static_link
         --@rules_python//python/config_settings:python_version=${{ inputs.python_version }}
       REFRESH_CACHE: ${{ inputs.refresh_cache }}
       GH_TOKEN: ${{ github.token }} # Required for gh cache delete
@@ -144,20 +141,17 @@ jobs:
             --test_output=errors \
             --output_groups=+test_xml
 
-      # Checks that the wheel is manylinux_2_27 compliant (auditwheel repair
-      # fails otherwise) and that it works.
       - name: Package Python
         working-directory: yggdrasil_decision_forests/port/python
-        env:
-          PYTHON_VERSION: ${{ inputs.python_version }}
-        # The default shell of container jobs is sh, which has no `source`.
-        shell: bash
         # BAZEL_PY_FLAGS is intentionally unquoted so it is split into separate flags.
+        # The wheel is a top-level target so that Bazel also creates it if the
+        # test result is cached.
         run: |
-          bazel run $BAZEL_PY_FLAGS \
-            @rules_python//python/bin:python -- -m venv --clear /tmp/venv
-          source /tmp/venv/bin/activate
-          ./tools/package_linux.sh
+          bazel test //tools:wheel //tools:wheel_test \
+            $BAZEL_PY_FLAGS \
+            --test_output=errors
+          mkdir -p dist
+          cp "$(bazel cquery $BAZEL_PY_FLAGS --output=files //tools:wheel)" dist/
 
       - name: Upload wheel
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

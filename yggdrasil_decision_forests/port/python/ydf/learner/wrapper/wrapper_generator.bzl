@@ -84,5 +84,4 @@ def py_wrap_yggdrasil_learners(
             "//ydf/model/random_forest_model",
             "//ydf/utils:func_helpers",
         ],
-        data = [":" + run_wrapper_name, ":" + wrapper_name],
     )

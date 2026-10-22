@@ -46,7 +46,8 @@ build_and_maybe_test () {
 
     bazel version
 
-    local flags="--config=linux_cpp17 --features=-fully_static_link --@rules_python//python/config_settings:python_version=${PYTHON_VERSION} ${BAZEL_FLAGS}"
+    # The OS specific flags are in .bazelrc.
+    local flags="--@rules_python//python/config_settings:python_version=${PYTHON_VERSION} ${BAZEL_FLAGS}"
 
     if [[ "$RUN_TESTS" = 0 ]]; then
       # OSS builds don't check with Pytype, but we need to compile all targets

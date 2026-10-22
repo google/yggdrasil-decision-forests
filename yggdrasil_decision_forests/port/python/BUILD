@@ -6,6 +6,9 @@ package(
     licenses = ["notice"],
 )
 
+# Long description of the pip package (see //tools:wheel).
+exports_files(["README.md"])
+
 # Universal lock file of the third-party Python packages, for all the supported
 # Python versions and platforms.
 #
@@ -20,6 +23,7 @@ lock(
     out = "requirements_lock.txt",
     args = [
         "--universal",
+        # The oldest supported Python version (see MODULE.bazel).
         "--python-version=3.10",
     ],
 )
