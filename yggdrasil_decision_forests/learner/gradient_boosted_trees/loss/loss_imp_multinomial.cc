@@ -15,6 +15,7 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_multinomial.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -47,6 +48,14 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
+
+namespace {
+// Log of a class prior, clamped so that an empty class gives a finite value.
+float LogClampedProbability(const double prob) {
+  return static_cast<float>(std::log(std::max(
+      prob, static_cast<double>(std::numeric_limits<float>::epsilon()))));
+}
+}  // namespace
 
 absl::StatusOr<std::unique_ptr<AbstractLoss>>
 MultinomialLogLikelihoodLoss::RegistrationCreate(const ConstructorArgs& args) {
@@ -107,12 +116,8 @@ MultinomialLogLikelihoodLoss::InitialPredictions(
   std::vector<float> initial_predictions(dimension_);
   const double inv_sum_weights = 1. / sum_weights;
   for (int dim = 0; dim < dimension_; ++dim) {
-    const double prob = weighted_counts[dim] * inv_sum_weights;
-    if (prob <= 0.) {
-      initial_predictions[dim] = std::numeric_limits<float>::lowest();
-    } else {
-      initial_predictions[dim] = static_cast<float>(std::log(prob));
-    }
+    initial_predictions[dim] =
+        LogClampedProbability(weighted_counts[dim] * inv_sum_weights);
   }
   return initial_predictions;
 }
@@ -134,15 +139,12 @@ MultinomialLogLikelihoodLoss::InitialPredictions(
         label_statistics.classification().labels().counts_size()));
   }
   const auto& counts = label_statistics.classification().labels().counts();
-  const double inv_sum = 1. / label_statistics.classification().labels().sum();
+  const double sum = label_statistics.classification().labels().sum();
+  STATUS_CHECK_GT(sum, 0);
+  const double inv_sum = 1. / sum;
   std::vector<float> initial_predictions(dimension_);
   for (size_t dim = 0; dim < dimension_; ++dim) {
-    double prob = counts[dim + 1] * inv_sum;
-    if (prob <= 0.) {
-      initial_predictions[dim] = std::numeric_limits<float>::lowest();
-    } else {
-      initial_predictions[dim] = static_cast<float>(std::log(prob));
-    }
+    initial_predictions[dim] = LogClampedProbability(counts[dim + 1] * inv_sum);
   }
   return initial_predictions;
 }
@@ -166,11 +168,16 @@ absl::Status MultinomialLogLikelihoodLoss::TemplatedUpdateGradients(
     return absl::InternalError("Hessian missing");
   }
   for (size_t example_idx = 0; example_idx < num_examples; example_idx++) {
+    const float* example_predictions =
+        predictions.data() + example_idx * gradients->size();
+    float max_prediction = example_predictions[0];
+    for (int grad_idx = 1; grad_idx < gradients->size(); grad_idx++) {
+      max_prediction = std::max(max_prediction, example_predictions[grad_idx]);
+    }
     // Compute normalization term.
     float sum_exp = 0;
     for (int grad_idx = 0; grad_idx < gradients->size(); grad_idx++) {
-      float exp_val =
-          std::exp(predictions[grad_idx + example_idx * gradients->size()]);
+      float exp_val = std::exp(example_predictions[grad_idx] - max_prediction);
       accumulator[grad_idx] = exp_val;
       sum_exp += exp_val;
     }
@@ -232,44 +239,34 @@ void MultinomialLogLikelihoodLoss::TemplatedLossImp(
   for (size_t example_idx = begin_example_idx; example_idx < end_example_idx;
        example_idx++) {
     const int label = labels[example_idx];
-    int predicted_class = -1;
-    float predicted_class_exp_value = 0;
+    const float* example_predictions =
+        predictions.data() + example_idx * dimension;
+
+    int predicted_class = 1;
+    float max_prediction = example_predictions[0];
+    for (int grad_idx = 1; grad_idx < dimension; grad_idx++) {
+      if (example_predictions[grad_idx] > max_prediction) {
+        max_prediction = example_predictions[grad_idx];
+        predicted_class = grad_idx + 1;
+      }
+    }
     float sum_exp = 0;
+    for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
+      sum_exp += std::exp(example_predictions[grad_idx] - max_prediction);
+    }
+    DCheckIsFinite(sum_exp);
+    // Loss:
+    //   - log(predict_proba[true_label])
+    const float log_proba =
+        example_predictions[label - 1] - max_prediction - std::log(sum_exp);
+
     if constexpr (weighted) {
       const float weight = weights[example_idx];
-      for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
-        const float exp_val =
-            std::exp(predictions[grad_idx + example_idx * dimension]);
-        sum_exp += exp_val;
-        DCheckIsFinite(sum_exp);
-        if (exp_val > predicted_class_exp_value) {
-          predicted_class_exp_value = exp_val;
-          predicted_class = grad_idx + 1;
-        }
-      }
       confusion_matrix->Add(label, predicted_class, weight);
-      // Loss:
-      //   - log(predict_proba[true_label])
-      const float tree_label_exp_value =
-          std::exp(predictions[(label - 1) + example_idx * dimension]);
-      loss -= weight * std::log(tree_label_exp_value / sum_exp);
+      loss -= weight * log_proba;
     } else {
-      for (int grad_idx = 0; grad_idx < dimension; grad_idx++) {
-        const float exp_val =
-            std::exp(predictions[grad_idx + example_idx * dimension]);
-        sum_exp += exp_val;
-        DCheckIsFinite(sum_exp);
-        if (exp_val > predicted_class_exp_value) {
-          predicted_class_exp_value = exp_val;
-          predicted_class = grad_idx + 1;
-        }
-      }
       confusion_matrix->Add(label, predicted_class, 1);
-      // Loss:
-      //   - log(predict_proba[true_label])
-      const float tree_label_exp_value =
-          std::exp(predictions[(label - 1) + example_idx * dimension]);
-      loss -= std::log(tree_label_exp_value / sum_exp);
+      loss -= log_proba;
     }
     DCheckIsFinite(loss);
     DCheckIsFinite(confusion_matrix->sum());

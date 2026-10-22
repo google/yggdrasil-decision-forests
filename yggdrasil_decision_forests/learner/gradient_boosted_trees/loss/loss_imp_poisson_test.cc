@@ -153,6 +153,31 @@ TEST(PoissonLossTest, InitialPredictionsLabelStatistics) {
   EXPECT_THAT(init_pred, ElementsAre(FloatNear(log_mean, kTestPrecision)));
 }
 
+TEST(PoissonLossTest, InitialPredictionsZeroLabelSumIsFinite) {
+  decision_tree::proto::LabelStatistics label_statistics;
+  auto* labels = label_statistics.mutable_regression()->mutable_labels();
+  labels->set_count(4);
+  labels->set_sum(0);
+
+  dataset::proto::Column column_spec = PARSE_TEST_PROTO(R"pb(
+    type: NUMERICAL
+    name: "a"
+  )pb");
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss_imp,
+      PoissonLoss::RegistrationCreate(
+          {{}, {}, model::proto::Task::REGRESSION, column_spec}));
+
+  ASSERT_OK_AND_ASSIGN(const std::vector<float> init_pred,
+                       loss_imp->InitialPredictions(label_statistics));
+  ASSERT_THAT(init_pred, testing::SizeIs(1));
+  EXPECT_TRUE(std::isfinite(init_pred[0]));
+
+  labels->set_count(0);
+  EXPECT_FALSE(loss_imp->InitialPredictions(label_statistics).ok());
+}
+
 TEST_P(PoissonLossTest, UpdateGradientsLabelColIdx) {
   ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
                        CreateToyDataset());

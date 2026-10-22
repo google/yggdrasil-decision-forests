@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <numeric>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -278,6 +279,11 @@ absl::Status GetWeights(
   if (train_config_link.has_weight_definition()) {
     RETURN_IF_ERROR(
         GetWeights(dataset, train_config_link.weight_definition(), weights));
+    if (std::accumulate(weights->begin(), weights->end(), 0.0) <= 0.0) {
+      return absl::InvalidArgumentError(
+          "The sum of the example weights is zero. At least one example must "
+          "have a positive weight.");
+    }
     // Check if all values are identical.
     if (use_optimized_unit_weights &&
         std::all_of(weights->cbegin(), weights->cend(),

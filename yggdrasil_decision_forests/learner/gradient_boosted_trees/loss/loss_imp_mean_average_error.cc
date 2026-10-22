@@ -87,7 +87,7 @@ absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
   const absl::Span<const float> labels = label_col->values();
   STATUS_CHECK_GT(labels.size(), 0);
 
-  float initial_prediction;
+  float initial_prediction = 0.f;
   if (weights.empty()) {
     initial_prediction = utils::Median(labels);
   } else {
@@ -107,6 +107,7 @@ absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
           .weight = weights[example_idx],
       });
     }
+    STATUS_CHECK_GT(sum_weights, 0);
     std::sort(items.begin(), items.end(),
               [](const Item& a, const Item& b) { return a.label < b.label; });
 
@@ -116,6 +117,7 @@ absl::StatusOr<std::vector<float>> MeanAverageErrorLoss::InitialPredictions(
       cur_sum_weights += item.weight;
       if (cur_sum_weights > mid_weight) {
         initial_prediction = item.label;
+        break;
       }
     }
   }

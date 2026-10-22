@@ -22,6 +22,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
@@ -118,10 +119,22 @@ TEST_P(MeanAverageErrorLossWeightTest, InitialPredictions) {
       const std::vector<float> init_pred,
       loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 0, weights));
   if (weighted) {
-    EXPECT_THAT(init_pred, ElementsAre(4.f));
+    EXPECT_THAT(init_pred, ElementsAre(3.f));
   } else {
     EXPECT_THAT(init_pred, ElementsAre(2.5f));
   }
+}
+
+TEST(MeanAverageErrorLossTest, InitialPredictionsIgnoresZeroWeightMaximum) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const MeanAverageErrorLoss loss_imp(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(0)});
+  EXPECT_THAT(loss_imp
+                  .InitialPredictions(dataset, /* label_col_idx= */ 0,
+                                      {1.f, 1.f, 1.f, 0.f})
+                  .value(),
+              ElementsAre(2.f));
 }
 
 TEST(MeanAverageErrorLossTestNonWeighted, InitialPredictionsOdd) {
@@ -165,11 +178,7 @@ TEST_P(MeanAverageErrorLossWeightAndThreadingTest, UpdateGradients) {
                                      &random, thread_pool_.get()));
 
   ASSERT_THAT(gradients, Not(IsEmpty()));
-  if (weighted) {
-    EXPECT_THAT(gradients.front().gradient, ElementsAre(-1, -1, -1, 1));
-  } else {
-    EXPECT_THAT(gradients.front().gradient, ElementsAre(-1, -1, 1, 1));
-  }
+  EXPECT_THAT(gradients.front().gradient, ElementsAre(-1, -1, 1, 1));
 }
 
 TEST_P(MeanAverageErrorLossWeightAndThreadingTest, ComputeLoss) {

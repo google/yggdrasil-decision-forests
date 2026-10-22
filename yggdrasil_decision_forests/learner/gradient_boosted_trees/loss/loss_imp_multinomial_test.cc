@@ -26,6 +26,7 @@
 #include "absl/types/optional.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
@@ -136,6 +137,41 @@ TEST(MultinomialLogLikelihoodLossTest, UpdateGradients) {
                                     FloatNear(-1.f / 3.f, kTestPrecision)));
 }
 
+TEST(MultinomialLogLikelihoodLossTest, UpdateGradientsWithExtremePredictions) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+
+  dataset::VerticalDataset gradient_dataset;
+  std::vector<GradientData> gradients;
+  std::vector<float> predictions;
+  const MultinomialLogLikelihoodLoss loss_imp(
+      {{},
+       {},
+       model::proto::Task::CLASSIFICATION,
+       dataset.data_spec().columns(1)});
+  ASSERT_OK(internal::CreateGradientDataset(dataset,
+                                            /* label_col_idx= */ 1, loss_imp,
+                                            &gradient_dataset, &gradients,
+                                            &predictions));
+  predictions.clear();
+  for (int example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+    predictions.insert(predictions.end(), {100.f, 0.f, 0.f});
+  }
+
+  utils::RandomEngine random(1234);
+  ASSERT_OK(loss_imp.UpdateGradients(
+      gradient_dataset, /* label_col_idx= */ 1, predictions,
+      /*ranking_index=*/nullptr, &gradients, &random));
+  ASSERT_THAT(gradients, Not(IsEmpty()));
+
+  EXPECT_THAT(gradients.front().gradient,
+              ElementsAre(FloatNear(0.f, kTestPrecision),
+                          FloatNear(-1.f, kTestPrecision),
+                          FloatNear(-1.f, kTestPrecision),
+                          FloatNear(0.f, kTestPrecision),
+                          FloatNear(-1.f, kTestPrecision),
+                          FloatNear(-1.f, kTestPrecision)));
+}
+
 TEST(MultinomialLogLikelihoodLossTest, SecondaryMetricName) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
   const MultinomialLogLikelihoodLoss loss_imp(
@@ -226,6 +262,54 @@ TEST_P(MultinomialLogLikelihoodLossTest, ComputeLossWithNullWeights) {
   EXPECT_THAT(loss_results.loss, IsNan());
   EXPECT_THAT(loss_results.secondary_metrics, ElementsAre(IsNan()));
   EXPECT_EQ(loss_results.confusion_table, std::nullopt);
+}
+
+TEST(MultinomialLogLikelihoodLossTest, ClassPriorsWithZeroWeightClass) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  // Class 3 only has zero-weight examples.
+  const std::vector<float> weights = {1.f, 1.f, 0.f, 1.f, 1.f, 0.f};
+  proto::GradientBoostedTreesTrainingConfig gbt_config;
+  gbt_config.mutable_multinomial_loss_options()
+      ->set_initialize_with_class_priors(true);
+  const auto& label_column = dataset.data_spec().columns(1);
+  const MultinomialLogLikelihoodLoss loss_imp(
+      {{}, gbt_config, model::proto::Task::CLASSIFICATION, label_column});
+
+  ASSERT_OK_AND_ASSIGN(
+      const std::vector<float> init_pred,
+      loss_imp.InitialPredictions(dataset, /* label_col_idx= */ 1, weights));
+  ASSERT_THAT(init_pred, testing::SizeIs(3));
+  EXPECT_THAT(init_pred, testing::Each(testing::Truly(
+                             [](float v) { return std::isfinite(v); })));
+
+  std::vector<float> predictions;
+  for (int example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+    predictions.insert(predictions.end(), init_pred.begin(), init_pred.end());
+  }
+  ASSERT_OK_AND_ASSIGN(
+      const LossResults loss_results,
+      loss_imp.Loss(dataset, /* label_col_idx= */ 1, predictions, weights,
+                    nullptr));
+  EXPECT_TRUE(std::isfinite(loss_results.loss));
+}
+
+TEST(MultinomialLogLikelihoodLossTest, ComputeLossWithExtremePredictions) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset());
+  const std::vector<float> weights = {1.f, 0.f, 0.f, 1.f, 0.f, 0.f};
+  const auto& label_column = dataset.data_spec().columns(1);
+  std::vector<float> predictions;
+  for (int example_idx = 0; example_idx < dataset.nrow(); example_idx++) {
+    predictions.insert(predictions.end(), {50.f, -200.f, 0.f});
+  }
+  const MultinomialLogLikelihoodLoss loss_imp(
+      {{}, {}, model::proto::Task::CLASSIFICATION, label_column});
+  ASSERT_OK_AND_ASSIGN(
+      const LossResults loss_results,
+      loss_imp.Loss(dataset, /* label_col_idx= */ 1, predictions, weights,
+                    nullptr));
+  EXPECT_NEAR(loss_results.loss, 0.f, kTestPrecision);
+  EXPECT_THAT(loss_results.secondary_metrics,
+              ElementsAre(FloatNear(1.f, kTestPrecision)));
 }
 
 }  // namespace

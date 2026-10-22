@@ -15,8 +15,10 @@
 
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_imp_poisson.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -39,6 +41,17 @@
 namespace yggdrasil_decision_forests {
 namespace model {
 namespace gradient_boosted_trees {
+
+namespace {
+// Log of the label mean, clamped so that a zero mean gives a finite value.
+float LogMean(const double sum_labels, const double sum_weights) {
+  DCHECK_GT(sum_weights, 0);
+  return static_cast<float>(
+      std::log(std::max(sum_labels / sum_weights,
+                        static_cast<double>(
+                            std::numeric_limits<float>::epsilon()))));
+}
+}  // namespace
 
 absl::StatusOr<std::vector<float>> PoissonLoss::InitialPredictions(
     const dataset::VerticalDataset &dataset, int label_col_idx,
@@ -69,22 +82,17 @@ absl::StatusOr<std::vector<float>> PoissonLoss::InitialPredictions(
   }
   // Note: Null and negative weights are detected by the dataspec
   // computation.
-  if (sum_weights <= 0) {
-    return absl::InvalidArgumentError(
-        "The sum of weights are null. The dataset is "
-        "either empty or contains null weights.");
-  }
+  STATUS_CHECK_GT(sum_weights, 0);
   // The initial prediction is the expected alpha coefficient of the poisson
   // distribution i.e. the log of the label mean.
-  return std::vector<float>{static_cast<float>(std::log(weighted_sum_labels) -
-                                               std::log(sum_weights))};
+  return std::vector<float>{LogMean(weighted_sum_labels, sum_weights)};
 }
 
 absl::StatusOr<std::vector<float>> PoissonLoss::InitialPredictions(
     const decision_tree::proto::LabelStatistics &label_statistics) const {
   const auto stats = label_statistics.regression().labels();
-  return std::vector<float>{
-      static_cast<float>(std::log(stats.sum() / stats.count()))};
+  STATUS_CHECK_GT(stats.count(), 0);
+  return std::vector<float>{LogMean(stats.sum(), stats.count())};
 }
 
 absl::StatusOr<std::unique_ptr<AbstractLoss>> PoissonLoss::RegistrationCreate(

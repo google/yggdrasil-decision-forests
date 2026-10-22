@@ -362,6 +362,27 @@ TEST(Weight, OptimizedNonunitWeightsAreUnchanged) {
   EXPECT_THAT(optimized_nonunit_weights, ElementsAre(2, 2, 2));
 }
 
+TEST(Weight, ZeroTotalWeightFails) {
+  const proto::DataSpecification data_spec = PARSE_TEST_PROTO(
+      R"pb(
+        columns { type: NUMERICAL name: "Num_1" is_manual_type: true }
+      )pb");
+  VerticalDataset dataset;
+  dataset.set_data_spec(data_spec);
+  CHECK_OK(dataset.CreateColumnsFromDataspec());
+  CHECK_OK(dataset.AppendExampleWithStatus({{"Num_1", "0"}}));
+  CHECK_OK(dataset.AppendExampleWithStatus({{"Num_1", "0"}}));
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.mutable_weight_definition()->set_attribute_idx(0);
+  config_link.mutable_weight_definition()->mutable_numerical();
+
+  std::vector<float> weights;
+  EXPECT_THAT(GetWeights(dataset, config_link, &weights),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "The sum of the example weights is zero"));
+}
+
 }  // namespace
 }  // namespace dataset
 }  // namespace yggdrasil_decision_forests
