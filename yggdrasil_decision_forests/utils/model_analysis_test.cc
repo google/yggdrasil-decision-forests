@@ -66,8 +66,8 @@ std::string ModelDir() {
 
 // Note: The old golden models don't contain the necessary meta-data (the number
 // of training examples per nodes) to compute SHAP values. For this reason,
-// tests like "ClassificationGodenModel" don't show SHAP variable importances.
-TEST(ModelAnalysis, ClassificationGodenModel) {
+// tests like "ClassificationGoldenModel" don't show SHAP variable importances.
+TEST(ModelAnalysis, ClassificationGoldenModel) {
   const std::string dataset_path =
       absl::StrCat("csv:", file::JoinPath(DatasetDir(), "adult_test.csv"));
   const std::string model_path =

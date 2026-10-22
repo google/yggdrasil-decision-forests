@@ -111,7 +111,11 @@ void SortVariableImportance(const std::vector<std::string>& importance_names,
   const auto var_importance_comparer =
       [](const model::proto::VariableImportance& a,
          const model::proto::VariableImportance& b) {
-        return a.importance() > b.importance();
+        if (a.importance() != b.importance()) {
+          return a.importance() > b.importance();
+        } else {
+          return a.attribute_idx() < b.attribute_idx();
+        }
       };
 
   for (const auto& importance_name : importance_names) {
@@ -539,7 +543,11 @@ absl::Status ComputeShapFeatureImportance(
   const auto var_importance_comparer =
       [](const model::proto::VariableImportance& a,
          const model::proto::VariableImportance& b) {
-        return a.importance() > b.importance();
+        if (a.importance() != b.importance()) {
+          return a.importance() > b.importance();
+        } else {
+          return a.attribute_idx() < b.attribute_idx();
+        }
       };
   std::sort(vas.begin(), vas.end(), var_importance_comparer);
   return absl::OkStatus();
