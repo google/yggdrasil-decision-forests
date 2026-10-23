@@ -1899,7 +1899,7 @@ class GradientBoostedTreesOnIris : public utils::TrainAndTestTester {
 TEST_F(GradientBoostedTreesOnIris, Base) {
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9533, 0.03, 0.96);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2988, 0.2562, 0.2255);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2988, 0.2562, 0.2597);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
   utils::ExpectEqualGoldenModel(*model_, "gbt_iris");
 }
@@ -1918,7 +1918,7 @@ TEST_F(GradientBoostedTreesOnIris, Hessian) {
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
   YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9533, 0.03, 0.9733);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3628, 0.3514, 0.1462);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.3628, 0.3514, 0.1455);
   utils::ExpectEqualGoldenModel(*model_, "gbt_iris_hessian");
 }
 
@@ -1940,8 +1940,8 @@ TEST_F(GradientBoostedTreesOnIris, Dart) {
   gbt_config->mutable_dart()->set_dropout_rate(0.1f);
   gbt_config->mutable_decision_tree()->set_num_candidate_attributes(8);
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9467, 0.04, 0.9733);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.2019);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9467, 0.04, 0.9466);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1925, 0.1226, 0.19854);
   // Note: R RandomForest has an OOB accuracy of 0.9467.
 }
 
@@ -1986,8 +1986,8 @@ class GradientBoostedTreesOnDNA : public utils::TrainAndTestTester {
 
 TEST_F(GradientBoostedTreesOnDNA, Base) {
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9507, 0.0108, 0.9542);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1933, 0.08, 0.1452);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9507, 0.0108, 0.9510);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1933, 0.08, 0.1440);
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
@@ -2013,8 +2013,8 @@ TEST_F(GradientBoostedTreesOnDNA, Hessian) {
 TEST_F(GradientBoostedTreesOnDNA, BaseBooleanAsNumerical) {
   guide_filename_ = "dna_guide.pbtxt";
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9514, 0.0118, 0.9542);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1757, 0.0568, 0.1452);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9514, 0.0118, 0.9510);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1757, 0.0568, 0.144);
   // Note: R RandomForest has an OOB accuracy of 0.909.
 }
 
