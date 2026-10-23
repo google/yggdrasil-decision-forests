@@ -59,9 +59,6 @@ namespace yggdrasil_decision_forests {
 namespace model {
 namespace cart {
 
-constexpr char CartLearner::kRegisteredName[];
-constexpr char CartLearner::kHParamValidationRatio[];
-
 namespace {
 
 // Generates the indices for the training and validation datasets.
@@ -385,9 +382,10 @@ absl::Status PruneNode(
   }
 
   // Note: This copy ensures the values are tested in the same order.
-  // This is a bit less efficiently memory-wise, but make the computation of the
+  // This is a bit less efficient memory-wise, but make the computation of the
   // evaluation more local (i.e., faster).
-  const auto save_example_idxs_order = example_idxs.active;
+  const std::vector<UnsignedExampleIdx> save_example_idxs_order(
+      example_idxs.active.begin(), example_idxs.active.end());
 
   // Maybe prune the children.
   ASSIGN_OR_RETURN(auto example_split,
@@ -438,7 +436,7 @@ absl::Status PruneNode(
 }
 
 absl::Status PruneTreeClassification(
-    const dataset::VerticalDataset& dataset, const std::vector<float> weights,
+    const dataset::VerticalDataset& dataset, const std::vector<float>& weights,
     const decision_tree::SelectedExamplesRollingBuffer example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -478,7 +476,7 @@ absl::Status PruneTreeClassification(
 }
 
 absl::Status PruneTreeRegression(
-    const dataset::VerticalDataset& dataset, const std::vector<float> weights,
+    const dataset::VerticalDataset& dataset, const std::vector<float>& weights,
     const decision_tree::SelectedExamplesRollingBuffer example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,
@@ -519,7 +517,7 @@ absl::Status PruneTreeRegression(
 }
 
 absl::Status PruneTreeUpliftCategorical(
-    const dataset::VerticalDataset& dataset, const std::vector<float> weights,
+    const dataset::VerticalDataset& dataset, const std::vector<float>& weights,
     const decision_tree::SelectedExamplesRollingBuffer example_idxs,
     const model::proto::TrainingConfig& config,
     const model::proto::TrainingConfigLinking& config_link,

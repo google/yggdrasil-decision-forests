@@ -22,13 +22,13 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_CART_CART_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_CART_CART_H_
 
+#include <functional>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/types/span.h"
-#include "yggdrasil_decision_forests/dataset/types.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"

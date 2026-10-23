@@ -97,7 +97,7 @@ class CARTLearnerTest(learner_test_utils.LearnerTest, parameterized.TestCase):
     )
     model = learner.train(self.two_center_regression.train)
     evaluation = model.evaluate(self.two_center_regression.test)
-    self.assertAlmostEqual(evaluation.rmse, 116, delta=0.5)
+    self.assertAlmostEqual(evaluation.rmse, 114, delta=0.5)
 
   def test_monotonic_non_compatible_learner(self):
     with self.assertRaisesRegex(
