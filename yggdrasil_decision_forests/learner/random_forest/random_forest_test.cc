@@ -1738,8 +1738,8 @@ TEST_F(RandomForestOnSyntheticVectorSequence, Base) {
   train_config_.set_label(options.label_key);
 
   // Runs checks
-  TrainModel();
-  CHECK_OK(PostTrainingChecks());
+  ASSERT_NO_FATAL_FAILURE(TrainModel());
+  ASSERT_OK(PostTrainingChecks());
   EXPECT_GT(metric::Accuracy(evaluation_), 0.85);
 }
 
@@ -1765,8 +1765,8 @@ TEST_F(RandomForestOnSyntheticVectorSequence, WithSampling) {
   train_config_.set_label(options.label_key);
 
   // Runs checks
-  TrainModel();
-  CHECK_OK(PostTrainingChecks());
+  ASSERT_NO_FATAL_FAILURE(TrainModel());
+  EXPECT_OK(PostTrainingChecks());
 }
 
 TEST(RandomForestBootstrappingIndices, Base) {

@@ -69,6 +69,7 @@
 #include "yggdrasil_decision_forests/serving/decision_forest/decision_forest.h"
 #include "yggdrasil_decision_forests/serving/example_set.h"
 #include "yggdrasil_decision_forests/serving/fast_engine.h"
+#include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -313,7 +314,7 @@ void ExpectEqualPredictionsTemplate(const dataset::VerticalDataset& dataset,
     const auto end_idx =
         std::min(begin_idx + batch_size, static_cast<int>(dataset.nrow()));
 
-    EXPECT_OK(dataset_as_example_set.Copy(begin_idx, end_idx, engine,
+    ASSERT_OK(dataset_as_example_set.Copy(begin_idx, end_idx, engine,
                                           &example_set_batch));
 
     // Generate the predictions of the engine.
@@ -343,7 +344,7 @@ void ExpectEqualPredictionsOldTemplate(
     const auto end_idx =
         std::min(begin_idx + batch_size, static_cast<int>(dataset.nrow()));
 
-    CHECK_OK(serving::decision_forest::LoadFlatBatchFromDataset(
+    ASSERT_OK(serving::decision_forest::LoadFlatBatchFromDataset(
         dataset, begin_idx, end_idx,
         FeatureNames(engine.features().fixed_length_features()),
         engine.features().fixed_length_na_replacement_values(),
@@ -412,7 +413,8 @@ std::string InternalGetTestName(T* t) {
   return type_id_name;
 }
 
-// Returns the rank of importance of an attribute.
+// Returns the rank of importance of an attribute. If the attribute is not
+// found, adds a test failure and returns `variable_importance.size()`.
 int GetVariableImportanceRank(
     const absl::string_view attribute,
     const dataset::proto::DataSpecification& data_spec,
