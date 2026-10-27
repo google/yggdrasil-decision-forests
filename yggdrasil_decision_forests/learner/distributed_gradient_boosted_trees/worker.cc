@@ -193,8 +193,10 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     LOG(INFO) << "Create thread pool with "
               << welcome_.deployment_config().num_threads() << " threads";
   }
+  utils::concurrency::ThreadPool::Options threadpool_options{
+      .name_prefix = std::string("generic")};
   thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>(
-      "generic", welcome_.deployment_config().num_threads());
+      welcome_.deployment_config().num_threads(), threadpool_options);
 
   return absl::OkStatus();
 }

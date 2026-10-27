@@ -17,12 +17,12 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_CONCURRENCY_DEFAULT_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_CONCURRENCY_DEFAULT_H_
 
-#include <queue>
+#include <functional>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
-#include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
 namespace yggdrasil_decision_forests {
 namespace utils {
@@ -48,8 +48,6 @@ class ThreadPool {
   // during "Schedule" calls.
   ThreadPool(int num_threads, Options options);
   ThreadPool(int num_threads) : ThreadPool(num_threads, {}) {}
-  [[deprecated]] ThreadPool(std::string name, int num_threads)
-      : ThreadPool(num_threads, {std::move(name)}) {}
 
   // Ensure all the jobs are done and all the threads have been joined.
   ~ThreadPool();

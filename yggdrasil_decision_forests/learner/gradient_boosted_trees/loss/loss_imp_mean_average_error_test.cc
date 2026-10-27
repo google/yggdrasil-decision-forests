@@ -17,6 +17,7 @@
 
 #include <cmath>
 #include <memory>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -94,7 +95,10 @@ class MeanAverageErrorLossWeightAndThreadingTest
   void SetUp() override {
     const bool threaded = std::get<1>(GetParam()) == UseMultithreading::kYes;
     if (threaded) {
-      thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>("", 6);
+      utils::concurrency::ThreadPool::Options threadpool_options{
+          .name_prefix = std::string("")};
+      thread_pool_ = std::make_unique<utils::concurrency::ThreadPool>(
+          6, threadpool_options);
     }
   }
 

@@ -823,8 +823,10 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   if (deployment_.num_threads() > 1) {
     LOG(INFO) << "Create thread pool with " << deployment_.num_threads()
               << " threads";
+    utils::concurrency::ThreadPool::Options threadpool_options{
+        .name_prefix = std::string("GBTLossThreadpool")};
     thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
-        "GBTLossThreadpool", deployment_.num_threads());
+        deployment_.num_threads(), threadpool_options);
   }
 
   // Split the shards between train and validation.
@@ -1550,8 +1552,10 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
   if (deployment_.num_threads() > 1) {
     LOG(INFO) << "Create thread pool with " << deployment_.num_threads()
               << " threads for loss computation";
+    utils::concurrency::ThreadPool::Options threadpool_options{
+        .name_prefix = std::string("GBTLossThreadpool")};
     thread_pool = std::make_unique<utils::concurrency::ThreadPool>(
-        "GBTLossThreadpool", deployment_.num_threads());
+        deployment_.num_threads(), threadpool_options);
   }
 
   // Try to resume training.

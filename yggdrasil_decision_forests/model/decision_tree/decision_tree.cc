@@ -73,12 +73,6 @@ std::string PrettyLocalPrefix(const std::optional<bool>& is_pos) {
   }
 }
 
-// Append "num_tabs x tab_width" spaces to the string.
-void AppendMargin(const int num_tabs, std::string* dst,
-                  const int tab_width = 2) {
-  absl::StrAppend(dst, std::string(num_tabs * tab_width, ' '));
-}
-
 // Tests if the categorical value "value" is set in the bitmap of a
 // "ContainsBitmap" condition.
 inline bool GetCategoricalBitmapValue(const std::string& bitmap,

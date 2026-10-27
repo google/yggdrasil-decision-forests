@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -1100,7 +1101,8 @@ TemplatedFindBestSplitsWithDiscretizedNumericalFeatureMultiThreading(
   utils::concurrency::Mutex mutex_status;
 
   {
-    utils::concurrency::ThreadPool thread_pool("splitter", num_threads);
+    utils::concurrency::ThreadPool thread_pool(
+        num_threads, {.name_prefix = std::string("splitter")});
 
     RETURN_IF_ERROR(InitializeCategoricalFeatureBuckets<>(
         common, is_target_node, /*num_feature_values=*/num_discretized_values,

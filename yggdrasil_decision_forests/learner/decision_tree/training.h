@@ -228,7 +228,7 @@ struct SplitterWorkRequest {
   SplitterWorkRequest(const SplitterWorkRequest&) = delete;
   SplitterWorkRequest& operator=(const SplitterWorkRequest&) = delete;
   SplitterWorkRequest(SplitterWorkRequest&&) = default;
-  SplitterWorkRequest& operator=(SplitterWorkRequest&&) = default;
+  SplitterWorkRequest& operator=(SplitterWorkRequest&&) = delete;
 };
 
 // Contains the result of a splitter.

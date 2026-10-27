@@ -165,7 +165,7 @@ absl::Status ConcurrentForLoopWithWorker(
 
   // Aggregated failure status of the individual jobs.
   Mutex global_status_mutex;
-  absl::Status global_status GUARDED_BY(global_status_mutex);
+  absl::Status global_status;
 
   // Does global_status contains a failure?
   std::atomic<bool> has_failure{false};
