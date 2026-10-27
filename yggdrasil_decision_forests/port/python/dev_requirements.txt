@@ -7,17 +7,17 @@ tensorflow; platform_machine != 'aarch64' and python_version >= '3.9' and python
 portpicker
 matplotlib
 scikit-learn
-jax; platform_machine != 'aarch64' and platform_system != 'Windows'
-jaxlib; platform_machine != 'aarch64' and platform_system != 'Windows'
+jax; platform_system != 'Windows' and (platform_machine != 'aarch64' or platform_system == 'Darwin')
+jaxlib; platform_system != 'Windows' and (platform_machine != 'aarch64' or platform_system == 'Darwin')
 jaxtyping
-optax; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.9'
+optax; platform_system != 'Windows' and (platform_machine != 'aarch64' or platform_system == 'Darwin')
+flax; platform_system != 'Windows' and (platform_machine != 'aarch64' or platform_system == 'Darwin')
 flatbuffers; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.12'
 tensorflow-datasets; platform_machine != 'aarch64' and platform_system != 'Windows' and python_version >= '3.9'
 grain; platform_machine != 'aarch64' and platform_system == 'Linux' and python_version >= '3.10' and python_version < '3.13'
 fastavro
 polars
 pyarrow
-flax; platform_machine != 'aarch64' and platform_system != 'Windows'
 tqdm
 safetensors
 # For FastAPI Tests.

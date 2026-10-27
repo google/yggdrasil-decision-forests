@@ -15,7 +15,7 @@ absl-py==2.5.1 \
     #   tensorflow
     #   tensorflow-datasets
     #   tensorflow-metadata
-aiofiles==25.1.0 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+aiofiles==25.1.0 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:a8d728f0a29de45dc521f18f07297428d56992a742f0cd2701ba86e44d23d5b2 \
     --hash=sha256:abe311e527c862958650f9438e859c1fa7568a141b22abcd015e120e86a85695
     # via orbax-checkpoint
@@ -513,7 +513,11 @@ einops==0.8.2 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
     --hash=sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193 \
     --hash=sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827
     # via etils
-etils[edc, enp, epath, epy, etree]==1.13.0 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+etils[edc, enp, etree]==1.13.0 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+    --hash=sha256:a5b60c71f95bcd2d43d4e9fb3dc3879120c1f60472bb5ce19f7a860b1d44f607 \
+    --hash=sha256:d9cd4f40fbe77ad6613b7348a18132cc511237b6c076dbb89105c0b520a4c6bb
+    # via tensorflow-datasets
+etils[epath, epy]==1.13.0 ; (python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.11' and sys_platform == 'darwin') \
     --hash=sha256:a5b60c71f95bcd2d43d4e9fb3dc3879120c1f60472bb5ce19f7a860b1d44f607 \
     --hash=sha256:d9cd4f40fbe77ad6613b7348a18132cc511237b6c076dbb89105c0b520a4c6bb
     # via
@@ -521,7 +525,11 @@ etils[edc, enp, epath, epy, etree]==1.13.0 ; python_full_version < '3.11' and pl
     #   grain
     #   orbax-checkpoint
     #   tensorflow-datasets
-etils[edc, enp, epath, epy, etree]==1.14.0 ; python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+etils[edc, enp, etree]==1.14.0 ; python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+    --hash=sha256:8136e7f4c4173cd0af0ca5481c4475152f0b8686192951eefa60ee8711e1ede4 \
+    --hash=sha256:b5df7341f54dbe1405a4450b2741207b4a8c279780402b45f87202b94dfc52b4
+    # via tensorflow-datasets
+etils[epath, epy]==1.14.0 ; (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.11' and sys_platform == 'darwin') \
     --hash=sha256:8136e7f4c4173cd0af0ca5481c4475152f0b8686192951eefa60ee8711e1ede4 \
     --hash=sha256:b5df7341f54dbe1405a4450b2741207b4a8c279780402b45f87202b94dfc52b4
     # via
@@ -637,15 +645,15 @@ flatbuffers==25.12.19 ; (python_full_version < '3.13' and platform_machine != 'a
     # via
     #   -r dev_requirements.txt
     #   tensorflow
-flax==0.10.7 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+flax==0.10.7 ; (python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.11' and sys_platform == 'darwin') \
     --hash=sha256:2930d6671e23076f6db3b96afacf45c5060898f5c189ecab6dda7e05d26c2085 \
     --hash=sha256:4033223a9a9969ba0b252e085e9714d0a1e9124ac300aaf48e92c40769c420f6
     # via -r dev_requirements.txt
-flax==0.12.8 ; python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+flax==0.12.8 ; (python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version == '3.11.*' and sys_platform == 'darwin') \
     --hash=sha256:1bb438775b967a3f1f42b9c3d4ddf1d2883cd6406589f9cecdc244634036bdc4 \
     --hash=sha256:807931d369cbc716fc447801ab39cd6c3c2614d573387a2319a028675dd34fe5
     # via -r dev_requirements.txt
-flax==0.12.10 ; python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+flax==0.12.10 ; (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.12' and sys_platform == 'darwin') \
     --hash=sha256:5cc6cca80157f6810a4d76d2a03832ad1e8dba43cfcbbfdb53b6806745f3ec63 \
     --hash=sha256:8f752114350feb3dedb4e6c2fcabd735057e7b11973efe06b9a29a7bb220ce2a
     # via -r dev_requirements.txt
@@ -777,7 +785,7 @@ fonttools==4.66.1 ; python_full_version >= '3.11' \
     --hash=sha256:f08ab7f8461c37ecfdd29ad97fb0c0780b50501bd664bb0f46b6e83ed2b9d2a7 \
     --hash=sha256:fdf4afd75c643e60ef4a96fe64fc8a9def27d2a542112332371a9e5066885f9a
     # via matplotlib
-fsspec==2026.9.0 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+fsspec==2026.9.0 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:0f08147951c8cb31d844c3547d631053b127863b60be04cf06e121333ee0e2fe \
     --hash=sha256:8dd6e646e99ea382bd85f97a45e6b526a442d79423a7dc673f1e2756d05fcb5f
     # via etils
@@ -939,7 +947,7 @@ httpx2-jsfetch==1.0 ; python_full_version >= '3.12' and sys_platform == 'emscrip
     --hash=sha256:70a0e3eabfef7cce5ad9c629f7d01ca05e418f586646f4ddf14782e4c1454c60 \
     --hash=sha256:cb916b707601e69a07721aabc8f3f6659be3a6893bc1ff5c6f9e02241df2da32
     # via httpx2
-humanize==4.16.0 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+humanize==4.16.0 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:353eb2f34c09d098b2880eee8bef21832eae6d174f48c5762fff7e5fcb74d01d \
     --hash=sha256:7dc2244a2f84a4bfb1d36c37bac80cd78e35cdc5c119206d87b018e1445f3a3f
     # via orbax-checkpoint
@@ -954,11 +962,11 @@ immutabledict==4.3.1 ; platform_machine != 'aarch64' and sys_platform != 'win32'
     --hash=sha256:c9facdc0ff30fdb8e35bd16532026cac472a549e182c94fa201b51b25e4bf7bf \
     --hash=sha256:f844a669106cfdc73f47b1a9da003782fb17dc955a54c80972e0d93d1c63c514
     # via tensorflow-datasets
-importlib-resources==7.1.0 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+importlib-resources==7.1.0 ; (python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.11' and sys_platform == 'darwin') \
     --hash=sha256:0722d4c6212489c530f2a145a34c0a7a3b4721bc96a15fada5930e2a0b760708 \
     --hash=sha256:1bd7b48b4088eddb2cd16382150bb515af0bd2c70128194392725f82ad2c96a1
     # via etils
-jax==0.6.2 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+jax==0.6.2 ; (python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.11' and sys_platform == 'darwin') \
     --hash=sha256:a437d29038cbc8300334119692744704ca7941490867b9665406b7f90665cd96 \
     --hash=sha256:bb24a82dc60ccf704dcaf6dbd07d04957f68a6c686db19630dd75260d1fb788c
     # via
@@ -966,7 +974,7 @@ jax==0.6.2 ; python_full_version < '3.11' and platform_machine != 'aarch64' and 
     #   flax
     #   optax
     #   orbax-checkpoint
-jax==0.10.2 ; python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+jax==0.10.2 ; (python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version == '3.11.*' and sys_platform == 'darwin') \
     --hash=sha256:724d73c4678d8b06f6a6ab4db1b8a2fea8cd4f1e2c2564f99601634ec7b8d1c6 \
     --hash=sha256:bf77428a8c2e6904c4f46d5ab12aa5cfc6cad2179f07f7e4c0fc75ac86ef0639
     # via
@@ -974,7 +982,7 @@ jax==0.10.2 ; python_full_version == '3.11.*' and platform_machine != 'aarch64' 
     #   flax
     #   optax
     #   orbax-checkpoint
-jax==0.11.2 ; python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+jax==0.11.2 ; (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.12' and sys_platform == 'darwin') \
     --hash=sha256:540dc0bed96bd5a0d8acca15cf16198fea98ef2fc151d40bdf1ace49eb76efd9 \
     --hash=sha256:59e7ed9bd9ace049f4856752fe580c890e0164e1c023f40fadac386408daad66
     # via
@@ -982,7 +990,7 @@ jax==0.11.2 ; python_full_version >= '3.12' and platform_machine != 'aarch64' an
     #   flax
     #   optax
     #   orbax-checkpoint
-jaxlib==0.6.2 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+jaxlib==0.6.2 ; (python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.11' and sys_platform == 'darwin') \
     --hash=sha256:11eae7e05bc5a79875da36324afb9eddd4baeaef2a0386caf6d4f3720b9aef28 \
     --hash=sha256:153eaa51f778b60851720729d4f461a91edd9ba3932f6f3bc598d4413870038b \
     --hash=sha256:335d7e3515ce78b52a410136f46aa4a7ea14d0e7d640f34e1e137409554ad0ac \
@@ -1005,7 +1013,7 @@ jaxlib==0.6.2 ; python_full_version < '3.11' and platform_machine != 'aarch64' a
     #   -r dev_requirements.txt
     #   jax
     #   optax
-jaxlib==0.10.2 ; python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+jaxlib==0.10.2 ; (python_full_version == '3.11.*' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version == '3.11.*' and sys_platform == 'darwin') \
     --hash=sha256:1faca3c5d4662cb4a6130a68105d68bb520764817e165d6eebfd6786c0d1f30f \
     --hash=sha256:45b28b0238697ab74bbcf20411aafb6db42acc31836cc2fd711e5cf056bf9556 \
     --hash=sha256:47bb7c011515ea862be7e8313f40f9c56cbec09dc98a0fcb5016785fcd454c01 \
@@ -1032,7 +1040,7 @@ jaxlib==0.10.2 ; python_full_version == '3.11.*' and platform_machine != 'aarch6
     #   -r dev_requirements.txt
     #   jax
     #   optax
-jaxlib==0.11.2 ; python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+jaxlib==0.11.2 ; (python_full_version >= '3.12' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.12' and sys_platform == 'darwin') \
     --hash=sha256:061468eb5ac6b6213215fd1102b237bcbc93f24480c881245b73619d0c2a321e \
     --hash=sha256:1f31d8a6b1fb13181ff1807757506d10f6e7cba6b2707f7f80f73b853cb2ff22 \
     --hash=sha256:33d9c43f729f0e5b597f3fca73b2e1b342877e063a7e259ab57b6cc6e686369e \
@@ -1234,7 +1242,7 @@ libclang==18.1.1 ; python_full_version < '3.13' and platform_machine != 'aarch64
     --hash=sha256:c533091d8a3bbf7460a00cb6c1a71da93bffe148f172c7d03b1c31fbf8aa2a0b \
     --hash=sha256:cf4a99b05376513717ab5d82a0db832c56ccea4fd61a69dbb7bccf2dfb207dbe
     # via tensorflow
-markdown-it-py==4.2.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') \
+markdown-it-py==4.2.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49 \
     --hash=sha256:9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a
     # via rich
@@ -1350,11 +1358,11 @@ matplotlib==3.11.2 ; python_full_version >= '3.11' \
     --hash=sha256:f2ac30cf5eb5dff1b584627ae0b0e1186551a4f69ae3c75073911da497a29170 \
     --hash=sha256:fea03cf56568cc1cba08b470be6a0559e71c3a5b688d54b7179bb35ba23d0821
     # via -r dev_requirements.txt
-mdurl==0.1.2 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') \
+mdurl==0.1.2 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8 \
     --hash=sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba
     # via markdown-it-py
-ml-dtypes==0.6.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') \
+ml-dtypes==0.6.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:008382aeab529df5d3f00501ad9a7dcd64494d4b5b1971fc4c79019e6c1f5010 \
     --hash=sha256:03ce583adfce34ad33aa9e1fc7a8344dcf90ea776cc4ef0e5a48d4eae84e5d20 \
     --hash=sha256:084dfe51a7ad58b171f05115f8226ed4233a454a1611371947e806e76f0c638d \
@@ -1405,7 +1413,7 @@ more-itertools==11.1.0 ; python_full_version < '3.11' and platform_machine != 'a
     --hash=sha256:48e8f4d9e7e5878571ecf6f2b4e57634f93cd474cc8cfbd2376f2d11b396e30d \
     --hash=sha256:4b65538ae22f6fed0ce4874efd317463a7489796a0939fa66824dd542125a192
     # via grain
-msgpack==1.2.3 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+msgpack==1.2.3 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:07c9733089d1b176c3dd2f7fa268452f9d5d784d076473499d754a58e8d1fbbb \
     --hash=sha256:0955b9000725573d1457c1676944b370dd9643c8d18f25bda5ac72913f850949 \
     --hash=sha256:0c91762c48cd686dc9cf2b142c0bc544083952de32f5853d6624c956e54b85e5 \
@@ -1776,13 +1784,13 @@ opentelemetry-api==1.45.1 \
     --hash=sha256:aa38ed19bcc084ba42782a73255b3582283eced7ad6dddbd6695189e69adfb75 \
     --hash=sha256:b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb
     # via fastapi
-opt-einsum==3.4.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') \
+opt-einsum==3.4.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd \
     --hash=sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac
     # via
     #   jax
     #   tensorflow
-optax==0.2.8 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+optax==0.2.8 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:5b225b35066fc3eebaa4d798f1b4173b4d57d1a480610908981f8343b50af0b0 \
     --hash=sha256:e3ca2d36c99daab1800ae9dbc0545034382d6bc780b24d969e1b0df65fa31cb4
     # via
@@ -1913,11 +1921,11 @@ optree==0.20.0 ; python_full_version < '3.13' and platform_machine != 'aarch64' 
     --hash=sha256:f9faccc47bef4b37f53e201b708c3e3288e143d430d8a1a78e571b554dc8233c \
     --hash=sha256:fa0340d92215264634d8acc8f2f6e44d32cfffb3ce5334bb58ffada89fc56d7b
     # via keras
-orbax-checkpoint==0.11.39 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+orbax-checkpoint==0.11.39 ; (python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.11' and sys_platform == 'darwin') \
     --hash=sha256:047f5078c4e6baa823efd1341886f690931d2c7a58c69e7b8aa3da08b37cfae2 \
     --hash=sha256:6bf22a6d4d20ed98f4e576248e4f53adb85b5a18353f08f323e29f2fc79fd2d1
     # via flax
-orbax-checkpoint==0.12.7 ; python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+orbax-checkpoint==0.12.7 ; (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.11' and sys_platform == 'darwin') \
     --hash=sha256:96b352c3d017bf268a05977ea7677ce5af1faa728a99204ea3dc8157c6ce575a \
     --hash=sha256:ed62a3efcdbce9639a6f6ecbefc050ced035f6fb90e578033deffd492983da92
     # via flax
@@ -2162,7 +2170,7 @@ portpicker==1.6.0 \
     # via
     #   -r dev_requirements.txt
     #   grain
-prometheus-client==0.26.0 ; python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+prometheus-client==0.26.0 ; (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.11' and sys_platform == 'darwin') \
     --hash=sha256:04a91bcf94e2cf74a44a1a874d651a2e853ed354b6e822f3b7487751465d5c2b \
     --hash=sha256:fa93d06737aa02bacd05794768508bb97d2fbee28cb3bca04eaae92f0ca953d6
     # via orbax-checkpoint
@@ -2481,7 +2489,7 @@ pyelftools==0.33 ; sys_platform == 'linux' \
     --hash=sha256:660d82dcbeb8e83d1702bd97f223f761625da06111c0cc988eac6b8ab0c1b61f \
     --hash=sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036
     # via auditwheel
-pygments==2.21.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') \
+pygments==2.21.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9 \
     --hash=sha256:610ca751c9bc2492b38eb9a38a7fbc93edbbb2d7182edaf34e66ae493dee5c8c
     # via rich
@@ -2499,7 +2507,7 @@ pytz==2026.5 ; python_full_version < '3.11' \
     --hash=sha256:e658af3757f9e26a9d25dd2aff38335acd92bc9104f890a894b2c1ba28311b03 \
     --hash=sha256:fa23724b9c486543b9ff54a327ee7569ac83ade54bb9afd0fc18676620401c86
     # via pandas
-pyyaml==6.0.3 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+pyyaml==6.0.3 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:00c4bdeba853cc34e7dd471f16b4114f4162dc03e6b7afcc2128711f0eca823c \
     --hash=sha256:0150219816b6a1fa26fb4699fb7daa9caf09eb1999f3b70fb6e786805e80375a \
     --hash=sha256:02893d100e99e03eda1c8fd5c441d8c60103fd175728e23e431db1b589cf5ab3 \
@@ -2583,7 +2591,7 @@ requests==2.34.2 \
     #   -r dev_requirements.txt
     #   tensorflow
     #   tensorflow-datasets
-rich==15.0.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') \
+rich==15.0.0 ; (python_full_version < '3.13' and platform_machine != 'aarch64') or (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb \
     --hash=sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36
     # via
@@ -2877,7 +2885,7 @@ simple-parsing==0.1.9 ; platform_machine != 'aarch64' and sys_platform != 'win32
     --hash=sha256:0ff184ebaa6606420989ddbcb5650b21c62e2a59ec5388bc76c3343bda872cde \
     --hash=sha256:398c6b2c3d6ee3b865a6b8d7413999ee7b373de3c5a047f0b12b03b705d52e16
     # via tensorflow-datasets
-simplejson==4.2.0 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+simplejson==4.2.0 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:01111d369fe8f21255228dfc6211664cb434a48f442febdc0fe00b81e963eb34 \
     --hash=sha256:0493bffcb4bba66b38a5b9adb41a2d8db54dff5f8e537a47d4741818e2a28f4a \
     --hash=sha256:0b10f6872fef4c4eaa19bc41c1d785654a83f49c6b52ba1b7b74056ffa404662 \
@@ -3046,7 +3054,7 @@ tensorflow-metadata==1.21.0 ; platform_machine != 'aarch64' and sys_platform != 
     --hash=sha256:0520806bf3bdd9157333203a3aa0e8afde2a97cc619f15ba622603dc6c898d1f \
     --hash=sha256:2108ed8ea40df9ac4f7c506a62e9ecf5dcd40678b3308dcee2ec9e0e59d60609
     # via tensorflow-datasets
-tensorstore==0.1.78 ; python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+tensorstore==0.1.78 ; (python_full_version < '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version < '3.11' and sys_platform == 'darwin') \
     --hash=sha256:1910101ea85b6507958da28628ef53712c5311df19a795f449604f82bae6a24b \
     --hash=sha256:1c91e7ff93561612bd9868f3ee56702b0e4fecb45079a4c152dff9a6aa751913 \
     --hash=sha256:1e92195db0c8c3ca749f24b1e930ab93382ac27430ac4ad2e3f53fc8f739323f \
@@ -3071,7 +3079,7 @@ tensorstore==0.1.78 ; python_full_version < '3.11' and platform_machine != 'aarc
     # via
     #   flax
     #   orbax-checkpoint
-tensorstore==0.1.85 ; python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32' \
+tensorstore==0.1.85 ; (python_full_version >= '3.11' and platform_machine != 'aarch64' and sys_platform != 'win32') or (python_full_version >= '3.11' and sys_platform == 'darwin') \
     --hash=sha256:07245185b399402d139a9e7e90bd5938a08f5e33867efc91299e97c3e7fa0d0d \
     --hash=sha256:0e2f42d1e57df7e07655b819dd07f3de258fde97e39b896a53f089d7d7067e21 \
     --hash=sha256:19a3a809948a96eb44a6da72eef04f8ba44086d52f1e8122b84938890551fa2e \
@@ -3121,7 +3129,7 @@ tqdm==4.70.1 \
     #   -r dev_requirements.txt
     #   etils
     #   tensorflow-datasets
-treescope==0.1.10 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+treescope==0.1.10 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:20f74656f34ab2d8716715013e8163a0da79bdc2554c16d5023172c50d27ea95 \
     --hash=sha256:dde52f5314f4c29d22157a6fe4d3bd103f9cae02791c9e672eefa32c9aa1da51
     # via flax
@@ -3167,7 +3175,7 @@ urllib3==2.8.0 \
     # via
     #   -r dev_requirements.txt
     #   requests
-uvloop==0.23.0 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+uvloop==0.23.0 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:0305871ac712f54b62af73f943dbf21ae3ce80a44bc0f0151424484affa85645 \
     --hash=sha256:090865d8ce7a03986755a3ce711b7dd0d4b44eb14ab74368b717f3fad1180208 \
     --hash=sha256:098a85e1393ef5202767b7e5fb41a32cd8bd81e6ee4af364c179801c4aa3f6d4 \
@@ -3352,7 +3360,7 @@ xarray==2026.9.0 ; python_full_version >= '3.11' \
     --hash=sha256:6abc69694c22fa1f0fb2f357ff4e41d88beb4477ed71091f944b7dbf67ed54fe \
     --hash=sha256:fe349fa871628b1a0a5217af3fe1283a2862d5485156e6eda354fffb81c3bb7c
     # via -r dev_requirements.txt
-zipp==4.1.1 ; platform_machine != 'aarch64' and sys_platform != 'win32' \
+zipp==4.1.1 ; (platform_machine != 'aarch64' and sys_platform != 'win32') or sys_platform == 'darwin' \
     --hash=sha256:7ebb7a44c021b29fd8dbd7cce6812d0d7b5b454521f93cc71af6ccd155aaa70b \
     --hash=sha256:8979f52d874162f485ff2981e3891f3a3317b7a3dd43ff1e1775b9304f307a9c
     # via etils
