@@ -1057,7 +1057,6 @@ TEST(ProjectionEvaluator, CanBeCached) {
   dt_config.set_missing_value_policy(
       proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION);
   EXPECT_TRUE(internal::ProjectionEvaluator::CanBeCached(dt_config));
-  // Each node is trained on a per-node imputed copy of the dataset.
   dt_config.set_missing_value_policy(
       proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION);
   EXPECT_FALSE(internal::ProjectionEvaluator::CanBeCached(dt_config));

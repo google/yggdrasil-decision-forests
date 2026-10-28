@@ -4895,8 +4895,7 @@ absl::Status DecisionTreeTrain(
   InternalTrainConfig effective_internal_config = internal_config;
 
   // If oblique splits are enabled, build the projection evaluator once for the
-  // entire tree. Without it, each node-local evaluator costs O(n. features).
-  // Without numerical features, oblique splitters don't build an evaluator
+  // entire tree.
   if (internal_config.projection_evaluator == nullptr &&
       !config_link.numerical_features().empty() &&
       internal::ProjectionEvaluator::CanBeCached(dt_config)) {
