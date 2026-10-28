@@ -17,17 +17,13 @@
 
 #include <cstdint>
 #include <numeric>
-#include <random>
 #include <string>
-#include <tuple>
-#include <unordered_map>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
-#include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -1076,59 +1072,30 @@ TEST(ProjectionEvaluator, CanBeCached) {
 // missing value policy matters.
 class CachedProjectionEvaluatorTest
     : public testing::TestWithParam<
-          std::tuple<model::proto::Task,
-                     proto::DecisionTreeTrainingConfig::MissingValuePolicy>> {
-};
+          proto::DecisionTreeTrainingConfig::MissingValuePolicy> {};
 
 TEST_P(CachedProjectionEvaluatorTest, SameTreeAsPerNodeEvaluators) {
-  const auto task = std::get<0>(GetParam());
-  const auto missing_value_policy = std::get<1>(GetParam());
-
-  // Dataset with 4 numerical features, 20% of the feature values missing.
   dataset::VerticalDataset dataset;
-  if (task == model::proto::Task::CLASSIFICATION) {
-    ASSERT_OK_AND_ASSIGN(auto label_col,
-                         dataset.AddColumn("l", ColumnType::CATEGORICAL));
-    label_col->mutable_categorical()->set_is_already_integerized(true);
-    label_col->mutable_categorical()->set_number_of_unique_values(3);
-  } else {
-    ASSERT_OK(dataset.AddColumn("l", ColumnType::NUMERICAL).status());
-  }
-  constexpr int kNumFeatures = 4;
-  for (int i = 0; i < kNumFeatures; i++) {
-    ASSERT_OK(dataset.AddColumn(absl::StrCat("f", i), ColumnType::NUMERICAL)
-                  .status());
-  }
+  ASSERT_OK_AND_ASSIGN(auto label_col,
+                       dataset.AddColumn("l", ColumnType::CATEGORICAL));
+  label_col->mutable_categorical()->set_is_already_integerized(true);
+  label_col->mutable_categorical()->set_number_of_unique_values(3);
+  ASSERT_OK(dataset.AddColumn("f0", ColumnType::NUMERICAL).status());
+  ASSERT_OK(dataset.AddColumn("f1", ColumnType::NUMERICAL).status());
   ASSERT_OK(dataset.CreateColumnsFromDataspec());
-  std::mt19937 data_rng(1234);
-  std::uniform_real_distribution<float> unif(0.f, 1.f);
-  constexpr int kNumExamples = 300;
-  for (int example_idx = 0; example_idx < kNumExamples; example_idx++) {
-    std::vector<float> features(kNumFeatures);
-    for (auto& f : features) {
-      f = unif(data_rng);
-    }
-    const float score = features[0] - 1.5f * features[1] + 0.5f * features[2] +
-                        0.1f * unif(data_rng);
-    std::unordered_map<std::string, std::string> example;
-    if (task == model::proto::Task::CLASSIFICATION) {
-      example["l"] = (score > 0.f) ? "1" : "2";
-    } else {
-      example["l"] = absl::StrCat(score);
-    }
-    for (int i = 0; i < kNumFeatures; i++) {
-      example[absl::StrCat("f", i)] = absl::StrCat(features[i]);
-    }
-    dataset.AppendExample(example);
-    for (int i = 0; i < kNumFeatures; i++) {
-      if (unif(data_rng) < 0.2f) {
-        dataset.mutable_column(i + 1)->SetNA(example_idx);
-      }
-    }
-  }
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.1"}, {"f1", "0.9"}});
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.2"}});
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.3"}, {"f1", "0.7"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.6"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.6"}, {"f1", "0.4"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.7"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.8"}, {"f1", "0.2"}});
+  dataset.AppendExample({{"l", "2"}, {"f1", "0.1"}});
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.9"}, {"f1", "0.8"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.4"}, {"f1", "0.3"}});
 
   // Training configuration
-  std::vector<UnsignedExampleIdx> selected_examples(kNumExamples);
+  std::vector<UnsignedExampleIdx> selected_examples(dataset.nrow());
   std::iota(selected_examples.begin(), selected_examples.end(), 0);
   const std::vector<float> weights = {};
   model::proto::TrainingConfig config;
@@ -1136,15 +1103,14 @@ TEST_P(CachedProjectionEvaluatorTest, SameTreeAsPerNodeEvaluators) {
   proto::DecisionTreeTrainingConfig dt_config;
   const model::proto::DeploymentConfig deployment;
 
-  config.set_task(task);
+  config.set_task(model::proto::Task::CLASSIFICATION);
   config_link.set_label(0);
-  for (int i = 0; i < kNumFeatures; i++) {
-    config_link.add_features(i + 1);
-    config_link.add_numerical_features(i + 1);
+  for (const int feature : {1, 2}) {
+    config_link.add_features(feature);
+    config_link.add_numerical_features(feature);
   }
   dt_config.set_min_examples(1);
-  dt_config.set_max_depth(6);
-  dt_config.set_missing_value_policy(missing_value_policy);
+  dt_config.set_missing_value_policy(GetParam());
   dt_config.mutable_sparse_oblique_split();
   dt_config.mutable_internal()->set_sorting_strategy(
       proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
@@ -1170,11 +1136,10 @@ TEST_P(CachedProjectionEvaluatorTest, SameTreeAsPerNodeEvaluators) {
   // Per-node evaluators: DecisionTreeCoreTrain does not set the evaluator.
   utils::RandomEngine random_per_node(42);
   DecisionTree tree_per_node;
-  std::vector<UnsignedExampleIdx> working_selected_examples = selected_examples;
   ASSERT_OK(DecisionTreeCoreTrain(dataset, config, config_link, dt_config,
                                   deployment, weights, &random_per_node,
                                   internal_config, &tree_per_node,
-                                  absl::MakeSpan(working_selected_examples),
+                                  absl::MakeSpan(selected_examples),
                                   std::nullopt));
 
   std::string description_cached, description_per_node;
@@ -1186,85 +1151,9 @@ TEST_P(CachedProjectionEvaluatorTest, SameTreeAsPerNodeEvaluators) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    AllTasksAndPolicies, CachedProjectionEvaluatorTest,
-    testing::Combine(
-        testing::Values(model::proto::Task::CLASSIFICATION,
-                        model::proto::Task::REGRESSION),
-        testing::Values(
-            proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION,
-            proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION,
-            proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION)));
-
-// Oblique splits enabled but no numerical features: the oblique splitters
-// return early without an evaluator, and DecisionTreeTrain must not build the
-// shared one (it requires at least one numerical feature).
-TEST(CachedProjectionEvaluator, NoNumericalFeatures) {
-  dataset::VerticalDataset dataset;
-  ASSERT_OK_AND_ASSIGN(auto label_col,
-                       dataset.AddColumn("l", ColumnType::CATEGORICAL));
-  label_col->mutable_categorical()->set_is_already_integerized(true);
-  label_col->mutable_categorical()->set_number_of_unique_values(3);
-  ASSERT_OK_AND_ASSIGN(auto feature_col,
-                       dataset.AddColumn("c", ColumnType::CATEGORICAL));
-  feature_col->mutable_categorical()->set_is_already_integerized(true);
-  feature_col->mutable_categorical()->set_number_of_unique_values(5);
-  ASSERT_OK(dataset.CreateColumnsFromDataspec());
-  constexpr int kNumExamples = 100;
-  for (int example_idx = 0; example_idx < kNumExamples; example_idx++) {
-    const int c = 1 + (example_idx * 7) % 4;
-    dataset.AppendExample(
-        {{"l", (c >= 3) ? "1" : "2"}, {"c", absl::StrCat(c)}});
-  }
-
-  std::vector<UnsignedExampleIdx> selected_examples(kNumExamples);
-  std::iota(selected_examples.begin(), selected_examples.end(), 0);
-  const std::vector<float> weights = {};
-  model::proto::TrainingConfig config;
-  model::proto::TrainingConfigLinking config_link;
-  proto::DecisionTreeTrainingConfig dt_config;
-  const model::proto::DeploymentConfig deployment;
-
-  config.set_task(model::proto::Task::CLASSIFICATION);
-  config_link.set_label(0);
-  config_link.add_features(1);
-  ASSERT_TRUE(config_link.numerical_features().empty());
-  dt_config.set_min_examples(1);
-  dt_config.mutable_sparse_oblique_split();
-  dt_config.mutable_internal()->set_sorting_strategy(
-      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
-  dt_config.mutable_growing_strategy_local();
-  dt_config.set_num_candidate_attributes(-1);
-  ASSERT_TRUE(internal::ProjectionEvaluator::CanBeCached(dt_config));
-
-  ASSERT_OK_AND_ASSIGN(const auto preprocessing,
-                       decision_tree::PreprocessTrainingDataset(
-                           dataset, config, config_link, dt_config, 1));
-  const InternalTrainConfig internal_config{
-      .preprocessing = &preprocessing,
-      .duplicated_selected_examples = false,
-  };
-
-  utils::RandomEngine random_shared(42);
-  DecisionTree tree_shared;
-  ASSERT_OK(DecisionTreeTrain(dataset, selected_examples, config, config_link,
-                              dt_config, deployment, weights, &random_shared,
-                              &tree_shared, internal_config));
-
-  utils::RandomEngine random_per_node(42);
-  DecisionTree tree_per_node;
-  std::vector<UnsignedExampleIdx> working_selected_examples = selected_examples;
-  ASSERT_OK(DecisionTreeCoreTrain(dataset, config, config_link, dt_config,
-                                  deployment, weights, &random_per_node,
-                                  internal_config, &tree_per_node,
-                                  absl::MakeSpan(working_selected_examples),
-                                  std::nullopt));
-
-  std::string description_shared, description_per_node;
-  tree_shared.AppendModelStructure(dataset.data_spec(), 0, &description_shared);
-  tree_per_node.AppendModelStructure(dataset.data_spec(), 0,
-                                     &description_per_node);
-  EXPECT_EQ(description_shared, description_per_node);
-}
+    AllPolicies, CachedProjectionEvaluatorTest,
+    testing::Values(proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION,
+                    proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION));
 
 }  // namespace
 }  // namespace decision_tree

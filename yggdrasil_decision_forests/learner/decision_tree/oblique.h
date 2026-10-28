@@ -184,8 +184,10 @@ class ProjectionEvaluator {
                                     dt_config.has_mhld_oblique_split() ||
                                     dt_config.has_guided_oblique_split();
     return use_oblique_splits &&
-           dt_config.missing_value_policy() !=
-               proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION;
+           (dt_config.missing_value_policy() ==
+                proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION ||
+            dt_config.missing_value_policy() ==
+                proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION);
   }
 
   // Evaluates a projection of a set of selected examples.
