@@ -180,9 +180,7 @@ class ProjectionEvaluator {
 
   // Whether an evaluator can be cached i.e. built once per tree.
   static bool CanBeCached(const proto::DecisionTreeTrainingConfig& dt_config) {
-    const bool use_oblique_splits = dt_config.has_sparse_oblique_split() ||
-                                    dt_config.has_guided_oblique_split();
-    return use_oblique_splits &&
+    return dt_config.has_sparse_oblique_split() &&
            (dt_config.missing_value_policy() ==
                 proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION ||
             dt_config.missing_value_policy() ==

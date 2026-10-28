@@ -462,10 +462,8 @@ absl::StatusOr<bool> FindBestConditionGuidedObliqueTemplate(
   float current_threshold = 0;
   auto& projection_values = cache->projection_values;
 
-  std::optional<ProjectionEvaluator> local_projection_evaluator;
-  const ProjectionEvaluator& projection_evaluator =
-      GetProjectionEvaluator(train_dataset, config_link, internal_config,
-                             &local_projection_evaluator);
+  ProjectionEvaluator projection_evaluator(train_dataset,
+                                           config_link.numerical_features());
 
   // TODO: Cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);
