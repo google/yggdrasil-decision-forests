@@ -5,7 +5,6 @@ requests
 urllib3
 tensorflow; platform_machine != 'aarch64' and python_version >= '3.9' and python_version < '3.13'
 portpicker
-matplotlib
 scikit-learn
 jax; platform_system != 'Windows' and (platform_machine != 'aarch64' or platform_system == 'Darwin')
 jaxlib; platform_system != 'Windows' and (platform_machine != 'aarch64' or platform_system == 'Darwin')

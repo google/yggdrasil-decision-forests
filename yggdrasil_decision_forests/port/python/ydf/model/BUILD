@@ -399,7 +399,6 @@ py_test(
         "@abseil-py//absl/testing:parameterized",
         "@pypi_ydf//jax",
         "@pypi_ydf//jax:pkg",
-        "@pypi_ydf//matplotlib",
         "@pypi_ydf//numpy",
         "@pypi_ydf//optax",
         "@pypi_ydf//tensorflow",

@@ -17,14 +17,13 @@ import logging
 import os
 import sys
 import tempfile
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 from jax.experimental import jax2tf
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
@@ -116,14 +115,12 @@ def create_dataset_mnist(
 def create_dataset_ellipse(
     num_examples: int = 1000,
     num_features: int = 3,
-    plot_path: Optional[str] = None,
 ) -> Dict[str, np.ndarray]:
   """Creates a binary classification dataset classifying ellipses.
 
   Args:
     num_examples: Number of generated examples.
     num_features: Number of features.
-    plot_path: If set, saves a plot of the examples to this file.
 
   Returns:
     An ellipse dataset.
@@ -135,65 +132,10 @@ def create_dataset_ellipse(
       np.sqrt(np.sum(np.multiply(np.square(features), scales), axis=1)) <= 0.80
   )
 
-  if plot_path:
-    colors = ["blue" if l else "red" for l in labels]
-    fig, ax = plt.subplots(1, 1)
-    ax.scatter(features[:, 0], features[:, 1], color=colors, s=1.5)
-    ax.set_axis_off()
-    ax.set_aspect("equal")
-    fig.savefig(plot_path)
-
   data = {"label": labels}
   for i in range(num_features):
     data[f"f_{i}"] = features[:, i]  # pyrefly: ignore[bad-assignment]
   return data
-
-
-def plot_ellipse_predictions(
-    prediction_fn: Callable[[Dict[str, jax.Array]], jax.Array],
-    path: str,
-    resolution: int = 200,
-    num_features: int = 3,
-) -> None:
-  """Plots the predictions of a model on the ellipse dataset.
-
-  Args:
-    prediction_fn: A function taking a batch of examples, and returning
-      predictions.
-    path: Save to save the plot.
-    resolution: Plotting resolution, for each axis.
-    num_features: Number of features.
-  """
-
-  # Compute feature values
-  vs = np.linspace(-1, 1, resolution)
-  tuple_features = np.meshgrid(*((vs,) * num_features))
-  raw_features = np.stack([np.reshape(f, [-1]) for f in tuple_features], axis=1)
-  dict_features = {
-      f"f_{i}": jnp.asarray(raw_features[:, i]) for i in range(num_features)
-  }
-
-  # Generate predictions
-  predictions = prediction_fn(dict_features)
-
-  disp_predictions = np.reshape(predictions, [resolution] * num_features)
-  if len(disp_predictions.shape) > 2:
-    disp_predictions = np.mean(  # pyrefly: ignore[no-matching-overload]
-        disp_predictions,
-        axis=[i for i in range(2, len(disp_predictions.shape))],
-    )
-
-  # Plot predictions
-  fig, ax = plt.subplots(1, 1)
-  ax.imshow(
-      disp_predictions,
-      interpolation="none",
-      resample=False,
-      cmap="coolwarm",
-  )
-  ax.set_axis_off()
-  ax.set_aspect("equal")
-  fig.savefig(path)
 
 
 def check_toy_model(test_self, model):
@@ -1097,19 +1039,6 @@ class ToJaxTest(parameterized.TestCase):
           tfl_predictions,
           rtol=1e-5,
           atol=1e-5,
-      )
-
-  def test_dataset_ellipse(self):
-    with tempfile.TemporaryDirectory() as tempdir:
-      _ = create_dataset_ellipse(
-          1000, plot_path=os.path.join(tempdir, "ds.png")
-      )
-
-      def prediction_fn(features: Dict[str, jax.Array]) -> jax.Array:
-        return features["f_0"] >= 0.1
-
-      plot_ellipse_predictions(
-          prediction_fn, os.path.join(tempdir, "predictions.png")
       )
 
   @parameterized.named_parameters(
