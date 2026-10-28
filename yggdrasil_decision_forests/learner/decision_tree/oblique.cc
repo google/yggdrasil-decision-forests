@@ -946,10 +946,8 @@ absl::StatusOr<bool> FindBestConditionMHLDObliqueTemplate(
     return false;
   }
 
-  std::optional<ProjectionEvaluator> local_projection_evaluator;
-  const ProjectionEvaluator& projection_evaluator =
-      GetProjectionEvaluator(train_dataset, config_link, internal_config,
-                             &local_projection_evaluator);
+  ProjectionEvaluator projection_evaluator(train_dataset,
+                                           config_link.numerical_features());
 
   // TODO: Cache.
   const auto selected_labels = ExtractLabels(label_stats, selected_examples);

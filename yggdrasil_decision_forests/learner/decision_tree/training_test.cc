@@ -1060,7 +1060,7 @@ TEST(ProjectionEvaluator, CanBeCached) {
   dt_config.set_missing_value_policy(
       proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION);
   dt_config.mutable_mhld_oblique_split();
-  EXPECT_TRUE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+  EXPECT_FALSE(internal::ProjectionEvaluator::CanBeCached(dt_config));
   dt_config.mutable_guided_oblique_split();
   EXPECT_TRUE(internal::ProjectionEvaluator::CanBeCached(dt_config));
 }
