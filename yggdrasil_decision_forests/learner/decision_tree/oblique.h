@@ -178,12 +178,7 @@ class ProjectionEvaluator {
   ProjectionEvaluator(const dataset::VerticalDataset& train_dataset,
                       const google::protobuf::RepeatedField<int32_t>& numerical_features);
 
-  // Whether an evaluator can be cached i.e. built once per tree. Holds
-  // pointers into the dataset columns, so nodes must be trained on that same
-  // dataset. This holds with GLOBAL_IMPUTATION and LOCAL_IMPUTATION, where
-  // missing values are always global column mean-imputed.
-  // Does not hold with RANDOM_LOCAL_IMPUTATION, where NodeTrain trains on a
-  // per-node imputed dataset copy.
+  // Whether an evaluator can be cached i.e. built once per tree.
   static bool CanBeCached(const proto::DecisionTreeTrainingConfig& dt_config) {
     const bool use_oblique_splits = dt_config.has_sparse_oblique_split() ||
                                     dt_config.has_mhld_oblique_split() ||
