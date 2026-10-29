@@ -4891,6 +4891,21 @@ absl::Status DecisionTreeTrain(
                                      absl::MakeSpan(leaf_examples.value()))
                                : std::nullopt;
 
+  // If oblique splits are enabled, build the projection evaluator once for the
+  // entire tree.
+  if (internal_config.projection_evaluator == nullptr &&
+      !config_link.numerical_features().empty() &&
+      internal::ProjectionEvaluator::CanBeCached(dt_config)) {
+    const internal::ProjectionEvaluator projection_evaluator(
+        train_dataset, config_link.numerical_features());
+    InternalTrainConfig effective_internal_config = internal_config;
+    effective_internal_config.projection_evaluator = &projection_evaluator;
+    return DecisionTreeCoreTrain(
+        train_dataset, config, config_link, dt_config, deployment, weights,
+        random, effective_internal_config, dt,
+        absl::MakeSpan(working_selected_examples), leaf_example_span);
+  }
+
   return DecisionTreeCoreTrain(train_dataset, config, config_link, dt_config,
                                deployment, weights, random, internal_config, dt,
                                absl::MakeSpan(working_selected_examples),

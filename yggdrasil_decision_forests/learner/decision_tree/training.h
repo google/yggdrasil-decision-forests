@@ -51,6 +51,8 @@
 namespace yggdrasil_decision_forests::model::decision_tree {
 
 namespace internal {
+class ProjectionEvaluator;
+
 struct NodeAndExamples {
   // The current node
   NodeWithChildren* node;
@@ -337,6 +339,11 @@ struct InternalTrainConfig {
   // Non owning pointer to pre-processing information.
   // Depending on the decision tree configuration this field might be required.
   const Preprocessing* preprocessing = nullptr;
+
+  // Non-owning pointer to a projection evaluator shared by all the oblique
+  // split searches of a tree. Set by DecisionTreeTrain when
+  // "ProjectionEvaluator::CanBeCached" is true.
+  const internal::ProjectionEvaluator* projection_evaluator = nullptr;
 
   decision_tree::gpu::VectorSequenceComputer* vector_sequence_computer =
       nullptr;

@@ -1041,6 +1041,120 @@ TEST(SampleGuidedProjection, Base) {
 #endif
 }
 
+TEST(ProjectionEvaluator, CanBeCached) {
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_axis_aligned_split();
+  EXPECT_FALSE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+
+  dt_config.mutable_sparse_oblique_split();
+  dt_config.set_missing_value_policy(
+      proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION);
+  EXPECT_TRUE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+  dt_config.set_missing_value_policy(
+      proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION);
+  EXPECT_TRUE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+  dt_config.set_missing_value_policy(
+      proto::DecisionTreeTrainingConfig::RANDOM_LOCAL_IMPUTATION);
+  EXPECT_FALSE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+
+  dt_config.set_missing_value_policy(
+      proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION);
+  dt_config.mutable_mhld_oblique_split();
+  EXPECT_FALSE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+  dt_config.mutable_guided_oblique_split();
+  EXPECT_FALSE(internal::ProjectionEvaluator::CanBeCached(dt_config));
+}
+
+// Trains the same oblique tree with the tree-wide (cached) projection
+// evaluator set by "DecisionTreeTrain" and with the per-node evaluators used
+// when "InternalTrainConfig::projection_evaluator" is null, and checks that the
+// trees are identical. The dataset contains missing values so that the
+// missing value policy matters.
+class CachedProjectionEvaluatorTest
+    : public testing::TestWithParam<
+          proto::DecisionTreeTrainingConfig::MissingValuePolicy> {};
+
+TEST_P(CachedProjectionEvaluatorTest, SameTreeAsPerNodeEvaluators) {
+  dataset::VerticalDataset dataset;
+  ASSERT_OK_AND_ASSIGN(auto label_col,
+                       dataset.AddColumn("l", ColumnType::CATEGORICAL));
+  label_col->mutable_categorical()->set_is_already_integerized(true);
+  label_col->mutable_categorical()->set_number_of_unique_values(3);
+  ASSERT_OK(dataset.AddColumn("f0", ColumnType::NUMERICAL).status());
+  ASSERT_OK(dataset.AddColumn("f1", ColumnType::NUMERICAL).status());
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.1"}, {"f1", "0.9"}});
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.2"}});
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.3"}, {"f1", "0.7"}});
+  dataset.AppendExample({{"l", "1"}, {"f1", "0.6"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.6"}, {"f1", "0.4"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.7"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.8"}, {"f1", "0.2"}});
+  dataset.AppendExample({{"l", "2"}, {"f1", "0.1"}});
+  dataset.AppendExample({{"l", "1"}, {"f0", "0.9"}, {"f1", "0.8"}});
+  dataset.AppendExample({{"l", "2"}, {"f0", "0.4"}, {"f1", "0.3"}});
+
+  // Training configuration
+  std::vector<UnsignedExampleIdx> selected_examples(dataset.nrow());
+  std::iota(selected_examples.begin(), selected_examples.end(), 0);
+  const std::vector<float> weights = {};
+  model::proto::TrainingConfig config;
+  model::proto::TrainingConfigLinking config_link;
+  proto::DecisionTreeTrainingConfig dt_config;
+  const model::proto::DeploymentConfig deployment;
+
+  config.set_task(model::proto::Task::CLASSIFICATION);
+  config_link.set_label(0);
+  for (const int feature : {1, 2}) {
+    config_link.add_features(feature);
+    config_link.add_numerical_features(feature);
+  }
+  dt_config.set_min_examples(1);
+  dt_config.set_missing_value_policy(GetParam());
+  dt_config.mutable_sparse_oblique_split();
+  dt_config.mutable_internal()->set_sorting_strategy(
+      proto::DecisionTreeTrainingConfig::Internal::IN_NODE);
+  dt_config.mutable_growing_strategy_local();
+  dt_config.set_num_candidate_attributes(-1);
+
+  ASSERT_OK_AND_ASSIGN(const auto preprocessing,
+                       decision_tree::PreprocessTrainingDataset(
+                           dataset, config, config_link, dt_config, 1));
+  const InternalTrainConfig internal_config{
+      .preprocessing = &preprocessing,
+      .duplicated_selected_examples = false,
+  };
+  ASSERT_EQ(internal_config.projection_evaluator, nullptr);
+
+  // Tree-wide evaluator (set by DecisionTreeTrain when CanBeCached is true).
+  utils::RandomEngine random_cached(42);
+  DecisionTree tree_cached;
+  ASSERT_OK(DecisionTreeTrain(dataset, selected_examples, config, config_link,
+                              dt_config, deployment, weights, &random_cached,
+                              &tree_cached, internal_config));
+
+  // Per-node evaluators: DecisionTreeCoreTrain does not set the evaluator.
+  utils::RandomEngine random_per_node(42);
+  DecisionTree tree_per_node;
+  ASSERT_OK(DecisionTreeCoreTrain(dataset, config, config_link, dt_config,
+                                  deployment, weights, &random_per_node,
+                                  internal_config, &tree_per_node,
+                                  absl::MakeSpan(selected_examples),
+                                  std::nullopt));
+
+  std::string description_cached, description_per_node;
+  tree_cached.AppendModelStructure(dataset.data_spec(), 0, &description_cached);
+  tree_per_node.AppendModelStructure(dataset.data_spec(), 0,
+                                     &description_per_node);
+  EXPECT_GT(tree_cached.NumNodes(), 1);
+  EXPECT_EQ(description_cached, description_per_node);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    AllPolicies, CachedProjectionEvaluatorTest,
+    testing::Values(proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION,
+                    proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION));
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

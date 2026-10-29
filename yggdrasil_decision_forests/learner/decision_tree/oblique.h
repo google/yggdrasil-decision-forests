@@ -178,6 +178,15 @@ class ProjectionEvaluator {
   ProjectionEvaluator(const dataset::VerticalDataset& train_dataset,
                       const google::protobuf::RepeatedField<int32_t>& numerical_features);
 
+  // Whether an evaluator can be cached i.e. built once per tree.
+  static bool CanBeCached(const proto::DecisionTreeTrainingConfig& dt_config) {
+    return dt_config.has_sparse_oblique_split() &&
+           (dt_config.missing_value_policy() ==
+                proto::DecisionTreeTrainingConfig::GLOBAL_IMPUTATION ||
+            dt_config.missing_value_policy() ==
+                proto::DecisionTreeTrainingConfig::LOCAL_IMPUTATION);
+  }
+
   // Evaluates a projection of a set of selected examples.
   //
   // "values", the output variable, contains "selected_examples.size()" values.
