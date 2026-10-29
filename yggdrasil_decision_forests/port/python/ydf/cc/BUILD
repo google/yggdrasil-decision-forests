@@ -16,6 +16,7 @@ pybind_extension(
         "//conditions:default": [],
     }),
     deps = [
+        ":maybe_gcs_filesystem",  # buildcleaner: keep
         "//ydf/dataset:dataset_cc",
         "//ydf/learner:learner_cc",
         "//ydf/learner:worker_cc",
