@@ -11,8 +11,10 @@ package(
 pybind_extension(
     name = "ydf",
     srcs = ["ydf.cc"],
+    additional_linker_inputs = ["ydf.lds"],
     linkopts = select({
         "@bazel_tools//src/conditions:darwin": ["-Wl,-exported_symbol,_PyInit_ydf"],
+        "@platforms//os:linux": ["-Wl,--version-script,$(location :ydf.lds)"],
         "//conditions:default": [],
     }),
     deps = [

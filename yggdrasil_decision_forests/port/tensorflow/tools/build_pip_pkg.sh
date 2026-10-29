@@ -71,6 +71,33 @@ function create_venv() {
   fi
 }
 
+# Checks that libtensorflow_framework exports all the Abseil, Protobuf and
+# TensorFlow symbols imported by the op library $1. The op is compiled against
+# the Abseil and Protobuf versions of MODULE.bazel, but uses the copies in
+# libtensorflow_framework at runtime. If the versions differ, the op fails to
+# load or crashes at runtime. This check catches it at build time.
+function check_tf_symbols() {
+  local op_lib="$1"
+  local tf_lib
+  tf_lib=$(ls "$(bazel info output_base)"/external/*local_config_tf/tensorflow/libtensorflow_framework.so.2 | head -n 1)
+  if [[ ! -f "${tf_lib}" ]]; then
+    echo "Error: libtensorflow_framework.so.2 not found"
+    exit 1
+  fi
+  local missing
+  missing=$(comm -23 \
+    <(nm -D --undefined-only "${op_lib}" | awk '{print $2}' | sed 's/@.*//' | sort -u) \
+    <(nm -D --defined-only "${tf_lib}" | awk '{print $3}' | sed 's/@.*//' | sort -u) \
+    | c++filt | grep -E 'absl::|google::protobuf::|tensorflow::|tsl::' || true)
+  if [[ -n "${missing}" ]]; then
+    echo "Error: ${op_lib} imports symbols not exported by ${tf_lib}."
+    echo "Make sure the Abseil and Protobuf versions in MODULE.bazel match the"
+    echo "ones of TensorFlow ${YDF_TF_VERSION}. Missing symbols:"
+    echo "${missing}" | head -n 20
+    exit 1
+  fi
+}
+
 # Prepare build environment
 mkdir -p /build_tools
 cd /build_tools
@@ -157,14 +184,18 @@ for YDF_TF_VERSION in "${TF_VERSIONS[@]}"; do
       --copt=-mavx2 --copt=-mavx \
       //ydf_tf:inference.so
 
-    # Create package structure
-    rm -rf pip_pkg/ydf_tf
-    mkdir -p pip_pkg/ydf_tf
-
     if [ ! -f bazel-bin/ydf_tf/inference.so ]; then
         echo "Error: bazel-bin/ydf_tf/inference.so not found!"
         exit 1
     fi
+
+    if [[ "$LEGACY" != "1" ]]; then
+      check_tf_symbols bazel-bin/ydf_tf/inference.so
+    fi
+
+    # Create package structure
+    rm -rf pip_pkg/ydf_tf
+    mkdir -p pip_pkg/ydf_tf
 
     cp bazel-bin/ydf_tf/inference.so pip_pkg/ydf_tf
     cp ydf_tf/{__init__.py,api.py,op.py,op_dynamic.py} pip_pkg/ydf_tf
