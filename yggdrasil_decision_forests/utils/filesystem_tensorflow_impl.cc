@@ -116,8 +116,8 @@ absl::StatusOr<int> FileInputByteStream::ReadUpTo(char* buffer, int max_read) {
   if (max_read > scrath_.size()) {
     scrath_.resize(max_read);
   }
-  const auto status =
-      file_->item()->Read(offset_, max_read, &result, &scrath_[0]);
+  const auto status = file_->item()->Read(
+      offset_, result, absl::MakeSpan(&scrath_[0], max_read));
   if (!status.ok() && status.code() != absl::StatusCode::kOutOfRange) {
     return status;
   }
@@ -132,8 +132,8 @@ absl::StatusOr<bool> FileInputByteStream::ReadExactly(char* buffer,
   if (num_read > scrath_.size()) {
     scrath_.resize(num_read);
   }
-  const auto status =
-      file_->item()->Read(offset_, num_read, &result, &scrath_[0]);
+  const auto status = file_->item()->Read(
+      offset_, result, absl::MakeSpan(&scrath_[0], num_read));
   if (!status.ok()) {
     if (status.code() == absl::StatusCode::kOutOfRange && result.empty() &&
         num_read > 0) {
