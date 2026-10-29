@@ -3,17 +3,17 @@ module(
     version = "0.16.1",
 )
 
-bazel_dep(name = "abseil-cpp", version = "20250814.1", repo_name = "com_google_absl")
+bazel_dep(name = "abseil-cpp", version = "20260526.0", repo_name = "com_google_absl")
 
 # Note: abseil-py 2.4.0 registers non-hermetic `runtime_env` Python toolchains.
 bazel_dep(name = "abseil-py", version = "2.1.0")
-bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1", repo_name = "com_google_googletest")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "31.1", repo_name = "com_google_protobuf")
-bazel_dep(name = "pybind11_bazel", version = "2.13.6")
-bazel_dep(name = "pybind11_protobuf", version = "0.0.0-20250210-f02a2b7")
-bazel_dep(name = "rules_cc", version = "0.2.17")
-bazel_dep(name = "rules_python", version = "2.3.4")
+bazel_dep(name = "pybind11_bazel", version = "3.0.3")
+bazel_dep(name = "pybind11_protobuf", version = "0.0.0-20261001-ca1c3d3")
+bazel_dep(name = "rules_cc", version = "0.2.27")
+bazel_dep(name = "rules_python", version = "2.4.5")
 bazel_dep(name = "yggdrasil_decision_forests", version = "1.12.0", repo_name = "ydf_cc")
 local_path_override(
     module_name = "yggdrasil_decision_forests",
@@ -30,9 +30,9 @@ local_path_override(
 bazel_dep(name = "rules_ml_toolchain")
 archive_override(
     module_name = "rules_ml_toolchain",
-    integrity = "sha256-Z38HhfFL91M5oxh8un+pXhofiIoYVo7cLl+sh9UT/Hw=",
-    strip_prefix = "rules_ml_toolchain-f56a19573fec3543050a5f4bcd9a07a1de08e8ee",
-    urls = ["https://github.com/google-ml-infra/rules_ml_toolchain/archive/f56a19573fec3543050a5f4bcd9a07a1de08e8ee.tar.gz"],
+    integrity = "sha256-9+4rpwQMv77PxA+AGMWpwcjioakWHi4nJ7UQ0iPHrJo=",
+    strip_prefix = "rules_ml_toolchain-3a4df0c8e9e51687ac4c62c793a00a27286e5e83",
+    urls = ["https://github.com/google-ml-infra/rules_ml_toolchain/archive/3a4df0c8e9e51687ac4c62c793a00a27286e5e83.tar.gz"],
 )
 
 register_toolchains("@rules_ml_toolchain//cc:linux_x86_64_linux_x86_64")
@@ -45,13 +45,24 @@ register_toolchains("@rules_ml_toolchain//cc:linux_x86_64_linux_x86_64")
 # (https://github.com/protocolbuffers/protobuf/commit/720e5468cebb). Remove the
 # patch once YDF uses a protobuf release that includes this change.
 #
-# The version is pinned because rules_ml_toolchain depends on protobuf 33.0,
-# which would otherwise be selected.
+# The version is pinned because other modules depend on newer versions (e.g.
+# rules_ml_toolchain and yggdrasil_decision_forests on 33.x), which would
+# otherwise be selected. It is the version of the protoc generating the
+# *_pb2.py files, i.e. the minimum version of the protobuf pip package (see
+# tools/BUILD).
 single_version_override(
     module_name = "protobuf",
     patch_strip = 1,
     patches = ["//:protobuf_hermetic_python_headers.patch"],
     version = "31.1",
+)
+
+# Abseil 20260526.0 has no `compatibility_level` (i.e. 0), while older
+# versions requested by other modules (e.g. grpc, protobuf) have 1. Bazel fails
+# on such a mismatch, unless the version is overridden.
+single_version_override(
+    module_name = "abseil-cpp",
+    version = "20260526.0",
 )
 
 # Hermetic Python toolchains (python-build-standalone).
@@ -107,7 +118,7 @@ uv = use_extension(
     "uv",
     dev_dependency = True,
 )
-uv.configure(version = "0.11.2")
+uv.configure(version = "0.13.6")
 
 # Use the PyPI protobuf package as the runtime of `py_proto_library`.
 register_toolchains("//:python_proto_toolchain")

@@ -4,25 +4,36 @@ module(
 )
 
 # BCR Dependencies
-bazel_dep(name = "abseil-cpp", version = "20250814.1", repo_name = "com_google_absl")
-bazel_dep(name = "bazel_skylib", version = "1.8.2")
+bazel_dep(name = "abseil-cpp", version = "20260526.0", repo_name = "com_google_absl")
+bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boost.math", version = "1.90.0.bcr.1")
-bazel_dep(name = "boringssl", version = "0.20250114.0")
-bazel_dep(name = "crc32c", version = "1.1.0", repo_name = "com_github_google_crc32c")
-bazel_dep(name = "curl", version = "8.8.0.bcr.3", repo_name = "com_github_curl_curl")
-bazel_dep(name = "eigen", version = "3.4.0.bcr.3")
-bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
-bazel_dep(name = "grpc", version = "1.74.1", repo_name = "com_github_grpc_grpc")
-bazel_dep(name = "highway", version = "1.3.0", repo_name = "com_google_highway")
-bazel_dep(name = "nlohmann_json", version = "3.11.3.bcr.1", repo_name = "com_github_nlohmann_json")
-bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "protobuf", version = "31.1", repo_name = "com_google_protobuf")
-bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "boringssl", version = "0.20261020.0")
+bazel_dep(name = "curl", version = "8.22.0.bcr.1")
+bazel_dep(name = "eigen", version = "5.0.1.bcr.3")
+bazel_dep(name = "google_cloud_cpp", version = "3.7.0")
+bazel_dep(name = "googletest", version = "1.18.0.bcr.1", repo_name = "com_google_googletest")
+bazel_dep(name = "grpc", version = "1.81.1", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "highway", version = "1.4.0.bcr.1", repo_name = "com_google_highway")
+bazel_dep(name = "nlohmann_json", version = "3.12.0.bcr.2", repo_name = "com_github_nlohmann_json")
+bazel_dep(name = "platforms", version = "1.1.0")
+
+# YDF must still compile with Protobuf 31.1: ydf-tf builds it against the
+# Protobuf of TensorFlow 2.22 (see port/tensorflow/MODULE.bazel).
+bazel_dep(name = "protobuf", version = "33.6", repo_name = "com_google_protobuf")
+bazel_dep(name = "rules_cc", version = "0.2.27")
 bazel_dep(name = "rules_proto", version = "7.1.0")
-bazel_dep(name = "rules_python", version = "2.3.4")
-bazel_dep(name = "zlib", version = "1.3.1.bcr.7")
+bazel_dep(name = "rules_python", version = "2.4.5")
+bazel_dep(name = "zlib", version = "1.3.2.bcr.3")
 
 bazel_dep(name = "emsdk", version = "4.0.13", dev_dependency = True)
+
+# Abseil 20260526.0 has no `compatibility_level` (i.e. 0), while older
+# versions requested by other modules (e.g. grpc, protobuf) have 1. Bazel fails
+# on such a mismatch, unless the version is overridden.
+single_version_override(
+    module_name = "abseil-cpp",
+    version = "20260526.0",
+)
 
 # Dependencies that are not available in BCR
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
@@ -39,18 +50,11 @@ cc_library(
   defines = ["FARMHASH_NO_BUILTIN_EXPECT"],
 )
 """,
-    integrity = "sha256-GDks8HNuHWLsu41pXDFJa2UHhZ6MdVQdetC6CS3FIRU=",
-    strip_prefix = "farmhash-0d859a811870d10f53a594927d0d0b97573ad06d/src",
-    urls = ["https://github.com/google/farmhash/archive/0d859a811870d10f53a594927d0d0b97573ad06d.tar.gz"],
+    integrity = "sha256-2e5cJYUUA2afH3tb6lsF4Jkb/MfleH2dO9O7ibb6TqA=",
+    strip_prefix = "farmhash-9d99331eb762e9ee22fd97d15a594525ad98310a/src",
+    urls = ["https://github.com/google/farmhash/archive/9d99331eb762e9ee22fd97d15a594525ad98310a.tar.gz"],
 )
 
-http_archive(
-    name = "google_cloud_cpp",
-    integrity = "sha256-Ypy/zFvVgdOCd7qPqUpbZZGvHg9q8Nq20dnteWv0i2E=",
-    patch_args = ["-p1"],
-    strip_prefix = "google-cloud-cpp-2.39.0",
-    urls = ["https://github.com/googleapis/google-cloud-cpp/archive/refs/tags/v2.39.0.tar.gz"],
-)
 
 # If Tensorflow headers are required, download them from pip.
 tf_ext = use_extension("//third_party:tf_downloader.bzl", "tf_downloaded_header_extension")

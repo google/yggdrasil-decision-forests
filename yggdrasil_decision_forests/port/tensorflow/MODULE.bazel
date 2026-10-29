@@ -2,8 +2,8 @@ module(
     name = "ydf_tf",
 )
 
-bazel_dep(name = "rules_cc", version = "0.2.17")
-bazel_dep(name = "rules_python", version = "2.3.4")
+bazel_dep(name = "rules_cc", version = "0.2.27")
+bazel_dep(name = "rules_python", version = "2.4.5")
 bazel_dep(name = "yggdrasil_decision_forests", version = "1.12.0", repo_name = "ydf_cc")
 local_path_override(
     module_name = "yggdrasil_decision_forests",
@@ -16,11 +16,11 @@ local_path_override(
 #     --@rules_python//python/config_settings:python_version=3.X -- -m venv <dir>
 # The C++ op itself does not depend on Python.
 PYTHON_VERSIONS = [
-    "3.9",
     "3.10",
     "3.11",
     "3.12",
     "3.13",
+    "3.14",
 ]
 
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
@@ -34,8 +34,8 @@ python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 ]
 
 # Must match the Abseil and Protobuf version used by the Tensorflow version you're compiling for.
-# The current value is set for TF 2.21.0
-bazel_dep(name = "abseil-cpp", version = "20250814.1", repo_name = "com_google_absl")
+# The current value is set for TF 2.22.0
+bazel_dep(name = "abseil-cpp", version = "20260526.0", repo_name = "com_google_absl")
 bazel_dep(name = "protobuf", version = "31.1", repo_name = "com_google_protobuf")
 single_version_override(
     module_name = "protobuf",
@@ -44,7 +44,7 @@ single_version_override(
 
 single_version_override(
     module_name = "abseil-cpp",
-    version = "20250814.1",
+    version = "20260526.0",
 )
 
 tf_ext = use_extension("@ydf_cc//third_party:tf_downloader.bzl", "tf_downloaded_header_extension")

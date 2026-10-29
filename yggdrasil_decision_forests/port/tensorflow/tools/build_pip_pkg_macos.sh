@@ -98,10 +98,10 @@ if [[ "$LEGACY" == "1" ]]; then
   fi
 else
   if [[ -z "${TF_VERSIONS+x}" ]]; then
-    TF_VERSIONS=("2.20.0")
+    TF_VERSIONS=("2.22.0")
   fi
   if [[ -z "${PY_VERSIONS+x}" ]]; then
-    PY_VERSIONS=("3.9" "3.10" "3.11" "3.12" "3.13")
+    PY_VERSIONS=("3.10" "3.11" "3.12" "3.13" "3.14")
   fi
 fi
 
