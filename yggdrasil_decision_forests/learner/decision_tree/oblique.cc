@@ -516,7 +516,7 @@ absl::StatusOr<bool> FindBestConditionGuidedObliqueTemplate(
                            dt_config, label_stats, dense_example_idxs,
                            selected_weights, selected_labels, projection_values,
                            internal_config, selected_feature, constraints,
-                           monotonic_direction, best_condition, cache));
+                           monotonic_direction, best_condition, cache, random));
     } else {
       SampleGuidedProjection(config_link.numerical_features(), dt_config,
                              train_dataset.data_spec(), config_link,
