@@ -3,12 +3,104 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
-## HEAD
+## 1.13.0 - 2026-10-28
+
+This release introduces an unusually large number of bugfixes. While the
+majority of bugfixes concern rarely-used cases, we recommend users carefully
+monitor model quality, both for existing models and re-trained models. Most
+notably, users of POISSON loss and users of the slow engine may see different
+predictions for existing models. Additionally, users of MHLD oblique splits,
+`use_hessian_gain=True`, Cox Loss, CART trees, GOSS sampling and honest trees
+should expect model changes beyond the movement of the random seed.
+
+### Breaking Changes
+
+-   Removed the deprecated model compiler (`cli/compile_model`). Use the
+    standalone C++ export instead.
+-   Removed `distribute_cli`.
+-   `compute_oob_variable_importances=true` now requires
+    `compute_oob_performances=true` instead of silently enabling it.
+-   Distributed hyperparameter tuning with cross-validation now fails. This
+    option was exposed, but cross-validation was not actually used.
+-   Training with all example weights equal to zero now fails.
+-   Classification self-evaluation reports loss instead of deviance (values
+    halve); no training change.
 
 ### Features
 
+-   Support for Model Calibration: Decision Forest binary classification models
+    can be calibrated on a calibration dataset using the `postprocessors` field
+    of the training config. Model calibration information is also available in
+    the model evaluation. Calibrated models can be served as other YDF models,
+    including the standalone C++ and Java exports.
+-   GBDT models set `early_stopping_triggered` if early stopping triggered.
 -   "True" and "False" are now recognized as boolean in CSV files. This change
     only changes the behaviour of columns explicitly specified as BOOLEAN.
+-   Support for guided oblique splits. Note that guided oblique splits are still
+    experimental.
+-   Add support for custom secondary evaluation metrics in GBT training.
+-   Add support for MSLE metric.
+-   Add MSE secondary metric for GBT regression.
+-   Java standalone: Add `use_runtime_derived_resource_path`.
+-   New hyperparameter `sparse_oblique_include_axis_aligned_splits`.
+-   Full evaluation inside the self-evaluation.
+-   New hyperparameter `min_sum_hessian_in_leaf`.
+-   Allow hyperparameter tuning with monotonicity constraints.
+-   Support additional metrics as hyperparameter optimization objectives.
+-   New hyperparameters `categorical_random_num_trial_exponent`,
+    `categorical_random_max_num_trials`
+-   Enable Highway Dynamic Dispatch by default for Serving.
+-   Add a "time" field in GBT training logs.
+-   Add legends / axis annotations to plots.
+
+### Fix
+
+-   Fix out-of-range categorical inference engine crashes.
+-   Fix slow engine predictions for oblique splits with missing values,
+    `initialize_with_class_priors=True`, ranking with SQUARED_ERROR loss and
+    POISSON loss with `output_logits=False`.
+-   Fix POISSON loss with `output_logits=False` for the generic engine.
+-   Fix multi-class GBT with `output_logits=False` and
+    `initialize_with_class_priors=True`.
+-   Standalone C++ export: Fix Random Forest SCORE aggregation and IF_ELSE
+    floating point precision.
+-   Fixed many typos in documentation and error messages.
+-   Fix initial predictions of MAE and POISSON losses with zero weights, and
+    use a more robust softmax for the multinomial loss.
+-   Fix CART pruning. This change broadly improves model quality and decreases
+    model size.
+-   Fix example-weighted CART pruning.
+-   Fix Hessian gain with example weights.
+-   Fix MHLD oblique splits LDA computation.
+-   Fix Hessian split score computation and clamping, esp under monotonicity
+    constraints.
+-   Fix correct honest splits to account for unique examples.
+-   Fix GOSS sampling to align with the paper.
+-   Fix Cox loss overflows.
+-   Fix early stopping edge cases (e.g. DART).
+-   Deterministic variable-importance order on ties.
+-   Fix PDP/CEP for all-nan numerical features.
+-   Ignore Nans in Confidence interval computation.
+-   Fix overflow / truncation of num_pos_training_examples_with_weight metadata
+    with large or fractional weights.
+-   Fix validation of oblique conditions.
+-   Cancel pending candidates if HP tuner finishes early.
+-   Fix smaller HP tuner issues, e.g. integer rounding for negative
+    hyperparameters.
+-   Set the accuracy field in the evaluation proto.
+-   Remove old checkpoints in distributed GBT learner according to
+    `max_kept_snapshots`
+-   Distributed training: Fix async validation, model corruption on failed
+    checkpoints, early unloading of features and release of discarded gRPC
+    stubs on worker relocation.
+-   Fix double-sqrt bug in training log RMSE encoding.
+-   Various crashes.
+-   Various performance improvements.
+
+### Infra
+
+-   Use hermetic Python to build YDF.
+-   Update dependencies.
 
 ## 1.12.0 - 2026-02-04
 

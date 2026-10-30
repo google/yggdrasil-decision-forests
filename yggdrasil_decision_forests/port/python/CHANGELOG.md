@@ -2,22 +2,107 @@
 
 ## Head
 
-### API Changes
+## 0.17.0 - 2026-10-28
 
--   Removed the `may_trigger_gc` parameter of the losses. Losses no longer
-    trigger the Python GC.
+This release introduces an unusually large number of bugfixes. While the
+majority of bugfixes concern rarely-used cases, we recommend users carefully
+monitor model quality, both for existing models and re-trained models. Most
+notably, users of POISSON loss and users of the slow engine may see different
+predictions for existing models. Additionally, users of MHLD oblique splits,
+`use_hessian_gain=True`, Cox Loss, CART trees, GOSS sampling and honest trees
+should expect model changes beyond the movement of the random seed. The more
+robust multinomial softmax slightly changes all multi-class GBT models.
 
-### Fix
+### Breaking Changes
+
+-   Removed the `may_trigger_gc` parameter of the custom losses. Losses no
+    longer trigger the Python GC.
+-   For already-integerized categorical columns where missing values are the
+    most frequent value, global imputation no longer uses -1 as the most
+    frequent value.
+-   Regex characters in label names are now escaped.
+-   Reporting: classification self-evaluation reports loss instead of deviance
+    (values halve); no training change.
+-   `compute_oob_variable_importances` now requires `compute_oob_performances`.
+-   The default GBT tuner search space now includes `use_hessian_gain` for
+    regression.
 
 ### Features
 
--   Support PyArrow Tables and RecordBatches as in-memory datasets.
+-   Support for Model Calibration: Decision Forest binary classification models
+    can be calibrated on a calibration dataset using `model.calibrate()`.
+    Model calibration information is also available in the model evaluation.
+    Calibrated models can be served as other YDF models.
+-   GBDT models set `model.early_stopping_triggered()`.
+-   "True" and "False" are now recognized as boolean in CSV files. This change
+    only changes the behaviour of columns explicitly specified as BOOLEAN.
+-   Add PyArrow support for in-memory datasets.
+-   Add keys() to logbook.
+-   Support hyperparameter optimization objectives in PYDF.
+-   Expose `ydf.VerticalDataset`.
+-   Allow nan as a missing-value holder for Categorical Set columns.
+-   None / NaN / pd.NA in CATEGORICAL & CATEGORICAL_SET columns are now imported
+    as missing instead of raising
+-   Propagate num_threads for evaluation.
+-   Support DISCRETIZED_NUMERICAL in YDF SavedModel export.
+-   Support for guided oblique splits. Note that guided oblique splits are still
+    experimental and require the use of `extra_training_config` in Python.
+-   Add support for custom secondary evaluation metrics in GBT training.
+-   Add support for MSLE metric.
+-   New hyperparameter `sparse_oblique_include_axis_aligned_splits`.
+-   Full evaluation inside the self-evaluation.
+-   New hyperparameter `min_sum_hessian_in_leaf`.
+-   Allow hyperparameter tuning with monotonicity constraints.
+-   New hyperparameters `categorical_random_num_trial_exponent`,
+    `categorical_random_max_num_trials`
+-   Enable Highway Dynamic Dispatch by default for Serving.
+-   Add "time" field in training logs.
 
 ### Fix
 
+-   Fix out-of-range categorical inference engine crashes.
 -   Refactored C++ to Python custom loss and metric evaluation to perform safe
     memory copies instead of zero-copy array sharing. This simplifies memory
     management and avoids use-after-free bugs.
+-   Fix set_data_spec missing engine invalidation.
+-   Fix unstacked multidimensional feature name resolution in SavedModel export.
+-   Fix metric display.
+-   Fix faulty GIL release when using custom losses.
+-   Fixed many typos in documentation and error messages.
+-   Refuse all-zero weights.
+-   Fix CART pruning.
+-   Fix Hessian gain with example weights.
+-   Fix MHLD oblique splits LDA computation.
+-   Fix Hessian split score computation and clamping, esp under monotonicity
+    constraints.
+-   Fix honest splits to account for unique examples.
+-   Deterministic variable-importance order on ties.
+-   Fix PDP/CEP for all-nan numerical features.
+-   Ignore Nans in Confidence interval computation.
+-   Fix overflow / truncation of num_pos_training_examples_with_weight metadata
+    with large or fractional weights.
+-   Cancel pending candidates if HP tuner finishes early.
+-   Set the accuracy field in the evaluation proto.
+-   Remove old checkpoints in distributed GBT learner according to
+    `max_kept_snapshots`
+-   Fix double-sqrt bug in training log RMSE encoding.
+-   Fix Cox loss overflows.
+-   Fix multi-class with `initialize_with_class_priors=True` and 
+    `output_logits=False`
+-   Early-stopping edge cases such as DART.
+-   GOSS sampling fixed and make it usable from Python.
+-   Various crashes.
+-   Various performance improvements.
+
+### Infra
+
+-   Use hermetic Python to build YDF.
+-   Python now targets `manylinux_2_27`.
+-   Updated dependencies.
+
+### Release music
+
+Symphony No. 9 in E minor "From the New World" Op. 95 (B. 178). Antonín Dvořák
 
 ## 0.16.1 - 2026-03-24
 
