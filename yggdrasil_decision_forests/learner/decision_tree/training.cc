@@ -4891,10 +4891,24 @@ absl::Status DecisionTreeTrain(
                                      absl::MakeSpan(leaf_examples.value()))
                                : std::nullopt;
 
-  return DecisionTreeCoreTrain(train_dataset, config, config_link, dt_config,
-                               deployment, weights, random, internal_config, dt,
-                               absl::MakeSpan(working_selected_examples),
-                               leaf_example_span);
+  std::optional<internal::ProjectionEvaluator> projection_evaluator;
+  InternalTrainConfig effective_internal_config = internal_config;
+
+  // If oblique splits are enabled, build the projection evaluator once for the
+  // entire tree. Without it, each node-local evaluator costs O(n. features).
+  // Without numerical features, oblique splitters don't build an evaluator
+  if (internal_config.projection_evaluator == nullptr &&
+      !config_link.numerical_features().empty() &&
+      internal::ProjectionEvaluator::CanBeCached(dt_config)) {
+    projection_evaluator.emplace(train_dataset,
+                                 config_link.numerical_features());
+    effective_internal_config.projection_evaluator = &*projection_evaluator;
+  }
+
+  return DecisionTreeCoreTrain(
+      train_dataset, config, config_link, dt_config, deployment, weights,
+      random, effective_internal_config, dt,
+      absl::MakeSpan(working_selected_examples), leaf_example_span);
 }
 
 std::unique_ptr<SplitterFinderStreamProcessor>
