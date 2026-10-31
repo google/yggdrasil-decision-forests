@@ -105,6 +105,14 @@ absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
   gradient_boosted_trees::GradientBoostedTreesLearner gbt_learner(
       training_config_);
   RETURN_IF_ERROR(gbt_learner.SetHyperParametersImpl(generic_hyper_params));
+  const auto& gbt_ext =
+      gradient_boosted_trees::proto::gradient_boosted_trees_config;
+  model::proto::TrainingConfig updated = gbt_learner.training_config();
+  updated.ClearExtension(gbt_ext);
+  if (training_config_.HasExtension(gbt_ext)) {
+    *updated.MutableExtension(gbt_ext) = training_config_.GetExtension(gbt_ext);
+  }
+  training_config_ = std::move(updated);
   auto* dgbt_config = training_config_.MutableExtension(
       distributed_gradient_boosted_trees::proto::
           distributed_gradient_boosted_trees_config);
