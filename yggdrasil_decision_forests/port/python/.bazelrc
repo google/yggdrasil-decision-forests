@@ -68,6 +68,12 @@ build:linux --features=-fully_static_link
 build:macos --cxxopt=-std=c++17
 build:macos --host_cxxopt=-std=c++17
 
+# The layering check of the macOS C++ toolchain rejects some dependencies, e.g.
+# grpc 1.81.1 (grpc_xds_client includes upb headers of targets it does not
+# depend on).
+build:macos --features=-layering_check
+build:macos --host_features=-layering_check
+
 # Bazel 7.0.0 no longer supports dynamic symbol lookup on macOS. To resolve
 # undefined symbol errors in macOS arm64 builds, explicitly add the necessary
 # linker flags until dependencies are well defined. See
