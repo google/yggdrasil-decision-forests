@@ -237,6 +237,10 @@ REGISTER_AbstractLearner(GradientBoostedTreesLearner,
 
 namespace internal {
 
+absl::Status SetHyperParameters(
+    utils::GenericHyperParameterConsumer* generic_hyper_params,
+    proto::GradientBoostedTreesTrainingConfig* gbt_config);
+
 // Builds the internal (i.e. generally not accessible to user) configuration for
 // the weak learner.
 decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
