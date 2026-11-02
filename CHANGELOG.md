@@ -3,7 +3,7 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
-## 1.13.0 - 2026-10-28
+## 1.13.0 - 2026-10-30
 
 This release introduces an unusually large number of bugfixes. While the
 majority of bugfixes concern rarely-used cases, we recommend users carefully
