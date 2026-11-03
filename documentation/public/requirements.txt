@@ -7,6 +7,7 @@ mkdocs-glightbox
 mkdocs-macros-plugin
 mkdocs-gen-files
 mkdocstrings[python]
+pymdown-extensions<12.2
 mkdocstrings-crystal
 black
 griffe_inherited_docstrings
