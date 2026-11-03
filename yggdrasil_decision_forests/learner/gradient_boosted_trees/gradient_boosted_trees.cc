@@ -1915,365 +1915,6 @@ absl::Status GradientBoostedTreesLearner::SetHyperParametersImpl(
                                                 gbt_config);
 }
 
-namespace internal {
-
-absl::Status SetHyperParameters(
-    utils::GenericHyperParameterConsumer* generic_hyper_params,
-    proto::GradientBoostedTreesTrainingConfig* gbt_config) {
-  // Decision tree specific hyper-parameters.
-  absl::flat_hash_set<std::string> consumed_hparams;
-  RETURN_IF_ERROR(decision_tree::SetHyperParameters(
-      &consumed_hparams, gbt_config->mutable_decision_tree(),
-      generic_hyper_params));
-
-  {
-    const auto hparam =
-        generic_hyper_params->Get(GradientBoostedTreesLearner::kHParamLoss);
-    if (hparam.has_value()) {
-      const auto& str_loss = hparam.value().value().categorical();
-      model::gradient_boosted_trees::proto::Loss loss;
-      if (!model::gradient_boosted_trees::proto::Loss_Parse(str_loss, &loss)) {
-        return absl::InvalidArgumentError(
-            absl::Substitute("The loss value \"$0\" is unknown.", str_loss));
-      }
-      gbt_config->set_loss(loss);
-    }
-  }
-
-  {
-    const auto hparam =
-        generic_hyper_params->Get(GradientBoostedTreesLearner::kHParamNumTrees);
-    if (hparam.has_value()) {
-      gbt_config->set_num_trees(hparam.value().value().integer());
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamShrinkage);
-    if (hparam.has_value()) {
-      gbt_config->set_shrinkage(hparam.value().value().real());
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamL1Regularization);
-    if (hparam.has_value()) {
-      gbt_config->set_l1_regularization(hparam.value().value().real());
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamL2Regularization);
-    if (hparam.has_value()) {
-      gbt_config->set_l2_regularization(hparam.value().value().real());
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamL2CategoricalRegularization);
-    if (hparam.has_value()) {
-      gbt_config->set_l2_regularization_categorical(
-          hparam.value().value().real());
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamLambdaLoss);
-    if (hparam.has_value()) {
-      gbt_config->set_lambda_loss(hparam.value().value().real());
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamForestExtraction);
-    if (hparam.has_value()) {
-      if (hparam.value().value().categorical() ==
-          GradientBoostedTreesLearner::kHParamForestExtractionMart) {
-        gbt_config->mutable_mart();
-      } else if (hparam.value().value().categorical() ==
-                 GradientBoostedTreesLearner::kHParamForestExtractionDart) {
-        gbt_config->mutable_dart();
-      } else {
-        LOG(WARNING) << "Unknown value " << hparam.value().value().categorical()
-                     << " for "
-                     << GradientBoostedTreesLearner::kHParamForestExtraction
-                     << ".";
-      }
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamDartDropOut);
-    if (hparam.has_value() && gbt_config->has_dart()) {
-      gbt_config->mutable_dart()->set_dropout_rate(
-          hparam.value().value().real());
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::
-            kHParamAdaptSubsampleForMaximumTrainingDuration);
-    if (hparam.has_value()) {
-      gbt_config->set_adapt_subsample_for_maximum_training_duration(
-          hparam.value().value().categorical() == "true");
-    }
-  }
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamUseHessianGain);
-    if (hparam.has_value()) {
-      gbt_config->set_use_hessian_gain(hparam.value().value().categorical() ==
-                                       "true");
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamMinSumHessianInLeaf);
-    if (hparam.has_value()) {
-      gbt_config->set_min_sum_hessian_in_leaf(hparam.value().value().real());
-    }
-  }
-
-  // Determine the sampling strategy.
-  const auto sampling_method_hparam = generic_hyper_params->Get(
-      GradientBoostedTreesLearner::kHParamSamplingMethod);
-  if (sampling_method_hparam.has_value()) {
-    // The preferred way of choosing a sampling method and setting its params.
-    const auto sampling_method =
-        sampling_method_hparam.value().value().categorical();
-
-    if (sampling_method == GradientBoostedTreesLearner::kSamplingMethodRandom) {
-      gbt_config->mutable_stochastic_gradient_boosting();
-    } else if (sampling_method ==
-               GradientBoostedTreesLearner::kSamplingMethodGOSS) {
-      gbt_config->mutable_gradient_one_side_sampling();
-    } else if (sampling_method ==
-               GradientBoostedTreesLearner::kSamplingMethodSelGB) {
-      gbt_config->mutable_selective_gradient_boosting();
-    } else if (sampling_method ==
-               GradientBoostedTreesLearner::kSamplingMethodNone) {
-      gbt_config->clear_stochastic_gradient_boosting();
-      gbt_config->clear_selective_gradient_boosting();
-      gbt_config->clear_gradient_one_side_sampling();
-    }
-  } else {
-
-    if (gbt_config->sampling_methods_case() ==
-        proto::GradientBoostedTreesTrainingConfig::SAMPLING_METHODS_NOT_SET) {
-      // If no other sampling method is selected, we activate the "subsample"
-      // field for backwards compatibility.
-      gbt_config->mutable_stochastic_gradient_boosting();
-    } else {
-      if (gbt_config->has_subsample()) {
-        LOG(WARNING)
-            << "Too many sampling methods are set in the config. "
-               "Only one may be configured at any given time. Ignoring "
-               "'subsample'.";
-        gbt_config->clear_subsample();
-      }
-    }
-  }
-
-  // Set sampling strategy's hyperparameters.
-  {
-    const auto subsample = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamSubsample);
-    if (subsample.has_value()) {
-      if (gbt_config->sampling_methods_case() ==
-              proto::GradientBoostedTreesTrainingConfig::
-                  SAMPLING_METHODS_NOT_SET ||
-          gbt_config->sampling_methods_case() ==
-              proto::GradientBoostedTreesTrainingConfig::
-                  kStochasticGradientBoosting) {
-        // Note: Force stochastic gb if the sampling method is "NONE" and the
-        // "subsampling" parameter is set.
-        gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
-            subsample.value().value().real());
-      } else {
-        LOG(WARNING) << "\"subsample\" hyperparameter set, but "
-                        "\"sampling_method\" is not \"RANDOM\" or \"NONE\".";
-      }
-    }
-  }
-
-  {
-    const auto alpha = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamGossAlpha);
-    if (alpha.has_value()) {
-      if (gbt_config->has_gradient_one_side_sampling()) {
-        gbt_config->mutable_gradient_one_side_sampling()->set_alpha(
-            alpha.value().value().real());
-      } else {
-        LOG(WARNING) << "\"goss_alpha\" set but \"sampling_method\" not equal "
-                        "to \"GOSS\".";
-      }
-    }
-    const auto beta =
-        generic_hyper_params->Get(GradientBoostedTreesLearner::kHParamGossBeta);
-    if (beta.has_value()) {
-      if (gbt_config->has_gradient_one_side_sampling()) {
-        gbt_config->mutable_gradient_one_side_sampling()->set_beta(
-            beta.value().value().real());
-      } else {
-        LOG(WARNING)
-            << "\"goss_beta\" set but \"sampling_method\" not equal to "
-               "\"GOSS\".";
-      }
-    }
-  }
-
-  {
-    const auto selgb = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamSelGBRatio);
-    if (selgb.has_value()) {
-      if (gbt_config->has_selective_gradient_boosting()) {
-        gbt_config->mutable_selective_gradient_boosting()->set_ratio(
-            selgb.value().value().real());
-      } else {
-        LOG(WARNING) << "\"selective_gradient_boosting_ratio\" set but "
-                        "\"sampling_method\" not equal to "
-                        "\"SELGB\".";
-      }
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamValidationSetRatio);
-    if (hparam.has_value()) {
-      gbt_config->set_validation_set_ratio(hparam.value().value().real());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead);
-    if (hparam.has_value()) {
-      gbt_config->set_early_stopping_num_trees_look_ahead(
-          hparam.value().value().integer());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamEarlyStoppingInitialIteration);
-    if (hparam.has_value()) {
-      gbt_config->set_early_stopping_initial_iteration(
-          hparam.value().value().integer());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamValidationIntervalInTrees);
-    if (hparam.has_value()) {
-      gbt_config->set_validation_interval_in_trees(
-          hparam.value().value().integer());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamEarlyStopping);
-    if (hparam.has_value()) {
-      const auto early_stopping = hparam.value().value().categorical();
-      if (early_stopping ==
-          GradientBoostedTreesLearner::kHParamEarlyStoppingNone) {
-        gbt_config->set_early_stopping(
-            proto::GradientBoostedTreesTrainingConfig::NONE);
-      } else if (early_stopping == GradientBoostedTreesLearner::
-                                       kHParamEarlyStoppingMinLossFullModel) {
-        gbt_config->set_early_stopping(
-            proto::GradientBoostedTreesTrainingConfig::
-                MIN_VALIDATION_LOSS_ON_FULL_MODEL);
-      } else if (early_stopping == GradientBoostedTreesLearner::
-                                       kHParamEarlyStoppingLossIncrease) {
-        gbt_config->set_early_stopping(
-            proto::GradientBoostedTreesTrainingConfig::
-                VALIDATION_LOSS_INCREASE);
-      }
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamApplyLinkFunction);
-    if (hparam.has_value()) {
-      gbt_config->set_apply_link_function(
-          hparam.value().value().categorical() == "true");
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::
-            kHParamComputePermutationVariableImportance);
-    if (hparam.has_value()) {
-      gbt_config->set_compute_permutation_variable_importance(
-          hparam.value().value().categorical() == "true");
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamFocalLossGamma);
-    if (hparam.has_value()) {
-      gbt_config->mutable_binary_focal_loss_options()
-          ->set_misprediction_exponent(hparam.value().value().real());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamFocalLossAlpha);
-    if (hparam.has_value()) {
-      gbt_config->mutable_binary_focal_loss_options()
-          ->set_positive_sample_coefficient(hparam.value().value().real());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamNDCGTruncation);
-    if (hparam.has_value()) {
-      gbt_config->mutable_lambda_mart_ndcg()->set_ndcg_truncation(
-          hparam.value().value().integer());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamXENDCGTruncation);
-    if (hparam.has_value()) {
-      gbt_config->mutable_xe_ndcg()->set_ndcg_truncation(
-          hparam.value().value().integer());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamTotalMaxNumNodes);
-    if (hparam.has_value()) {
-      gbt_config->set_total_max_num_nodes(hparam.value().value().integer());
-    }
-  }
-
-  {
-    const auto hparam = generic_hyper_params->Get(
-        GradientBoostedTreesLearner::kHParamMultinomialInitializeClassPriors);
-    if (hparam.has_value()) {
-      gbt_config->mutable_multinomial_loss_options()
-          ->set_initialize_with_class_priors(
-              hparam.value().value().categorical() == "true");
-    }
-  }
-
-  return absl::OkStatus();
-}
-
-}  // namespace internal
-
 absl::StatusOr<model::proto::HyperParameterSpace>
 GradientBoostedTreesLearner::PredefinedHyperParameterSpace() const {
   model::proto::HyperParameterSpace space;
@@ -2843,6 +2484,361 @@ For example, in the case of binary classification, the pre-link function output 
 }
 
 namespace internal {
+
+absl::Status SetHyperParameters(
+    utils::GenericHyperParameterConsumer* generic_hyper_params,
+    proto::GradientBoostedTreesTrainingConfig* gbt_config) {
+  // Decision tree specific hyper-parameters.
+  absl::flat_hash_set<std::string> consumed_hparams;
+  RETURN_IF_ERROR(decision_tree::SetHyperParameters(
+      &consumed_hparams, gbt_config->mutable_decision_tree(),
+      generic_hyper_params));
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(GradientBoostedTreesLearner::kHParamLoss);
+    if (hparam.has_value()) {
+      const auto& str_loss = hparam.value().value().categorical();
+      model::gradient_boosted_trees::proto::Loss loss;
+      if (!model::gradient_boosted_trees::proto::Loss_Parse(str_loss, &loss)) {
+        return absl::InvalidArgumentError(
+            absl::Substitute("The loss value \"$0\" is unknown.", str_loss));
+      }
+      gbt_config->set_loss(loss);
+    }
+  }
+
+  {
+    const auto hparam =
+        generic_hyper_params->Get(GradientBoostedTreesLearner::kHParamNumTrees);
+    if (hparam.has_value()) {
+      gbt_config->set_num_trees(hparam.value().value().integer());
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamShrinkage);
+    if (hparam.has_value()) {
+      gbt_config->set_shrinkage(hparam.value().value().real());
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamL1Regularization);
+    if (hparam.has_value()) {
+      gbt_config->set_l1_regularization(hparam.value().value().real());
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamL2Regularization);
+    if (hparam.has_value()) {
+      gbt_config->set_l2_regularization(hparam.value().value().real());
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamL2CategoricalRegularization);
+    if (hparam.has_value()) {
+      gbt_config->set_l2_regularization_categorical(
+          hparam.value().value().real());
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamLambdaLoss);
+    if (hparam.has_value()) {
+      gbt_config->set_lambda_loss(hparam.value().value().real());
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamForestExtraction);
+    if (hparam.has_value()) {
+      if (hparam.value().value().categorical() ==
+          GradientBoostedTreesLearner::kHParamForestExtractionMart) {
+        gbt_config->mutable_mart();
+      } else if (hparam.value().value().categorical() ==
+                 GradientBoostedTreesLearner::kHParamForestExtractionDart) {
+        gbt_config->mutable_dart();
+      } else {
+        LOG(WARNING) << "Unknown value " << hparam.value().value().categorical()
+                     << " for "
+                     << GradientBoostedTreesLearner::kHParamForestExtraction
+                     << ".";
+      }
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamDartDropOut);
+    if (hparam.has_value() && gbt_config->has_dart()) {
+      gbt_config->mutable_dart()->set_dropout_rate(
+          hparam.value().value().real());
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::
+            kHParamAdaptSubsampleForMaximumTrainingDuration);
+    if (hparam.has_value()) {
+      gbt_config->set_adapt_subsample_for_maximum_training_duration(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamUseHessianGain);
+    if (hparam.has_value()) {
+      gbt_config->set_use_hessian_gain(hparam.value().value().categorical() ==
+                                       "true");
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamMinSumHessianInLeaf);
+    if (hparam.has_value()) {
+      gbt_config->set_min_sum_hessian_in_leaf(hparam.value().value().real());
+    }
+  }
+
+  // Determine the sampling strategy.
+  const auto sampling_method_hparam = generic_hyper_params->Get(
+      GradientBoostedTreesLearner::kHParamSamplingMethod);
+  if (sampling_method_hparam.has_value()) {
+    // The preferred way of choosing a sampling method and setting its params.
+    const auto sampling_method =
+        sampling_method_hparam.value().value().categorical();
+
+    if (sampling_method == GradientBoostedTreesLearner::kSamplingMethodRandom) {
+      gbt_config->mutable_stochastic_gradient_boosting();
+    } else if (sampling_method ==
+               GradientBoostedTreesLearner::kSamplingMethodGOSS) {
+      gbt_config->mutable_gradient_one_side_sampling();
+    } else if (sampling_method ==
+               GradientBoostedTreesLearner::kSamplingMethodSelGB) {
+      gbt_config->mutable_selective_gradient_boosting();
+    } else if (sampling_method ==
+               GradientBoostedTreesLearner::kSamplingMethodNone) {
+      gbt_config->clear_stochastic_gradient_boosting();
+      gbt_config->clear_selective_gradient_boosting();
+      gbt_config->clear_gradient_one_side_sampling();
+    }
+  } else {
+
+    if (gbt_config->sampling_methods_case() ==
+        proto::GradientBoostedTreesTrainingConfig::SAMPLING_METHODS_NOT_SET) {
+      // If no other sampling method is selected, we activate the "subsample"
+      // field for backwards compatibility.
+      gbt_config->mutable_stochastic_gradient_boosting();
+    } else {
+      if (gbt_config->has_subsample()) {
+        LOG(WARNING)
+            << "Too many sampling methods are set in the config. "
+               "Only one may be configured at any given time. Ignoring "
+               "'subsample'.";
+        gbt_config->clear_subsample();
+      }
+    }
+  }
+
+  // Set sampling strategy's hyperparameters.
+  {
+    const auto subsample = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamSubsample);
+    if (subsample.has_value()) {
+      if (gbt_config->sampling_methods_case() ==
+              proto::GradientBoostedTreesTrainingConfig::
+                  SAMPLING_METHODS_NOT_SET ||
+          gbt_config->sampling_methods_case() ==
+              proto::GradientBoostedTreesTrainingConfig::
+                  kStochasticGradientBoosting) {
+        // Note: Force stochastic gb if the sampling method is "NONE" and the
+        // "subsampling" parameter is set.
+        gbt_config->mutable_stochastic_gradient_boosting()->set_ratio(
+            subsample.value().value().real());
+      } else {
+        LOG(WARNING) << "\"subsample\" hyperparameter set, but "
+                        "\"sampling_method\" is not \"RANDOM\" or \"NONE\".";
+      }
+    }
+  }
+
+  {
+    const auto alpha = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamGossAlpha);
+    if (alpha.has_value()) {
+      if (gbt_config->has_gradient_one_side_sampling()) {
+        gbt_config->mutable_gradient_one_side_sampling()->set_alpha(
+            alpha.value().value().real());
+      } else {
+        LOG(WARNING) << "\"goss_alpha\" set but \"sampling_method\" not equal "
+                        "to \"GOSS\".";
+      }
+    }
+    const auto beta =
+        generic_hyper_params->Get(GradientBoostedTreesLearner::kHParamGossBeta);
+    if (beta.has_value()) {
+      if (gbt_config->has_gradient_one_side_sampling()) {
+        gbt_config->mutable_gradient_one_side_sampling()->set_beta(
+            beta.value().value().real());
+      } else {
+        LOG(WARNING)
+            << "\"goss_beta\" set but \"sampling_method\" not equal to "
+               "\"GOSS\".";
+      }
+    }
+  }
+
+  {
+    const auto selgb = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamSelGBRatio);
+    if (selgb.has_value()) {
+      if (gbt_config->has_selective_gradient_boosting()) {
+        gbt_config->mutable_selective_gradient_boosting()->set_ratio(
+            selgb.value().value().real());
+      } else {
+        LOG(WARNING) << "\"selective_gradient_boosting_ratio\" set but "
+                        "\"sampling_method\" not equal to "
+                        "\"SELGB\".";
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamValidationSetRatio);
+    if (hparam.has_value()) {
+      gbt_config->set_validation_set_ratio(hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamEarlyStoppingNumTreesLookAhead);
+    if (hparam.has_value()) {
+      gbt_config->set_early_stopping_num_trees_look_ahead(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamEarlyStoppingInitialIteration);
+    if (hparam.has_value()) {
+      gbt_config->set_early_stopping_initial_iteration(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamValidationIntervalInTrees);
+    if (hparam.has_value()) {
+      gbt_config->set_validation_interval_in_trees(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamEarlyStopping);
+    if (hparam.has_value()) {
+      const auto early_stopping = hparam.value().value().categorical();
+      if (early_stopping ==
+          GradientBoostedTreesLearner::kHParamEarlyStoppingNone) {
+        gbt_config->set_early_stopping(
+            proto::GradientBoostedTreesTrainingConfig::NONE);
+      } else if (early_stopping == GradientBoostedTreesLearner::
+                                       kHParamEarlyStoppingMinLossFullModel) {
+        gbt_config->set_early_stopping(
+            proto::GradientBoostedTreesTrainingConfig::
+                MIN_VALIDATION_LOSS_ON_FULL_MODEL);
+      } else if (early_stopping == GradientBoostedTreesLearner::
+                                       kHParamEarlyStoppingLossIncrease) {
+        gbt_config->set_early_stopping(
+            proto::GradientBoostedTreesTrainingConfig::
+                VALIDATION_LOSS_INCREASE);
+      }
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamApplyLinkFunction);
+    if (hparam.has_value()) {
+      gbt_config->set_apply_link_function(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::
+            kHParamComputePermutationVariableImportance);
+    if (hparam.has_value()) {
+      gbt_config->set_compute_permutation_variable_importance(
+          hparam.value().value().categorical() == "true");
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamFocalLossGamma);
+    if (hparam.has_value()) {
+      gbt_config->mutable_binary_focal_loss_options()
+          ->set_misprediction_exponent(hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamFocalLossAlpha);
+    if (hparam.has_value()) {
+      gbt_config->mutable_binary_focal_loss_options()
+          ->set_positive_sample_coefficient(hparam.value().value().real());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamNDCGTruncation);
+    if (hparam.has_value()) {
+      gbt_config->mutable_lambda_mart_ndcg()->set_ndcg_truncation(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamXENDCGTruncation);
+    if (hparam.has_value()) {
+      gbt_config->mutable_xe_ndcg()->set_ndcg_truncation(
+          hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamTotalMaxNumNodes);
+    if (hparam.has_value()) {
+      gbt_config->set_total_max_num_nodes(hparam.value().value().integer());
+    }
+  }
+
+  {
+    const auto hparam = generic_hyper_params->Get(
+        GradientBoostedTreesLearner::kHParamMultinomialInitializeClassPriors);
+    if (hparam.has_value()) {
+      gbt_config->mutable_multinomial_loss_options()
+          ->set_initialize_with_class_priors(
+              hparam.value().value().categorical() == "true");
+    }
+  }
+
+  return absl::OkStatus();
+}
 
 decision_tree::InternalTrainConfig BuildWeakLearnerInternalConfig(
     const internal::AllTrainingConfiguration& config, const int num_threads,
