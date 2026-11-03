@@ -173,7 +173,6 @@ plugins:
             show_submodules: true
             # This is currently the only way to show annotations for constructor arguments.
             merge_init_into_class: true
-            show_if_no_docstring: false
             show_signature_annotations: true
             show_docstring_attributes: true
             allow_inspection: true
