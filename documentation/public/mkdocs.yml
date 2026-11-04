@@ -223,6 +223,9 @@ plugins:
   - mkdocs-jupyter:
       execute: false
       include: ["*.ipynb"]
+      # mkdocs-jupyter parses .md files with jupytext before checking `include`,
+      # which runs pandoc on `:::` mkdocstrings directives and hangs on RTD.
+      ignore: ["*.md"]
       allow_errors: false
       include_requirejs: false
   - gen-files:
