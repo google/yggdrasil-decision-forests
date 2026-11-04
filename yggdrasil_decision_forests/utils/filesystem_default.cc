@@ -25,6 +25,7 @@
 #include <memory>
 #include <regex>  // NOLINT
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -41,13 +42,6 @@
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
 namespace fs = std::filesystem;
-
-// Converts an absl::string_view into an object compatible with std::filesystem.
-#ifdef ABSL_USES_STD_STRING_VIEW
-#define SV_ABSL_TO_STD(X) X
-#else
-#define SV_ABSL_TO_STD(X) std::string(X)
-#endif
 
 namespace yggdrasil_decision_forests::utils::filesystem {
 
@@ -157,7 +151,7 @@ namespace file {
 std::string JoinPathList(std::initializer_list<absl::string_view> paths) {
   fs::path all_paths;
   for (const auto& path : paths) {
-    all_paths /= SV_ABSL_TO_STD(path);
+    all_paths /= std::string_view(path);
   }
   return all_paths.string();
 }
@@ -208,8 +202,9 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
   }
 
   try {
-    const auto search_dir = fs::path(SV_ABSL_TO_STD(pattern)).parent_path();
-    const auto filename = fs::path(SV_ABSL_TO_STD(pattern)).filename().string();
+    const auto search_dir = fs::path(std::string_view(pattern)).parent_path();
+    const auto filename =
+        fs::path(std::string_view(pattern)).filename().string();
     std::string regexp_filename =
         absl::StrReplaceAll(filename, {{".", "\\."}, {"*", ".*"}, {"?", "."}});
     std::regex regexp_pattern(regexp_filename);
@@ -249,7 +244,7 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
   }
 
   try {
-    fs::create_directories(SV_ABSL_TO_STD(path));
+    fs::create_directories(std::string_view(path));
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
@@ -270,7 +265,7 @@ absl::Status RecursivelyDelete(absl::string_view path, int options) {
   }
 
   try {
-    fs::remove(SV_ABSL_TO_STD(path));
+    fs::remove(std::string_view(path));
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
@@ -397,7 +392,7 @@ absl::StatusOr<bool> FileExists(absl::string_view path) {
     }
   }
 
-  return fs::exists(SV_ABSL_TO_STD(path));
+  return fs::exists(std::string_view(path));
 }
 
 absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
@@ -419,7 +414,7 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
   }
 
   try {
-    fs::rename(SV_ABSL_TO_STD(from), SV_ABSL_TO_STD(to));
+    fs::rename(std::string_view(from), std::string_view(to));
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
   }
@@ -428,7 +423,7 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
 
 std::string GetBasename(absl::string_view path) {
   try {
-    auto filename = fs::path(SV_ABSL_TO_STD(path)).filename().string();
+    auto filename = fs::path(std::string_view(path)).filename().string();
     return filename;
   } catch (const std::exception& e) {
     LOG(ERROR) << "Error parsing basename of " << path << ": " << e.what();
@@ -438,7 +433,7 @@ std::string GetBasename(absl::string_view path) {
 
 std::string GetDirname(absl::string_view path) {
   try {
-    auto filename = fs::path(SV_ABSL_TO_STD(path)).parent_path().string();
+    auto filename = fs::path(std::string_view(path)).parent_path().string();
     return filename;
   } catch (const std::exception& e) {
     LOG(ERROR) << "Error parsing dirname of " << path << ": " << e.what();
