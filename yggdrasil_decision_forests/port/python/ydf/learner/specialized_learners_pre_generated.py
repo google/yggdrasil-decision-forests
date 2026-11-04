@@ -84,7 +84,7 @@ class RandomForestLearner(generic_learner.GenericCCLearner):
   documentation for
   details).
 
-  Attributes:
+  Args:
     label: Label of the dataset. The label column should not be identified as a
       feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
@@ -931,7 +931,7 @@ class IsolationForestLearner(generic_learner.GenericCCLearner):
   documentation for
   details).
 
-  Attributes:
+  Args:
     label: Label of the dataset. The label column should not be identified as a
       feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
@@ -1330,7 +1330,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
   documentation for
   details).
 
-  Attributes:
+  Args:
     label: Label of the dataset. The label column should not be identified as a
       feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
@@ -2273,7 +2273,7 @@ class DistributedGradientBoostedTreesLearner(generic_learner.GenericCCLearner):
   function's documentation for
   details).
 
-  Attributes:
+  Args:
     label: Label of the dataset. The label column should not be identified as a
       feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,
@@ -2690,7 +2690,7 @@ class CartLearner(generic_learner.GenericCCLearner):
   for
   details).
 
-  Attributes:
+  Args:
     label: Label of the dataset. The label column should not be identified as a
       feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,

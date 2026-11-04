@@ -32,7 +32,9 @@ arguments of learner classes.
     [RandomForestModel](RandomForestModel.md).
 -   [IsolationForestModel](IsolationForestModel.md)
 
-All models derive from [GenericModel](GenericModel.md).
+All models derive from [GenericModel](GenericModel.md). Decision forest models
+(e.g., Gradient Boosted Trees, Random Forest) derive from
+[DecisionForestModel](DecisionForestModel.md).
 
 ## Tuners
 
@@ -53,12 +55,14 @@ A **Feature Selector** finds the optimal set of input features for the model.
 ## Other
 
 -   [load_model](utilities.md#ydf.load_model): Load a model from disk.
+-   [deserialize_model](utilities.md#ydf.deserialize_model): Load a model
+    serialized with `model.serialize()`.
 -   [Feature](utilities.md#ydf.Feature): Input feature specific hyper-parameters
     e.g. semantic, constraints.
 -   [Column](utilities.md#ydf.Column): Alias for `Feature`.
 -   [Task](utilities.md#ydf.Task): Specify the task solved by the model e.g.
     classification.
--   [Semantic](utilities.md#ydf.Semantic): How an input feature in interpreted
+-   [Semantic](utilities.md#ydf.Semantic): How an input feature is interpreted
     e.g. numerical, categorical.
 -   [evaluate_predictions](utilities.md#ydf.evaluate_predictions): Evaluates
     predictions of YDF and non-YDF models.
@@ -68,20 +72,31 @@ A **Feature Selector** finds the optimal set of input features for the model.
 -   [strict](utilities.md#ydf.strict): Show more logs.
 -   [Evaluation](utilities.md#ydf.Evaluation): Result of a model evaluation i.e.
     `model.evaluate(...)`.
+-   [Monotonic](utilities.md#ydf.Monotonic): Monotonic constraint between a
+    feature and the model output.
+-   [CalibrationConfig](utilities.md#ydf.CalibrationConfig) and
+    [CalibrationType](utilities.md#ydf.CalibrationType): Configuration of the
+    calibration of a model.
 
 ## Utilities
 
--   [ydf.util.read_tf_record](util.md#ydf.util.read_tf_record): Read a TF Record
-    dataset in memory.
--   [ydf.util.write_tf_record](util.md#ydf.util.write_tf_record): Write a TF
-    Record dataset from memory.
--   [ydf.util.get_vertex_ai_cluster_spec](util.md#ydf.util.get_vertex_ai_cluster_spec):
+-   [ydf.util.read_tf_record](util.md#ydf.util.tf_example.read_tf_record): Read
+    a TF Record dataset in memory.
+-   [ydf.util.write_tf_record](util.md#ydf.util.tf_example.write_tf_record):
+    Write a TF Record dataset from memory.
+-   [ydf.util.get_vertex_ai_cluster_spec](util.md#ydf.util.vertex_ai.get_vertex_ai_cluster_spec):
     Parses the Vertex AI cluster specification for distributed training.
+-   [ydf.util.VertexAIClusterSpec](util.md#ydf.util.vertex_ai.VertexAIClusterSpec):
+    Vertex AI cluster specification.
+-   [ydf.util.LogBook](util.md#ydf.util.log_book.LogBook): Keeps track of ML
+    experiments.
 
 ## Advanced Utilities
 
 -   [ModelIOOptions](utilities.md#ydf.ModelIOOptions): Options to save a model
     to disk.
+-   [VerticalDataset](utilities.md#ydf.VerticalDataset): A dataset loaded in
+    memory, as returned by `create_vertical_dataset`.
 -   [create_vertical_dataset](utilities.md#ydf.create_vertical_dataset): Load a
     dataset in memory.
 -   [ModelMetadata](utilities.md#ydf.ModelMetadata): Meta-data about the model
@@ -108,13 +123,22 @@ A **Feature Selector** finds the optimal set of input features for the model.
 -   [Activation](utilities.md#ydf.Activation): Collection of activation (aka
     linkage) functions for custom losses.
 
+## Custom Metric
+
+-   [RegressionMetric](utilities.md#ydf.RegressionMetric): Custom metric for
+    regression tasks.
+-   [BinaryClassificationMetric](utilities.md#ydf.BinaryClassificationMetric):
+    Custom metric for binary classification tasks.
+-   [MultiClassificationMetric](utilities.md#ydf.MultiClassificationMetric):
+    Custom metric for multi-class classification tasks.
+
 ## Tree
 
 The `ydf.tree.*` classes provides programmatic read and write access to the tree
 structure, leaves, and values.
 
 -   [tree.Tree](tree.md#ydf.tree.Tree): A decision tree as returned and consumed
-    by `model.get_tree(...)` and `model.set_tree(...)`..
+    by `model.get_tree(...)` and `model.set_tree(...)`.
 
 ### Conditions
 
@@ -134,6 +158,12 @@ structure, leaves, and values.
     form `attribute is true`.
 -   [tree.NumericalSparseObliqueCondition](tree.md#ydf.tree.NumericalSparseObliqueCondition):
     Condition of the form `sum(attributes[i] * weights[i]) >= threshold`.
+-   [tree.NumericalVectorSequenceCloserThanCondition](tree.md#ydf.tree.NumericalVectorSequenceCloserThanCondition):
+    Condition on a numerical vector sequence: Is any vector closer than a
+    threshold to an anchor?
+-   [tree.NumericalVectorSequenceProjectedMoreThanCondition](tree.md#ydf.tree.NumericalVectorSequenceProjectedMoreThanCondition):
+    Condition on a numerical vector sequence: Is the projection of any vector on
+    an anchor greater than a threshold?
 
 ### Nodes
 
@@ -147,7 +177,13 @@ structure, leaves, and values.
 -   [tree.AbstractValue](tree.md#ydf.tree.AbstractValue): Base value class.
 -   [tree.ProbabilityValue](tree.md#ydf.tree.ProbabilityValue): A probability
     distribution value.
--   [tree.Leaf](tree.md#ydf.tree.Leaf): The regression value of a regressive
-    tree.
+-   [tree.RegressionValue](tree.md#ydf.tree.RegressionValue): The regression
+    value of a regressive tree.
 -   [tree.UpliftValue](tree.md#ydf.tree.UpliftValue): The uplift value of a
     classification or regression uplift tree.
+-   [tree.AnomalyDetectionValue](tree.md#ydf.tree.AnomalyDetectionValue): The
+    value of an anomaly detection tree.
+
+### Plotting
+
+-   [tree.PlotOptions](tree.md#ydf.tree.PlotOptions): Options to plot a tree.

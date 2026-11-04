@@ -13,7 +13,7 @@ model's predictive quality is generally tied to its size and complexity.
 
 Having a basic understanding of how decision forests work is helpful for
 optimizing them. For more information, please refer to Google's Decision Forests
-class. The [hyper-parameter page](../hyperparameters) also lists and explains
+class. The [hyper-parameter page](hyperparameters.md) also lists and explains
 all available options.
 
 ## Random Forest or Gradient Boosted Trees?
@@ -67,7 +67,7 @@ To benefit from YDF's latest algorithmic improvements without deep-diving into
 every hyperparameter, you can use pre-configured hyperparameter templates.
 
 You can list the available templates by calling
-[hyperparameter_templates](../py_api/GradientBoostedTreesLearner/#ydf.GradientBoostedTreesLearner.hyperparameter_templates)
+[hyperparameter_templates](py_api/GradientBoostedTreesLearner.md#ydf.GradientBoostedTreesLearner.hyperparameter_templates)
 on a learner.
 
 ```python
@@ -180,7 +180,7 @@ The inference speed and size of a model are constrained by the number of input
 features, the number of trees, and the average depth of the trees.
 
 You can measure the inference speed of a model with the
-[benchmark()](../py_api/GradientBoostedTreesModel/#ydf.GradientBoostedTreesModel.benchmark)
+[benchmark()](py_api/GradientBoostedTreesModel.md#ydf.GradientBoostedTreesModel.benchmark)
 method.
 
 ```python

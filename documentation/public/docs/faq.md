@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-![](image/cpu_forest.png){: .center}
+![Illustration of a tree on a circuit board](image/cpu_forest.png){: .center}
 
 ## About YDF
 

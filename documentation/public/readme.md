@@ -12,7 +12,7 @@ python -m pip install -r third_party/yggdrasil_decision_forests/documentation/pu
 
 # Add the `__init__.py` files missing from the ydf 0.17.0 wheel (see the
 # `post_install` job in `.readthedocs.yaml`).
-python -c "import pathlib, ydf; [(d / '__init__.py').touch() for d in pathlib.Path(ydf.__file__).parent.rglob('*') if d.is_dir() and d.name != '__pycache__']"
+python third_party/yggdrasil_decision_forests/documentation/public/add_missing_init_files.py
 
 # Start a http server with the documentation
 (cd third_party/yggdrasil_decision_forests && mkdocs serve -a localhost:8889 -f documentation/public/mkdocs.yml)

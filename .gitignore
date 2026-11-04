@@ -3,3 +3,5 @@ dist
 .vscode
 __pycache__
 no_sync*
+# Documentation build (mkdocs-jupyter cache).
+.cache

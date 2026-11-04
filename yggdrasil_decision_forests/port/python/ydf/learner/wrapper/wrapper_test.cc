@@ -139,7 +139,7 @@ class FakeAlgorithmLearner(generic_learner.GenericCCLearner):
   `FakeAlgorithmLearner.hyperparameter_templates()` (see this function's documentation for
   details).
 
-  Attributes:
+  Args:
     label: Label of the dataset. The label column
       should not be identified as a feature in the `features` parameter.
     task: Task to solve (e.g. Task.CLASSIFICATION, Task.REGRESSION,

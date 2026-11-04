@@ -99,7 +99,13 @@ from yggdrasil_decision_forests.dataset.data_spec_pb2 import DataSpecification a
 from yggdrasil_decision_forests.learner.abstract_learner_pb2 import TrainingConfig as _TrainingConfig
 
 DataSpecification = _DataSpecification
+"""Internal data specification proto. Describes the columns of a model.
+
+See `model.data_spec()`.
+"""
+
 TrainingConfig = _TrainingConfig
+"""Internal training configuration proto of a learner."""
 
 # Silent proto exentions
 from yggdrasil_decision_forests.learner.gradient_boosted_trees import gradient_boosted_trees_pb2 as _

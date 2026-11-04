@@ -1,7 +1,5 @@
 # Tree
 
-[TOC]
-
 ## Tree
 
 ::: ydf.tree.Tree
@@ -24,6 +22,10 @@
 
 ::: ydf.tree.NumericalSparseObliqueCondition
 
+::: ydf.tree.NumericalVectorSequenceCloserThanCondition
+
+::: ydf.tree.NumericalVectorSequenceProjectedMoreThanCondition
+
 ## Nodes
 
 ::: ydf.tree.AbstractNode
@@ -41,3 +43,9 @@
 ::: ydf.tree.ProbabilityValue
 
 ::: ydf.tree.UpliftValue
+
+::: ydf.tree.AnomalyDetectionValue
+
+## Plotting
+
+::: ydf.tree.PlotOptions

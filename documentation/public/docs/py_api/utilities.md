@@ -1,7 +1,5 @@
 # Utilities
 
-[TOC]
-
 ::: ydf.verbose
 
 ::: ydf.load_model
@@ -22,12 +20,17 @@
 
 ::: ydf.strict
 
-<!---
- May cause issues with the public documentation build, disable temporarily.
-# ::: ydf.Evaluation
--->
+::: ydf.Evaluation
+
+::: ydf.Monotonic
+
+::: ydf.CalibrationConfig
+
+::: ydf.CalibrationType
 
 ::: ydf.ModelIOOptions
+
+::: ydf.VerticalDataset
 
 ::: ydf.create_vertical_dataset
 
@@ -50,3 +53,9 @@
 ::: ydf.MultiClassificationLoss
 
 ::: ydf.Activation
+
+::: ydf.RegressionMetric
+
+::: ydf.BinaryClassificationMetric
+
+::: ydf.MultiClassificationMetric

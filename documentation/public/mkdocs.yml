@@ -15,7 +15,6 @@ theme:
     - navigation.tracking
     # - navigation.instant # TODO: Broken in development mode.
     - navigation.sections
-    - navigation.expand
     - navigation.path
     - navigation.indexes
     - search.suggest
@@ -38,11 +37,44 @@ extra_css:
 
 strict: true
 
+# Notebook generating images for the compose_with_tf tutorial.
+exclude_docs: |
+  tutorial/compose_with_tf_plots.ipynb
+
+# Pages linked from other pages, but intentionally not in the navigation.
+not_in_nav: |
+  changelog_pydf.md
+  tutorial/usage_example.ipynb
+
 nav:
   - 🏡 Home: index.md
   - 🧭 Getting Started: tutorial/getting_started.ipynb
   - 🔥 Hyper-parameters: hyperparameters.md
-  - 🐜 API: py_api/index.md
+  - 🐜 API:
+    - py_api/index.md
+    - Learners:
+      - GradientBoostedTreesLearner: py_api/GradientBoostedTreesLearner.md
+      - RandomForestLearner: py_api/RandomForestLearner.md
+      - CartLearner: py_api/CartLearner.md
+      - DistributedGradientBoostedTreesLearner: py_api/DistributedGradientBoostedTreesLearner.md
+      - IsolationForestLearner: py_api/IsolationForestLearner.md
+      - GenericLearner: py_api/GenericLearner.md
+    - Models:
+      - GradientBoostedTreesModel: py_api/GradientBoostedTreesModel.md
+      - RandomForestModel: py_api/RandomForestModel.md
+      - IsolationForestModel: py_api/IsolationForestModel.md
+      - DecisionForestModel: py_api/DecisionForestModel.md
+      - GenericModel: py_api/GenericModel.md
+    - Tuners and feature selection:
+      - RandomSearchTuner: py_api/RandomSearchTuner.md
+      - VizierTuner: py_api/VizierTuner.md
+      - OptimizerLogs: py_api/OptimizerLogs.md
+      - BackwardSelectionFeatureSelector: py_api/BackwardSelectionFeatureSelector.md
+      - FeatureSelectorLogs: py_api/FeatureSelectorLogs.md
+    - Utilities:
+      - py_api/utilities.md
+      - ydf.util: py_api/util.md
+      - ydf.tree: py_api/tree.md
   - ❔ FAQ: faq.md
   - 📖 Glossary: glossary.md
   - 🤸 For Googlers: http://go/ydf
@@ -177,7 +209,7 @@ plugins:
             show_docstring_attributes: true
             allow_inspection: true
             show_root_full_path: false
-            docstring_section_style: table
+            docstring_section_style: list
             signature_crossrefs: true
             show_signature: true
             separate_signature: true
@@ -202,6 +234,9 @@ extra:
   analytics:
     provider: google
     property: G-R7F46HQLK0
+
+hooks:
+  - colab_cleanup.py
 
 watch:
   - ../../CONTRIBUTING.md

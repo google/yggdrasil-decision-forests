@@ -2,9 +2,10 @@
 title: YDF documentation
 hide: toc
 ---
+
 #
 
-![](image/logo_v2.png){: .center .logo}
+![YDF logo](image/logo_v2.png){: .center .logo}
 <!-- ![](image/logo_v2_christmas.png){: .center .logo} -->
 
 <div class="intro_text">
@@ -29,13 +30,13 @@ Started 🧭 </a>
 </div>
 
 <div class="column illustration">
-<img src="image/code_1.png">
+<img src="image/code_1.png" alt="Example: train, predict, evaluate, and analyze a GradientBoostedTreesLearner model in five lines of Python.">
 </div>
 </div>
 
 <div class="argument">
 <div class="column illustration">
-<img src="image/code_2.png">
+<img src="image/code_2.png" alt="Example: export a YDF model to a TensorFlow SavedModel and to a TensorFlow function.">
 </div>
 
 <div class="column explanation">
@@ -57,7 +58,7 @@ Started 🧭 </a>
 </div>
 
 <div class="column illustration">
-<img src="image/compare_quality.png">
+<img src="image/compare_quality.png" alt="Comparison of the model quality of decision forest libraries.">
 <div class="label">
 Source: <a href="https://doi.org/10.1145/3580305.3599933">Yggdrasil Decision Forests: A Fast and Extensible Decision Forests Library (KDD 2023)</a>.
 </div>
@@ -66,7 +67,7 @@ Source: <a href="https://doi.org/10.1145/3580305.3599933">Yggdrasil Decision For
 
 <div class="argument">
 <div class="column illustration">
-<img src="image/compare_speed.png">
+<img src="image/compare_speed.png" alt="Comparison of the inference speed of decision forest libraries.">
 <div class="label">
 Source: <a href="https://doi.org/10.1145/3580305.3599933">A Comparison of Decision Forest Inference Platforms from A Database Perspective (Arxiv 2023)</a>.
 </div>
@@ -92,8 +93,8 @@ To install YDF from [PyPI](https://pypi.org/project/ydf/), run:
 pip install ydf -U
 ```
 
-YDF is available on Python 3.8, 3.9, 3.10, 3.11 and 3.12, on Windows x86-64
-Linux x86-64, and macOS ARM64.
+YDF is available on Python 3.10, 3.11, 3.12, 3.13 and 3.14, on Linux x86-64 and
+macOS ARM64.
 
 ## Usage example
 
@@ -160,7 +161,7 @@ model.save("/tmp/my_model")
 
 **Serving**
 
--   [Benchmark](tutorial/getting_started/#benchmark-model-speed) model
+-   [Benchmark](tutorial/getting_started.ipynb#benchmark-model-speed) model
     inference.
 -   Run models in Python, [C++](tutorial/cpp.ipynb),
     [Go](https://github.com/google/yggdrasil-decision-forests/tree/main/yggdrasil_decision_forests/port/go),
@@ -185,6 +186,7 @@ model.save("/tmp/my_model")
 -   Enjoy backward compatibility for model and learners since 2018.
 -   [Edits trees](tutorial/editing_trees.ipynb) in Python.
 -   Define [custom loss](tutorial/custom_loss.ipynb) in Python.
+-   Calibration [custom loss](tutorial/binary_calibration.ipynb) in Python.
 
 ## Next steps
 

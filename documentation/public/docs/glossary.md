@@ -203,7 +203,7 @@ distribution.
 Following is an example of a residual normal probability plot. The residual of
 model 2 is more or less normal while the residual of model 1 is not.
 
-![](image/residual_normal_probability_plot.png)
+![Residual normal probability plots of two models](image/residual_normal_probability_plot.png)
 
 ### Conditional {Ground truth, Prediction, Recall} Plot
 
@@ -214,7 +214,7 @@ perform best and where the models perform worst.
 Following is an example of three conditional plots. Model 1 performs best for
 low ground truth values, and model 2 looks random (it is a random predictor).
 
-![](image/conditional_plots.png)
+![Conditional plots of two models](image/conditional_plots.png)
 
 These plots should be read alongside a histogram of the ground truth.
 

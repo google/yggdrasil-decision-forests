@@ -677,7 +677,7 @@ class $0(generic_learner.GenericCCLearner):
   `$0.hyperparameter_templates()` (see this function's documentation for
   details).
 
-  Attributes:$2
+  Args:$2
     working_dir: Path to a directory available for the learning algorithm to
       store intermediate computation results. Depending on the learning
       algorithm and parameters, the working_dir might be optional, required, or
