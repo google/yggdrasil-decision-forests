@@ -74,6 +74,18 @@ class WheelTest(absltest.TestCase):
             f.endswith(_PACKAGE_FILE_EXTENSIONS), f"Unexpected file: {f}"
         )
 
+  def test_regular_packages(self):
+    # Each directory of the `ydf` package must contain an `__init__.py`.
+    # Otherwise, it is a namespace package, which breaks module discovery
+    # (e.g. `pkgutil.walk_packages`) and the API documentation (griffe).
+    package_dirs = {
+        f.rsplit("/", 1)[0]
+        for f in self.files
+        if f.startswith("ydf/") and f.endswith((".py", ".so"))
+    }
+    for package_dir in package_dirs:
+      self.assertIn(f"{package_dir}/__init__.py", self.files)
+
   def test_metadata(self):
     dist_info = [f for f in self.files if f.endswith(".dist-info/METADATA")]
     self.assertLen(dist_info, 1)

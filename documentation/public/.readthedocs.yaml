@@ -4,6 +4,12 @@ build:
   os: ubuntu-24.04
   tools:
     python: "3.14"
+  jobs:
+    post_install:
+      # TODO: Remove once the ydf wheel ships the `__init__.py` files of its
+      # sub-packages (missing in ydf 0.17.0). Without them, mkdocstrings
+      # (griffe) cannot load the `ydf` package.
+      - python -c "import pathlib, ydf; [(d / '__init__.py').touch() for d in pathlib.Path(ydf.__file__).parent.rglob('*') if d.is_dir() and d.name != '__pycache__']"
 
 python:
   install:

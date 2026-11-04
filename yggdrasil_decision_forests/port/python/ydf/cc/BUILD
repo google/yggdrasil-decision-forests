@@ -1,8 +1,14 @@
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
+load("@rules_python//python:py_library.bzl", "py_library")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
+)
+
+py_library(
+    name = "init",
+    srcs = ["__init__.py"],
 )
 
 # Pybind

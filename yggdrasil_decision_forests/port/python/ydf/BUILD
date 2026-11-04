@@ -13,6 +13,7 @@ py_library(
     srcs = ["__init__.py"],
     visibility = ["//visibility:public"],
     deps = [
+        ":package_inits",  # buildcleaner: keep
         ":version",
         ":ydf_protos",
         "//ydf/api:experimental",
@@ -45,6 +46,27 @@ py_library(
         "//ydf/model/random_forest_model",
         "//ydf/model/tree:all",
         "//ydf/utils:log",
+    ],
+)
+
+py_library(
+    name = "package_inits",
+    deps = [
+        "//ydf/api:init",
+        "//ydf/cc:init",
+        "//ydf/dataset:init",
+        "//ydf/dataset/io:init",
+        "//ydf/deep:init",
+        "//ydf/learner:init",
+        "//ydf/metric:init",
+        "//ydf/model:init",
+        "//ydf/model/decision_forest_model:init",
+        "//ydf/model/gradient_boosted_trees_model:init",
+        "//ydf/model/isolation_forest_model:init",
+        "//ydf/model/random_forest_model:init",
+        "//ydf/monitoring:init",
+        "//ydf/util:init",
+        "//ydf/utils:init",
     ],
 )
 

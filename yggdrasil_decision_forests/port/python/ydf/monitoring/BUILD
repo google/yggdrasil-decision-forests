@@ -7,6 +7,11 @@ package(
     licenses = ["notice"],
 )
 
+py_library(
+    name = "init",
+    srcs = ["__init__.py"],
+)
+
 # Binaries
 # ========
 

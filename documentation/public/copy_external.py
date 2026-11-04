@@ -24,11 +24,19 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 files_to_copy = {
     "CHANGELOG.md": "changelog.md",
     "LICENSE": "LICENSE",
-    "yggdrasil_decision_forests/port/python/CHANGELOG.md": "changelog_pydf.md",
+    (
+        "yggdrasil_decision_forests/port/python/CHANGELOG.md",
+        "port/python/CHANGELOG.md",
+    ): "changelog_pydf.md",
 }
 
-for src_path, dest_name in files_to_copy.items():
-  full_src_path = os.path.join(REPO_ROOT, src_path)
+for src_paths, dest_name in files_to_copy.items():
+  if isinstance(src_paths, str):
+    src_paths = (src_paths,)
+  full_src_paths = [os.path.join(REPO_ROOT, p) for p in src_paths]
+  full_src_path = next(
+      (p for p in full_src_paths if os.path.exists(p)), full_src_paths[0]
+  )
   try:
     with open(full_src_path, "r", encoding="utf-8") as f_in:
       with mkdocs_gen_files.open(dest_name, "w") as f_out:
