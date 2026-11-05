@@ -4492,7 +4492,7 @@ void SetDefaultHyperParameters(proto::DecisionTreeTrainingConfig* config) {
       case proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH:
         ps->set_num_candidates(255);
         break;
-      default:
+      case proto::NumericalSplit::EXACT:
         break;
     }
   }

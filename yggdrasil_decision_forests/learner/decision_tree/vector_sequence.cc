@@ -119,7 +119,6 @@ absl::Status TryProjectedMoreThanCondition(
     utils::RandomEngine* random,
     proto::NodeCondition* condition, SplitSearchResult* result_flag,
     std::vector<float>* projections) {
-
   STATUS_CHECK(internal_config.vector_sequence_computer);
   projections->resize(selected_examples.size() * num_anchors);
   RETURN_IF_ERROR(
