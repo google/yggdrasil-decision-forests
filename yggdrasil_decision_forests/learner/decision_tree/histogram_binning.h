@@ -21,7 +21,7 @@
 
 #include "absl/types/span.h"
 
-namespace yggdrasil_decision_forests::decision_tree::internal {
+namespace yggdrasil_decision_forests::model::decision_tree::internal {
 
 // Maps values to histogram bins: the index of the last threshold <= value, or
 // -1 if none. Same result as std::upper_bound(thresholds, value) - begin - 1.
@@ -57,6 +57,6 @@ class HistogramBinner {
   alignas(64) float group_maxima_[kMaxCoarseVectors * kMaxLanes];
 };
 
-}  // namespace yggdrasil_decision_forests::decision_tree::internal
+}  // namespace yggdrasil_decision_forests::model::decision_tree::internal
 
 #endif  // YGGDRASIL_DECISION_FORESTS_LEARNER_DECISION_TREE_HISTOGRAM_BINNING_H_

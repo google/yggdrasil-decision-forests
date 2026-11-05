@@ -31,7 +31,7 @@
 #include "hwy/highway.h"
 
 HWY_BEFORE_NAMESPACE();
-namespace yggdrasil_decision_forests::decision_tree::internal {
+namespace yggdrasil_decision_forests::model::decision_tree::internal {
 namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 
@@ -70,11 +70,11 @@ void BinIndices(const float* HWY_RESTRICT padded_thresholds,
 }
 
 }  // namespace HWY_NAMESPACE
-}  // namespace yggdrasil_decision_forests::decision_tree::internal
+}  // namespace yggdrasil_decision_forests::model::decision_tree::internal
 HWY_AFTER_NAMESPACE();
 
 #if HWY_ONCE
-namespace yggdrasil_decision_forests::decision_tree::internal {
+namespace yggdrasil_decision_forests::model::decision_tree::internal {
 
 HWY_EXPORT(NumLanes);
 HWY_EXPORT(BinIndices);
@@ -128,5 +128,5 @@ void HistogramBinner::Index(absl::Span<const float> values,
 #endif
 }
 
-}  // namespace yggdrasil_decision_forests::decision_tree::internal
+}  // namespace yggdrasil_decision_forests::model::decision_tree::internal
 #endif  // HWY_ONCE

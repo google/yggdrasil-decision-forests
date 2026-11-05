@@ -27,7 +27,7 @@
 #include "absl/types/span.h"
 #include "hwy/targets.h"
 
-namespace yggdrasil_decision_forests::decision_tree::internal {
+namespace yggdrasil_decision_forests::model::decision_tree::internal {
 namespace {
 
 int32_t ReferenceIndex(const std::vector<float>& thresholds, const float x) {
@@ -117,4 +117,4 @@ TEST(HistogramBinner, Empty) {
 }
 
 }  // namespace
-}  // namespace yggdrasil_decision_forests::decision_tree::internal
+}  // namespace yggdrasil_decision_forests::model::decision_tree::internal
