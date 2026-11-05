@@ -101,16 +101,13 @@ DistributedGradientBoostedTreesLearner::TrainWithStatusImpl(
 
 absl::Status DistributedGradientBoostedTreesLearner::SetHyperParametersImpl(
     utils::GenericHyperParameterConsumer* generic_hyper_params) {
-  // Use the non-distributed GBT learner to set the configuration.
-  gradient_boosted_trees::GradientBoostedTreesLearner gbt_learner(
-      training_config_);
-  RETURN_IF_ERROR(gbt_learner.SetHyperParametersImpl(generic_hyper_params));
+  RETURN_IF_ERROR(
+      AbstractLearner::SetHyperParametersImpl(generic_hyper_params));
   auto* dgbt_config = training_config_.MutableExtension(
       distributed_gradient_boosted_trees::proto::
           distributed_gradient_boosted_trees_config);
-  dgbt_config->mutable_gbt()->MergeFrom(
-      gbt_learner.training_config().GetExtension(
-          gradient_boosted_trees::proto::gradient_boosted_trees_config));
+  RETURN_IF_ERROR(gradient_boosted_trees::internal::SetHyperParameters(
+      generic_hyper_params, dgbt_config->mutable_gbt()));
 
   {
     const auto hparam = generic_hyper_params->Get(
