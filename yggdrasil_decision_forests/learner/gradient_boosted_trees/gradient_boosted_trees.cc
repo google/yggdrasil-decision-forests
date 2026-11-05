@@ -3195,9 +3195,7 @@ void SampleTrainingExamples(
   }
   if (selected_examples->empty()) {
     // Ensure at least one example is selected.
-    selected_examples->push_back(
-        std::uniform_int_distribution<UnsignedExampleIdx>(num_rows -
-                                                          1)(*random));
+    selected_examples->push_back(utils::RandomUniformInt(num_rows, random));
   }
 }
 
@@ -3249,9 +3247,7 @@ void SampleTrainingExamplesWithGoss(
 
   // Ensure at least one example is selected.
   if (selected_examples->empty()) {
-    selected_examples->push_back(
-        std::uniform_int_distribution<UnsignedExampleIdx>(num_rows -
-                                                          1)(*random));
+    selected_examples->push_back(utils::RandomUniformInt(num_rows, random));
   }
 
   // Sort selected examples by example index, since downstream users of selected
