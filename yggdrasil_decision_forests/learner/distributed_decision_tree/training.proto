@@ -31,3 +31,40 @@ message Split {
 message SplitPerOpenNode {
   repeated Split splits = 1;
 }
+
+// Statistics of a list of histogram bins, stored as flat packed arrays. Used to
+// exchange the per-bin statistics of the histogram branch-and-bound split
+// finding (see "histogram_bnb.h") between workers and the manager.
+//
+// For the "i"-th bin:
+//   counts[i]: Number of examples (unweighted).
+//   sums[4*i + 0]: Sum of the example weights.
+//   sums[4*i + 1]: Sum of weight * gradient.
+//   sums[4*i + 2]: Sum of weight * gradient^2.
+//   sums[4*i + 3]: Sum of weight * hessian.
+//   ranges[4*i + 0]: Minimum feature value.
+//   ranges[4*i + 1]: Maximum feature value.
+//   ranges[4*i + 2]: Minimum ratio g/h (criterion dependent).
+//   ranges[4*i + 3]: Maximum ratio g/h (criterion dependent).
+message BinStatistics {
+  repeated int64 counts = 1 [packed = true];
+  repeated double sums = 2 [packed = true];
+  repeated float ranges = 3 [packed = true];
+}
+
+// Weighted quantile summary with certified rank bounds. See
+// "quantile_sketch.h".
+//
+// For the "i"-th entry with value "values[i]":
+//   min_ranks[i] <= W(x < values[i])
+//   max_ranks[i] >= W(x <= values[i])
+//   weights[i] <= W(x == values[i])
+// where "W(.)" is the total weight of the summarized observations satisfying
+// the condition.
+message QuantileSummary {
+  repeated float values = 1 [packed = true];
+  repeated double min_ranks = 2 [packed = true];
+  repeated double max_ranks = 3 [packed = true];
+  repeated double weights = 4 [packed = true];
+  optional double total_weight = 5;
+}

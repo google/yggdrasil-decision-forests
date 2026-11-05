@@ -62,8 +62,85 @@ cc_library_ydf(
     ],
 )
 
+cc_library_ydf(
+    name = "histogram_bnb",
+    srcs = ["histogram_bnb.cc"],
+    hdrs = [
+        "histogram_bnb.h",
+        "label_accessor.h",
+    ],
+    deps = [
+        ":training",
+        ":training_cc_proto",
+        "//yggdrasil_decision_forests/dataset:types",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
+        "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/learner/decision_tree:splitter",
+        "//yggdrasil_decision_forests/learner/decision_tree:utils",
+        "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/utils:distribution",
+        "//yggdrasil_decision_forests/utils:distribution_cc_proto",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library_ydf(
+    name = "quantile_sketch",
+    srcs = ["quantile_sketch.cc"],
+    hdrs = ["quantile_sketch.h"],
+    deps = [
+        ":training_cc_proto",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:status_macros",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
 # Test
 # =========================================================
+
+cc_test(
+    name = "histogram_bnb_test",
+    srcs = ["histogram_bnb_test.cc"],
+    deps = [
+        ":histogram_bnb",
+        ":quantile_sketch",
+        ":training",
+        ":training_cc_proto",
+        "//yggdrasil_decision_forests/dataset:types",
+        "//yggdrasil_decision_forests/learner/decision_tree:decision_tree_cc_proto",
+        "//yggdrasil_decision_forests/learner/decision_tree:utils",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/log:check",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "quantile_sketch_test",
+    srcs = ["quantile_sketch_test.cc"],
+    deps = [
+        ":quantile_sketch",
+        ":training_cc_proto",
+        "//yggdrasil_decision_forests/utils:random",
+        "//yggdrasil_decision_forests/utils:testing_macros",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
 
 cc_test(
     name = "training_test",
