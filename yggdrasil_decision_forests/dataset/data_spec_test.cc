@@ -641,8 +641,37 @@ TEST(Dataset, GenDiscretizedBoundariesCornerCases) {
                                        /*maximum_num_bins=*/1,
                                        /*min_obs_in_bins=*/1, {2.f})
                   .value(),
-              ElementsAre(1.5, std::nextafter(2.f, 1.f),
-                          std::nextafter(2.f, 3.f), 2.5, 3.5, 4.5));
+              ElementsAre(std::nextafter(2.f, 1.f), std::nextafter(2.f, 3.f)));
+
+  EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
+                                       /*maximum_num_bins=*/0,
+                                       /*min_obs_in_bins=*/1, {})
+                  .status(),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+
+  EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
+                                       /*maximum_num_bins=*/-1,
+                                       /*min_obs_in_bins=*/1, {})
+                  .status(),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST(Dataset, GenDiscretizedBoundariesSmallMaximumNumBins) {
+  std::vector<std::pair<float, int>> candidates;
+  for (int i = -100000; i < 100000; i++) {
+    candidates.emplace_back(i, 1);
+  }
+
+  for (const int maximum_num_bins : {1, 2, 3, 4}) {
+    SCOPED_TRACE(maximum_num_bins);
+    // Both special values are in the range of the candidates.
+    EXPECT_THAT(
+        GenDiscretizedBoundaries(candidates, maximum_num_bins,
+                                 /*min_obs_in_bins=*/3, {0.f, -0.5f})
+            .value(),
+        ElementsAre(std::nextafter(-0.5f, 0.f), std::nextafter(0.f, -1.f),
+                    std::nextafter(0.f, 1.f)));
+  }
 }
 
 TEST(Dataset, GenDiscretizedBoundariesWithSpecialValues) {

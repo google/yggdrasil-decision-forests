@@ -876,6 +876,12 @@ absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
   // remaining counts: Observations not already assigned to a bin and not
   // reserved by a large candidate.
 
+  if (maximum_num_bins < 1) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "The maximum number of bins of a discretized numerical column must be "
+        "at least 1. Got ",
+        maximum_num_bins, "."));
+  }
   STATUS_CHECK_LT(maximum_num_bins, kDiscretizedNumericalMissingValue);
   STATUS_CHECK_GE(min_obs_in_bins, 1);
 
@@ -889,13 +895,17 @@ absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
       }
     }
   }
-  maximum_num_bins =
-      std::max<std::size_t>(1, maximum_num_bins - special_values.size() -
-                                   num_special_values_in_bounds);
+  // Note: The computation is done with signed integers since the number of
+  // reserved bins can exceed `maximum_num_bins`.
+  const int64_t num_reserved_bins =
+      static_cast<int64_t>(special_values.size()) +
+      num_special_values_in_bounds;
+  maximum_num_bins = static_cast<int>(std::max<int64_t>(
+      1, static_cast<int64_t>(maximum_num_bins) - num_reserved_bins));
 
   const int max_num_boundaries = maximum_num_bins - 1;
   std::vector<float> boundaries;
-  if (candidates.size() > maximum_num_bins) {
+  if (candidates.size() > static_cast<size_t>(maximum_num_bins)) {
     int64_t sum_counts = 0;
     for (const auto& candidate : candidates) {
       sum_counts += candidate.second;
@@ -982,6 +992,9 @@ absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
   }
   std::sort(boundaries.begin(), boundaries.end());
 
+  // The bin index of a value is stored as a "DiscretizedNumericalIndex", with
+  // "kDiscretizedNumericalMissingValue" reserved for missing values.
+  STATUS_CHECK_LT(boundaries.size(), kDiscretizedNumericalMissingValue);
   return boundaries;
 }
 

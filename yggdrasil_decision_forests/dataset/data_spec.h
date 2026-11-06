@@ -217,7 +217,10 @@ absl::StatusOr<float> DiscretizedNumericalToNumerical(
 //
 // Args:
 //  candidates: Pairs of <value,count> sorted by value. Values should be unique.
-//  maximum_num_bins: Maximum number of bins.
+//  maximum_num_bins: Maximum number of bins. Should be in [1, 65535[. The bins
+//    of the special values are taken from this budget. If the budget is too
+//    small to accommodate the special values, the special values still get
+//    their bins, and the number of other bins is kept to a minimum.
 //  min_obs_in_bins: Minimum number of observations (sum of counts) in each
 //    bins.
 //  special_values: Special values (not necessarily present in "candidates")
