@@ -55,6 +55,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/math.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -214,7 +215,7 @@ struct FeatureNumericalBucket {
     void SetConditionFinalFromThresholds(
         const float threshold_1, const float threshold_2,
         proto::NodeCondition* condition) const {
-      const float threshold = MidThreshold(threshold_1, threshold_2);
+      const float threshold = utils::MidThreshold(threshold_1, threshold_2);
       condition->mutable_condition()->mutable_higher_condition()->set_threshold(
           threshold);
       condition->set_na_value(na_replacement_ >= threshold);
