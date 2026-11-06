@@ -545,8 +545,9 @@ absl::Status GenericCCModel::Calibrate(
   RETURN_IF_ERROR(model::GetLearner(config, &learner));
   *learner->mutable_deployment() = deployment;
 
-  ASSIGN_OR_RETURN(model_, learner->TrainWithStatus(dataset, std::nullopt,
-                                                    std::move(model_)));
+  RETURN_IF_ERROR(dataset.CheckCategoricalValuesInRange());
+  RETURN_IF_ERROR(learner->TrainPostprocessor(*postprocessor, *model_, dataset,
+                                              /*valid_dataset=*/std::nullopt));
 
   invalidate_engine_ = true;
 

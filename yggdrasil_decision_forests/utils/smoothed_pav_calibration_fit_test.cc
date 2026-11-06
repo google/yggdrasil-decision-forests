@@ -31,6 +31,7 @@ namespace utils {
 namespace {
 
 using ::testing::FloatNear;
+using ::testing::HasSubstr;
 using ::testing::Le;
 using ::testing::Not;
 using ::testing::SizeIs;
@@ -459,6 +460,57 @@ TEST(SmoothedPavCalibrationFit, PchipSlopesWeighted) {
     auto d = *pchip_slopes(x, y, w);
     EXPECT_THAT(d[1], FloatNear(0.0, 1e-9));
     EXPECT_THAT(d[2], FloatNear(0.0, 1e-9));
+  }
+}
+
+TEST(SmoothedPavCalibrationFit, FitCalibrationDegenerateCases) {
+  // 1. Empty calibration bins -> n = 0 < 2
+  {
+    std::vector<BinAccumulator> empty_bins(10);
+    auto curve_or = fit_calibration(empty_bins);
+    EXPECT_EQ(curve_or.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(curve_or.status().message(),
+                HasSubstr("no non-empty calibration bins (n = 0 < 2)"));
+  }
+
+  // 2. All predictions fall in a single bin -> finalized.size() == 1
+  {
+    std::vector<AccumulatorType> p = {0.2, 0.2, 0.2, 0.2};
+    std::vector<AccumulatorType> y = {0.0, 0.0, 1.0, 1.0};
+    auto curve_or = fit_calibration(p, y, /*n_bins=*/10);
+    EXPECT_EQ(curve_or.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(curve_or.status().message(),
+                HasSubstr("all calibration examples fell into a single bin"));
+    EXPECT_THAT(curve_or.status().message(), HasSubstr("n = 1 < 2"));
+  }
+
+  // 3. Multiple bins collapse into a single pool under plain PAV
+  // (z_threshold=0)
+  {
+    std::vector<AccumulatorType> p = {0.1, 0.1, 0.9, 0.9};
+    std::vector<AccumulatorType> y = {1.0, 1.0, 0.0, 0.0};
+    auto curve_or = fit_calibration(p, y, /*n_bins=*/10, /*z_threshold=*/0.0);
+    EXPECT_EQ(curve_or.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        curve_or.status().message(),
+        HasSubstr("2 non-empty calibration bins collapsed into a single pool "
+                  "after Pool-Adjacent-Violators merging (n = 1 < 2)"));
+  }
+
+  // 4. Multiple monotone bins collapse into a single pool due to z_threshold >
+  // 0
+  {
+    std::vector<BinAccumulator> bins = {{1.0, 5.0, 10.0}, {2.0, 5.1, 10.0}};
+    auto curve_z0_or = fit_calibration(bins, /*z_threshold=*/0.0);
+    EXPECT_TRUE(curve_z0_or.ok());
+
+    auto curve_big_z_or = fit_calibration(bins, /*z_threshold=*/5.0);
+    EXPECT_EQ(curve_big_z_or.status().code(),
+              absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        curve_big_z_or.status().message(),
+        HasSubstr("collapsed into a single pool after monotonicity merging "
+                  "with z_threshold = 5 (n = 1 < 2)"));
   }
 }
 

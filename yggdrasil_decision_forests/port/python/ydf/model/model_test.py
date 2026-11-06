@@ -1449,6 +1449,25 @@ Use `model.describe()` for more details.
     with self.assertRaises(ValueError):
       model.predict(test_df)
 
+  def test_calibrate_failure_preserves_model(self):
+    model = model_lib.load_model(
+        os.path.join(self._model_dir, "adult_binary_class_gbdt")
+    )
+    test_df = self.adult_binary_class_gbdt_test_ds
+    predictions_before = model.predict(test_df)
+
+    # Create a degenerate calibration dataset (single example -> 1 bin, n=1 < 2)
+    degenerate_cal_df = test_df.iloc[:1].copy()
+    with self.assertRaisesRegex(
+        ValueError, "all calibration examples fell into a single bin"
+    ):
+      model.calibrate(degenerate_cal_df)
+
+    # Model must remain usable and return identical predictions after failure.
+    predictions_after_failed_calibration = model.predict(test_df)
+    npt.assert_equal(predictions_before, predictions_after_failed_calibration)
+    self.assertEqual(model.num_trees(), 68)
+
 
 if __name__ == "__main__":
   absltest.main()

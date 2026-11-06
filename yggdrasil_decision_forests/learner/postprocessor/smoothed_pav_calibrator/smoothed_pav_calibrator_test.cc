@@ -241,5 +241,27 @@ TEST(SmoothedPavCalibratorTest, ConfigVariation) {
   }
 }
 
+TEST(SmoothedPavCalibratorTest, DegenerateSinglePoolReturnsInvalidArgument) {
+  // Constant model predictions collapse into a single bin ->
+  // InvalidArgumentError
+  std::vector<int> labels = {1, 1, 2, 2};
+  std::vector<float> predictions = {0.5f, 0.5f, 0.5f, 0.5f};
+
+  auto dataset = CreateDataset(labels);
+  FakeClassificationModel model(predictions);
+
+  model::proto::DeploymentConfig deployment;
+  deployment.set_num_threads(1);
+
+  model::proto::TrainingConfigLinking config_link;
+  config_link.set_label(0);
+
+  proto::SmoothedPavCalibratorTrainingConfig postprocessor_config;
+
+  auto calibrator_or = CreateSmoothedPavCalibrator(
+      deployment, config_link, postprocessor_config, model, dataset);
+  EXPECT_EQ(calibrator_or.status().code(), absl::StatusCode::kInvalidArgument);
+}
+
 }  // namespace smoothed_pav_calibrator
 }  // namespace yggdrasil_decision_forests::model::postprocessor

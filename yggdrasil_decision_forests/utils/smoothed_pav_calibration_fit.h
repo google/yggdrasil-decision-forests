@@ -295,11 +295,13 @@ struct FittedCalibrationCurve {
   std::vector<BinAccumulator::AccumulatorType> d;
 };
 
-// Shared tail of the fitting pipeline (anchor -> fix endpoint ties ->
-// confidence-weight -> PCHIP slopes), used by both calibration-curve
-// fitting (after PAV) and score-distribution fitting (which skips PAV).
-// x, y, w: Interior points and per-point weights, not yet anchored.
-// Returns: The fully fitted, anchored curve.
+// Shared tail of the fitting pipeline (confidence-weight -> PCHIP slopes),
+// used by both calibration-curve fitting (after PAV, unanchored) and
+// score-distribution fitting (which skips PAV and anchors endpoints in
+// cumulative_from_bins).
+// x, y, w: Strictly increasing knot positions, non-decreasing knot values, and
+//          per-knot sample counts. Must contain at least 2 points.
+// Returns: The fitted monotone curve.
 absl::StatusOr<FittedCalibrationCurve> fit_monotone_curve(
     std::vector<BinAccumulator::AccumulatorType> x,
     std::vector<BinAccumulator::AccumulatorType> y,

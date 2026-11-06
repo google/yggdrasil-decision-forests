@@ -353,7 +353,41 @@ absl::StatusOr<FittedCalibrationCurve> fit_calibration(
     const std::vector<BinAccumulator>& bins, AccumulatorType z_threshold) {
   auto finalized = finalize_bins(
       std::vector<BinAccumulator>(bins));  // copy; bins left untouched
+  if (finalized.empty()) {
+    return absl::InvalidArgumentError(
+        "Calibration failed: no non-empty calibration bins (n = 0 < 2). "
+        "Ensure the calibration dataset is non-empty.");
+  }
+  if (finalized.size() == 1) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Calibration failed: all calibration examples fell into a single bin "
+        "(prob_pred = ",
+        finalized[0].prob_pred(), ", prob_true = ", finalized[0].prob_true(),
+        ", count = ", finalized[0].count,
+        "; n = 1 < 2). At least 2 distinct monotone pools are required to fit "
+        "a calibration curve; check that model predictions on the calibration "
+        "dataset are not constant and that n_bins is sufficiently large."));
+  }
   auto pools = merge_bins_for_monotonicity(finalized, z_threshold);
+  if (pools.size() < 2) {
+    if (z_threshold > 0.0 &&
+        merge_bins_for_monotonicity(finalized, 0.0).size() >= 2) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "Calibration failed: ", finalized.size(),
+          " non-empty calibration bins collapsed into a single pool after "
+          "monotonicity merging with z_threshold = ",
+          z_threshold,
+          " (n = 1 < 2). Try lowering z_threshold or providing more "
+          "calibration examples."));
+    }
+    return absl::InvalidArgumentError(absl::StrCat(
+        "Calibration failed: ", finalized.size(),
+        " non-empty calibration bins collapsed into a single pool after "
+        "Pool-Adjacent-Violators merging (n = 1 < 2). At least 2 distinct "
+        "monotone pools are required to fit a calibration curve; this "
+        "typically happens when calibration predictions are anti-correlated "
+        "with the labels or the calibration dataset is too small."));
+  }
 
   std::vector<AccumulatorType> x, y, w;
   x.reserve(pools.size());
