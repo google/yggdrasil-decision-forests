@@ -61,6 +61,7 @@ cc_library_ydf(
         ":example_cc_proto",
         "//yggdrasil_decision_forests/utils:hash",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:math",
         "//yggdrasil_decision_forests/utils:regex",
         "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/base:core_headers",

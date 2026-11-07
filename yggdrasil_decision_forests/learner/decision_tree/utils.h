@@ -94,20 +94,6 @@ T1 l1_threshold(const T1 value, const T2 l1) {
   }
 }
 
-// Returns r := (a+b)/2 for a>b.
-// Ensure that:
-// - r is finite.
-// - r > a.
-// - r = b if there is not float number in between a and b.
-//
-inline float MidThreshold(const float a, const float b) {
-  float threshold = a + (b - a) / 2.f;
-  if (threshold <= a) {
-    threshold = b;
-  }
-  return threshold;
-}
-
 // Constraints applied to a node during training.
 struct NodeConstraints {
   // Minimum and maximum value of the node output.

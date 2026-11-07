@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -540,6 +541,35 @@ TEST(DataSpec, DiscretizedNumericalToNumerical) {
   EXPECT_NEAR(DiscretizedNumericalToNumerical(col, 3).value(), 31.f, eps);
 }
 
+// The numerical value of a bin falls in the bin, even if there is no float
+// number in between the boundaries of the bin.
+TEST(DataSpec, DiscretizedNumericalToNumericalAdjacentBoundaries) {
+  const float a = 1.f;
+  const float b = std::nextafter(a, 2.f);
+  proto::Column col;
+  col.set_type(proto::ColumnType::DISCRETIZED_NUMERICAL);
+  col.mutable_discretized_numerical()->add_boundaries(a);
+  col.mutable_discretized_numerical()->add_boundaries(b);
+
+  const float value = DiscretizedNumericalToNumerical(col, 1).value();
+  EXPECT_EQ(value, a);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, value), 1);
+}
+
+// The numerical value of a bin with large boundaries of opposite signs is
+// finite and falls in the bin.
+TEST(DataSpec, DiscretizedNumericalToNumericalLargeBoundaries) {
+  using nl = std::numeric_limits<float>;
+  proto::Column col;
+  col.set_type(proto::ColumnType::DISCRETIZED_NUMERICAL);
+  col.mutable_discretized_numerical()->add_boundaries(nl::lowest());
+  col.mutable_discretized_numerical()->add_boundaries(nl::max());
+
+  const float value = DiscretizedNumericalToNumerical(col, 1).value();
+  EXPECT_EQ(value, 0.f);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, value), 1);
+}
+
 // Conversion numerical -> discretized numerical.
 TEST(DataSpec, NumericalToDiscretizedNumerical) {
   proto::Column col = PARSE_TEST_PROTO(
@@ -710,6 +740,42 @@ TEST(Dataset, GenDiscretizedBoundariesWithSpecialValues) {
                                        /*min_obs_in_bins=*/1, {5.f})
                   .value(),
               ElementsAre(1.5, 2.5, 3.5, std::nextafter(5.f, 4.f)));
+}
+
+// Boundaries are finite and separate consecutive candidates, even if there is
+// no float number in between the candidates, or if the candidates are large.
+TEST(Dataset, GenDiscretizedBoundariesFloatCornerCases) {
+  using nl = std::numeric_limits<float>;
+  const float a = 1.f;
+  const float a_next = std::nextafter(a, 2.f);
+
+  const auto check = [](const std::vector<std::pair<float, int>>& candidates,
+                        const int maximum_num_bins) {
+    SCOPED_TRACE(maximum_num_bins);
+    const auto boundaries =
+        GenDiscretizedBoundaries(candidates, maximum_num_bins,
+                                 /*min_obs_in_bins=*/1, /*special_values=*/{})
+            .value();
+    ASSERT_FALSE(boundaries.empty());
+    proto::Column col;
+    col.set_type(proto::ColumnType::DISCRETIZED_NUMERICAL);
+    for (const float boundary : boundaries) {
+      EXPECT_TRUE(std::isfinite(boundary));
+      col.mutable_discretized_numerical()->add_boundaries(boundary);
+    }
+    // The first two candidates are in different bins.
+    EXPECT_EQ(NumericalToDiscretizedNumerical(col, candidates[0].first), 0);
+    EXPECT_EQ(NumericalToDiscretizedNumerical(col, candidates[1].first), 1);
+  };
+
+  // Lossless discretization (i.e. more bins than candidates).
+  check({{a, 1}, {a_next, 1}, {2.f, 1}}, /*maximum_num_bins=*/10);
+  check({{2e38f, 1}, {2.5e38f, 1}, {nl::max(), 1}}, /*maximum_num_bins=*/10);
+  check({{nl::lowest(), 1}, {nl::max(), 1}}, /*maximum_num_bins=*/10);
+
+  // Lossy discretization (i.e. less bins than candidates).
+  check({{a, 1}, {a_next, 1}, {2.f, 1}}, /*maximum_num_bins=*/2);
+  check({{2e38f, 1}, {2.5e38f, 1}, {nl::max(), 1}}, /*maximum_num_bins=*/2);
 }
 
 TEST(Dataset, BuildColIdxToFeatureLabelIdx) {
