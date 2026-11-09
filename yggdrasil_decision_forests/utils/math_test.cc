@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <random>
 #include <vector>
 
@@ -40,6 +41,48 @@ TEST(CeilDiV, Base) {
   EXPECT_EQ(CeilDiV(15, 5), 3);
 
   EXPECT_EQ(CeilDiV(16, 5), 4);
+}
+
+TEST(MidThreshold, Base) {
+  const auto test = [](const float a, const float b) {
+    SCOPED_TRACE(testing::Message() << "a=" << a << " b=" << b);
+    ASSERT_GT(b, a);
+    const float r = MidThreshold(a, b);
+    EXPECT_TRUE(std::isfinite(r));
+    EXPECT_GT(r, a);
+    EXPECT_LE(r, b);
+  };
+  using nl = std::numeric_limits<float>;
+
+  test(1.f, 2.f);
+  test(-10.f, -5.f);
+
+  test(0.f, nl::max());
+  test(nl::min(), nl::max());
+
+  test(1.f, std::nextafter(1.f, 2.f));
+  test(std::nextafter(1.f, 0.f), 1.f);
+  test(std::nextafter(1.f, 0.f), std::nextafter(1.f, 2.f));
+
+  test(std::nextafter(nl::max(), 0.f), nl::max());
+  test(nl::lowest(), std::nextafter(nl::lowest(), 0.f));
+
+  // "b - a" overflows.
+  test(nl::lowest(), nl::max());
+  test(-2e38f, nl::max());
+  test(nl::lowest(), 2e38f);
+}
+
+TEST(MidThreshold, Values) {
+  using nl = std::numeric_limits<float>;
+  EXPECT_EQ(MidThreshold(1.f, 2.f), 1.5f);
+  EXPECT_EQ(MidThreshold(-2.f, -1.f), -1.5f);
+  EXPECT_EQ(MidThreshold(nl::lowest(), nl::max()), 0.f);
+
+  // No float in between "a" and "b".
+  const float a = 1.f;
+  const float b = std::nextafter(a, 2.f);
+  EXPECT_EQ(MidThreshold(a, b), b);
 }
 
 TEST(Median, Empty) { EXPECT_TRUE(std::isnan(Median({}))); }

@@ -46,6 +46,7 @@
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/example.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/math.h"
 #include "yggdrasil_decision_forests/utils/regex.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 
@@ -951,9 +952,9 @@ absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
           running_count >= current_large_count ||
           (is_large_count[candidate_idx + 1] &&
            running_count >= std::max(int64_t{1}, current_large_count / 2))) {
-        const float boundary = (candidates[candidate_idx].first +
-                                candidates[candidate_idx + 1].first) /
-                               2;
+        const float boundary =
+            utils::MidThreshold(candidates[candidate_idx].first,
+                                candidates[candidate_idx + 1].first);
         boundaries.push_back(boundary);
 
         next_bin_idx++;
@@ -978,9 +979,9 @@ absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
          candidate_idx++) {
       running_count += candidates[candidate_idx].second;
       if (running_count >= min_obs_in_bins) {
-        const float boundary = (candidates[candidate_idx].first +
-                                candidates[candidate_idx + 1].first) /
-                               2;
+        const float boundary =
+            utils::MidThreshold(candidates[candidate_idx].first,
+                                candidates[candidate_idx + 1].first);
         boundaries.push_back(boundary);
         running_count = 0;
       }
@@ -1013,7 +1014,13 @@ absl::StatusOr<float> DiscretizedNumericalToNumerical(
     return boundaries[boundaries.size() - 1] +
            kEpsDiscretizedToNonDiscretizedNumerical;
   }
-  return (boundaries[value] + boundaries[value - 1]) / 2;
+  // The value should be in the bin [lower, upper[. "MidThreshold" returns a
+  // value in ]lower, upper], which is equal to "upper" only if there is no
+  // float number in between "lower" and "upper".
+  const float lower = boundaries[value - 1];
+  const float upper = boundaries[value];
+  const float mid = utils::MidThreshold(lower, upper);
+  return mid < upper ? mid : lower;
 }
 
 DiscretizedNumericalIndex NumericalToDiscretizedNumerical(

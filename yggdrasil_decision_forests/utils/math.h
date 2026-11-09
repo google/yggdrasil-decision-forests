@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_MATH_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_MATH_H_
 
+#include <cmath>
 #include <type_traits>
 
 #include "absl/types/span.h"
@@ -31,6 +32,28 @@ template <typename T>
 T CeilDiV(T x, T y) {
   static_assert(std::is_integral<T>::value, "Integral required.");
   return (x + y - 1) / y;
+}
+
+// Returns r := (a+b)/2 for finite a < b, to be used as the threshold of a
+// condition "x >= r" separating "a" (negative) from "b" (positive).
+//
+// Ensures that:
+// - r is finite.
+// - r > a.
+// - r <= b.
+// - r = b if there is no float number in between a and b.
+inline float MidThreshold(const float a, const float b) {
+  float threshold = a + (b - a) / 2.f;
+  if (!std::isfinite(threshold)) {
+    // "b - a" overflows if "a" and "b" have large magnitudes and opposite
+    // signs. In this case, the sum does not overflow.
+    threshold = static_cast<float>(
+        (static_cast<double>(a) + static_cast<double>(b)) / 2.);
+  }
+  if (threshold <= a) {
+    threshold = b;
+  }
+  return threshold;
 }
 
 // Computes the median of "values".

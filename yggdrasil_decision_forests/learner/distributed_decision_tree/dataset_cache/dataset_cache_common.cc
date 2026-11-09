@@ -34,12 +34,12 @@
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
-#include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/column_cache.h"
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/dataset_cache/dataset_cache.pb.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/math.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -137,7 +137,7 @@ float DiscretizedNumericalToNumerical(
                                    std::numeric_limits<float>::infinity()),
                     boundaries[boundaries.size() - 1] + 1.f);
   }
-  return decision_tree::MidThreshold(boundaries[value - 1], boundaries[value]);
+  return utils::MidThreshold(boundaries[value - 1], boundaries[value]);
 }
 
 DiscretizedIndexedNumericalType NumericalToDiscretizedNumerical(
@@ -170,8 +170,8 @@ ExtractDiscretizedBoundariesWithoutDownsampling(
   for (size_t boundary_idx = 0; boundary_idx < boundaries.size();
        boundary_idx++) {
     boundaries[boundary_idx] =
-        decision_tree::MidThreshold(sorted_unique_values[boundary_idx],
-                                    sorted_unique_values[boundary_idx + 1]);
+        utils::MidThreshold(sorted_unique_values[boundary_idx],
+                            sorted_unique_values[boundary_idx + 1]);
   }
   return boundaries;
 }

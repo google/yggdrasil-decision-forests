@@ -39,6 +39,7 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/label_accessor.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/math.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/synchronization_primitives.h"
 
@@ -725,7 +726,7 @@ absl::Status FindSortedNumericalThreshold(
       const float delta_value =
           delta_values[target_value.delta_value_idx - sum_num_delta];
       if (target_value.is_next) {
-        const auto threshold = decision_tree::MidThreshold(
+        const auto threshold = utils::MidThreshold(
             prev_delta_values[target_value.node_idx], delta_value);
 
         (*common.best_splits)[target_value.node_idx]
