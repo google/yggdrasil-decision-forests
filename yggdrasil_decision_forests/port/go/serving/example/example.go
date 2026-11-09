@@ -19,6 +19,7 @@ package example
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	dataspec_pb "github.com/google/yggdrasil-decision-forests/yggdrasil_decision_forests/port/go/dataset/proto"
@@ -59,6 +60,9 @@ type Features struct {
 
 	// Compatibility indicates how the model is served.
 	Compatibility CompatibilityType
+
+	// DiscretizedFeaturesMaps maps NumericalFeatureID to its boundaries.
+	DiscretizedFeaturesMaps map[NumericalFeatureID][]float32
 }
 
 // CategoricalSpec is the meta-data about a categorical feature.
@@ -96,6 +100,7 @@ func NewFeatures(dataspec *dataspec_pb.DataSpecification,
 	features.MissingNumericalValues = make([]float32, 0)
 	features.MissingCategoricalValues = make([]uint32, 0)
 	features.CategoricalSpec = make([]CategoricalSpec, 0)
+	features.DiscretizedFeaturesMaps = map[NumericalFeatureID][]float32{}
 
 	buildMap := &FeatureConstructionMap{}
 	buildMap.NumericalFeatures = map[int]NumericalFeatureID{}
@@ -132,6 +137,32 @@ func NewFeatures(dataspec *dataspec_pb.DataSpecification,
 					spec.Dictionary[itemKey] = uint32(itemValue.GetIndex())
 				}
 			}
+
+		case dataspec_pb.ColumnType_DISCRETIZED_NUMERICAL:
+			featureID := NumericalFeatureID(len(features.NumericalFeatures))
+			buildMap.NumericalFeatures[int(columnIdx)] = featureID
+			features.NumericalFeatures[column.GetName()] = featureID
+
+			var boundaries []float32
+			spec := column.GetDiscretizedNumerical()
+			if spec != nil {
+				boundaries = make([]float32, len(spec.GetBoundaries()))
+				copy(boundaries, spec.GetBoundaries())
+				features.DiscretizedFeaturesMaps[featureID] = boundaries
+			}
+
+			var missingValue float32
+			if column.GetNumerical() != nil {
+				mean := float32(column.GetNumerical().GetMean())
+				if len(boundaries) > 0 {
+					missingValue = discretize(mean, boundaries)
+				} else {
+					missingValue = mean
+				}
+			} else {
+				missingValue = -1.0
+			}
+			features.MissingNumericalValues = append(features.MissingNumericalValues, missingValue)
 
 		default:
 			return nil, nil, fmt.Errorf("Non supported feature %v with type %v",
@@ -227,8 +258,10 @@ func (batch *Batch) FillMissing() {
 	}
 }
 
-// SetNumerical sets the value of a numerical feature.
 func (batch *Batch) SetNumerical(exampleIdx int, feature NumericalFeatureID, value float32) {
+	if boundaries, ok := batch.features.DiscretizedFeaturesMaps[feature]; ok {
+		value = discretize(value, boundaries)
+	}
 	batch.NumericalValues[int(feature)+exampleIdx*len(batch.features.NumericalFeatures)] = value
 }
 
@@ -415,3 +448,23 @@ const (
 	// CompatibilityAutomatic detects automatically the compatibility of the model.
 	CompatibilityAutomatic = 3
 )
+
+func discretize(value float32, boundaries []float32) float32 {
+	if math.IsNaN(float64(value)) {
+		return -1.0
+	}
+	if len(boundaries) == 0 {
+		return 0.0
+	}
+	l := 0
+	r := len(boundaries)
+	for l < r {
+		m := l + (r-l)/2
+		if boundaries[m] > value {
+			r = m
+		} else {
+			l = m + 1
+		}
+	}
+	return float32(l)
+}
