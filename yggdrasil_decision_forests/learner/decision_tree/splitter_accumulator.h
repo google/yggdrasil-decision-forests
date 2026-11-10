@@ -46,6 +46,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
+#include "absl/log/log.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
@@ -97,11 +98,12 @@ struct FloatGradientHessian {
   [[no_unique_address]] std::conditional_t<weighted, float, Empty> weight;
 };
 
+// Accumulation in double; float accumulation drifts too much.
 template <bool weighted>
-struct FloatSumGradientHessian {
-  float sum_gradient;
-  float sum_hessian;
-  [[no_unique_address]] std::conditional_t<weighted, float, Empty> sum_weight;
+struct DoubleSumGradientHessian {
+  double sum_gradient;
+  double sum_hessian;
+  [[no_unique_address]] std::conditional_t<weighted, double, Empty> sum_weight;
 };
 
 template <bool weighted>
@@ -1711,7 +1713,7 @@ struct LabelHessianNumericalBucket {
   float priority;
 
   using SumGradientHessianAndMaybeWeights =
-      internal::FloatSumGradientHessian<weighted>;
+      internal::DoubleSumGradientHessian<weighted>;
   SumGradientHessianAndMaybeWeights content;
   int64_t count;
 
@@ -1720,7 +1722,7 @@ struct LabelHessianNumericalBucket {
       acc->Add(content.sum_gradient, content.sum_hessian, content.sum_weight);
     } else {
       acc->Add(content.sum_gradient, content.sum_hessian,
-               static_cast<float>(count));
+               static_cast<double>(count));
     }
   }
 
@@ -1729,7 +1731,7 @@ struct LabelHessianNumericalBucket {
       acc->Sub(content.sum_gradient, content.sum_hessian, content.sum_weight);
     } else {
       acc->Sub(content.sum_gradient, content.sum_hessian,
-               static_cast<float>(count));
+               static_cast<double>(count));
     }
   }
 
@@ -1783,6 +1785,10 @@ struct LabelHessianNumericalBucket {
 
     bool IsValidSplit(const LabelHessianNumericalScoreAccumulator& neg,
                       const LabelHessianNumericalScoreAccumulator& pos) const {
+      if (neg.sum_hessian <= 0 || pos.sum_hessian <= 0) {
+        LOG_EVERY_POW_2(INFO) << "Rejected split with negative hessian";
+        return false;
+      }
       if (min_sum_hessian_in_leaf_ > 0 &&
           (neg.sum_hessian < min_sum_hessian_in_leaf_ ||
            pos.sum_hessian < min_sum_hessian_in_leaf_)) {

@@ -1565,8 +1565,8 @@ TEST_F(GradientBoostedTreesOnAdult, HessianRandomCategorical) {
 
   TrainAndEvaluateModel();
 
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0085, 0.867);
-  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2945, 0.0103, 0.2884);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.8638, 0.0085, 0.8639);
+  YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.2945, 0.0103, 0.2905);
 }
 
 TEST_F(GradientBoostedTreesOnAdult, HessianDiscretizedNumerical) {
@@ -2006,7 +2006,7 @@ TEST_F(GradientBoostedTreesOnDNA, Hessian) {
       gradient_boosted_trees::proto::gradient_boosted_trees_config);
   gbt_config->set_use_hessian_gain(true);
   TrainAndEvaluateModel();
-  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9545, 0.0099, 0.9554);
+  YDF_TEST_METRIC(metric::Accuracy(evaluation_), 0.9545, 0.0099, 0.9567);
   YDF_TEST_METRIC(metric::LogLoss(evaluation_), 0.1733, 0.0596, 0.1442);
 }
 
