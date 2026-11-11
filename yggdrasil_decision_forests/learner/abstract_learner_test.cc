@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 
+#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -21,6 +22,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
@@ -32,9 +34,11 @@
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/model_testing.h"
 #include "yggdrasil_decision_forests/model/prediction.pb.h"
+#include "yggdrasil_decision_forests/utils/fold_generator.pb.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
+#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 
@@ -350,6 +354,116 @@ TEST(AbstractLearner, EvaluateLearner) {
 
   EXPECT_NEAR(metric::Accuracy(eval), 0.5f, 0.001f);
   EXPECT_NEAR(eval.count_predictions(), 4000., 0.001);
+}
+
+TEST(AbstractLearner, EvaluateLearnerSingleThread) {
+  class FakeClassificationModel : public FakeModel {
+   public:
+    void PredictImpl(const dataset::VerticalDataset& dataset,
+                     dataset::VerticalDataset::row_t row_idx,
+                     model::proto::Prediction* prediction) const override {
+      *prediction = PARSE_TEST_PROTO(R"pb(
+        classification {
+          value: 1
+          distribution { counts: 0 counts: 1 counts: 0 sum: 1 }
+        }
+      )pb");
+    }
+  };
+
+  class FakeLearner : public AbstractLearner {
+   public:
+    explicit FakeLearner(const proto::TrainingConfig& training_config)
+        : AbstractLearner(training_config) {}
+
+    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
+        const dataset::VerticalDataset& train_dataset,
+        std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+            valid_dataset = {}) const override {
+      auto model = std::make_unique<FakeClassificationModel>();
+      model::proto::TrainingConfigLinking config_link;
+      RETURN_IF_ERROR(AbstractLearner::LinkTrainingConfig(
+          training_config(), train_dataset.data_spec(), &config_link));
+      InitializeModelWithAbstractTrainingConfig(training_config(), config_link,
+                                                model.get());
+      return model;
+    }
+  };
+
+  const proto::TrainingConfig train_config =
+      PARSE_TEST_PROTO("label: \"a\" task: CLASSIFICATION");
+  FakeLearner learner(train_config);
+  dataset::VerticalDataset dataset;
+  dataset.set_data_spec(PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "a"
+      categorical { is_already_integerized: true number_of_unique_values: 3 }
+    }
+  )pb"));
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  for (int i = 0; i < 10; i++) {
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
+  }
+
+  ASSERT_OK_AND_ASSIGN(
+      const auto eval,
+      EvaluateLearnerOrStatus(
+          learner, dataset, PARSE_TEST_PROTO("cross_validation { num_folds: 2 }"),
+          PARSE_TEST_PROTO("task: CLASSIFICATION"),
+          PARSE_TEST_PROTO("num_threads: 1")));
+  EXPECT_NEAR(metric::Accuracy(eval), 0.5f, 0.001f);
+  EXPECT_NEAR(eval.count_predictions(), 20., 0.001);
+}
+
+TEST(AbstractLearner, EvaluateLearnerTrainingError) {
+  class FailingLearner : public AbstractLearner {
+   public:
+    explicit FailingLearner(const proto::TrainingConfig& training_config)
+        : AbstractLearner(training_config) {}
+
+    absl::StatusOr<std::unique_ptr<AbstractModel>> TrainWithStatusImpl(
+        const dataset::VerticalDataset& train_dataset,
+        std::optional<std::reference_wrapper<const dataset::VerticalDataset>>
+            valid_dataset = {}) const override {
+      return absl::InternalError("Training failed");
+    }
+  };
+
+  const proto::TrainingConfig train_config =
+      PARSE_TEST_PROTO("label: \"a\" task: CLASSIFICATION");
+  FailingLearner learner(train_config);
+  dataset::VerticalDataset dataset;
+  dataset.set_data_spec(PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: CATEGORICAL
+      name: "a"
+      categorical { is_already_integerized: true number_of_unique_values: 3 }
+    }
+  )pb"));
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  for (int i = 0; i < 10; i++) {
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "1"}}));
+    ASSERT_OK(dataset.AppendExampleWithStatus({{"a", "2"}}));
+  }
+
+  const metric::proto::EvaluationOptions evaluation_options =
+      PARSE_TEST_PROTO("task: CLASSIFICATION");
+  const utils::proto::FoldGenerator fold_generator =
+      PARSE_TEST_PROTO("cross_validation { num_folds: 2 }");
+
+  EXPECT_THAT(
+      EvaluateLearnerOrStatus(learner, dataset, fold_generator,
+                              evaluation_options)
+          .status(),
+      StatusIs(absl::StatusCode::kInternal, "Training failed"));
+  EXPECT_THAT(
+      EvaluateLearnerOrStatus(learner, dataset, fold_generator,
+                              evaluation_options,
+                              PARSE_TEST_PROTO("num_threads: 1"))
+          .status(),
+      StatusIs(absl::StatusCode::kInternal, "Training failed"));
 }
 
 TEST(AbstractLearner, MaximumModelSizeInMemoryInBytes) {

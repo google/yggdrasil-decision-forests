@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -993,7 +994,8 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
     case proto::DeploymentConfig::kLocal:
       break;
     default:
-      STATUS_FATAL("\"EvaluateLearner\" only support local deployment config.");
+      STATUS_FATAL(
+          "\"EvaluateLearner\" only supports local deployment config.");
       break;
   }
 
@@ -1002,6 +1004,7 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
   RETURN_IF_ERROR(
       utils::GenerateFoldsConstDataset(fold_generator, dataset, &folds));
   const int num_folds = utils::NumberOfFolds(fold_generator, folds);
+  STATUS_CHECK_GE(num_folds, 1);
 
   // Get the label column specification.
   int32_t label_col_idx;
@@ -1012,66 +1015,61 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluateLearnerOrStatus(
   // Protects "aggregated_evaluation".
   utils::concurrency::Mutex evaluation_mutex;
   metric::proto::EvaluationResults aggregated_evaluation;
-  absl::Status status_train_and_evaluate;
 
-  // Trains and evaluates a single model on the "fold_idx".
+  // TODO: Support passing a seed. Optionally, re-design the loop below to make
+  // it fully deterministic with a deterministic summation order.
+  utils::RandomEngine rnd(142003);
+  std::vector<utils::RandomEngine::result_type> seeds(num_folds);
+  for (int i = 0; i < num_folds; i++) {
+    seeds[i] = rnd();
+  }
+
   const auto train_and_evaluate =
       [&aggregated_evaluation, &evaluation_mutex, &label_col_spec, &dataset,
-       &folds, &learner, &evaluation_options, &status_train_and_evaluate](
-          const int fold_idx, utils::RandomEngine* rnd) {
-        metric::proto::EvaluationResults evaluation;
-        {
-          utils::concurrency::MutexLock lock(evaluation_mutex);
-          if (!status_train_and_evaluate.ok()) {
-            return;
-          }
-          status_train_and_evaluate.Update(metric::InitializeEvaluation(
-              evaluation_options, label_col_spec, &evaluation));
-          if (!status_train_and_evaluate.ok()) {
-            return;
-          }
-        }
+       &folds, &learner, &evaluation_options,
+       &seeds](size_t /*block_idx*/, size_t begin_item_idx,
+               size_t end_item_idx) -> absl::Status {
+    metric::proto::EvaluationResults evaluation;
+    for (size_t fold_idx = begin_item_idx; fold_idx < end_item_idx;
+         fold_idx++) {
+      evaluation.Clear();
+      utils::RandomEngine rnd(seeds[fold_idx]);
+      RETURN_IF_ERROR(metric::InitializeEvaluation(
+          evaluation_options, label_col_spec, &evaluation));
+      // Extract the training and testing dataset.
+      ASSIGN_OR_RETURN(const auto testing_dataset,
+                       dataset.Extract(folds[fold_idx]));
+      const auto training_indices =
+          utils::MergeIndicesExceptOneFold(folds, fold_idx);
+      ASSIGN_OR_RETURN(const auto training_dataset,
+                       dataset.Extract(training_indices));
 
-        // Extract the training and testing dataset.
-        const auto testing_dataset = dataset.Extract(folds[fold_idx]).value();
-        const auto training_indices =
-            utils::MergeIndicesExceptOneFold(folds, fold_idx);
-        const auto training_dataset = dataset.Extract(training_indices).value();
-        // Train a model.
-        auto model = learner.TrainWithStatus(training_dataset).value();
-        // Evaluate the model.
-        CHECK_OK(model->InitializeForEvaluation(evaluation_options,
-                                                label_col_spec, &evaluation));
-        auto status_append = model->AppendEvaluation(
-            testing_dataset, evaluation_options, rnd, &evaluation);
-        CHECK_OK(model->FinalizeForEvaluation(evaluation_options,
-                                              label_col_spec, &evaluation));
-        // Aggregate the evaluations.
-        {
-          utils::concurrency::MutexLock lock(evaluation_mutex);
-          status_train_and_evaluate.Update(status_append);
-          status_train_and_evaluate.Update(metric::MergeEvaluation(
-              evaluation_options, evaluation, &aggregated_evaluation));
-        }
-      };
+      // Train a model.
+      ASSIGN_OR_RETURN(const auto model,
+                       learner.TrainWithStatus(training_dataset));
+      RETURN_IF_ERROR(model->InitializeForEvaluation(
+          evaluation_options, label_col_spec, &evaluation));
+      RETURN_IF_ERROR(model->AppendEvaluation(
+          testing_dataset, evaluation_options, &rnd, &evaluation));
+      RETURN_IF_ERROR(model->FinalizeForEvaluation(
+          evaluation_options, label_col_spec, &evaluation));
+      utils::concurrency::MutexLock lock(evaluation_mutex);
+      RETURN_IF_ERROR(metric::MergeEvaluation(evaluation_options, evaluation,
+                                              &aggregated_evaluation));
+    }
+    return absl::OkStatus();
+  };
 
-  utils::RandomEngine rnd;
   RETURN_IF_ERROR(metric::InitializeEvaluation(
       evaluation_options, label_col_spec, &aggregated_evaluation));
-  if (deployment_evaluation.num_threads() > 1) {
+  const auto num_threads = deployment_evaluation.num_threads();
+  if (num_threads > 1 && num_folds > 1) {
     yggdrasil_decision_forests::utils::concurrency::ThreadPool pool(
-        deployment_evaluation.num_threads(),
-        {.name_prefix = std::string("Evaluator")});
-    for (int fold_idx = 0; fold_idx < num_folds; fold_idx++) {
-      pool.Schedule([&train_and_evaluate, fold_idx, seed{rnd()}]() {
-        utils::RandomEngine rnd(seed);
-        train_and_evaluate(fold_idx, &rnd);
-      });
-    }
+        num_threads, {.name_prefix = std::string("CrossValidation")});
+    RETURN_IF_ERROR(utils::concurrency::ConcurrentForLoopWithStatus(
+        num_folds, &pool, num_folds, train_and_evaluate));
   } else {
-    for (int fold_idx = 0; fold_idx < num_folds; fold_idx++) {
-      train_and_evaluate(fold_idx, &rnd);
-    }
+    RETURN_IF_ERROR(train_and_evaluate(0, 0, num_folds));
   }
 
   RETURN_IF_ERROR(metric::FinalizeEvaluation(evaluation_options, label_col_spec,
