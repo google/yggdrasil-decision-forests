@@ -24,7 +24,7 @@ from ydf.dataset.io import dataset_io_types
 
 def import_xarray():
   try:
-    import xarray as xr  # pylint: disable=g-import-not-at-top
+    import xarray as xr  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
 
     return xr
   except ImportError:

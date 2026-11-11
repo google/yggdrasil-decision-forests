@@ -16,14 +16,17 @@ py_library(
 # Libraries
 # =========
 
+# Note: Pandas and Xarray are optional dependencies of YDF. This build rule only imports them for
+# type checking, and the connectors (e.g. ":pandas_io", ":xarray_io") import them lazily. Users who
+# pass a Pandas DataFrame or a Xarray Dataset to YDF already depend on those libraries. Do not add
+# //third_party/py/pandas or //third_party/py/xarray here (build_cleaner may suggest it): they
+# would be linked into every YDF binary.
 py_library(
     name = "dataset_io_types",
     srcs = ["dataset_io_types.py"],
     deps = [
         "@pypi_ydf//numpy",
-        "@pypi_ydf//pandas",
         # "@pypi_ydf//polars",   # TODO: Re-enable.
-        "@pypi_ydf//xarray",
     ],
 )
 
@@ -80,7 +83,6 @@ py_library(
     deps = [
         ":dataset_io_types",
         "@abseil-py//absl/logging",
-        "@pypi_ydf//xarray",
     ],
 )
 

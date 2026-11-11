@@ -20,8 +20,10 @@ from typing import Any, Dict, List, Sequence, Union
 import numpy as np
 
 if typing.TYPE_CHECKING:
-  import pandas as pd  # pylint: disable=unused-import,g-bad-import-order
-  import xarray as xr  # pylint: disable=unused-import,g-bad-import-order
+  # Note: Pandas and Xarray are optional dependencies (not listed in the BUILD
+  # rule). They are only imported here for type checking.
+  import pandas as pd  # pylint: disable=unused-import,g-bad-import-order  # pyrefly: ignore[missing-import]
+  import xarray as xr  # pylint: disable=unused-import,g-bad-import-order  # pyrefly: ignore[missing-import]
   # Note: Polars & PyArrow are not included in the automatic build to speed-up
   # compilation.
   # import polars as pl  # pylint: disable=unused-import,g-bad-import-order

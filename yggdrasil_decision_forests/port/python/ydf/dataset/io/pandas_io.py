@@ -26,7 +26,7 @@ from ydf.dataset.io import generator as generator_lib
 
 def import_pd():
   try:
-    import pandas as pd  # pylint: disable=g-import-not-at-top
+    import pandas as pd  # pylint: disable=g-import-not-at-top  # pyrefly: ignore[missing-import]
 
     return pd
   except ImportError:
