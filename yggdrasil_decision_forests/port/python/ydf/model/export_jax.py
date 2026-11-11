@@ -31,11 +31,13 @@ from ydf.model import tree as tree_lib
 from ydf.model.decision_forest_model import decision_forest_model
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 
+# Note: JAX is an optional dependency of YDF (not listed in the BUILD rule). It
+# is only imported when the JAX conversion is used.
 # pytype: disable=import-error
 # pylint: disable=g-import-not-at-top
 try:
-  import jax.numpy as jnp
-  import jax
+  import jax.numpy as jnp  # pyrefly: ignore[missing-import]
+  import jax  # pyrefly: ignore[missing-import]
 except ImportError as exc:
   raise ImportError("Cannot import jax") from exc
 # pylint: enable=g-import-not-at-top

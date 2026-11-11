@@ -28,12 +28,14 @@ from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
 from ydf.model.isolation_forest_model import isolation_forest_model
 from ydf.model.random_forest_model import random_forest_model
 
+# Note: scikit-learn is an optional dependency of YDF (not listed in the BUILD
+# rule). It is only imported when the scikit-learn conversion is used.
 # pylint: disable=g-import-not-at-top
 try:
-  from sklearn import base
-  from sklearn import dummy
-  from sklearn import ensemble
-  from sklearn import tree
+  from sklearn import base  # pyrefly: ignore[missing-import]
+  from sklearn import dummy  # pyrefly: ignore[missing-import]
+  from sklearn import ensemble  # pyrefly: ignore[missing-import]
+  from sklearn import tree  # pyrefly: ignore[missing-import]
 except ImportError as exc:
   raise ImportError("Cannot import sklearn") from exc
 # pylint: enable=g-import-not-at-top

@@ -147,8 +147,10 @@ py_library(
     ],
 )
 
-# Note: This build rule does not depends on JAX. To use its functionalities, JAX needs to be
-# imported manually by the call i.e. //third_party/py/jax.
+# Note: This build rule intentionally does not depend on JAX, so that `:api` (and every binary using
+# YDF) does not link JAX (and XLA, XProf, etc.). To use its functionalities (e.g.
+# `model.to_jax_function()`), JAX needs to be added manually by the caller i.e.
+# //third_party/py/jax. Do not add //third_party/py/jax here (build_cleaner may suggest it).
 py_library(
     name = "export_jax",
     srcs = ["export_jax.py"],
@@ -159,14 +161,14 @@ py_library(
         "//ydf/model/decision_forest_model",
         "//ydf/model/gradient_boosted_trees_model",
         "//ydf/model/tree:all",
-        "@pypi_ydf//jax",
         "@pypi_ydf//numpy",
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
     ],
 )
 
-# Note: This build rule does not depends on SKLearn. To use its functionalities, SKLearn needs to be
-# imported manually by the call i.e. //third_party/py/sklearn.
+# Note: This build rule intentionally does not depend on SKLearn. To use its functionalities (e.g.
+# `ydf.from_sklearn()`), SKLearn needs to be added manually by the caller i.e.
+# //third_party/py/sklearn. Do not add //third_party/py/sklearn here (build_cleaner may suggest it).
 py_library(
     name = "export_sklearn",
     srcs = ["export_sklearn.py"],
@@ -179,7 +181,6 @@ py_library(
         "//ydf/model/random_forest_model",
         "//ydf/model/tree:all",
         "@pypi_ydf//numpy",
-        "@pypi_ydf//scikit_learn",
     ],
 )
 

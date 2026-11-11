@@ -29,14 +29,16 @@ py_library(
     deps = ["//ydf/monitoring:benchmark_io_speed"],
 )
 
+# Note: This build rule intentionally does not depend on the JAX based deep models
+# (//ydf/deep:{mlp,model_lib,tabular_transformer})
+# so that `:api` does not link JAX. Those are added by the opt-in target
+# //ydf:experimental_deep (google3 users:
+# //third_party/py/ydf:experimental_deep). Without it, `ydf.experimental.*` raise a helpful error.
 py_library(
     name = "experimental",
     srcs = ["experimental.py"],
     deps = [
         "//ydf/deep:jax_fallback",
-        "//ydf/deep:mlp",
-        "//ydf/deep:model_lib",
-        "//ydf/deep:tabular_transformer",
     ],
 )
 

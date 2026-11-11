@@ -19,7 +19,12 @@ py_package(
         "ydf",
         "yggdrasil_decision_forests",
     ],
-    deps = ["//ydf:api"],
+    # Note: `//ydf:api` does not depend on the JAX based deep models
+    # (`ydf.experimental`). `//ydf:experimental_deep` adds them to the wheel.
+    deps = [
+        "//ydf:api",
+        "//ydf:experimental_deep",
+    ],
 )
 
 config_setting(

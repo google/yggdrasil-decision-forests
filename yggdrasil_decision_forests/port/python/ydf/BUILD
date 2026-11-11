@@ -49,6 +49,20 @@ py_library(
     ],
 )
 
+# Opt-in target enabling the JAX based deep models of `ydf.experimental` (e.g.
+# `ydf.experimental.MultiLayerPerceptronLearner`). Those are not part of `:api` as they depend on
+# JAX, Flax and Optax.
+py_library(
+    name = "experimental_deep",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":api",
+        "//ydf/deep:mlp",
+        "//ydf/deep:model_lib",
+        "//ydf/deep:tabular_transformer",
+    ],
+)
+
 py_library(
     name = "package_inits",
     deps = [
@@ -144,5 +158,30 @@ py_test(
         "@pypi_ydf//tensorflow",  # buildcleaner: keep
         # tensorflow_decision_forests dep,  # buildcleaner: keep
         "//ydf/utils:test_utils",
+    ],
+)
+
+# Checks that YDF works without its optional dependencies (JAX, scikit-learn). Do not add those
+# dependencies to this test.
+py_test(
+    name = "api_without_optional_deps_test",
+    srcs = ["api_without_optional_deps_test.py"],
+    data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
+    deps = [
+        ":api",
+        "@abseil-py//absl/flags",
+        "@abseil-py//absl/testing:absltest",
+        "@pypi_ydf//numpy",
+    ],
+)
+
+py_test(
+    name = "experimental_deep_test",
+    srcs = ["experimental_deep_test.py"],
+    deps = [
+        ":api",
+        ":experimental_deep",
+        "//ydf/deep:jax_fallback",
+        "@abseil-py//absl/testing:absltest",
     ],
 )

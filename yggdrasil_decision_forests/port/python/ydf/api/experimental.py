@@ -26,15 +26,17 @@ _experimental_import_error = None
 if sys.version_info < (3, 9):
   _experimental_import_error = "ydf.experimental requires Python>=3.9"
 elif importlib.util.find_spec("jax") is not None:
+  # Note: The deep models are optional dependencies of ydf (they are not listed
+  # in the BUILD rule of this file) as they require JAX.
   try:
-    from ydf.deep.mlp import MultiLayerPerceptronModel
-    from ydf.deep.mlp import MultiLayerPerceptronLearner
+    from ydf.deep.mlp import MultiLayerPerceptronModel  # pyrefly: ignore[missing-import]
+    from ydf.deep.mlp import MultiLayerPerceptronLearner  # pyrefly: ignore[missing-import]
 
-    from ydf.deep.tabular_transformer import TabularTransformerModel
-    from ydf.deep.tabular_transformer import TabularTransformerLearner
+    from ydf.deep.tabular_transformer import TabularTransformerModel  # pyrefly: ignore[missing-import]
+    from ydf.deep.tabular_transformer import TabularTransformerLearner  # pyrefly: ignore[missing-import]
 
     # TODO: Hook into ydf.load_model
-    from ydf.deep.model_lib import load_model
+    from ydf.deep.model_lib import load_model  # pyrefly: ignore[missing-import]
 
     _has_experimental = True
   except Exception as e:
