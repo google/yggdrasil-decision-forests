@@ -3519,6 +3519,147 @@ TEST(DecisionTree, LabelHessianNumericalBucketFillerFinalizeClamping) {
   EXPECT_NEAR(bucket.priority, 1000.0f, 1e-5f);
 }
 
+// Data for the "hessian bucket precision" tests below: one large bucket (value
+// 0) and one small bucket (value 1). With float bucket sums, the hessian of the
+// large bucket drifts by ~850 (relative error ~0.4%), which exceeds the total
+// hessian of the small bucket (5). Since the positive side of the split is
+// computed as (parent total) - (bucket sums), this used to produce a negative
+// hessian for the small bucket and an inflated split score.
+struct HessianBucketPrecisionData {
+  static constexpr UnsignedExampleIdx kNumLarge = 2'599'950;
+  static constexpr UnsignedExampleIdx kNumSmall = 50;
+  static constexpr float kGradientLarge = -0.05f;
+  static constexpr float kHessianLarge = 0.0736f;
+  static constexpr float kGradientSmall = 0.5f;
+  static constexpr float kHessianSmall = 0.1f;
+
+  HessianBucketPrecisionData() {
+    const UnsignedExampleIdx num_examples = kNumLarge + kNumSmall;
+    selected_examples.resize(num_examples);
+    gradients.resize(num_examples);
+    hessians.resize(num_examples);
+    bucket.resize(num_examples);
+    for (UnsignedExampleIdx i = 0; i < num_examples; i++) {
+      const bool is_large = i < kNumLarge;
+      selected_examples[i] = i;
+      gradients[i] = is_large ? kGradientLarge : kGradientSmall;
+      hessians[i] = is_large ? kHessianLarge : kHessianSmall;
+      bucket[i] = is_large ? 0 : 1;
+      // The parent statistics are accumulated in double (as done by
+      // SetLeafValueWithNewtonRaphsonStep).
+      sum_gradient += gradients[i];
+      sum_hessian += hessians[i];
+    }
+    sum_weights = num_examples;
+  }
+
+  // Exact score of the split {large bucket} vs {small bucket} (no
+  // regularization, parent score not subtracted).
+  static double ExpectedScore() {
+    const double g_large = kNumLarge * static_cast<double>(kGradientLarge);
+    const double h_large = kNumLarge * static_cast<double>(kHessianLarge);
+    const double g_small = kNumSmall * static_cast<double>(kGradientSmall);
+    const double h_small = kNumSmall * static_cast<double>(kHessianSmall);
+    return g_large * g_large / h_large + g_small * g_small / h_small;
+  }
+
+  std::vector<UnsignedExampleIdx> selected_examples;
+  std::vector<float> gradients;
+  std::vector<float> hessians;
+  std::vector<int> bucket;
+  double sum_gradient = 0;
+  double sum_hessian = 0;
+  double sum_weights = 0;
+};
+
+TEST(Hessian, DiscretizedNumericalLargeBucketPrecision) {
+  const HessianBucketPrecisionData data;
+  const std::vector<dataset::DiscretizedNumericalIndex> attributes(
+      data.bucket.begin(), data.bucket.end());
+  const std::vector<float> weights;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  InternalTrainConfig internal_config;
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(
+      FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<false>(
+          data.selected_examples, weights, attributes, /*num_bins=*/2,
+          data.gradients, data.hessians, /*na_replacement=*/0,
+          /*min_num_obs=*/1, dt_config, data.sum_gradient, data.sum_hessian,
+          data.sum_weights, -1, internal_config, {}, 0, &best_condition, &cache)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
+  EXPECT_EQ(
+      best_condition.condition().discretized_higher_condition().threshold(), 1);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(),
+            int64_t{HessianBucketPrecisionData::kNumSmall});
+  // ~88438.5. With float bucket sums, the score was ~1e10.
+  EXPECT_NEAR(best_condition.split_score(),
+              HessianBucketPrecisionData::ExpectedScore(), 0.1);
+}
+
+TEST(Hessian, CategoricalLargeBucketPrecision) {
+  const HessianBucketPrecisionData data;
+  const std::vector<int32_t> attributes(data.bucket.begin(), data.bucket.end());
+  const std::vector<float> weights;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_categorical()->mutable_cart();
+  InternalTrainConfig internal_config;
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  utils::RandomEngine random;
+  EXPECT_EQ(FindSplitLabelHessianRegressionFeatureCategorical<false>(
+                data.selected_examples, weights, attributes, data.gradients,
+                data.hessians, /*num_attribute_classes=*/2,
+                /*na_replacement=*/0, /*min_num_obs=*/1, dt_config,
+                data.sum_gradient, data.sum_hessian, data.sum_weights, -1,
+                internal_config, {}, &best_condition, &cache, &random)
+                .value(),
+            SplitSearchResult::kBetterSplitFound);
+  EXPECT_EQ(best_condition.num_pos_training_examples_without_weight(),
+            int64_t{HessianBucketPrecisionData::kNumSmall});
+  // ~88438.5. With float bucket sums, the score was ~1e10.
+  EXPECT_NEAR(best_condition.split_score(),
+              HessianBucketPrecisionData::ExpectedScore(), 0.1);
+}
+
+TEST(Hessian, DiscretizedNumericalRejectsChildWithZeroHessian) {
+  // Bins 2 and 3 have zero hessian. Any split isolating them in the positive
+  // branch would have a non-positive child hessian and is rejected (otherwise
+  // its score would be computed with the clamped denominator and be inflated).
+  const std::vector<float> weights;
+  const std::vector<UnsignedExampleIdx> selected_examples{0, 1, 2, 3};
+  const std::vector<dataset::DiscretizedNumericalIndex> attributes{0, 1, 2, 3};
+  const std::vector<float> gradients{-10, 10, 10, 10};
+  const std::vector<float> hessians{1, 1, 0, 0};
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  const double sum_gradient =
+      std::accumulate(gradients.begin(), gradients.end(), 0.);
+  const double sum_hessian =
+      std::accumulate(hessians.begin(), hessians.end(), 0.);
+  const double sum_weights = selected_examples.size();
+
+  InternalTrainConfig internal_config;
+  proto::NodeCondition best_condition;
+  SplitterPerThreadCache cache;
+  EXPECT_EQ(
+      FindSplitLabelHessianRegressionFeatureDiscretizedNumericalCart<false>(
+          selected_examples, weights, attributes, /*num_bins=*/4, gradients,
+          hessians, /*na_replacement=*/0, /*min_num_obs=*/1, dt_config,
+          sum_gradient, sum_hessian, sum_weights, -1, internal_config, {}, 0,
+          &best_condition, &cache)
+          .value(),
+      SplitSearchResult::kBetterSplitFound);
+  // Only the split between bins 0 and 1 is valid: neg = {g:-10, h:1}, pos =
+  // {g:30, h:1}.
+  EXPECT_EQ(
+      best_condition.condition().discretized_higher_condition().threshold(), 1);
+  EXPECT_NEAR(best_condition.split_score(), 10 * 10 / 1. + 30 * 30 / 1., 1e-3);
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model
