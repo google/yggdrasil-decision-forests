@@ -2888,7 +2888,7 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelClassificationFeatureNA(
     // Binary classification.
     if (weights.empty()) {
       LabelBinaryCategoricalBucket</*weighted=*/false>::Filler label_filler(
-          labels, {}, label_distribution);
+          labels, weights, label_distribution);
 
       LabelBinaryCategoricalBucket</*weighted=*/false>::Initializer initializer(
           label_distribution);
@@ -3019,7 +3019,7 @@ absl::StatusOr<SplitSearchResult> FindSplitLabelClassificationFeatureBoolean(
     // Binary classification.
     if (weights.empty()) {
       LabelBinaryCategoricalBucket</*weighted=*/false>::Filler label_filler(
-          labels, {}, label_distribution);
+          labels, weights, label_distribution);
 
       LabelBinaryCategoricalBucket</*weighted=*/false>::Initializer initializer(
           label_distribution);
