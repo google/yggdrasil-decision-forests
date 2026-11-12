@@ -28,6 +28,7 @@ cc_library_ydf(
     deps = [
         ":decision_tree_cc_proto",
         ":gpu",
+        ":histogram_binning",
         ":label",
         ":preprocessing",
         ":splitter",
@@ -164,6 +165,17 @@ cc_library_ydf(
 )
 
 cc_library_ydf(
+    name = "histogram_binning",
+    srcs = ["histogram_binning.cc"],
+    hdrs = ["histogram_binning.h"],
+    deps = [
+        "//yggdrasil_decision_forests/utils:logging",
+        "@com_google_absl//absl/types:span",
+        "@com_google_highway//:hwy",
+    ],
+)
+
+cc_library_ydf(
     name = "uplift",
     srcs = [],
     hdrs = ["uplift.h"],
@@ -256,6 +268,17 @@ cc_test(
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "histogram_binning_test",
+    srcs = ["histogram_binning_test.cc"],
+    deps = [
+        ":histogram_binning",
+        "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_highway//:hwy",
     ],
 )
 
