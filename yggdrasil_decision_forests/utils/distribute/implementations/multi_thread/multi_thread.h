@@ -81,6 +81,11 @@ class MultiThreadManager : public AbstractManager,
     return std::move(answer.value());
   }
 
+  virtual absl::StatusOr<Blob> BlockingRequestToOtherWorker(
+      Blob blob, int target_worker_idx, AbstractWorker* emitter_worker) {
+    return workers_[target_worker_idx]->worker_imp->RunRequest(std::move(blob));
+  }
+
  private:
   struct Worker {
     void StartThreads(int num_threads, MultiThreadManager* manager) {

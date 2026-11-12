@@ -17,7 +17,9 @@
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_TOY_WORKER_H_
 
 #include <atomic>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/log/log.h"
 #include "absl/status/status.h"
@@ -28,6 +30,7 @@
 #include "absl/synchronization/barrier.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -56,7 +59,14 @@ class ToyWorker final : public AbstractWorker {
   absl::Status Setup(Blob welcome_blob) override {
     LOG(INFO) << "Setup worker " << WorkerIdx();
     CHECK_EQ(welcome_blob, "hello");
+    absl::SleepFor(absl::Milliseconds(setup_delay_ms_.load()));
+    setup_done_ = true;
     return absl::OkStatus();
+  }
+
+  // Duration of the next calls to "Setup" (e.g. a worker loading its dataset).
+  static void SetSetupDelay(absl::Duration delay) {
+    setup_delay_ms_ = absl::ToInt64Milliseconds(delay);
   }
 
   absl::Status Done() override {
@@ -69,6 +79,10 @@ class ToyWorker final : public AbstractWorker {
 
     if (forbidden) {
       LOG(FATAL) << "A forbidden worker was called!";
+    }
+
+    if (!setup_done_) {
+      return absl::FailedPreconditionError("Request before the end of Setup");
     }
 
     if (absl::StartsWith(blob, "identity")) {
@@ -94,6 +108,36 @@ class ToyWorker final : public AbstractWorker {
         sum_other_idxs += other_worker_idx;
       }
       return absl::StrCat(sum_other_idxs);
+    } else if (blob == "blocking_sum_other_worker_idxs") {
+      // Same as "sum_other_worker_idxs" with blocking requests, all at the
+      // same time (one thread per other worker).
+      std::vector<absl::StatusOr<Blob>> answers(NumWorkers(), Blob());
+      {
+        std::vector<std::unique_ptr<utils::concurrency::Thread>> threads;
+        for (int w = 0; w < NumWorkers(); w++) {
+          if (w == WorkerIdx()) continue;
+          threads.push_back(std::make_unique<utils::concurrency::Thread>(
+              [this, w, &answers]() {
+                answers[w] = BlockingRequestToOtherWorker("worker_idx", w);
+              }));
+        }
+        for (auto& thread : threads) thread->Join();
+      }
+      int sum_other_idxs = 0;
+      for (int w = 0; w < NumWorkers(); w++) {
+        if (w == WorkerIdx()) continue;
+        RETURN_IF_ERROR(answers[w].status());
+        int other_worker_idx;
+        CHECK(absl::SimpleAtoi(*answers[w], &other_worker_idx));
+        sum_other_idxs += other_worker_idx;
+      }
+      return absl::StrCat(sum_other_idxs);
+    } else if (blob == "next_worker_blocking_sum") {
+      // The "blocking_sum_other_worker_idxs" of the next worker, requested
+      // with a blocking request (requests between the workers while
+      // answering a request of another worker).
+      return BlockingRequestToOtherWorker("blocking_sum_other_worker_idxs",
+                                          (WorkerIdx() + 1) % NumWorkers());
     } else if (blob == "create_5_barrier") {
       barrier_ = new absl::Barrier(5);
       return "";
@@ -115,8 +159,56 @@ class ToyWorker final : public AbstractWorker {
       value_ = items.second;
       return "";
     } else if (absl::StartsWith(blob, "sleep")) {
+      num_sleeps_++;
       absl::SleepFor(absl::Seconds(5));
       return "";
+    } else if (blob == "other_worker_sleep") {
+      // Asks the next worker to sleep, and returns the status of its answer.
+      RETURN_IF_ERROR(AsynchronousRequestToOtherWorker(
+          "sleep", (WorkerIdx() + 1) % NumWorkers()));
+      const auto answer = NextAsynchronousAnswerFromOtherWorker();
+      return answer.ok() ? std::string("ok")
+                         : std::string(absl::StatusCodeToString(
+                               answer.status().code()));
+    } else if (blob == "num_sleeps") {
+      return absl::StrCat(num_sleeps_.load());
+    } else if (absl::StartsWith(blob, "concurrent_requests:")) {
+      // Sends this many "concurrent_sleep" requests to the other workers (in
+      // turn) at once, and returns the largest number of them that ran at the
+      // same time.
+      int num_requests;
+      if (!absl::SimpleAtoi(blob.substr(blob.find(':') + 1), &num_requests)) {
+        return absl::InvalidArgumentError("Invalid number of requests");
+      }
+      max_concurrent_sleeps_ = 0;
+      for (int i = 0; i < num_requests; i++) {
+        const int target =
+            (WorkerIdx() + 1 + i % (NumWorkers() - 1)) % NumWorkers();
+        RETURN_IF_ERROR(
+            AsynchronousRequestToOtherWorker("concurrent_sleep", target));
+      }
+      for (int i = 0; i < num_requests; i++) {
+        RETURN_IF_ERROR(NextAsynchronousAnswerFromOtherWorker().status());
+      }
+      return absl::StrCat(max_concurrent_sleeps_.load());
+    } else if (blob == "concurrent_sleep") {
+      // Sleeps 1 second, counting the "concurrent_sleep" requests running at
+      // the same time (on all the toy workers).
+      const int running = ++concurrent_sleeps_;
+      int max_running = max_concurrent_sleeps_.load();
+      while (
+          running > max_running &&
+          !max_concurrent_sleeps_.compare_exchange_weak(max_running, running)) {
+      }
+      absl::SleepFor(absl::Seconds(1));
+      concurrent_sleeps_--;
+      return "";
+    } else if (blob == "next_worker_idx_or_error") {
+      // The index of the next worker, or the error of its answer.
+      RETURN_IF_ERROR(AsynchronousRequestToOtherWorker(
+          "worker_idx", (WorkerIdx() + 1) % NumWorkers()));
+      const auto answer = NextAsynchronousAnswerFromOtherWorker();
+      return answer.ok() ? answer.value() : answer.status().ToString();
     } else if (absl::StartsWith(blob, "short_sleep_and_error")) {
       absl::SleepFor(absl::Seconds(2));
       return absl::InvalidArgumentError("Some error");
@@ -138,10 +230,21 @@ class ToyWorker final : public AbstractWorker {
 
   // Maximum number of "ToyWorker" objects ever initialized in memory.
   static std::atomic<int> max_num_existing_toy_workers_;
+  // Number of "sleep" requests run, by all the toy workers.
+  static std::atomic<int> num_sleeps_;
+  // Duration of "Setup", in milliseconds.
+  static std::atomic<int> setup_delay_ms_;
+  // "concurrent_sleep" requests running, and their maximum since the last
+  // "concurrent_requests" (all the toy workers).
+  static std::atomic<int> concurrent_sleeps_;
+  static std::atomic<int> max_concurrent_sleeps_;
+
+  // "Setup" is done.
+  std::atomic<bool> setup_done_{false};
 
   std::string value_;  // For the "get/set" task.
 
-  absl::Barrier *barrier_ = nullptr;
+  absl::Barrier* barrier_ = nullptr;
 
   std::atomic<bool> forbidden{false};
 };

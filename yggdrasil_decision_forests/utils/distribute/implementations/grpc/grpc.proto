@@ -37,6 +37,32 @@ message GRPCImp {
   // At a given time, only one manager can be instantiated with the same key in
   // a given process. Note that many managers can be instantiated without a key.
   optional int32 key = 4;
+
+  // If > 0, a request without an answer after this many seconds is sent again
+  // to the same worker (e.g. the request was lost, or the worker was stuck).
+  // The worker runs a re-sent request only once: a copy of a request still
+  // running waits for it (see "Query.query_id"). 0: no timeout. Half of it is
+  // the deadline of the requests between the workers (see
+  // "WorkerConfig.request_timeout_seconds").
+  optional int32 request_timeout_seconds = 6 [default = 0];
+
+  // If > 0, interval, in milliseconds, of the keep-alive pings of the
+  // connections to the workers (from the manager, and between the workers). A
+  // connection without an answer to a ping after "keepalive_timeout_ms" is
+  // closed: the requests it carries fail with a transient error, and are sent
+  // again on a new connection. This detects a worker that died while running a
+  // request (e.g. rescheduled by Borg) without closing the connection, in
+  // seconds instead of at the request timeout. 0: no keep-alive pings.
+  optional int32 keepalive_time_ms = 7 [default = 30000];
+
+  // Time, in milliseconds, to wait for the answer to a keep-alive ping before
+  // closing the connection. See "keepalive_time_ms".
+  optional int32 keepalive_timeout_ms = 8 [default = 20000];
+
+  // If > 0, number of requests that a worker sends to the other workers at the
+  // same time ("AsynchronousRequestToOtherWorker"; one thread each). 0: the
+  // "parallel_execution_per_worker" of the manager.
+  optional int32 worker_to_worker_parallelism = 9 [default = 0];
 }
 
 message GrpcAddresses {
@@ -65,6 +91,22 @@ message WorkerConfig {
   // "parallel_execution_per_worker" parameter of the manager. How many request
   // can a worker process in parallel.
   optional int32 parallel_execution_per_worker = 5;
+  // If > 0, a request to another worker without an answer after this many
+  // seconds (including the re-sendings after transient errors) fails with
+  // DEADLINE_EXCEEDED: a stuck worker cannot block the other workers forever.
+  // Half of "GRPCImp.request_timeout_seconds" of the manager, so that the
+  // worker answers (with the error) before the manager re-sends its request.
+  // 0: no deadline.
+  optional int32 request_timeout_seconds = 6;
+  // Keep-alive of the connections between the workers. Copy of
+  // "GRPCImp.keepalive_time_ms" and "GRPCImp.keepalive_timeout_ms" of the
+  // manager.
+  optional int32 keepalive_time_ms = 7 [default = 30000];
+  optional int32 keepalive_timeout_ms = 8 [default = 20000];
+  // Number of requests that the worker sends to the other workers at the same
+  // time. Copy of "GRPCImp.worker_to_worker_parallelism" of the manager (0:
+  // "parallel_execution_per_worker").
+  optional int32 worker_to_worker_parallelism = 9;
 }
 
 // GRPC service.
@@ -91,6 +133,9 @@ message Query {
   optional uint64 manager_uid = 3;
   optional int32 worker_idx = 4;
   optional WorkerConfig worker_config = 5;
+  // Identifier of the request, the same when a request is sent again (see
+  // "GRPCImp.request_timeout_seconds").
+  optional uint64 query_id = 6;
 
   reserved 2;
 }

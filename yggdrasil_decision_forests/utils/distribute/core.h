@@ -86,6 +86,16 @@ class AbstractWorker {
   template <typename Result>
   absl::StatusOr<Result> NextAsynchronousProtoAnswerFromOtherWorker();
 
+  // Runs a task on another worker and waits for its result, independently of
+  // the asynchronous requests above (e.g. from several threads at the same
+  // time, or while handling a request of another worker).
+  absl::StatusOr<Blob> BlockingRequestToOtherWorker(Blob blob, int worker_idx);
+
+  // Same as "BlockingRequestToOtherWorker" with protos.
+  template <typename Result, typename Request>
+  absl::StatusOr<Result> BlockingProtoRequestToOtherWorker(
+      const Request& request, int worker_idx);
+
  private:
   // Initialize the internal fields of the workers. Called before "Setup".
   absl::Status InternalInitialize(int worker_idx, int num_workers,
@@ -123,6 +133,11 @@ class AbstractWorkerHook {
   // Retrieve an answer from a request previously send to another worker.
   virtual absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
       AbstractWorker* emitter_worker);
+
+  // Runs a request on another worker in the calling thread, and returns its
+  // answer.
+  virtual absl::StatusOr<Blob> BlockingRequestToOtherWorker(
+      Blob blob, int target_worker_idx, AbstractWorker* emitter_worker);
 };
 
 // A manager is in charge to managed (e.g. create, kill) and communicate (send
@@ -249,6 +264,15 @@ absl::StatusOr<Result>
 AbstractWorker::NextAsynchronousProtoAnswerFromOtherWorker() {
   ASSIGN_OR_RETURN(auto serialized_result,
                    NextAsynchronousAnswerFromOtherWorker());
+  return utils::ParseBinaryProto<Result>(serialized_result);
+}
+
+template <typename Result, typename Request>
+absl::StatusOr<Result> AbstractWorker::BlockingProtoRequestToOtherWorker(
+    const Request& request, const int worker_idx) {
+  ASSIGN_OR_RETURN(
+      auto serialized_result,
+      BlockingRequestToOtherWorker(request.SerializeAsString(), worker_idx));
   return utils::ParseBinaryProto<Result>(serialized_result);
 }
 

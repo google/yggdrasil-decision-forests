@@ -18,6 +18,8 @@
 
 #include "grpcpp/channel.h"
 #include "grpcpp/client_context.h"
+#include "grpcpp/server_builder.h"
+#include "grpcpp/support/channel_arguments.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -31,6 +33,19 @@ typedef int WorkerIdx;
 
 // Creates a client context;
 void ConfigureClientContext(grpc::ClientContext* context);
+
+// Arguments of the channels to the workers: unlimited message sizes, a
+// connection owned by the channel (a new channel opens a new connection
+// instead of reusing the one of a previous channel to the same address), and,
+// if "keepalive_time_ms > 0", keep-alive pings (see
+// "GRPCImp.keepalive_time_ms"), also during long requests without data.
+grpc::ChannelArguments WorkerChannelArguments(int keepalive_time_ms,
+                                              int keepalive_timeout_ms);
+
+// Lets the worker server accept the keep-alive pings of
+// "WorkerChannelArguments" (by default, a server closes the connection of a
+// client sending pings more often than every 5 minutes).
+void AcceptKeepalivePings(grpc::ServerBuilder* builder);
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

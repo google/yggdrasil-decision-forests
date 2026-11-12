@@ -15,6 +15,10 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_manager.h"
 
+#include <algorithm>
+#include <atomic>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <random>
@@ -23,6 +27,7 @@
 #include <vector>
 
 #include "grpcpp/create_channel.h"
+#include "grpcpp/loas2_credentials_options.h"
 #include "grpcpp/support/channel_arguments.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/log.h"
@@ -31,7 +36,11 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "third_party/grpc/include/grpcpp/client_context.h"
+#include "third_party/grpc/include/grpcpp/security/credentials.h"
+#include "third_party/grpc/include/grpcpp/support/status.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc_common.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
@@ -92,12 +101,11 @@ absl::Status GrpcStatusToAbslStatus(const grpc::Status& src) {
 // Creates a connection (called "stub" in grpc).
 std::unique_ptr<proto::Server::Stub> CreateStub(
     const absl::string_view address,
-    std::shared_ptr<grpc::ChannelCredentials>* credential) {
-  grpc::ChannelArguments channel_arguments;
-  channel_arguments.SetMaxReceiveMessageSize(std::numeric_limits<int>::max());
-  channel_arguments.SetMaxSendMessageSize(std::numeric_limits<int>::max());
-  auto channel = grpc::CreateCustomChannel(std::string(address), *credential,
-                                           channel_arguments);
+    std::shared_ptr<grpc::ChannelCredentials>* credential,
+    const int keepalive_time_ms, const int keepalive_timeout_ms) {
+  auto channel = grpc::CreateCustomChannel(
+      std::string(address), *credential,
+      WorkerChannelArguments(keepalive_time_ms, keepalive_timeout_ms));
   return proto::Server::NewStub(channel);
 }
 
@@ -242,15 +250,19 @@ absl::Status GRPCManager::UpdateWorkerConnection(Worker* worker) {
 
 absl::Status GRPCManager::UpdateWorkerConnectionLocked(Worker* worker) {
   if (!worker->stub || worker->expected_address != worker->connected_address) {
-    // The worker has moved or connection is uninitialized.
+    // The worker has moved, the connection is uninitialized, or the connection
+    // was dropped (see "ResetWorkerConnection").
 
     if (worker->connected_address.empty()) {
       LOG(INFO) << "Set address of worker #" << worker->worker_idx << " to \""
                 << worker->expected_address << "\"";
-    } else {
+    } else if (worker->connected_address != worker->expected_address) {
       LOG(INFO) << "Update address of worker #" << worker->worker_idx
                 << " from \"" << worker->connected_address << "\" to \""
                 << worker->expected_address << "\"";
+    } else {
+      LOG(INFO) << "Open a new connection to worker #" << worker->worker_idx
+                << " at \"" << worker->connected_address << "\"";
     }
 
     worker->connected_address = worker->expected_address;
@@ -262,7 +274,8 @@ absl::Status GRPCManager::UpdateWorkerConnectionLocked(Worker* worker) {
     }
 
     DCHECK(credential_);
-    auto stub = CreateStub(worker->connected_address, &credential_);
+    auto stub = CreateStub(worker->connected_address, &credential_,
+                           keepalive_time_ms_, keepalive_timeout_ms_);
     worker->stub = std::make_shared<Worker::TrackedStub>();
     worker->stub->stub = std::move(stub);
   }
@@ -276,6 +289,20 @@ absl::StatusOr<GRPCManager::Worker::ActiveCall> GRPCManager::GetStubForCall(
   utils::concurrency::MutexLock l(worker->mutex_address);
   RETURN_IF_ERROR(UpdateWorkerConnectionLocked(worker));
   return Worker::ActiveCall(worker->stub, context);
+}
+
+void GRPCManager::ResetWorkerConnection(Worker* worker,
+                                        const Worker::ActiveCall& failed_call) {
+  utils::concurrency::MutexLock l(worker->mutex_address);
+  // "failed_call" holds its connection: if it is the current one, it was not
+  // replaced since the call.
+  if (worker->stub.get() != failed_call.tracked_stub()) {
+    return;
+  }
+  // The calls in flight hold the connection until they end (they are not
+  // cancelled: they might be fine, and fail on their own otherwise).
+  // "GetStubForCall" opens a new connection.
+  worker->stub.reset();
 }
 
 std::weak_ptr<const void> GRPCManager::WorkerStubWeakPtrForTesting(
@@ -318,12 +345,16 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
   *query.mutable_blob() = std::move(blob);
   query.set_manager_uid(manager_uid_);
   query.set_worker_idx(worker->worker_idx);
+  query.set_query_id(next_query_id_.fetch_add(1, std::memory_order_relaxed));
 
   proto::Answer answer;
   while (true) {
     // Run the job remotely and wait for the result.
     grpc::ClientContext context;
     ConfigureClientContext(&context);
+    if (request_timeout_ > absl::ZeroDuration()) {
+      context.set_deadline(absl::ToChronoTime(absl::Now() + request_timeout_));
+    }
 
     ASSIGN_OR_RETURN(auto active_call, GetStubForCall(worker, &context));
 
@@ -337,6 +368,20 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
       if (status.error_code() == grpc::StatusCode::CANCELLED) {
         LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
                      << " was CANCELLED (worker relocated). Retrying.";
+        ResetWorkerConnection(worker, active_call);
+        continue;
+      }
+      if (status.error_code() == grpc::StatusCode::DEADLINE_EXCEEDED &&
+          request_timeout_ > absl::ZeroDuration()) {
+        // The worker did not answer in time (lost request, stuck worker, or
+        // half-open connection to a dead worker): send the request again, on a
+        // new connection. A copy of a request still running on the worker
+        // waits for it.
+        LOG(WARNING) << "Worker #" << worker->worker_idx
+                     << " did not answer request " << query.query_id()
+                     << " within " << request_timeout_
+                     << ". Sending it again on a new connection.";
+        ResetWorkerConnection(worker, active_call);
         continue;
       }
       if (status.error_message() == "UNAVAILABLE: worker config required") {
@@ -353,7 +398,8 @@ absl::StatusOr<Blob> GRPCManager::WorkerRunImp(Blob blob, Worker* worker) {
           LOG(WARNING) << "GRPC to worker #" << worker->worker_idx
                        << " has a TRANSIENT error: " << status.error_message();
         }
-        // The worker is temporarily not available.
+        // The worker is temporarily not available. Retry on a new connection.
+        ResetWorkerConnection(worker, active_call);
         absl::SleepFor(absl::Seconds(5));
         continue;
       } else {
@@ -586,11 +632,30 @@ absl::Status GRPCManager::Initialize(const proto::Config& config,
     LOG(INFO) << "Initialize manager with " << welcome_blob.size()
               << " bytes welcome blob, uid:" << manager_uid_;
   }
+  const auto& imp_config = config.GetExtension(proto::grpc);
+  keepalive_time_ms_ = imp_config.keepalive_time_ms();
+  keepalive_timeout_ms_ = imp_config.keepalive_timeout_ms();
+  {
+    utils::concurrency::MutexLock l(mutex_worker_config_);
+    worker_config_.set_keepalive_time_ms(keepalive_time_ms_);
+    worker_config_.set_keepalive_timeout_ms(keepalive_timeout_ms_);
+    if (imp_config.worker_to_worker_parallelism() > 0) {
+      worker_config_.set_worker_to_worker_parallelism(
+          imp_config.worker_to_worker_parallelism());
+    }
+  }
+  if (imp_config.request_timeout_seconds() > 0) {
+    request_timeout_ = absl::Seconds(imp_config.request_timeout_seconds());
+    utils::concurrency::MutexLock l(mutex_worker_config_);
+    // Half of the manager's timeout: a worker blocked by another worker
+    // answers (with an error) before the manager re-sends its request.
+    worker_config_.set_request_timeout_seconds(
+        std::max(1, imp_config.request_timeout_seconds() / 2));
+  }
   RETURN_IF_ERROR(InitializeWorkers(config, parallel_execution_per_worker));
   RETURN_IF_ERROR(InitializeConfigFile(config, worker_name,
                                        parallel_execution_per_worker,
                                        std::move(welcome_blob)));
-  const auto& imp_config = config.GetExtension(proto::grpc);
   if (imp_config.has_key()) {
     key_ = imp_config.key();
     StartEventCheckingThread();

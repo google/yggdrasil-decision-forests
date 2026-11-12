@@ -83,6 +83,10 @@ void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager,
                                               bool call_done = true);
 void TestAsynchronousParallelWorkerExecution(AbstractManager* manager,
                                              bool call_done = true);
+// Blocking requests between the workers ("BlockingRequestToOtherWorker"),
+// concurrent and nested.
+void TestBlockingIntraWorkerCommunication(AbstractManager* manager,
+                                          bool call_done = true);
 void TestChangeManager(ManagerCreatorAndWorkers* manager_creator, bool nice);
 
 // Call various other tests (e.g., TestWorkerError) interrupted with calls to

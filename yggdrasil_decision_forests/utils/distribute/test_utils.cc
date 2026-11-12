@@ -15,11 +15,17 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/test_utils.h"
 
+#include <functional>
+#include <map>
+#include <string>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 #include "absl/strings/str_cat.h"
+#include "yggdrasil_decision_forests/utils/distribute/core.h"
 
 namespace yggdrasil_decision_forests {
 namespace distribute {
@@ -161,6 +167,32 @@ void TestAsynchronousIntraWorkerCommunication(AbstractManager* manager,
         manager->BlockingRequest("sum_other_worker_idxs", /*worker_idx=*/w)
             .value();
     EXPECT_EQ(result, absl::StrCat(sum_worker_idxs - w));
+  }
+  if (call_done) {
+    EXPECT_OK(manager->Done(true));
+  }
+}
+
+void TestBlockingIntraWorkerCommunication(AbstractManager* manager,
+                                          bool call_done) {
+  const int num_workers = manager->NumWorkers();
+  for (int w = 0; w < num_workers; w++) {
+    ASSERT_OK_AND_ASSIGN(const std::string result,
+                         manager->BlockingRequest("worker_idx", w));
+    EXPECT_EQ(result, absl::StrCat(w));
+  }
+  const int sum_worker_idxs = (num_workers - 1) * num_workers / 2;
+  for (int w = 0; w < num_workers; w++) {
+    ASSERT_OK_AND_ASSIGN(
+        const std::string blocking_sum_other_worker_idxs,
+        manager->BlockingRequest("blocking_sum_other_worker_idxs", w));
+    EXPECT_EQ(blocking_sum_other_worker_idxs,
+              absl::StrCat(sum_worker_idxs - w));
+    ASSERT_OK_AND_ASSIGN(
+        const std::string next_worker_blocking_sum,
+        manager->BlockingRequest("next_worker_blocking_sum", w));
+    EXPECT_EQ(next_worker_blocking_sum,
+              absl::StrCat(sum_worker_idxs - (w + 1) % num_workers));
   }
   if (call_done) {
     EXPECT_OK(manager->Done(true));

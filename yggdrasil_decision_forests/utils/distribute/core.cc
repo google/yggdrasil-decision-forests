@@ -15,6 +15,8 @@
 
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 
+#include <utility>
+
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 
@@ -50,6 +52,11 @@ absl::StatusOr<Blob> AbstractWorker::NextAsynchronousAnswerFromOtherWorker() {
   return hook_->NextAsynchronousAnswerFromOtherWorker(this);
 }
 
+absl::StatusOr<Blob> AbstractWorker::BlockingRequestToOtherWorker(
+    Blob blob, const int worker_idx) {
+  return hook_->BlockingRequestToOtherWorker(std::move(blob), worker_idx, this);
+}
+
 absl::Status AbstractWorkerHook::AsynchronousRequestToOtherWorker(
     Blob blob, int target_worker_idx, AbstractWorker* emitter_worker) {
   return absl::InternalError(
@@ -60,6 +67,11 @@ absl::StatusOr<Blob> AbstractWorkerHook::NextAsynchronousAnswerFromOtherWorker(
     AbstractWorker* emitter_worker) {
   return absl::InternalError(
       "NextAsynchronousAnswerFromOtherWorker Not implemented");
+}
+
+absl::StatusOr<Blob> AbstractWorkerHook::BlockingRequestToOtherWorker(
+    Blob blob, int target_worker_idx, AbstractWorker* emitter_worker) {
+  return absl::InternalError("BlockingRequestToOtherWorker Not implemented");
 }
 
 }  // namespace distribute
