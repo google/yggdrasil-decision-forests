@@ -643,6 +643,48 @@ TEST_F(EvalConditions, EvalConditionSequenceVectorProjectedMoreThan) {
   CheckCondition(condition_1, 2, true);
 }
 
+TEST(DecisionTree, EvalConditionSequenceVectorExampleWithWrongVectorSize) {
+  const dataset::proto::Example example = PARSE_TEST_PROTO(R"pb(
+    attributes {
+      numerical_vector_sequence {
+        vectors { values: 1 values: 2 values: 3 values: 4 values: 5 }
+      }
+    }
+  )pb");
+
+  const proto::NodeCondition closer_than = PARSE_TEST_PROTO(R"pb(
+    attribute: 0
+    condition {
+      numerical_vector_sequence {
+        closer_than {
+          threshold2: 0.04
+          anchor { grounded: 0.95 grounded: 0.95 }
+        }
+      }
+    }
+  )pb");
+  EXPECT_THAT(EvalCondition(closer_than, example).status(),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Invalid numerical vector sequence value for column 0. "
+                       "Expected vectors of size 2, got 5."));
+
+  const proto::NodeCondition projected_more_than = PARSE_TEST_PROTO(R"pb(
+    attribute: 0
+    condition {
+      numerical_vector_sequence {
+        projected_more_than {
+          threshold: 0.2
+          anchor { grounded: 0.95 grounded: 0.95 }
+        }
+      }
+    }
+  )pb");
+  EXPECT_THAT(EvalCondition(projected_more_than, example).status(),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Invalid numerical vector sequence value for column 0. "
+                       "Expected vectors of size 2, got 5."));
+}
+
 TEST(DecisionTree, ScaleRegressorOutput) {
   DecisionTree tree;
   tree.CreateRoot();
@@ -1563,6 +1605,76 @@ TEST(DecisionTree, ValidateObliqueCondition) {
             absl::StatusCode::kInvalidArgument,
             "Invalid oblique. Expect numerical feature, got type CATEGORICAL "
             "for attribute 2"));
+  }
+}
+
+TEST(DecisionTree, ValidateNumericalVectorSequenceCondition) {
+  dataset::proto::DataSpecification dataspec;
+  auto* col = dataset::AddColumn(
+      "vec", dataset::proto::ColumnType::NUMERICAL_VECTOR_SEQUENCE, &dataspec);
+  col->mutable_numerical_vector_sequence()->set_vector_length(3);
+
+  const auto fake_check_leaf = [](const decision_tree::proto::Node&) {
+    return absl::OkStatus();
+  };
+
+  auto make_tree = [&]() {
+    DecisionTree tree;
+    tree.CreateRoot();
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_regressor()
+        ->set_top_value(0.0f);
+    tree.mutable_root()
+        ->mutable_neg_child()
+        ->mutable_node()
+        ->mutable_regressor()
+        ->set_top_value(0.0f);
+    tree.mutable_root()->mutable_node()->mutable_condition()->set_attribute(0);
+    return tree;
+  };
+
+  auto mutable_nvs = [](DecisionTree* tree) {
+    return tree->mutable_root()
+        ->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_numerical_vector_sequence();
+  };
+
+  {
+    auto tree = make_tree();
+    auto* closer_than = mutable_nvs(&tree)->mutable_closer_than();
+    for (int i = 0; i < 3; i++) {
+      closer_than->mutable_anchor()->add_grounded(1.f);
+    }
+    EXPECT_OK(tree.Validate(dataspec, fake_check_leaf));
+  }
+
+  {
+    auto tree = make_tree();
+    mutable_nvs(&tree)->mutable_closer_than()->mutable_anchor()->add_grounded(
+        1.f);
+    EXPECT_THAT(tree.Validate(dataspec, fake_check_leaf),
+                StatusIs(absl::StatusCode::kInvalidArgument,
+                         "Invalid numerical vector sequence condition. The "
+                         "anchor has 1 values but the column \"vec\" has "
+                         "vector_length=3."));
+  }
+
+  {
+    auto tree = make_tree();
+    auto* projected = mutable_nvs(&tree)->mutable_projected_more_than();
+    for (int i = 0; i < 4; i++) {
+      projected->mutable_anchor()->add_grounded(1.f);
+    }
+    EXPECT_THAT(tree.Validate(dataspec, fake_check_leaf),
+                StatusIs(absl::StatusCode::kInvalidArgument,
+                         "Invalid numerical vector sequence condition. The "
+                         "anchor has 4 values but the column \"vec\" has "
+                         "vector_length=3."));
   }
 }
 

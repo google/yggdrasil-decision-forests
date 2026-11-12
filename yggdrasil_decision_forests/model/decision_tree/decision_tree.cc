@@ -1459,6 +1459,12 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
           for (const auto& proto_vector :
                attribute.numerical_vector_sequence().vectors()) {
             const absl::Span<const float> vector(proto_vector.values());
+            if (ABSL_PREDICT_FALSE(vector.size() != anchor_value.size())) {
+              return absl::InvalidArgumentError(absl::StrCat(
+                  "Invalid numerical vector sequence value for column ",
+                  condition.attribute(), ". Expected vectors of size ",
+                  anchor_value.size(), ", got ", vector.size(), "."));
+            }
             const float distance2 = SquaredDistance(vector, anchor_value);
             if (distance2 <= closer_than.threshold2()) {
               return true;
@@ -1475,6 +1481,12 @@ absl::StatusOr<bool> EvalCondition(const proto::NodeCondition& condition,
           for (const auto& proto_vector :
                attribute.numerical_vector_sequence().vectors()) {
             const absl::Span<const float> vector(proto_vector.values());
+            if (ABSL_PREDICT_FALSE(vector.size() != anchor_value.size())) {
+              return absl::InvalidArgumentError(absl::StrCat(
+                  "Invalid numerical vector sequence value for column ",
+                  condition.attribute(), ". Expected vectors of size ",
+                  anchor_value.size(), ", got ", vector.size(), "."));
+            }
             const float p = DotProduct(vector, anchor_value);
             if (p >= project_more_than.threshold()) {
               return true;
@@ -1776,13 +1788,36 @@ absl::Status NodeWithChildren::Validate(
           }
         }
       } break;
-      case proto::Condition::kNumericalVectorSequence:
+      case proto::Condition::kNumericalVectorSequence: {
         if (attribute_spec.type() !=
             dataset::proto::NUMERICAL_VECTOR_SEQUENCE) {
           return absl::InvalidArgumentError(
               "Invalid condition. Expect numerical vector sequence feature.");
         }
-        break;
+        const auto& nvs_condition = condition.numerical_vector_sequence();
+        int anchor_size;
+        switch (nvs_condition.type_case()) {
+          case proto::Condition::NumericalVectorSequence::kCloserThan:
+            anchor_size = nvs_condition.closer_than().anchor().grounded_size();
+            break;
+          case proto::Condition::NumericalVectorSequence::kProjectedMoreThan:
+            anchor_size =
+                nvs_condition.projected_more_than().anchor().grounded_size();
+            break;
+          case proto::Condition::NumericalVectorSequence::TYPE_NOT_SET:
+            return absl::InvalidArgumentError(
+                "Invalid numerical vector sequence condition without "
+                "sub-condition.");
+        }
+        const int vector_length =
+            attribute_spec.numerical_vector_sequence().vector_length();
+        if (anchor_size != vector_length) {
+          return absl::InvalidArgumentError(absl::Substitute(
+              "Invalid numerical vector sequence condition. The anchor has $0 "
+              "values but the column \"$1\" has vector_length=$2.",
+              anchor_size, attribute_spec.name(), vector_length));
+        }
+      } break;
       case proto::Condition::TYPE_NOT_SET:
         return absl::InvalidArgumentError("Unknown condition");
     }
