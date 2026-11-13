@@ -52,6 +52,7 @@
 #include "yggdrasil_decision_forests/learner/decision_tree/utils.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/utils/bitmap.h"
 #include "yggdrasil_decision_forests/utils/distribution.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
@@ -590,6 +591,72 @@ TEST(DecisionTree, FindBestCategoricalSplitRandom) {
 
     EXPECT_LE(random_condition.split_score(), cart_condition.split_score());
   }
+}
+
+// Regression test: The random categorical splitter must draw a random bit for
+// every bucket. Previously, it consumed 64 bits per call to the random engine
+// while std::mt19937 only produces 32 random bits, so the buckets with index
+// 32-63 (mod 64) were always assigned to the positive branch.
+TEST(DecisionTree, FindBestCategoricalSplitRandomUsesAllRandomBits) {
+  const int num_attribute_classes = 64;
+  const int num_label_classes = 2;
+  const int num_examples_per_class = 20;
+  const int32_t na_replacement = 0;
+  const UnsignedExampleIdx min_num_obs = 1;
+
+  proto::DecisionTreeTrainingConfig dt_config;
+  dt_config.mutable_categorical()->mutable_random();
+
+  // The label is the parity of the attribute value. The best split separates
+  // the odd from the even attribute values.
+  std::vector<UnsignedExampleIdx> selected_examples;
+  std::vector<float> weights;
+  std::vector<int32_t> attributes;
+  std::vector<int32_t> labels;
+  utils::IntegerDistributionDouble label_distribution;
+  label_distribution.SetNumClasses(num_label_classes);
+  for (int value = 0; value < num_attribute_classes; value++) {
+    for (int i = 0; i < num_examples_per_class; i++) {
+      selected_examples.push_back(selected_examples.size());
+      attributes.push_back(value);
+      labels.push_back(value % 2);
+      weights.push_back(1.f);
+      label_distribution.Add(value % 2, 1.f);
+    }
+  }
+
+  SplitterPerThreadCache cache;
+  utils::RandomEngine rnd(1234);
+  proto::NodeCondition condition;
+  ASSERT_EQ(FindSplitLabelClassificationFeatureCategorical(
+                selected_examples, weights, attributes, labels,
+                num_attribute_classes, num_label_classes, na_replacement,
+                min_num_obs, dt_config, label_distribution, -1, &rnd,
+                &condition, &cache)
+                .value(),
+            SplitSearchResult::kBetterSplitFound);
+
+  const auto is_positive = [&](const int value) {
+    const auto& cond = condition.condition();
+    if (cond.has_contains_bitmap_condition()) {
+      return utils::bitmap::GetValueBit(
+          cond.contains_bitmap_condition().elements_bitmap(), value);
+    }
+    const auto& elements = cond.contains_condition().elements();
+    return std::find(elements.begin(), elements.end(), value) !=
+           elements.end();
+  };
+
+  // Count the attribute values in [32, 64) sent to the negative branch. With
+  // the bug, this count was always zero.
+  int num_negative_upper_values = 0;
+  for (int value = 32; value < num_attribute_classes; value++) {
+    if (!is_positive(value)) {
+      num_negative_upper_values++;
+    }
+  }
+  EXPECT_GT(num_negative_upper_values, 0);
+  EXPECT_LT(num_negative_upper_values, 32);
 }
 
 TEST(DecisionTree, CategoricalSplitConditionStorageVector) {
