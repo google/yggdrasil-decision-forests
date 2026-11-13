@@ -1534,7 +1534,6 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
 
   // Path to the root snapshot directory used to resume interrupted training.
   // Empty if resuming training is disabled.
-  std::string snapshot_directory;
 
   // Current training iteration.
   int iter_idx = 0;
