@@ -615,7 +615,8 @@ absl::Status GrowNode(
 
   // Stop growth
   if (selected_examples.size() < dt_config.min_examples() ||
-      (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth())) {
+      (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth()) ||
+      decision_tree::IsAtMaxTreeDepth(depth)) {
     node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
     return absl::OkStatus();
   }

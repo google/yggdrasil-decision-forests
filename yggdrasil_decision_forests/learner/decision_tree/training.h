@@ -980,6 +980,9 @@ absl::Status GenerateRandomImputationOnColumn(
     absl::Span<const UnsignedExampleIdx> examples,
     dataset::VerticalDataset::AbstractColumn* dst, utils::RandomEngine* random);
 
+// Checks if `node_depth` is smaller than the hard-cap on tree depth.
+bool IsAtMaxTreeDepth(int node_depth);
+
 // Grows a decision tree with a "best-first" (or "leaf-wise") grow i.e. the leaf
 // that best improve the overall tree is split.
 absl::Status GrowTreeBestFirstGlobal(

@@ -37,6 +37,7 @@
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -584,25 +585,35 @@ absl::Status DecisionTree::ReadNodes(
 }
 
 absl::Status NodeWithChildren::WriteNodes(
-    utils::ProtoWriterInterface<proto::Node>* writer) const {
+    utils::ProtoWriterInterface<proto::Node>* writer, int depth) const {
+  if (depth > kMaxTreeDepth) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Tree depth exceeds the maximum supported depth of ",
+                     kMaxTreeDepth, " while writing nodes."));
+  }
   RETURN_IF_ERROR(writer->Write(node_));
   if (!IsLeaf()) {
-    RETURN_IF_ERROR(children_[0]->WriteNodes(writer));
-    RETURN_IF_ERROR(children_[1]->WriteNodes(writer));
+    RETURN_IF_ERROR(children_[0]->WriteNodes(writer, depth + 1));
+    RETURN_IF_ERROR(children_[1]->WriteNodes(writer, depth + 1));
   }
   return absl::OkStatus();
 }
 
 absl::Status NodeWithChildren::ReadNodes(
-    utils::ProtoReaderInterface<proto::Node>* reader) {
+    utils::ProtoReaderInterface<proto::Node>* reader, int depth) {
+  if (depth > kMaxTreeDepth) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Tree depth exceeds the maximum supported depth of ",
+                     kMaxTreeDepth, " while reading nodes."));
+  }
   ASSIGN_OR_RETURN(bool did_read, reader->Next(&node_));
   if (!did_read) {
     return absl::InvalidArgumentError("Unexpected EOF");
   }
   if (node_.has_condition()) {
     CreateChildren();
-    RETURN_IF_ERROR(children_[0]->ReadNodes(reader));
-    RETURN_IF_ERROR(children_[1]->ReadNodes(reader));
+    RETURN_IF_ERROR(children_[0]->ReadNodes(reader, depth + 1));
+    RETURN_IF_ERROR(children_[1]->ReadNodes(reader, depth + 1));
   }
   return absl::OkStatus();
 }
@@ -1681,7 +1692,13 @@ void NodeWithChildren::IterateOnMutableNodes(
 absl::Status NodeWithChildren::Validate(
     const dataset::proto::DataSpecification& data_spec,
     std::function<absl::Status(const decision_tree::proto::Node& node)>
-        check_leaf) const {
+        check_leaf,
+    int depth) const {
+  if (depth > kMaxTreeDepth) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Tree depth exceeds the maximum supported depth of ",
+                     kMaxTreeDepth, "."));
+  }
   if (!IsLeaf()) {
     const int num_columns = data_spec.columns_size();
     if (!pos_child() || !neg_child()) {
@@ -1822,8 +1839,8 @@ absl::Status NodeWithChildren::Validate(
         return absl::InvalidArgumentError("Unknown condition");
     }
 
-    RETURN_IF_ERROR(pos_child()->Validate(data_spec, check_leaf));
-    RETURN_IF_ERROR(neg_child()->Validate(data_spec, check_leaf));
+    RETURN_IF_ERROR(pos_child()->Validate(data_spec, check_leaf, depth + 1));
+    RETURN_IF_ERROR(neg_child()->Validate(data_spec, check_leaf, depth + 1));
   } else {
     if (node_.output_case() == proto::Node::OUTPUT_NOT_SET) {
       return absl::InvalidArgumentError("Leaf with missing output");

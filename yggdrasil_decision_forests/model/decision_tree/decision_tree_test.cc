@@ -15,8 +15,11 @@
 
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -38,6 +41,7 @@
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/protobuf.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -1675,6 +1679,107 @@ TEST(DecisionTree, ValidateNumericalVectorSequenceCondition) {
                          "anchor has 4 values but the column \"vec\" has "
                          "vector_length=3."));
   }
+}
+
+// Reader emitting an endless stream of non-leaf nodes, i.e., a tree of
+// unbounded depth.
+class EndlessNonLeafNodeReader final
+    : public utils::ProtoReaderInterface<proto::Node> {
+ public:
+  absl::StatusOr<bool> Next(proto::Node* value) override {
+    value->mutable_condition();
+    return true;
+  }
+};
+
+TEST(DecisionTree, ReadNodesFailsOnTooDeepTree) {
+  EndlessNonLeafNodeReader reader;
+  DecisionTree tree;
+
+  EXPECT_THAT(tree.ReadNodes(&reader),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Tree depth exceeds the maximum supported depth"));
+}
+
+// In-memory stream of nodes.
+class NodeBuffer final : public utils::ProtoWriterInterface<proto::Node>,
+                         public utils::ProtoReaderInterface<proto::Node> {
+ public:
+  absl::Status Write(const proto::Node& value) override {
+    nodes_.push_back(value);
+    return absl::OkStatus();
+  }
+
+  absl::StatusOr<bool> Next(proto::Node* value) override {
+    if (next_node_idx_ == nodes_.size()) {
+      return false;
+    }
+    *value = nodes_[next_node_idx_++];
+    return true;
+  }
+
+ private:
+  std::vector<proto::Node> nodes_;
+  size_t next_node_idx_ = 0;
+};
+
+// Dataspec with a single numerical column.
+DataSpecification NumericalDataspec() {
+  DataSpecification dataspec;
+  dataset::AddColumn("a", ColumnType::NUMERICAL, &dataspec);
+  return dataspec;
+}
+
+absl::Status AcceptLeaf(const proto::Node&) { return absl::OkStatus(); }
+
+// Valid regression tree made of a chain of "depth" non-leaf nodes, i.e., whose
+// deepest nodes are at depth "depth".
+DecisionTree MakeChainTree(const int depth) {
+  DecisionTree tree;
+  tree.CreateRoot();
+  NodeWithChildren* node = tree.mutable_root();
+  for (int i = 0; i < depth; i++) {
+    node->CreateChildren();
+    auto* condition = node->mutable_node()->mutable_condition();
+    condition->set_attribute(0);
+    condition->mutable_condition()->mutable_higher_condition()->set_threshold(
+        1);
+    node->mutable_neg_child()
+        ->mutable_node()
+        ->mutable_regressor()
+        ->set_top_value(0);
+    node = node->mutable_pos_child();
+  }
+  node->mutable_node()->mutable_regressor()->set_top_value(0);
+  return tree;
+}
+
+TEST(DecisionTree, TreeAtMaxDepthIsValidAndRoundTrips) {
+  const DecisionTree tree = MakeChainTree(kMaxTreeDepth);
+  NodeBuffer buffer;
+  DecisionTree read_tree;
+
+  EXPECT_OK(tree.Validate(NumericalDataspec(), AcceptLeaf));
+  ASSERT_OK(tree.WriteNodes(&buffer));
+  ASSERT_OK(read_tree.ReadNodes(&buffer));
+  EXPECT_EQ(read_tree.MaximumDepth(), kMaxTreeDepth);
+}
+
+TEST(DecisionTree, WriteNodesFailsOnTooDeepTree) {
+  const DecisionTree tree = MakeChainTree(kMaxTreeDepth + 1);
+  NodeBuffer buffer;
+
+  EXPECT_THAT(tree.WriteNodes(&buffer),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Tree depth exceeds the maximum supported depth"));
+}
+
+TEST(DecisionTree, ValidateFailsOnTooDeepTree) {
+  const DecisionTree tree = MakeChainTree(kMaxTreeDepth + 1);
+
+  EXPECT_THAT(tree.Validate(NumericalDataspec(), AcceptLeaf),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Tree depth exceeds the maximum supported depth"));
 }
 
 }  // namespace

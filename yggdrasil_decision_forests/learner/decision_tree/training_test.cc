@@ -1263,6 +1263,12 @@ TEST(CachedProjectionEvaluator, NoNumericalFeatures) {
   EXPECT_EQ(description_shared, description_per_node);
 }
 
+TEST(DecisionTree, IsAtMaxTreeDepth) {
+  EXPECT_FALSE(IsAtMaxTreeDepth(0));
+  EXPECT_FALSE(IsAtMaxTreeDepth(kMaxTreeDepth - 1));
+  EXPECT_TRUE(IsAtMaxTreeDepth(kMaxTreeDepth));
+}
+
 }  // namespace
 }  // namespace decision_tree
 }  // namespace model

@@ -58,6 +58,10 @@ static constexpr char kVariableImportanceSumScore[] = "SUM_SCORE";
 static constexpr char kVariableImportanceInvMeanMinDepth[] =
     "INV_MEAN_MIN_DEPTH";
 
+// Maximum depth of a node in a decision tree. The root is at depth 0 (same
+// convention as "DecisionTree::MaximumDepth" and "NodeWithChildren::depth").
+constexpr int kMaxTreeDepth = 4096;
+
 // Return an identifier of a type of condition.
 std::string ConditionTypeToString(proto::Condition::TypeCase type);
 
@@ -166,12 +170,17 @@ class NodeWithChildren {
   std::optional<size_t> EstimateSizeInByte() const;
 
   // Exports the node (and its children) to a RecordIO writer. The nodes are
-  // stored sequentially with a depth-first exploration.
-  absl::Status WriteNodes(
-      utils::ProtoWriterInterface<proto::Node>* writer) const;
+  // stored sequentially with a depth-first exploration. "depth" is the depth of
+  // the node; callers should leave it at its default value. Fails if the tree
+  // is deeper than "kMaxTreeDepth".
+  absl::Status WriteNodes(utils::ProtoWriterInterface<proto::Node>* writer,
+                          int depth = 0) const;
 
-  // Imports the node (and its children) to a RecordIO reader.
-  absl::Status ReadNodes(utils::ProtoReaderInterface<proto::Node>* reader);
+  // Imports the node (and its children) to a RecordIO reader. "depth" is the
+  // depth of the node; callers should leave it at its default value. Fails if
+  // the tree is deeper than "kMaxTreeDepth".
+  absl::Status ReadNodes(utils::ProtoReaderInterface<proto::Node>* reader,
+                         int depth = 0);
 
   // Indicates the node is a leaf i.e. if the node DOES NOT have children.
   bool IsLeaf() const { return !children_[0]; }
@@ -206,11 +215,14 @@ class NodeWithChildren {
   // Number of nodes.
   int64_t NumNodes() const;
 
-  // Check the validity of a node and its children.
+  // Check the validity of a node and its children. "depth" is the depth of the
+  // node; callers should leave it at its default value. Fails if the tree is
+  // deeper than "kMaxTreeDepth".
   absl::Status Validate(
       const dataset::proto::DataSpecification& data_spec,
       std::function<absl::Status(const decision_tree::proto::Node& node)>
-          check_leaf) const;
+          check_leaf,
+      int depth = 0) const;
 
   // Call "call_back" on the node and all its children.
   void IterateOnNodes(const std::function<void(const NodeWithChildren& node,

@@ -22,6 +22,8 @@
 #include "gtest/gtest.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
@@ -390,6 +392,21 @@ TEST(GenericParameters, OnlyInvalidFails) {
           absl::StatusCode::kInternal,
           "A caller must either supply both the valid hyperparameter and the "
           "invalid hyperparameters or none of them"));
+}
+
+TEST(GenericParameters, MaxDepthAboveMaxTreeDepthFails) {
+  model::proto::GenericHyperParameters hparams;
+  auto* field = hparams.add_fields();
+  field->set_name(kHParamMaxDepth);
+  field->mutable_value()->set_integer(kMaxTreeDepth + 1);
+  utils::GenericHyperParameterConsumer consumer(hparams);
+  absl::flat_hash_set<std::string> consumed_hparams;
+  proto::DecisionTreeTrainingConfig config;
+
+  EXPECT_THAT(SetHyperParameters(&consumed_hparams, &config, &consumer),
+              test::StatusIs(absl::StatusCode::kInvalidArgument,
+                             "is greater than the maximum supported tree "
+                             "depth"));
 }
 
 }  // namespace

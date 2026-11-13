@@ -750,9 +750,22 @@ absl::Status RunIteration(
         weak_learner_label_statistics[weak_model_idx]));
   }
 
-  for (int layer_idx = 0;
-       layer_idx < spe_config.gbt().decision_tree().max_depth() - 1;
-       layer_idx++) {
+  // Each layer increases the depth of the trees by one. The trees cannot be
+  // deeper than "kMaxTreeDepth".
+  const int requested_num_layers =
+      spe_config.gbt().decision_tree().max_depth() - 1;
+  if (requested_num_layers > decision_tree::kMaxTreeDepth) {
+    LOG_FIRST_N(WARNING, 1)
+        << "[This message is only shown once] max_depth="
+        << spe_config.gbt().decision_tree().max_depth()
+        << " exceeds the maximum supported tree depth ("
+        << decision_tree::kMaxTreeDepth
+        << "). The trees will not be grown further than this depth.";
+  }
+  const int max_num_layers =
+      std::min(requested_num_layers, decision_tree::kMaxTreeDepth);
+
+  for (int layer_idx = 0; layer_idx < max_num_layers; layer_idx++) {
     ASSIGN_OR_RETURN(
         const auto splits_per_weak_models,
         EmitFindSplits(spe_config, features, weak_models, distribute_manager,

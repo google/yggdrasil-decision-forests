@@ -28,7 +28,8 @@ message DecisionTreeTrainingConfig {
   // Basic parameters.
 
   // Maximum depth of the tree. max_depth=1 means that all trees will be roots.
-  // If max_depth=-1, the depth of the tree is not limited.
+  // If max_depth=-1, the depth of the tree is only limited by the maximum tree
+  // depth supported (4096).
   optional int32 max_depth = 1 [default = 16];
 
   // Minimum number of examples in a node.

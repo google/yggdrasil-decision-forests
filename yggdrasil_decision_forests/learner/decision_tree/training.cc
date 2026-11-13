@@ -4604,6 +4604,19 @@ void SplitHonestExamples(
   }
 }
 
+bool IsAtMaxTreeDepth(const int node_depth) {
+  if (node_depth < kMaxTreeDepth) {
+    return false;
+  }
+  LOG_FIRST_N(WARNING, 1)
+      << "[This message is only shown once] A branch of a decision tree "
+         "reached the maximum supported tree depth ("
+      << kMaxTreeDepth
+      << ") and was not grown further. This is generally a dataset issue or a "
+         "bug in the library. Please contact the development team for advice.";
+  return true;
+}
+
 absl::Status GrowTreeBestFirstGlobal(
     const dataset::VerticalDataset& train_dataset,
     const model::proto::TrainingConfig& config,
@@ -4678,7 +4691,8 @@ absl::Status GrowTreeBestFirstGlobal(
         node));
 
     if (example_idxs.size() < dt_config.min_examples() ||
-        (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth())) {
+        (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth()) ||
+        IsAtMaxTreeDepth(depth)) {
       // Stop the grow of the branch.
       node->FinalizeAsLeaf(dt_config.store_detailed_label_distribution());
       return absl::OkStatus();
@@ -5019,8 +5033,10 @@ ABSL_ATTRIBUTE_ALWAYS_INLINE static absl::Status NodeTrain(
     return absl::OkStatus();
   };
 
+  // Note: In this function, the root is at depth 1.
   if (selected_examples.size() < dt_config.min_examples() ||
       (dt_config.max_depth() >= 0 && depth >= dt_config.max_depth()) ||
+      IsAtMaxTreeDepth(depth - 1) ||
       (internal_config.timeout.has_value() &&
        internal_config.timeout < absl::Now())) {
     return finalize_as_leaf();

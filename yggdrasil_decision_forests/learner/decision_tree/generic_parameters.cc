@@ -28,6 +28,7 @@
 #include "absl/strings/substitute.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/utils/hyper_parameters.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/status_macros.h"
@@ -717,6 +718,12 @@ absl::Status SetHyperParameters(
     const auto hparam = generic_hyper_params->Get(kHParamMaxDepth);
     if (hparam.has_value()) {
       dt_config->set_max_depth(hparam.value().value().integer());
+      if (dt_config->max_depth() > kMaxTreeDepth) {
+        return absl::InvalidArgumentError(absl::Substitute(
+            "max_depth=$0 is greater than the maximum supported tree depth "
+            "($1). Use max_depth=-1 to grow trees up to this limit.",
+            dt_config->max_depth(), kMaxTreeDepth));
+      }
       if (dt_config->max_depth() < 2 && dt_config->max_depth() != -1 &&
           dt_config->max_depth() != -2) {
         LOG(WARNING)

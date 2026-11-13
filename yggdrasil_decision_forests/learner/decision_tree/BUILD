@@ -195,6 +195,7 @@ cc_library_ydf(
     deps = [
         ":decision_tree_cc_proto",
         "//yggdrasil_decision_forests/learner:abstract_learner",
+        "//yggdrasil_decision_forests/model/decision_tree",
         "//yggdrasil_decision_forests/utils:hyper_parameters",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
@@ -252,6 +253,8 @@ cc_test(
     srcs = ["generic_parameters_test.cc"],
     deps = [
         ":generic_parameters",
+        "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/utils:hyper_parameters",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/container:flat_hash_set",
         "@com_google_absl//absl/status",
