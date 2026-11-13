@@ -15,11 +15,16 @@
 
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.h"
 
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
+#include <memory>
+#include <numeric>
 #include <optional>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "gmock/gmock.h"
@@ -27,15 +32,21 @@
 #include "absl/debugging/leak_check.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.pb.h"
 #include "yggdrasil_decision_forests/dataset/data_spec_inference.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/common.h"
+#include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
 #include "yggdrasil_decision_forests/learner/learner_library.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
@@ -43,6 +54,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/snapshot.h"
+#include "yggdrasil_decision_forests/utils/status_macros.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
 
@@ -769,6 +781,175 @@ TEST(CheckConfiguration, FailsIfDiscretization) {
                        AllOf(HasSubstr("discnum1"), HasSubstr("discnum2"),
                              Not(HasSubstr("classic_numerical")),
                              Not(HasSubstr("categorical")))));
+}
+
+// A ranking group. All the items of the group have the same weight.
+struct ToyRankingGroup {
+  uint64_t group;
+  float weight;
+  std::vector<float> labels;
+  std::vector<float> predictions;
+};
+
+// Ranking groups with different sizes and weights.
+std::vector<ToyRankingGroup> ToyRankingGroups() {
+  return {
+      {0, 1.f, {3, 2, 1, 0, 0, 1}, {0.1, 0.5, 0.3, 0.9, 0.2, 0.4}},
+      {1, 3.f, {1, 0}, {0.8, 0.1}},
+      {2, 0.5f, {2, 0, 1}, {0.2, 0.6, 0.4}},
+      {3, 2.f, {4, 1, 0, 2}, {0.7, 0.3, 0.5, 0.1}},
+      // Group with zero weight.
+      {4, 0.f, {1, 0}, {0.0, 0.9}},
+  };
+}
+
+// Evaluates "loss" on a set of ranking groups, similarly to an evaluation
+// worker.
+absl::StatusOr<proto::Evaluation> EvaluateRankingGroups(
+    const gradient_boosted_trees::AbstractLoss& loss,
+    const absl::Span<const ToyRankingGroup> groups) {
+  std::vector<float> labels;
+  std::vector<float> predictions;
+  std::vector<float> weights;
+  std::vector<uint64_t> group_values;
+  for (const auto& group : groups) {
+    for (size_t item_idx = 0; item_idx < group.labels.size(); item_idx++) {
+      labels.push_back(group.labels[item_idx]);
+      predictions.push_back(group.predictions[item_idx]);
+      weights.push_back(group.weight);
+      group_values.push_back(group.group);
+    }
+  }
+  ASSIGN_OR_RETURN(const auto cache,
+                   loss.CreateRankingLossCache(labels, group_values));
+  ASSIGN_OR_RETURN(const auto loss_results,
+                   loss.Loss(labels, predictions, weights, cache.get(),
+                             /*thread_pool=*/nullptr));
+  ASSIGN_OR_RETURN(const auto* ranking_indices, cache->ranking_indices());
+
+  proto::Evaluation evaluation;
+  evaluation.set_iter_idx(0);
+  evaluation.set_loss(loss_results.loss);
+  *evaluation.mutable_metrics() = {loss_results.secondary_metrics.begin(),
+                                   loss_results.secondary_metrics.end()};
+  evaluation.set_sum_weights(
+      std::accumulate(weights.begin(), weights.end(), 0.0));
+  evaluation.set_num_examples(labels.size());
+  evaluation.set_sum_group_weights(ranking_indices->SumGroupWeights(weights));
+  return evaluation;
+}
+
+absl::StatusOr<std::unique_ptr<gradient_boosted_trees::AbstractLoss>>
+CreateRankingLoss(const gradient_boosted_trees::proto::Loss loss,
+                  const dataset::proto::Column& label_column) {
+  gradient_boosted_trees::proto::GradientBoostedTreesTrainingConfig gbt_config;
+  gbt_config.mutable_lambda_mart_ndcg()->set_ndcg_truncation(5);
+  return gradient_boosted_trees::CreateLoss(loss, model::proto::Task::RANKING,
+                                            label_column, gbt_config, {});
+}
+
+TEST(PartialEvaluationAggregator, ExampleWeighted) {
+  const proto::Evaluation partial_1 = PARSE_TEST_PROTO(
+      R"pb(
+        loss: 1 metrics: 2 sum_weights: 1 num_examples: 1 iter_idx: 0
+      )pb");
+  const proto::Evaluation partial_2 = PARSE_TEST_PROTO(
+      R"pb(
+        loss: 5 metrics: 6 sum_weights: 3 num_examples: 2 iter_idx: 0
+      )pb");
+  internal::PartialEvaluationAggregator aggregator(2);
+  ASSERT_OK(aggregator.AddPartial(partial_1));
+  ASSERT_OK(aggregator.AddPartial(partial_2));
+  ASSERT_OK_AND_ASSIGN(const proto::Evaluation aggregated,
+                       aggregator.GetAggregated(0));
+  const proto::Evaluation expected = PARSE_TEST_PROTO(
+      R"pb(
+        loss: 4 metrics: 5 sum_weights: 4 num_examples: 3 iter_idx: 0
+      )pb");
+  EXPECT_THAT(aggregated, EqualsProto(expected));
+}
+
+// The NDCG of the union of partial evaluations, each on a different subset of
+// groups, is equal to the NDCG on all the groups.
+TEST(PartialEvaluationAggregator, RankingNDCGIsWeightedByGroup) {
+  dataset::proto::Column label_column;
+  label_column.set_type(dataset::proto::ColumnType::NUMERICAL);
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss,
+      CreateRankingLoss(gradient_boosted_trees::proto::LAMBDA_MART_NDCG,
+                        label_column));
+  const std::vector<ToyRankingGroup> groups = ToyRankingGroups();
+  const absl::Span<const ToyRankingGroup> all_groups = groups;
+  ASSERT_OK_AND_ASSIGN(const proto::Evaluation expected,
+                       EvaluateRankingGroups(*loss, all_groups));
+  EXPECT_DOUBLE_EQ(expected.sum_group_weights(), 1. + 3. + 0.5 + 2.);
+
+  // Note: The last partial evaluation only contains a zero weight group and
+  // its NDCG is undefined.
+  const std::vector<absl::Span<const ToyRankingGroup>> parts = {
+      all_groups.subspan(0, 1), all_groups.subspan(1, 2),
+      all_groups.subspan(3, 1), all_groups.subspan(4, 1)};
+  std::vector<proto::Evaluation> partials;
+  for (const auto& part : parts) {
+    ASSERT_OK_AND_ASSIGN(proto::Evaluation partial,
+                         EvaluateRankingGroups(*loss, part));
+    partials.push_back(std::move(partial));
+  }
+
+  internal::PartialEvaluationAggregator aggregator(
+      partials.size(), loss->LossAveraging(),
+      loss->SecondaryMetricAveragings());
+  for (const auto& partial : partials) {
+    ASSERT_OK(aggregator.AddPartial(partial));
+  }
+  ASSERT_OK_AND_ASSIGN(const proto::Evaluation aggregated,
+                       aggregator.GetAggregated(0));
+  EXPECT_NEAR(aggregated.loss(), expected.loss(), 1e-5);
+  ASSERT_EQ(aggregated.metrics_size(), 1);
+  EXPECT_NEAR(aggregated.metrics(0), expected.metrics(0), 1e-5);
+  EXPECT_DOUBLE_EQ(aggregated.sum_weights(), expected.sum_weights());
+  EXPECT_DOUBLE_EQ(aggregated.sum_group_weights(),
+                   expected.sum_group_weights());
+  EXPECT_EQ(aggregated.num_examples(), expected.num_examples());
+
+  // Weighting the partial NDCGs by the sum of example weights is biased.
+  internal::PartialEvaluationAggregator example_aggregator(3);
+  for (int partial_idx = 0; partial_idx < 3; partial_idx++) {
+    ASSERT_OK(example_aggregator.AddPartial(partials[partial_idx]));
+  }
+  ASSERT_OK_AND_ASSIGN(const proto::Evaluation example_aggregated,
+                       example_aggregator.GetAggregated(0));
+  EXPECT_GT(std::abs(example_aggregated.metrics(0) - expected.metrics(0)),
+            0.01);
+}
+
+// With the squared error loss, the RMSE and MSE are averaged over the examples
+// while the NDCG is averaged over the groups.
+TEST(PartialEvaluationAggregator, RankingSquaredErrorMixesWeightings) {
+  dataset::proto::Column label_column;
+  label_column.set_type(dataset::proto::ColumnType::NUMERICAL);
+  ASSERT_OK_AND_ASSIGN(
+      const auto loss,
+      CreateRankingLoss(gradient_boosted_trees::proto::SQUARED_ERROR,
+                        label_column));
+  const std::vector<ToyRankingGroup> groups = ToyRankingGroups();
+  const absl::Span<const ToyRankingGroup> all_groups = groups;
+  ASSERT_OK_AND_ASSIGN(const proto::Evaluation expected,
+                       EvaluateRankingGroups(*loss, all_groups));
+
+  internal::PartialEvaluationAggregator aggregator(
+      2, loss->LossAveraging(), loss->SecondaryMetricAveragings());
+  for (const auto& part : {all_groups.subspan(0, 1), all_groups.subspan(1)}) {
+    ASSERT_OK_AND_ASSIGN(const proto::Evaluation partial,
+                         EvaluateRankingGroups(*loss, part));
+    ASSERT_OK(aggregator.AddPartial(partial));
+  }
+  ASSERT_OK_AND_ASSIGN(const proto::Evaluation aggregated,
+                       aggregator.GetAggregated(0));
+  // Metrics: rmse, mse, NDCG@5.
+  ASSERT_EQ(aggregated.metrics_size(), 3);
+  EXPECT_NEAR(aggregated.metrics(1), expected.metrics(1), 1e-5);
+  EXPECT_NEAR(aggregated.metrics(2), expected.metrics(2), 1e-5);
 }
 
 }  // namespace

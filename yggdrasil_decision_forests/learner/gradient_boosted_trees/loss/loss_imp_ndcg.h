@@ -99,6 +99,16 @@ class NDCGLoss : public AbstractLoss {
 
   std::vector<std::string> InternalSecondaryMetricNames() const override;
 
+  // The loss (-NDCG) and the NDCG are averaged over the groups.
+  MetricAveraging LossAveraging() const override {
+    return MetricAveraging::kRankingGroup;
+  }
+
+  std::vector<MetricAveraging> InternalSecondaryMetricAveragings()
+      const override {
+    return {MetricAveraging::kRankingGroup};
+  }
+
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,
       const absl::Span<const float> predictions,

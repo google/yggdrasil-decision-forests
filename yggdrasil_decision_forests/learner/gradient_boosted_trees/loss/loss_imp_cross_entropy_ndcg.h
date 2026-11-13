@@ -86,6 +86,11 @@ class CrossEntropyNDCGLoss : public AbstractLoss {
 
   std::vector<std::string> InternalSecondaryMetricNames() const override;
 
+  // The loss (-NDCG) is averaged over the groups.
+  MetricAveraging LossAveraging() const override {
+    return MetricAveraging::kRankingGroup;
+  }
+
   absl::StatusOr<LossResults> Loss(
       const absl::Span<const float> labels,
       const absl::Span<const float> predictions,

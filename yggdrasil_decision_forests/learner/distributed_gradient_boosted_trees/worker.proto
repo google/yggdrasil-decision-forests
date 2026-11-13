@@ -371,4 +371,9 @@ message Evaluation {
   optional double sum_weights = 3;
   optional int64 num_examples = 4;
   optional int32 iter_idx = 5;
+  // Sum of the weights of the ranking groups, where the weight of a group is
+  // the weight of its most relevant item. Only set for ranking. Used instead of
+  // "sum_weights" to combine the per-group metrics (e.g. NDCG) of partial
+  // evaluations.
+  optional double sum_group_weights = 6;
 }

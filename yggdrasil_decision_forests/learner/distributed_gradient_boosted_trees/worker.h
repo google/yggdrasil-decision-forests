@@ -19,6 +19,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -275,6 +276,9 @@ class DistributedGradientBoostedTreesWorker
     // Weight of the examples.
     std::vector<float> weights;
     double sum_weights;
+    // Sum of the weights of the ranking groups (see
+    // "RankingGroupsIndices::SumGroupWeights"). Only set for ranking.
+    std::optional<double> sum_group_weights;
 
     // Accumulated predictions of the current model on the validation dataset.
     // Array of size num_examples x num_output_dim. Initialized with the
