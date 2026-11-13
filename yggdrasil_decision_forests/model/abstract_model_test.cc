@@ -27,6 +27,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/dataset/vertical_dataset_io.h"
 #include "yggdrasil_decision_forests/metric/metric.h"
@@ -41,6 +42,7 @@
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 #include "yggdrasil_decision_forests/utils/protobuf.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
@@ -665,6 +667,33 @@ TEST(AbstractModel, ImportProto) {
   EXPECT_EQ(model.uplift_treatment_col_idx(), 5);
   EXPECT_EQ(model.classification_outputs_probabilities(), false);
   EXPECT_EQ(model.task(), proto::Task::ANOMALY_DETECTION);
+}
+
+TEST(AbstractModel, ValidateRejectsOutOfRangeUnstackedFeatures) {
+  FakeModel model;
+  model.set_task(proto::Task::REGRESSION);
+  model.set_label_col_idx(0);
+  dataset::AddColumn("label", dataset::proto::ColumnType::NUMERICAL,
+                     model.mutable_data_spec());
+  dataset::AddColumn("v.0", dataset::proto::ColumnType::NUMERICAL,
+                     model.mutable_data_spec());
+  auto* unstacked = model.mutable_data_spec()->add_unstackeds();
+  unstacked->set_original_name("v");
+  unstacked->set_begin_column_idx(1);
+  unstacked->set_size(1);
+  EXPECT_OK(model.Validate());
+
+  // Columns [1, 64) do not exist in a 2-column dataspec.
+  unstacked->set_size(64);
+  EXPECT_THAT(model.Validate(),
+              test::StatusIs(absl::StatusCode::kInvalidArgument,
+                             "Invalid unstacked feature"));
+
+  unstacked->set_size(1);
+  unstacked->set_begin_column_idx(-1);
+  EXPECT_THAT(model.Validate(),
+              test::StatusIs(absl::StatusCode::kInvalidArgument,
+                             "Invalid unstacked feature"));
 }
 
 }  // namespace

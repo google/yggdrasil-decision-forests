@@ -1488,6 +1488,18 @@ absl::Status AbstractModel::Validate() const {
     }
   }
 
+  for (const auto& unstacked : data_spec().unstackeds()) {
+    const int64_t begin = unstacked.begin_column_idx();
+    const int64_t size = unstacked.size();
+    if (begin < 0 || size < 0 || begin + size > data_spec().columns_size()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Invalid unstacked feature \"",
+                       unstacked.original_name(), "\": columns [", begin, ", ",
+                       begin + size, ") are outside the dataspec of ",
+                       data_spec().columns_size(), " columns"));
+    }
+  }
+
   for (const auto& var_importance : precomputed_variable_importances_) {
     for (const auto& feature : var_importance.second.variable_importances()) {
       if (feature.attribute_idx() < 0 ||
