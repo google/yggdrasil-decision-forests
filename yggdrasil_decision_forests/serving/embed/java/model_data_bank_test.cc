@@ -25,7 +25,6 @@
 #include "yggdrasil_decision_forests/serving/embed/common.h"
 #include "yggdrasil_decision_forests/serving/embed/java/java_embed.h"
 #include "yggdrasil_decision_forests/utils/test.h"  // IWYU pragma: keep
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 

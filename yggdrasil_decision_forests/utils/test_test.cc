@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
+#include "yggdrasil_decision_forests/utils/test.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest-spi.h"
@@ -22,8 +22,7 @@
 #include "absl/status/statusor.h"
 
 namespace yggdrasil_decision_forests {
-namespace utils {
-namespace testing_macros {
+namespace test {
 namespace {
 
 void FailsForFalse(const bool a) {
@@ -47,6 +46,5 @@ TEST(TestingMacros, ASSERT_NOT_OK_AND_ASSIGN_error) {
 }
 
 }  // namespace
-}  // namespace testing_macros
-}  // namespace utils
+}  // namespace test
 }  // namespace yggdrasil_decision_forests

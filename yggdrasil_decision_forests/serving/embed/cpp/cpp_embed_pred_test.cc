@@ -87,7 +87,6 @@ print(model.predict(ds[:1]))
 #include "yggdrasil_decision_forests/serving/embed/cpp/test_model_iris_multi_class_rf_wta_small_score.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests::serving::embed {
 namespace {

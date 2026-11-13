@@ -28,7 +28,6 @@
 #include "yggdrasil_decision_forests/dataset/example_reader.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/test.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests::dataset::avro {
 namespace {

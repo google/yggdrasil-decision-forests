@@ -515,7 +515,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:testing_macros",
     ],
 )
 
@@ -582,7 +581,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:sharded_io",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:testing_macros",
     ],
 )
 
@@ -633,7 +631,6 @@ cc_test(
         ":synthetic_dataset_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
@@ -665,7 +662,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:bytestream",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
@@ -686,7 +682,6 @@ cc_test(
         ":example_reader",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/strings",
         "@com_google_googletest//:gtest_main",

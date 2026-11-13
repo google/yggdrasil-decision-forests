@@ -35,7 +35,6 @@
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
 #include "yggdrasil_decision_forests/utils/test.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 using ::testing::ElementsAre;
 using ::testing::SizeIs;

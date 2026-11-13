@@ -55,7 +55,6 @@
 #include "yggdrasil_decision_forests/utils/status_macros.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/test.h"
 #include "yggdrasil_decision_forests/utils/test_utils.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"  // IWYU pragma: keep
 
 namespace yggdrasil_decision_forests {
 namespace serving {

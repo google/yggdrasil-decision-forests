@@ -94,7 +94,7 @@ cc_test(
         ":cpp_target_lowering",
         "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "//yggdrasil_decision_forests/serving/embed/ir:model_ir",
-        "//yggdrasil_decision_forests/utils:testing_macros",
+        "//yggdrasil_decision_forests/utils:test",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -120,7 +120,6 @@ cc_test(
         "//yggdrasil_decision_forests/serving/embed:embed_cc_proto",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -180,7 +179,6 @@ cc_test(
         "//yggdrasil_decision_forests/model/gradient_boosted_trees",
         "//yggdrasil_decision_forests/utils:filesystem",
         "//yggdrasil_decision_forests/utils:test",
-        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status:status_matchers",
         "@com_google_absl//absl/strings",

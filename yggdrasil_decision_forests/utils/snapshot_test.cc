@@ -23,7 +23,6 @@
 #include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/test.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
 
 namespace yggdrasil_decision_forests::utils {
 namespace {

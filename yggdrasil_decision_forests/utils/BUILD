@@ -60,15 +60,6 @@ cc_library_ydf(
     ],
 )
 
-cc_library_ydf(
-    name = "testing_macros",
-    testonly = 1,
-    hdrs = [
-        "testing_macros.h",
-    ],
-    deps = [],
-)
-
 alias(
     name = "filesystem",
     actual = select({
@@ -243,7 +234,6 @@ cc_library_ydf(
     deps = [
         ":filesystem",
         ":logging",
-        ":testing_macros",
         ":uid",
         ":usage",
         "@com_google_absl//absl/log",
@@ -1188,7 +1178,6 @@ cc_test(
         ":feature_importance",
         ":random",
         ":test",
-        ":testing_macros",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
@@ -1274,10 +1263,10 @@ cc_test(
 )
 
 cc_test(
-    name = "testing_macros_test",
-    srcs = ["testing_macros_test.cc"],
+    name = "test_test",
+    srcs = ["test_test.cc"],
     deps = [
-        ":testing_macros",
+        ":test",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_googletest//:gtest_main",
@@ -1473,7 +1462,6 @@ cc_test(
         ":blob_sequence",
         ":filesystem",
         ":test",
-        ":testing_macros",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
@@ -1488,7 +1476,6 @@ cc_test(
         ":filesystem",
         ":snapshot",
         ":test",
-        ":testing_macros",
         "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
     ],
@@ -1529,7 +1516,6 @@ cc_test(
         ":model_analysis_cc_proto",
         ":plot",
         ":test",
-        ":testing_macros",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:data_spec",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
@@ -1561,7 +1547,6 @@ cc_test(
     deps = [
         ":partial_dependence_plot",
         ":test",
-        ":testing_macros",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",
         "//yggdrasil_decision_forests/dataset:example_cc_proto",
         "//yggdrasil_decision_forests/dataset:vertical_dataset",
@@ -1630,7 +1615,6 @@ cc_test(
         ":shap",
         ":status_macros",
         ":test",
-        ":testing_macros",
         "//yggdrasil_decision_forests/dataset:csv_example_reader",
         "//yggdrasil_decision_forests/dataset:csv_example_writer",
         "//yggdrasil_decision_forests/dataset:data_spec_cc_proto",

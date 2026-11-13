@@ -32,7 +32,6 @@
 #include "absl/strings/string_view.h"
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
 #include "yggdrasil_decision_forests/utils/uid.h"  // IWYU pragma: keep
 #include "yggdrasil_decision_forests/utils/usage.h"
 

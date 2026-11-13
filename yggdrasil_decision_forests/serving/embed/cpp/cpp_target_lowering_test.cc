@@ -18,7 +18,7 @@
 #include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/serving/embed/embed.pb.h"
 #include "yggdrasil_decision_forests/serving/embed/ir/model_ir.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
+#include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests::serving::embed::internal {
 namespace {

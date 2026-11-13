@@ -28,7 +28,7 @@
 #include "yggdrasil_decision_forests/model/hyperparameter.pb.h"
 #include "ydf/learner/wrapper/wrapper_generator.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
-#include "yggdrasil_decision_forests/utils/testing_macros.h"
+#include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
 namespace {

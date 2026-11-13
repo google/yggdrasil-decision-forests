@@ -153,7 +153,6 @@ cc_test(
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:test",
         "//yggdrasil_decision_forests/utils:test_utils",
-        "//yggdrasil_decision_forests/utils:testing_macros",
         "@com_google_absl//absl/base:log_severity",
         "@com_google_absl//absl/container:btree",
         "@com_google_absl//absl/container:fixed_array",

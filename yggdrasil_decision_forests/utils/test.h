@@ -73,6 +73,25 @@ MATCHER(StatusIsOk, "Status is OK") { return arg.ok(); }
   ASSERT_THAT(expr, ::yggdrasil_decision_forests::test::StatusIsOk())
 #endif
 
+// Asserts that `rexpr` (an absl::StatusOr) is OK and assigns its value to
+// `lhs`. Neither googletest nor Abseil provide this macro in open source.
+//
+// Usage example:
+//    ASSERT_OK_AND_ASSIGN(const auto value, FunctionReturningStatusOr());
+#ifndef ASSERT_OK_AND_ASSIGN
+#define ASSERT_OK_AND_ASSIGN(lhs, rexpr) \
+  YDF_ASSERT_OK_AND_ASSIGN_IMPL(         \
+      YDF_TEST_CONCAT(_status_or_value, __COUNTER__), lhs, rexpr)
+
+#define YDF_ASSERT_OK_AND_ASSIGN_IMPL(statusor, lhs, rexpr)            \
+  auto statusor = (rexpr);                                            \
+  ASSERT_TRUE(statusor.status().ok()) << statusor.status().message(); \
+  lhs = std::move(statusor).value()
+
+#define YDF_TEST_CONCAT(x, y) YDF_TEST_CONCAT_IMPL(x, y)
+#define YDF_TEST_CONCAT_IMPL(x, y) x##y
+#endif
+
 #ifndef CHECK_NEAR
 #define CHECK_NEAR(a, b, delta)             \
   CHECK_LE(std::abs(a - b), delta)          \
