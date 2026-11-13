@@ -1721,26 +1721,37 @@ absl::Status NodeWithChildren::Validate(
       case proto::Condition::TypeCase::kTrueValueCondition:
         if (attribute_spec.type() != dataset::proto::BOOLEAN) {
           return absl::InvalidArgumentError(
-              "Invalid condition. Expect boolean feature.");
+              "Invalid condition. Expected boolean feature.");
         }
         break;
-      case proto::Condition::TypeCase::kDiscretizedHigherCondition:
+      case proto::Condition::TypeCase::kDiscretizedHigherCondition: {
         if (attribute_spec.type() != dataset::proto::DISCRETIZED_NUMERICAL) {
           return absl::InvalidArgumentError(
-              "Invalid condition. Expect discretized numerical feature.");
+              "Invalid condition. Expected discretized numerical feature.");
+        }
+        const int64_t threshold =
+            condition.discretized_higher_condition().threshold();
+        const int64_t num_boundaries =
+            attribute_spec.discretized_numerical().boundaries_size();
+        if (threshold < 1 || threshold > num_boundaries) {
+          return absl::InvalidArgumentError(
+              absl::StrCat("Invalid condition. Discretized threshold ",
+                           threshold, " is outside [1, ", num_boundaries,
+                           "] for column \"", attribute_spec.name(), "\"."));
         }
         break;
+      }
       case proto::Condition::TypeCase::kHigherCondition:
         if (attribute_spec.type() != dataset::proto::NUMERICAL) {
           return absl::InvalidArgumentError(
-              "Invalid condition. Expect numerical feature.");
+              "Invalid condition. Expected numerical feature.");
         }
         break;
       case proto::Condition::TypeCase::kContainsCondition:
         if (attribute_spec.type() != dataset::proto::CATEGORICAL &&
             attribute_spec.type() != dataset::proto::CATEGORICAL_SET) {
           return absl::InvalidArgumentError(
-              "Invalid condition. Expect categorical or categorical-set "
+              "Invalid condition. Expected categorical or categorical-set "
               "feature.");
         }
         for (const auto value : condition.contains_condition().elements()) {
@@ -1754,7 +1765,7 @@ absl::Status NodeWithChildren::Validate(
         if (attribute_spec.type() != dataset::proto::CATEGORICAL &&
             attribute_spec.type() != dataset::proto::CATEGORICAL_SET) {
           return absl::InvalidArgumentError(
-              "Invalid condition. Expect categorical or categorical-set "
+              "Invalid condition. Expected categorical or categorical-set "
               "feature.");
         }
         if (condition.contains_bitmap_condition().elements_bitmap().size() * 8 <
@@ -1798,7 +1809,7 @@ absl::Status NodeWithChildren::Validate(
               data_spec.columns(oblique_attribute);
           if (oblique_attribute_spec.type() != dataset::proto::NUMERICAL) {
             return absl::InvalidArgumentError(absl::Substitute(
-                "Invalid oblique. Expect numerical feature, got type $0 for "
+                "Invalid oblique. Expected numerical feature, got type $0 for "
                 "attribute $1",
                 dataset::proto::ColumnType_Name(oblique_attribute_spec.type()),
                 oblique_attribute));
@@ -1809,7 +1820,7 @@ absl::Status NodeWithChildren::Validate(
         if (attribute_spec.type() !=
             dataset::proto::NUMERICAL_VECTOR_SEQUENCE) {
           return absl::InvalidArgumentError(
-              "Invalid condition. Expect numerical vector sequence feature.");
+              "Invalid condition. Expected numerical vector sequence feature.");
         }
         const auto& nvs_condition = condition.numerical_vector_sequence();
         int anchor_size;

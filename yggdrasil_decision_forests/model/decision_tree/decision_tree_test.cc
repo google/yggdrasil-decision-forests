@@ -1606,8 +1606,51 @@ TEST(DecisionTree, ValidateObliqueCondition) {
         tree.Validate(dataspec, fake_check_leaf),
         StatusIs(
             absl::StatusCode::kInvalidArgument,
-            "Invalid oblique. Expect numerical feature, got type CATEGORICAL "
+            "Invalid oblique. Expected numerical feature, got type CATEGORICAL "
             "for attribute 2"));
+  }
+}
+
+TEST(DecisionTree, ValidateDiscretizedHigherConditionThreshold) {
+  dataset::proto::DataSpecification dataspec;
+  auto* column = dataset::AddColumn(
+      "f0", dataset::proto::ColumnType::DISCRETIZED_NUMERICAL, &dataspec);
+  column->mutable_discretized_numerical()->add_boundaries(1.0f);
+  column->mutable_discretized_numerical()->add_boundaries(2.0f);
+
+  const auto fake_check_leaf = [](const decision_tree::proto::Node&) {
+    return absl::OkStatus();
+  };
+
+  auto make_tree = [&](const int threshold) {
+    DecisionTree tree;
+    tree.CreateRoot();
+    tree.mutable_root()->CreateChildren();
+    tree.mutable_root()
+        ->mutable_pos_child()
+        ->mutable_node()
+        ->mutable_regressor()
+        ->set_top_value(0.0f);
+    tree.mutable_root()
+        ->mutable_neg_child()
+        ->mutable_node()
+        ->mutable_regressor()
+        ->set_top_value(0.0f);
+    auto* condition = tree.mutable_root()->mutable_node()->mutable_condition();
+    condition->set_attribute(0);
+    condition->mutable_condition()
+        ->mutable_discretized_higher_condition()
+        ->set_threshold(threshold);
+    return tree;
+  };
+
+  EXPECT_OK(make_tree(1).Validate(dataspec, fake_check_leaf));
+  EXPECT_OK(make_tree(2).Validate(dataspec, fake_check_leaf));
+  for (const int threshold : {0, 3, 12, -5}) {
+    EXPECT_THAT(
+        make_tree(threshold).Validate(dataspec, fake_check_leaf),
+        StatusIs(absl::StatusCode::kInvalidArgument, "Discretized threshold"))
+        << "threshold=" << threshold;
   }
 }
 
