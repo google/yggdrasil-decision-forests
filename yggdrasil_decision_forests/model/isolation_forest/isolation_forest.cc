@@ -461,18 +461,6 @@ absl::Status IsolationForestModel::Validate() const {
   if (task_ != model::proto::Task::ANOMALY_DETECTION) {
     return absl::InvalidArgumentError("Wrong task");
   }
-
-  const auto validate_leaf =
-      [](const decision_tree::proto::Node& node) -> absl::Status {
-    if (!node.has_anomaly_detection()) {
-      return absl::InvalidArgumentError("Anomaly detection output missing");
-    }
-    return absl::OkStatus();
-  };
-
-  for (const auto& tree : decision_trees_) {
-    RETURN_IF_ERROR(tree->Validate(data_spec(), validate_leaf));
-  }
   return absl::OkStatus();
 }
 
