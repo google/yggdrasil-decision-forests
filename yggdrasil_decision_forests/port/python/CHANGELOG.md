@@ -2,6 +2,12 @@
 
 ## Head
 
+### Fix
+
+-   Fix the deletion of non-empty directories on the local file system (e.g.
+    removal of old checkpoints and temporary files of the distributed
+    learners), which failed.
+
 ## 0.17.0 - 2026-11-02
 
 This release introduces an unusually large number of bugfixes. While the

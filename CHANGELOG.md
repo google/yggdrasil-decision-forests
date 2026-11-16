@@ -3,6 +3,14 @@
 Note: This is the changelog of the C++ library. The Python port has a separate
 Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
+## Head
+
+### Fix
+
+-   `file::RecursivelyDelete` of the default (non-Google) file system now
+    deletes non-empty directories recursively. It failed on non-empty
+    directories.
+
 ## 1.13.0 - 2026-10-30
 
 This release introduces an unusually large number of bugfixes. While the

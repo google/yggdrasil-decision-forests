@@ -160,6 +160,23 @@ TEST(Filesystem, RecursivelyCreateDir) {
   EXPECT_OK(SetContent(JoinPath(tmp_dir, "a", "b", "c", "d.txt"), "hello"));
 }
 
+TEST(Filesystem, RecursivelyDelete) {
+  const auto tmp_dir = yggdrasil_decision_forests::test::TmpDirectory();
+  // A non-empty directory with a sub-directory.
+  const auto dir = JoinPath(tmp_dir, "recursively_delete");
+  EXPECT_OK(RecursivelyCreateDir(JoinPath(dir, "a", "b"), Defaults()));
+  EXPECT_OK(SetContent(JoinPath(dir, "file.txt"), "hello"));
+  EXPECT_OK(SetContent(JoinPath(dir, "a", "b", "file.txt"), "hello"));
+  EXPECT_OK(RecursivelyDelete(dir, Defaults()));
+  EXPECT_FALSE(FileExists(dir).value());
+
+  // A file.
+  const auto file_path = JoinPath(tmp_dir, "recursively_delete.txt");
+  EXPECT_OK(SetContent(file_path, "hello"));
+  EXPECT_OK(RecursivelyDelete(file_path, Defaults()));
+  EXPECT_FALSE(FileExists(file_path).value());
+}
+
 TEST(Filesystem, Rename) {
   auto tmp_dir = yggdrasil_decision_forests::test::TmpDirectory();
   auto file_a = JoinPath(tmp_dir, "a.txt");

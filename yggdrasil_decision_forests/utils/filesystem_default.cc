@@ -251,7 +251,8 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
   }
 }
 
-// Delete the directory "path".
+// Deletes the file or directory "path", recursively. Does nothing if "path"
+// does not exist.
 absl::Status RecursivelyDelete(absl::string_view path, int options) {
   // Support for GCS
   if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
@@ -265,7 +266,7 @@ absl::Status RecursivelyDelete(absl::string_view path, int options) {
   }
 
   try {
-    fs::remove(std::string_view(path));
+    fs::remove_all(std::string_view(path));
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
