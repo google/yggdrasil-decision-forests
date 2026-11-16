@@ -24,6 +24,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "yggdrasil_decision_forests/dataset/data_spec.h"
@@ -47,6 +48,7 @@ const float kEpsilon = 0.00001f;
 
 using ::testing::ElementsAre;
 using ::yggdrasil_decision_forests::test::EqualsProto;
+using ::yggdrasil_decision_forests::test::StatusIs;
 
 std::string TestDataDir() {
   return file::JoinPath(test::DataRootDirectory(),
@@ -92,6 +94,39 @@ std::unique_ptr<IsolationForestModel> CreateToyModel() {
     model->mutable_decision_trees()->push_back(std::move(tree));
   }
 
+  return model;
+}
+
+// Creates an isolation forest with a single discretized numerical feature with
+// boundaries {0.5, 1.5} (i.e., valid discretized thresholds are 1 and 2), and a
+// single tree splitting on this feature with `discretized_threshold`.
+std::unique_ptr<IsolationForestModel> CreateDiscretizedToyModel(
+    const int discretized_threshold) {
+  auto model = std::make_unique<IsolationForestModel>();
+  model->set_task(model::proto::Task::ANOMALY_DETECTION);
+  model->set_num_examples_per_trees(10);
+
+  auto* column = dataset::AddColumn(
+      "a", dataset::proto::ColumnType::DISCRETIZED_NUMERICAL,
+      model->mutable_data_spec());
+  column->mutable_discretized_numerical()->add_boundaries(0.5f);
+  column->mutable_discretized_numerical()->add_boundaries(1.5f);
+  model->mutable_input_features()->push_back(0);
+
+  auto tree = std::make_unique<decision_tree::DecisionTree>();
+  tree->CreateRoot();
+  auto* root = tree->mutable_root();
+  root->CreateChildren();
+  root->mutable_node()->mutable_condition()->set_attribute(0);
+  root->mutable_node()
+      ->mutable_condition()
+      ->mutable_condition()
+      ->mutable_discretized_higher_condition()
+      ->set_threshold(discretized_threshold);
+  decision_tree::TreeBuilder(root->mutable_pos_child()).LeafAnomalyDetection(5);
+  decision_tree::TreeBuilder(root->mutable_neg_child()).LeafAnomalyDetection(5);
+  tree->SetLeafIndices();
+  model->mutable_decision_trees()->push_back(std::move(tree));
   return model;
 }
 
@@ -161,6 +196,56 @@ TEST(IsolationForest, Serialize) {
   ASSERT_OK_AND_ASSIGN(const auto loaded_model,
                        DeserializeModel(serialized_model));
   EXPECT_EQ(original_model->DebugCompare(*loaded_model), "");
+}
+
+TEST(IsolationForest, ValidateValidModels) {
+  EXPECT_OK(CreateToyModel()->Validate());
+  EXPECT_OK(CreateDiscretizedToyModel(1)->Validate());
+  EXPECT_OK(CreateDiscretizedToyModel(2)->Validate());
+}
+
+TEST(IsolationForest, ValidateRejectsInvalidDiscretizedThreshold) {
+  for (const int threshold : {0, 3, 12, -5}) {
+    const auto model = CreateDiscretizedToyModel(threshold);
+    EXPECT_THAT(
+        model->Validate(),
+        StatusIs(absl::StatusCode::kInvalidArgument, "Discretized threshold"))
+        << "threshold=" << threshold;
+
+    // Loading the model must fail before any inference engine is compiled.
+    ASSERT_OK_AND_ASSIGN(const std::string serialized_model,
+                         SerializeModel(*model));
+    EXPECT_THAT(
+        DeserializeModel(serialized_model).status(),
+        StatusIs(absl::StatusCode::kInvalidArgument, "Discretized threshold"))
+        << "threshold=" << threshold;
+  }
+}
+
+TEST(IsolationForest, ValidateRejectsInvalidAttribute) {
+  auto model = CreateToyModel();
+  (*model->mutable_decision_trees())[0]
+      ->mutable_root()
+      ->mutable_node()
+      ->mutable_condition()
+      ->set_attribute(10);
+  EXPECT_THAT(
+      model->Validate(),
+      StatusIs(absl::StatusCode::kInvalidArgument, "Invalid attribute index"));
+}
+
+TEST(IsolationForest, ValidateRejectsLeafWithoutAnomalyDetection) {
+  auto model = CreateToyModel();
+  // Replace the anomaly detection output of a leaf with a regression output.
+  (*model->mutable_decision_trees())[1]
+      ->mutable_root()
+      ->mutable_pos_child()
+      ->mutable_node()
+      ->mutable_regressor()
+      ->set_top_value(1.f);
+  EXPECT_THAT(model->Validate(),
+              StatusIs(absl::StatusCode::kInvalidArgument,
+                       "Anomaly detection output missing"));
 }
 
 TEST(IsolationForest, PredictGetLeaves) {
