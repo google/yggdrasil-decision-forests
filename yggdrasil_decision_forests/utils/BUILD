@@ -1140,6 +1140,7 @@ cc_test(
         # "@com_google_googletest//:gtest_main",  # When fixed
         "@com_google_googletest//:gtest_main",
         ":test",
+        "@com_google_absl//absl/status",
     ],
 )
 

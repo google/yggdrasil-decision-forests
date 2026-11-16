@@ -7,6 +7,8 @@
 -   Fix the deletion of non-empty directories on the local file system (e.g.
     removal of old checkpoints and temporary files of the distributed
     learners), which failed.
+-   Fix the crash (uncaught exception) when the existence of a local file
+    cannot be checked, e.g. without permission on its directory.
 
 ## 0.17.0 - 2026-11-02
 

@@ -15,8 +15,16 @@
 
 #include "yggdrasil_decision_forests/utils/filesystem.h"
 
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
+
+#include <string>
+#include <vector>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "absl/status/status.h"
 #include "yggdrasil_decision_forests/utils/distribution.pb.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
@@ -24,7 +32,9 @@ namespace file {
 namespace {
 
 using testing::ElementsAre;
+using testing::IsEmpty;
 using yggdrasil_decision_forests::test::DataRootDirectory;
+using yggdrasil_decision_forests::test::StatusIs;
 
 TEST(Filesystem, JoinPath) {
   EXPECT_EQ(file::JoinPath("a", "b"), "a/b");
@@ -64,6 +74,41 @@ TEST(Filesystem, Match) {
                      DataRootDirectory(),
                      "yggdrasil_decision_forests/test_data/dataset/"
                      "toy.tfe-tfrecord-00001-of-00002")));
+}
+
+TEST(Filesystem, MatchMissingDirectory) {
+  std::vector<std::string> paths;
+  EXPECT_OK(file::Match(
+      file::JoinPath(yggdrasil_decision_forests::test::TmpDirectory(),
+                     "match_missing_directory", "*"),
+      &paths, file::Defaults()));
+  EXPECT_THAT(paths, IsEmpty());
+}
+
+TEST(Filesystem, FileExists) {
+  const auto tmp_dir = yggdrasil_decision_forests::test::TmpDirectory();
+  const auto file_path = JoinPath(tmp_dir, "file_exists.txt");
+  EXPECT_OK(SetContent(file_path, "hello"));
+  EXPECT_TRUE(FileExists(file_path).value());
+  EXPECT_FALSE(FileExists(JoinPath(tmp_dir, "file_exists_missing")).value());
+}
+
+TEST(Filesystem, FileExistsPermissionDenied) {
+#ifdef _WIN32
+  GTEST_SKIP() << "Requires POSIX permissions";
+#else
+  const auto dir = JoinPath(yggdrasil_decision_forests::test::TmpDirectory(),
+                            "file_exists_permission_denied");
+  EXPECT_OK(RecursivelyCreateDir(dir, Defaults()));
+  EXPECT_OK(SetContent(JoinPath(dir, "file.txt"), "hello"));
+  ASSERT_EQ(chmod(dir.c_str(), 0), 0);
+  const auto exists = FileExists(JoinPath(dir, "file.txt"));
+  ASSERT_EQ(chmod(dir.c_str(), 0700), 0);
+  if (exists.ok() && *exists) {
+    GTEST_SKIP() << "The permissions are not enforced (e.g. root user)";
+  }
+  EXPECT_THAT(exists.status(), StatusIs(absl::StatusCode::kPermissionDenied));
+#endif
 }
 
 TEST(Filesystem, FileIO) {
@@ -175,6 +220,10 @@ TEST(Filesystem, RecursivelyDelete) {
   EXPECT_OK(SetContent(file_path, "hello"));
   EXPECT_OK(RecursivelyDelete(file_path, Defaults()));
   EXPECT_FALSE(FileExists(file_path).value());
+
+  // A missing path.
+  EXPECT_THAT(RecursivelyDelete(file_path, Defaults()),
+              StatusIs(absl::StatusCode::kNotFound));
 }
 
 TEST(Filesystem, Rename) {
@@ -186,6 +235,18 @@ TEST(Filesystem, Rename) {
   EXPECT_OK(Rename(file_a, file_b, Defaults()));
   auto read_content = GetContent(file_b).value();
   EXPECT_EQ(content, read_content);
+}
+
+TEST(Filesystem, RenameDoesNotReplace) {
+  const auto tmp_dir = yggdrasil_decision_forests::test::TmpDirectory();
+  const auto file_a = JoinPath(tmp_dir, "rename_a.txt");
+  const auto file_b = JoinPath(tmp_dir, "rename_b.txt");
+  EXPECT_OK(SetContent(file_a, "a"));
+  EXPECT_OK(SetContent(file_b, "b"));
+  EXPECT_THAT(Rename(file_a, file_b, Defaults()),
+              StatusIs(absl::StatusCode::kAlreadyExists));
+  EXPECT_EQ(GetContent(file_a).value(), "a");
+  EXPECT_EQ(GetContent(file_b).value(), "b");
 }
 
 TEST(Filesystem, Basename) {

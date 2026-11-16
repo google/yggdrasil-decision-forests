@@ -26,6 +26,7 @@
 #include <regex>  // NOLINT
 #include <string>
 #include <string_view>
+#include <system_error>  // NOLINT
 #include <utility>
 #include <vector>
 
@@ -220,6 +221,10 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
         results->push_back(path->path().string());
       }
     }
+    if (error == std::errc::no_such_file_or_directory) {
+      // Like the Google file system, a missing directory has no match.
+      return absl::OkStatus();
+    }
     if (error) {
       return absl::NotFoundError(error.message());
     }
@@ -251,8 +256,7 @@ absl::Status RecursivelyCreateDir(absl::string_view path, int options) {
   }
 }
 
-// Deletes the file or directory "path", recursively. Does nothing if "path"
-// does not exist.
+// Deletes the file or directory "path", recursively.
 absl::Status RecursivelyDelete(absl::string_view path, int options) {
   // Support for GCS
   if (::yggdrasil_decision_forests::utils::filesystem::HasGCSImplementation()) {
@@ -266,7 +270,9 @@ absl::Status RecursivelyDelete(absl::string_view path, int options) {
   }
 
   try {
-    fs::remove_all(std::string_view(path));
+    if (fs::remove_all(std::string_view(path)) == 0) {
+      return absl::NotFoundError(absl::StrCat("Not found: ", path));
+    }
     return absl::OkStatus();
   } catch (const std::exception& e) {
     return absl::InvalidArgumentError(e.what());
@@ -393,7 +399,14 @@ absl::StatusOr<bool> FileExists(absl::string_view path) {
     }
   }
 
-  return fs::exists(std::string_view(path));
+  std::error_code error;
+  const bool exists = fs::exists(std::string_view(path), error);
+  if (error) {
+    return absl::ErrnoToStatus(
+        error.default_error_condition().value(),
+        absl::StrCat("Cannot check the existence of ", path));
+  }
+  return exists;
 }
 
 absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
@@ -414,6 +427,12 @@ absl::Status Rename(absl::string_view from, absl::string_view to, int options) {
     }
   }
 
+  // Like the Google file system, does not replace an existing file.
+  ASSIGN_OR_RETURN(const bool to_exists, FileExists(to));
+  if (to_exists) {
+    return absl::AlreadyExistsError(
+        absl::StrCat("Cannot rename ", from, ": ", to, " already exists"));
+  }
   try {
     fs::rename(std::string_view(from), std::string_view(to));
   } catch (const std::exception& e) {

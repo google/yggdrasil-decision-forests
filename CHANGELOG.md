@@ -10,6 +10,12 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 -   `file::RecursivelyDelete` of the default (non-Google) file system now
     deletes non-empty directories recursively. It failed on non-empty
     directories.
+-   The functions of the default file system now behave like the Google file
+    system: `file::Rename` fails with `ALREADY_EXISTS` instead of
+    replacing an existing file, `file::Match` returns no match instead of
+    `NOT_FOUND` for a missing directory, `file::RecursivelyDelete` fails with
+    `NOT_FOUND` for a missing path, and `file::FileExists` returns errors (e.g.
+    `PERMISSION_DENIED`) instead of throwing an exception.
 
 ## 1.13.0 - 2026-10-30
 

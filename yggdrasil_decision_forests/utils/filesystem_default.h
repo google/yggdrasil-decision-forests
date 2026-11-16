@@ -129,7 +129,8 @@ inline std::string GenerateShardedFileSpec(absl::string_view path,
 //
 // For example, "a/b*" might returns the files "a/b1", "a/b2" and "a/btoto".
 //
-// Does not work recursively. The pattern does not apply in directories.
+// Does not work recursively. The pattern does not apply in directories. A
+// missing directory has no match (not an error).
 //
 absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
                    int options);
@@ -137,10 +138,11 @@ absl::Status Match(absl::string_view pattern, std::vector<std::string>* results,
 // Creates the directory "path" as well as all its missing parents.
 absl::Status RecursivelyCreateDir(absl::string_view path, int options);
 
-// Delete the directory "path".
+// Deletes the file or directory "path", recursively. Fails with NOT_FOUND if
+// "path" does not exist.
 absl::Status RecursivelyDelete(absl::string_view path, int options);
 
-// Renames a file or a directory.
+// Renames a file or a directory. Fails with ALREADY_EXISTS if "to" exists.
 absl::Status Rename(absl::string_view from, absl::string_view to, int options);
 
 // Placeholder empty function used in the "options" argument of some functions.
