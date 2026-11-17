@@ -43,6 +43,8 @@ using test::EqualsProto;
 using test::StatusIs;
 using testing::ElementsAre;
 
+using Limits = std::numeric_limits<float>;
+
 std::string DatasetDir() {
   return file::JoinPath(
       test::DataRootDirectory(),
@@ -559,11 +561,10 @@ TEST(DataSpec, DiscretizedNumericalToNumericalAdjacentBoundaries) {
 // The numerical value of a bin with large boundaries of opposite signs is
 // finite and falls in the bin.
 TEST(DataSpec, DiscretizedNumericalToNumericalLargeBoundaries) {
-  using nl = std::numeric_limits<float>;
   proto::Column col;
   col.set_type(proto::ColumnType::DISCRETIZED_NUMERICAL);
-  col.mutable_discretized_numerical()->add_boundaries(nl::lowest());
-  col.mutable_discretized_numerical()->add_boundaries(nl::max());
+  col.mutable_discretized_numerical()->add_boundaries(Limits::lowest());
+  col.mutable_discretized_numerical()->add_boundaries(Limits::max());
 
   const float value = DiscretizedNumericalToNumerical(col, 1).value();
   EXPECT_EQ(value, 0.f);
@@ -695,12 +696,10 @@ TEST(Dataset, GenDiscretizedBoundariesSmallMaximumNumBins) {
   for (const int maximum_num_bins : {1, 2, 3, 4}) {
     SCOPED_TRACE(maximum_num_bins);
     // Both special values are in the range of the candidates.
-    EXPECT_THAT(
-        GenDiscretizedBoundaries(candidates, maximum_num_bins,
-                                 /*min_obs_in_bins=*/3, {0.f, -0.5f})
-            .value(),
-        ElementsAre(std::nextafter(-0.5f, 0.f), std::nextafter(0.f, -1.f),
-                    std::nextafter(0.f, 1.f)));
+    EXPECT_THAT(GenDiscretizedBoundaries(candidates, maximum_num_bins,
+                                         /*min_obs_in_bins=*/3, {0.f, -0.5f})
+                    .value(),
+                ElementsAre(std::nextafter(-0.5f, 0.f), 0.f, Limits::min()));
   }
 }
 
@@ -719,7 +718,7 @@ TEST(Dataset, GenDiscretizedBoundariesWithSpecialValues) {
                                        /*maximum_num_bins=*/4 + 1,
                                        /*min_obs_in_bins=*/1, {0.f})
                   .value(),
-              ElementsAre(std::nextafter(0.f, 1.f), 1.5, 2.5, 3.5));
+              ElementsAre(Limits::min(), 1.5, 2.5, 3.5));
 
   EXPECT_THAT(GenDiscretizedBoundaries(interval_1_5,
                                        /*maximum_num_bins=*/4 + 2,
@@ -742,10 +741,122 @@ TEST(Dataset, GenDiscretizedBoundariesWithSpecialValues) {
               ElementsAre(1.5, 2.5, 3.5, std::nextafter(5.f, 4.f)));
 }
 
+TEST(Dataset, FlushSubnormalBoundary) {
+  EXPECT_EQ(FlushSubnormalBoundary(Limits::denorm_min()), Limits::min());
+  EXPECT_EQ(FlushSubnormalBoundary(Limits::min() / 2.f), Limits::min());
+  EXPECT_EQ(FlushSubnormalBoundary(-Limits::denorm_min()), 0.f);
+  EXPECT_EQ(FlushSubnormalBoundary(-Limits::min() / 2.f), 0.f);
+
+  // Non-subnormal values are not changed.
+  EXPECT_EQ(FlushSubnormalBoundary(0.f), 0.f);
+  EXPECT_EQ(FlushSubnormalBoundary(Limits::min()), Limits::min());
+  EXPECT_EQ(FlushSubnormalBoundary(-Limits::min()), -Limits::min());
+  EXPECT_EQ(FlushSubnormalBoundary(1.5f), 1.5f);
+  EXPECT_EQ(FlushSubnormalBoundary(-1.5f), -1.5f);
+  EXPECT_EQ(FlushSubnormalBoundary(Limits::max()), Limits::max());
+  EXPECT_EQ(FlushSubnormalBoundary(Limits::lowest()), Limits::lowest());
+}
+
+TEST(Dataset, FlushSubnormalDiscretizedBoundaries) {
+  proto::DataSpecification data_spec = PARSE_TEST_PROTO(R"pb(
+    columns {
+      type: DISCRETIZED_NUMERICAL
+      name: "a"
+      numerical { mean: 1 }
+      discretized_numerical { boundaries: -1 boundaries: 0.5 }
+    }
+    columns {
+      type: NUMERICAL
+      name: "b"
+      numerical { mean: 1e-45 }
+    }
+  )pb");
+  const auto set_boundaries = [&](const std::vector<float>& boundaries) {
+    *data_spec.mutable_columns(0)
+         ->mutable_discretized_numerical()
+         ->mutable_boundaries() = {boundaries.begin(), boundaries.end()};
+  };
+
+  // Nothing to flush.
+  const proto::DataSpecification original = data_spec;
+  EXPECT_FALSE(FlushSubnormalDiscretizedBoundaries(&data_spec));
+  EXPECT_THAT(data_spec, EqualsProto(original));
+
+  // Boundaries generated before subnormal boundaries were avoided. Boundaries
+  // are flushed in place, without being removed or deduplicated, so that the
+  // boundary indices referenced by the trees remain valid.
+  set_boundaries({-1.f, -Limits::denorm_min(), 0.f, Limits::denorm_min(),
+                  Limits::min() / 2, 0.5f});
+  EXPECT_TRUE(FlushSubnormalDiscretizedBoundaries(&data_spec));
+  EXPECT_THAT(data_spec.columns(0).discretized_numerical().boundaries(),
+              ElementsAre(-1.f, 0.f, 0.f, Limits::min(), Limits::min(), 0.5f));
+  // Other fields and columns are not changed.
+  EXPECT_EQ(data_spec.columns(0).numerical().mean(), 1.f);
+  EXPECT_THAT(data_spec.columns(1), EqualsProto(original.columns(1)));
+
+  // Flushing is idempotent.
+  EXPECT_FALSE(FlushSubnormalDiscretizedBoundaries(&data_spec));
+}
+
+// The bin of the special value 0 is [0, FLT_MIN[ instead of
+// [-denorm_min, denorm_min[. Subnormal boundaries are not safe for inference
+// (see "FlushSubnormalBoundary").
+TEST(Dataset, GenDiscretizedBoundariesSpecialValueZeroIsNotSubnormal) {
+  const std::vector<std::pair<float, int>> candidates = {
+      {-2.f, 1}, {-1.f, 1}, {0.f, 1}, {1.f, 1}, {2.f, 1}};
+  const auto boundaries =
+      GenDiscretizedBoundaries(candidates, /*maximum_num_bins=*/10,
+                               /*min_obs_in_bins=*/1, {0.f})
+          .value();
+  EXPECT_THAT(boundaries,
+              ElementsAre(-1.5f, -0.5f, 0.f, Limits::min(), 0.5f, 1.5f));
+
+  proto::Column col;
+  col.set_type(proto::ColumnType::DISCRETIZED_NUMERICAL);
+  for (const float boundary : boundaries) {
+    EXPECT_NE(std::fpclassify(boundary), FP_SUBNORMAL);
+    col.mutable_discretized_numerical()->add_boundaries(boundary);
+  }
+  // 0 is alone in its bin.
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, -0.25f), 2);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, -Limits::min()), 2);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, 0.f), 3);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, -0.f), 3);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, Limits::min()), 4);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, 0.25f), 4);
+
+  // The representative value of the bin of 0 is exactly 0 (and not a subnormal
+  // value), and it maps back to the same bin.
+  const float zero_bin_value = DiscretizedNumericalToNumerical(col, 3).value();
+  EXPECT_EQ(zero_bin_value, 0.f);
+  EXPECT_EQ(NumericalToDiscretizedNumerical(col, zero_bin_value), 3);
+}
+
+// Boundaries that become identical once flushed are deduplicated.
+TEST(Dataset, GenDiscretizedBoundariesSubnormalDeduplication) {
+  // The mid threshold of the first two candidates is a negative subnormal, and
+  // is flushed to 0 (which is also the lower boundary of the bin of 0).
+  const float tiny_negative = -Limits::min();
+  const std::vector<std::pair<float, int>> candidates = {
+      {tiny_negative, 1}, {Limits::denorm_min(), 1}, {1.f, 1}};
+  EXPECT_THAT(GenDiscretizedBoundaries(candidates, /*maximum_num_bins=*/10,
+                                       /*min_obs_in_bins=*/1, {0.f})
+                  .value(),
+              ElementsAre(0.f, Limits::min(), 0.5f));
+
+  // The boundaries of the bin of a positive subnormal value are both flushed
+  // to FLT_MIN.
+  EXPECT_THAT(
+      GenDiscretizedBoundaries({{-1.f, 1}, {1.f, 1}},
+                               /*maximum_num_bins=*/10,
+                               /*min_obs_in_bins=*/1, {Limits::min() / 2.f})
+          .value(),
+      ElementsAre(0.f, Limits::min()));
+}
+
 // Boundaries are finite and separate consecutive candidates, even if there is
 // no float number in between the candidates, or if the candidates are large.
 TEST(Dataset, GenDiscretizedBoundariesFloatCornerCases) {
-  using nl = std::numeric_limits<float>;
   const float a = 1.f;
   const float a_next = std::nextafter(a, 2.f);
 
@@ -770,12 +881,13 @@ TEST(Dataset, GenDiscretizedBoundariesFloatCornerCases) {
 
   // Lossless discretization (i.e. more bins than candidates).
   check({{a, 1}, {a_next, 1}, {2.f, 1}}, /*maximum_num_bins=*/10);
-  check({{2e38f, 1}, {2.5e38f, 1}, {nl::max(), 1}}, /*maximum_num_bins=*/10);
-  check({{nl::lowest(), 1}, {nl::max(), 1}}, /*maximum_num_bins=*/10);
+  check({{2e38f, 1}, {2.5e38f, 1}, {Limits::max(), 1}},
+        /*maximum_num_bins=*/10);
+  check({{Limits::lowest(), 1}, {Limits::max(), 1}}, /*maximum_num_bins=*/10);
 
   // Lossy discretization (i.e. less bins than candidates).
   check({{a, 1}, {a_next, 1}, {2.f, 1}}, /*maximum_num_bins=*/2);
-  check({{2e38f, 1}, {2.5e38f, 1}, {nl::max(), 1}}, /*maximum_num_bins=*/2);
+  check({{2e38f, 1}, {2.5e38f, 1}, {Limits::max(), 1}}, /*maximum_num_bins=*/2);
 }
 
 TEST(Dataset, BuildColIdxToFeatureLabelIdx) {

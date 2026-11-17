@@ -1218,6 +1218,73 @@ class TfModelTest(parameterized.TestCase):
           decimal=5,
       )
 
+  def test_to_tensorflow_saved_model_discretized_numerical_exact_zeros(self):
+    """Exact zeros of discretized features take the same branch in TF.
+
+    TensorFlow runs kernels with FTZ/DAZ, which evaluates subnormal boundaries
+    as 0 (b/586496982).
+    """
+    tmp_dir = self.create_tempdir()
+    tfrecord_path = os.path.join(tmp_dir.full_path, "exact_zeros.tfrecord")
+    rng = np.random.default_rng(seed=1)
+    num_examples = 2000
+    # Half of the values are exactly 0. The label depends on x == 0 vs x != 0.
+    xs = np.where(
+        rng.uniform(size=num_examples) < 0.5,
+        0.0,
+        rng.uniform(-1.0, 1.0, size=num_examples),
+    ).astype(np.float32)
+    labels = np.where(xs == 0.0, b"1", b"0")
+    with tf.io.TFRecordWriter(tfrecord_path) as writer:
+      for x, label in zip(xs, labels):
+        example = tf.train.Example(
+            features=tf.train.Features(
+                feature={
+                    "x": tf.train.Feature(
+                        float_list=tf.train.FloatList(value=[x])
+                    ),
+                    "label": tf.train.Feature(
+                        bytes_list=tf.train.BytesList(value=[label])
+                    ),
+                }
+            )
+        )
+        writer.write(example.SerializeToString())
+
+    typed_path = f"tfrecordv2+tfe:{tfrecord_path}"
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="label",
+        num_trees=5,
+        discretize_numerical_columns=True,
+    ).train(typed_path)
+    ydf_predictions = model.predict(typed_path)
+    # The model separates the exact zeros. Predictions are the probability of
+    # the second label class.
+    if model.label_classes()[1] == "1":
+      zero_probabilities = ydf_predictions
+    else:
+      zero_probabilities = 1.0 - ydf_predictions
+    npt.assert_array_less(zero_probabilities[xs != 0.0], 0.5)
+    npt.assert_array_less(0.5, zero_probabilities[xs == 0.0])
+
+    model_dir = os.path.join(tmp_dir.full_path, "saved_model")
+    model.to_tensorflow_saved_model(
+        model_dir,
+        mode="tf",
+        servo_api=True,
+        feed_example_proto=True,
+    )
+    tf_model = tf.saved_model.load(model_dir)
+    serialized_examples = list(
+        tf.data.TFRecordDataset([tfrecord_path]).as_numpy_iterator()
+    )
+    tf_predictions = tf_model.signatures["serving_default"](
+        inputs=tf.constant(serialized_examples)
+    )
+    npt.assert_almost_equal(
+        tf_predictions["scores"][:, 1], ydf_predictions, decimal=5
+    )
+
   def test_to_tensorflow_saved_model_wrong_dtype(self):
     columns = ["f1", "label_class_binary"]
     model = specialized_learners.RandomForestLearner(

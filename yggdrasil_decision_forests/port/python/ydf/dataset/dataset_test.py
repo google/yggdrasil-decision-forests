@@ -37,6 +37,10 @@ Semantic = dataspec_lib.Semantic
 VocabValue = ds_pb.CategoricalSpec.VocabValue
 Column = dataspec_lib.Column
 
+# Smallest positive normal float32. Subnormal discretization boundaries are
+# flushed to it (or to 0).
+_FLT_MIN = float(np.finfo(np.float32).tiny)
+
 
 class GenericDatasetTest(parameterized.TestCase):
   # Make "assertEqual" print more details.
@@ -3049,7 +3053,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
         ),
         discretized_numerical=ds_pb.DiscretizedNumericalSpec(
             boundaries=[
-                1.401298464324817e-45,
+                _FLT_MIN,
                 103.5,
                 105.49999237060547,
                 105.50000762939453,
@@ -3083,7 +3087,7 @@ class DiscretizedNumericalTest(parameterized.TestCase):
         ),
         discretized_numerical=ds_pb.DiscretizedNumericalSpec(
             boundaries=[
-                1.401298464324817e-45,
+                _FLT_MIN,
                 107.0,
                 110.99999237060547,
                 111.00000762939453,
@@ -3277,8 +3281,8 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                     ),
                     discretized_numerical=ds_pb.DiscretizedNumericalSpec(
                         boundaries=[
-                            -1.401298464324817e-45,
-                            1.401298464324817e-45,
+                            0.0,
+                            _FLT_MIN,
                             105.49999237060547,
                         ],
                         original_num_unique_values=10,
@@ -3300,8 +3304,8 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                     ),
                     discretized_numerical=ds_pb.DiscretizedNumericalSpec(
                         boundaries=[
-                            -1.401298464324817e-45,
-                            1.401298464324817e-45,
+                            0.0,
+                            _FLT_MIN,
                             110.99999237060547,
                         ],
                         original_num_unique_values=10,
@@ -3347,8 +3351,8 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                     ),
                     discretized_numerical=ds_pb.DiscretizedNumericalSpec(
                         boundaries=[
-                            -1.401298464324817e-45,
-                            1.401298464324817e-45,
+                            0.0,
+                            _FLT_MIN,
                             105.49999237060547,
                         ],
                         original_num_unique_values=10,
@@ -3378,8 +3382,8 @@ class DiscretizedNumericalTest(parameterized.TestCase):
                 ),
                 discretized_numerical=ds_pb.DiscretizedNumericalSpec(
                     boundaries=[
-                        -1.401298464324817e-45,
-                        1.401298464324817e-45,
+                        0.0,
+                        _FLT_MIN,
                         105.49999237060547,
                     ],
                     original_num_unique_values=10,

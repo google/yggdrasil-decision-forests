@@ -24,6 +24,10 @@
 #include <utility>
 #include <vector>
 
+#if defined(__x86_64__) && defined(__SSE__)
+#include <xmmintrin.h>
+#endif
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/log/log.h"
@@ -65,6 +69,7 @@ using model::gradient_boosted_trees::GradientBoostedTreesModel;
 using model::isolation_forest::IsolationForestModel;
 using model::random_forest::RandomForestModel;
 using testing::ElementsAre;
+using testing::ElementsAreArray;
 
 std::string TestDataDir() {
   return file::JoinPath(test::DataRootDirectory(),
@@ -852,6 +857,148 @@ TEST(DecisionForest, NAConditionGenericPredictions) {
   EXPECT_EQ(predictions.size(), 2);
   EXPECT_EQ(predictions[0], -10);
   EXPECT_EQ(predictions[1], 10);
+}
+
+#if defined(__x86_64__) && defined(__SSE__)
+// Enables flush-to-zero (FTZ) and denormals-are-zero (DAZ) in the scope, as
+// TensorFlow does when running kernels (e.g. the YDF inference op).
+class ScopedFlushDenormal {
+ public:
+  ScopedFlushDenormal() : saved_csr_(_mm_getcsr()) {
+    // 0x8000: FTZ. 0x0040: DAZ.
+    _mm_setcsr(saved_csr_ | 0x8040);
+  }
+  ~ScopedFlushDenormal() { _mm_setcsr(saved_csr_); }
+
+ private:
+  const unsigned int saved_csr_;
+};
+#endif
+
+// Builds a model with the subnormal discretized boundaries generated around the
+// special value 0 before b/586496982.
+//
+// "f".index >= 2 i.e. "f" >= denorm_min
+//     ├─(pos)─ pred:1
+//     └─(neg)─ "f".index >= 1 i.e. "f" >= -denorm_min
+//              ├─(pos)─ pred:2
+//              └─(neg)─ pred:3
+std::unique_ptr<GradientBoostedTreesModel> BuildSubnormalBoundariesGBT() {
+  using Limits = std::numeric_limits<float>;
+  auto model = std::make_unique<GradientBoostedTreesModel>();
+
+  dataset::proto::DataSpecification dataspec = PARSE_TEST_PROTO(R"pb(
+    columns { type: NUMERICAL name: "l" }
+    columns {
+      type: DISCRETIZED_NUMERICAL
+      name: "f"
+      numerical { mean: 1 }
+    }
+  )pb");
+  for (const float boundary :
+       {-Limits::denorm_min(), Limits::denorm_min(), 1.5f}) {
+    dataspec.mutable_columns(1)
+        ->mutable_discretized_numerical()
+        ->add_boundaries(boundary);
+  }
+
+  model->set_task(model::proto::Task::REGRESSION);
+  model->set_label_col_idx(0);
+  model->set_data_spec(dataspec);
+  model::gradient_boosted_trees::proto::LossConfiguration loss_config;
+  model->set_loss(model::gradient_boosted_trees::proto::Loss::SQUARED_ERROR,
+                  loss_config);
+  model->mutable_initial_predictions()->push_back(0);
+  model->mutable_input_features()->push_back(1);
+  model->set_num_trees_per_iter(1);
+
+  const auto split = [](model::decision_tree::NodeWithChildren* node,
+                        const int threshold) {
+    node->CreateChildren();
+    node->mutable_node()->mutable_condition()->set_attribute(1);
+    node->mutable_node()->mutable_condition()->set_na_value(false);
+    node->mutable_node()
+        ->mutable_condition()
+        ->mutable_condition()
+        ->mutable_discretized_higher_condition()
+        ->set_threshold(threshold);
+  };
+
+  auto tree = std::make_unique<model::decision_tree::DecisionTree>();
+  tree->CreateRoot();
+  auto* root = tree->mutable_root();
+  split(root, 2);
+  root->mutable_pos_child()->mutable_node()->mutable_regressor()->set_top_value(
+      1.f);
+  auto* neg = root->mutable_neg_child();
+  split(neg, 1);
+  neg->mutable_pos_child()->mutable_node()->mutable_regressor()->set_top_value(
+      2.f);
+  neg->mutable_neg_child()->mutable_node()->mutable_regressor()->set_top_value(
+      3.f);
+  model->mutable_decision_trees()->push_back(std::move(tree));
+  return model;
+}
+
+// Checks that the subnormal boundaries of a loaded model are flushed, and that
+// the fast engine sends exact zeros down the same branch as the generic
+// inference, with and without FTZ/DAZ.
+void CheckFlushedSubnormalBoundariesModel(const model::AbstractModel& model) {
+  EXPECT_THAT(model.data_spec().columns(1).discretized_numerical().boundaries(),
+              ElementsAre(0.f, std::numeric_limits<float>::min(), 1.5f));
+
+  const std::vector<float> values = {-1.f, 0.f, 1.f, 2.f};
+
+  // Generic inference on discretized values.
+  dataset::VerticalDataset dataset;
+  dataset.set_data_spec(model.data_spec());
+  ASSERT_OK(dataset.CreateColumnsFromDataspec());
+  std::vector<float> generic_predictions;
+  for (int example_idx = 0; example_idx < values.size(); example_idx++) {
+    ASSERT_OK(dataset.AppendExampleWithStatus(
+        {{"l", "0"}, {"f", absl::StrCat(values[example_idx])}}));
+    model::proto::Prediction prediction;
+    model.Predict(dataset, example_idx, &prediction);
+    generic_predictions.push_back(prediction.regression().value());
+  }
+  EXPECT_THAT(generic_predictions, ElementsAre(3.f, 2.f, 1.f, 1.f));
+
+  ASSERT_OK_AND_ASSIGN(const auto engine, model.BuildFastEngine());
+  const auto engine_predict = [&]() {
+    auto examples = engine->AllocateExamples(values.size());
+    const auto feature = engine->features().GetNumericalFeatureId("f").value();
+    for (int example_idx = 0; example_idx < values.size(); example_idx++) {
+      examples->SetNumerical(example_idx, feature, values[example_idx],
+                             engine->features());
+    }
+    std::vector<float> predictions;
+    engine->Predict(*examples, values.size(), &predictions);
+    return predictions;
+  };
+
+  EXPECT_THAT(engine_predict(), ElementsAreArray(generic_predictions));
+#if defined(__x86_64__) && defined(__SSE__)
+  {
+    ScopedFlushDenormal flush_denormal;
+    EXPECT_THAT(engine_predict(), ElementsAreArray(generic_predictions));
+  }
+#endif
+}
+
+TEST(DecisionForest, LoadModelFlushesSubnormalDiscretizedBoundaries) {
+  const std::string model_path =
+      file::JoinPath(test::TmpDirectory(), "subnormal_boundaries_model");
+  ASSERT_OK(model::SaveModel(model_path, *BuildSubnormalBoundariesGBT()));
+  ASSERT_OK_AND_ASSIGN(const auto model, model::LoadModel(model_path));
+  CheckFlushedSubnormalBoundariesModel(*model);
+}
+
+TEST(DecisionForest, DeserializeModelFlushesSubnormalDiscretizedBoundaries) {
+  ASSERT_OK_AND_ASSIGN(const std::string serialized_model,
+                       model::SerializeModel(*BuildSubnormalBoundariesGBT()));
+  ASSERT_OK_AND_ASSIGN(const auto model,
+                       model::DeserializeModel(serialized_model));
+  CheckFlushedSubnormalBoundariesModel(*model);
 }
 
 }  // namespace
