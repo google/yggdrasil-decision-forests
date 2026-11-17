@@ -227,9 +227,23 @@ absl::StatusOr<float> DiscretizedNumericalToNumerical(
 //    that require their own bin. E.g. if 5 is in "special_values", and if
 //    "candidates" contains values both greater and smaller than 5 (e.g. -3, 1,
 //    6, 10) there will be a bin [5-eps, 5+eps[.
+//
+// The returned boundaries are never subnormal (see "FlushSubnormalBoundary"),
+// so subnormal candidates may share a bin with 0 or FLT_MIN.
 absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
     const std::vector<std::pair<float, int>>& candidates, int maximum_num_bins,
     int min_obs_in_bins, const std::vector<float>& special_values);
+
+// Replaces a subnormal discretized numerical boundary with an equivalent
+// normal value: positive subnormals become the smallest normal float
+// (std::numeric_limits<float>::min()) and negative subnormals become 0. Other
+// values are returned unchanged.
+//
+// For any non-subnormal value "x", "x >= boundary" is unchanged. This matters
+// because TensorFlow runs kernels with flush-to-zero / denormals-are-zero
+// (FTZ/DAZ) enabled, which evaluates subnormal boundaries as 0 and changes the
+// branch taken by exact zeros.
+float FlushSubnormalBoundary(float boundary);
 
 // Converts a numerical value into a discretized numerical value.
 DiscretizedNumericalIndex NumericalToDiscretizedNumerical(

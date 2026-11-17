@@ -77,9 +77,13 @@ std::string PrettyPercent(uint64_t count, uint64_t total) {
 
 // Add a bucket [value-eps,value+eps] to boundaries.
 // "boundaries" is not expected to be sorted, and can become unsorted.
+// The bucket boundaries are never subnormal (see "FlushSubnormalBoundary"),
+// e.g. the bucket of 0 is [0, FLT_MIN[.
 void AddBucket(const float value, std::vector<float>* boundaries) {
-  const float lower_bound = std::nextafter(value, value - 1.f);
-  const float upper_bound = std::nextafter(value, value + 1.f);
+  const float lower_bound =
+      FlushSubnormalBoundary(std::nextafter(value, value - 1.f));
+  const float upper_bound =
+      FlushSubnormalBoundary(std::nextafter(value, value + 1.f));
 
   if (boundaries->empty()) {
     boundaries->push_back(lower_bound);
@@ -852,6 +856,13 @@ proto::Column* AddCategoricalSetColumn(
   return def;
 }
 
+float FlushSubnormalBoundary(const float boundary) {
+  if (std::fpclassify(boundary) != FP_SUBNORMAL) {
+    return boundary;
+  }
+  return boundary > 0.f ? std::numeric_limits<float>::min() : 0.f;
+}
+
 absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
     const std::vector<std::pair<float, int>>& candidates, int maximum_num_bins,
     int min_obs_in_bins, const std::vector<float>& special_values) {
@@ -991,7 +1002,15 @@ absl::StatusOr<std::vector<float>> GenDiscretizedBoundaries(
   for (const auto& special_value : special_values) {
     AddBucket(special_value, &boundaries);
   }
+  // "MidThreshold" can also return subnormal boundaries (e.g. in between 0 and
+  // a small value).
+  for (float& boundary : boundaries) {
+    boundary = FlushSubnormalBoundary(boundary);
+  }
   std::sort(boundaries.begin(), boundaries.end());
+  // Flushing subnormal boundaries can create duplicates (e.g. 0 and -1e-45).
+  boundaries.erase(std::unique(boundaries.begin(), boundaries.end()),
+                   boundaries.end());
 
   // The bin index of a value is stored as a "DiscretizedNumericalIndex", with
   // "kDiscretizedNumericalMissingValue" reserved for missing values.
@@ -1016,11 +1035,16 @@ absl::StatusOr<float> DiscretizedNumericalToNumerical(
   }
   // The value should be in the bin [lower, upper[. "MidThreshold" returns a
   // value in ]lower, upper], which is equal to "upper" only if there is no
-  // float number in between "lower" and "upper".
+  // float number in between "lower" and "upper". Subnormal values are avoided
+  // (e.g. the bin [0, FLT_MIN[ returns 0) as they are flushed to zero by some
+  // inference engines (see "FlushSubnormalBoundary").
   const float lower = boundaries[value - 1];
   const float upper = boundaries[value];
   const float mid = utils::MidThreshold(lower, upper);
-  return mid < upper ? mid : lower;
+  if (mid < upper && std::fpclassify(mid) != FP_SUBNORMAL) {
+    return mid;
+  }
+  return lower;
 }
 
 DiscretizedNumericalIndex NumericalToDiscretizedNumerical(
