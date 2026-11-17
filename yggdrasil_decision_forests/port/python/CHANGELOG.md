@@ -4,6 +4,9 @@
 
 ### Fix
 
+-   Fix the resumption of the distributed GBT learner after the manager is
+    interrupted while creating a checkpoint (e.g. preemption). The training
+    failed with `ALREADY_EXISTS` when creating this checkpoint again.
 -   Fix the deletion of non-empty directories on the local file system (e.g.
     removal of old checkpoints and temporary files of the distributed
     learners), which failed.

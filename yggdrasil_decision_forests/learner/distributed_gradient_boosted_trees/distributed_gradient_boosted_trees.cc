@@ -921,6 +921,58 @@ absl::Status InitializeDirectoryStructure(
   return absl::OkStatus();
 }
 
+absl::Status RemoveIncompleteCheckpoint(const absl::string_view work_directory,
+                                        const int iter_idx) {
+  // The snapshot directory does not exist before the first checkpoint, and
+  // "file::Match" fails on a missing directory on some file systems (e.g. the
+  // default file system).
+  const auto snapshot_directory = SnapshotDirectory(work_directory);
+  ASSIGN_OR_RETURN(const bool has_snapshots,
+                   file::FileExists(snapshot_directory));
+  std::deque<int> snapshots;
+  if (has_snapshots) {
+    ASSIGN_OR_RETURN(snapshots, utils::GetSnapshots(snapshot_directory));
+  }
+  if (std::find(snapshots.begin(), snapshots.end(), iter_idx) !=
+      snapshots.end()) {
+    return absl::InternalError(absl::StrCat("The checkpoint of iteration ",
+                                            iter_idx, " already exists"));
+  }
+  const auto checkpoint_dir = file::JoinPath(
+      work_directory, kFileNameCheckPoint, absl::StrCat(iter_idx));
+  ASSIGN_OR_RETURN(const bool exists, file::FileExists(checkpoint_dir));
+  if (!exists) {
+    return absl::OkStatus();
+  }
+  LOG(WARNING) << "Remove the incomplete checkpoint directory "
+               << checkpoint_dir;
+  const absl::Status status =
+      file::RecursivelyDelete(checkpoint_dir, file::Defaults());
+  if (!status.ok()) {
+    // Not an error: The files of the checkpoint are replaced when the
+    // checkpoint is created again.
+    LOG(WARNING) << "Cannot remove the incomplete checkpoint directory "
+                 << checkpoint_dir << ": " << status.message();
+  }
+  return absl::OkStatus();
+}
+
+namespace {
+
+// Renames the file "from" to "to". Replaces "to" if it already exists (e.g.
+// left by an incomplete checkpoint). "file::Rename" does not overwrite files on
+// all file systems.
+absl::Status RenameAndReplace(const absl::string_view from,
+                              const absl::string_view to) {
+  ASSIGN_OR_RETURN(const bool exists, file::FileExists(to));
+  if (exists) {
+    RETURN_IF_ERROR(file::RecursivelyDelete(to, file::Defaults()));
+  }
+  return file::Rename(from, to, file::Defaults());
+}
+
+}  // namespace
+
 absl::Status CreateCheckpoint(
     const int iter_idx,
     const gradient_boosted_trees::GradientBoostedTreesModel& model,
@@ -943,6 +995,7 @@ absl::Status CreateCheckpoint(
 
   const auto checkpoint_dir = file::JoinPath(
       work_directory, kFileNameCheckPoint, absl::StrCat(iter_idx));
+  RETURN_IF_ERROR(RemoveIncompleteCheckpoint(work_directory, iter_idx));
   RETURN_IF_ERROR(file::RecursivelyCreateDir(checkpoint_dir, file::Defaults()));
 
   // Save the worker-side checkpoint content.
@@ -963,7 +1016,8 @@ absl::Status CreateCheckpoint(
       file::SetBinaryProto(file::JoinPath(checkpoint_dir, "checkpoint"),
                            checkpoint, file::Defaults()));
 
-  // Record the snapshot.
+  // Record the snapshot. This marks the checkpoint as complete, and must be
+  // done after the checkpoint content is written.
   const auto snapshot_directory = SnapshotDirectory(work_directory);
   RETURN_IF_ERROR(utils::AddSnapshot(snapshot_directory, iter_idx));
 
@@ -1619,13 +1673,12 @@ absl::Status EmitCreateCheckpoint(
       const auto& result = generic_result.create_checkpoint();
       STATUS_CHECK(result.has_path());
       STATUS_CHECK(result.has_shard_idx());
-      RETURN_IF_ERROR(file::Rename(
+      RETURN_IF_ERROR(RenameAndReplace(
           result.path(),
           file::JoinPath(
               checkpoint_dir,
               distributed_decision_tree::dataset_cache::ShardFilename(
-                  "predictions", result.shard_idx(), num_shards)),
-          file::Defaults()));
+                  "predictions", result.shard_idx(), num_shards))));
     } else {
       if (!generic_result.has_create_evaluation_checkpoint()) {
         return absl::InternalError(

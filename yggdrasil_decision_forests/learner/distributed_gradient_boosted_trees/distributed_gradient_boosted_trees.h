@@ -321,6 +321,13 @@ absl::Status RestoreManagerCheckpoint(
     proto::Checkpoint* checkpoint,
     PartialEvaluationAggregator* validation_aggregator);
 
+// Removes the directory of the checkpoint of iteration "iter_idx", if any. A
+// checkpoint is complete once its snapshot record is written, which is done
+// last (see `CreateCheckpoint`). A checkpoint directory without snapshot record
+// is incomplete. Fails if the checkpoint is complete.
+absl::Status RemoveIncompleteCheckpoint(absl::string_view work_directory,
+                                        int iter_idx);
+
 // Creates a checkpoint of the model.
 absl::Status CreateCheckpoint(
     int iter_idx,

@@ -7,6 +7,9 @@ Changelog under `yggdrasil_decision_forests/port/python/CHANGELOG.md`.
 
 ### Fix
 
+-   Fix the resumption of the distributed GBT learner after the manager is
+    interrupted while creating a checkpoint (e.g. preemption). The training
+    failed with `ALREADY_EXISTS` when creating this checkpoint again.
 -   `file::RecursivelyDelete` of the default (non-Google) file system now
     deletes non-empty directories recursively. It failed on non-empty
     directories.

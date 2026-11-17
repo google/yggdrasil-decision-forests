@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <deque>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
@@ -207,6 +208,66 @@ TEST_F(DatasetAdult, MaxKeptSnapshots) {
     EXPECT_TRUE(exists) << "Expected checkpoint/" << kept_iter
                         << " to be kept.";
   }
+}
+
+// Simulates a manager interrupted (e.g. preempted) while creating the
+// checkpoint of iteration 10: The checkpoint directory is written (including
+// the immutable prediction shards renamed by the manager) but the snapshot
+// record, written last, is missing. When the training is resumed, the training
+// restarts from the checkpoint of iteration 5 and creates the checkpoint of
+// iteration 10 again.
+TEST_F(DatasetAdult, ResumeTrainingWithIncompleteCheckpoint) {
+  SetNumWorkers(2);
+  // Use a dedicated working directory so the training does not resume from
+  // the checkpoints of another test.
+  deployment_config_.set_cache_path(file::JoinPath(
+      test::TmpDirectory(), "resume_training_with_incomplete_checkpoint"));
+  deployment_config_.set_try_resume_training(true);
+  auto* spe_config = train_config_.MutableExtension(
+      distributed_gradient_boosted_trees::proto::
+          distributed_gradient_boosted_trees_config);
+  spe_config->mutable_gbt()->set_num_trees(10);
+  spe_config->set_checkpoint_interval_trees(5);
+  TrainAndEvaluateModel();
+  // Description of the model, including its trees. Ignores the node format,
+  // only set in the models restored from a checkpoint.
+  const auto model_description = [&]() -> std::string {
+    auto* gbt_model =
+        dynamic_cast<gradient_boosted_trees::GradientBoostedTreesModel*>(
+            model_.get());
+    CHECK(gbt_model != nullptr);
+    gbt_model->set_node_format(std::nullopt);
+    return gbt_model->DescriptionAndStatistics(/*full_definition=*/true);
+  };
+  const std::string expected_model = model_description();
+
+  const std::string checkpoint_root =
+      file::JoinPath(deployment_config_.cache_path(), kFileNameCheckPoint);
+  const std::string snapshot_dir =
+      file::JoinPath(checkpoint_root, kFileNameSnapshot);
+  ASSERT_OK_AND_ASSIGN(std::deque<int> snapshots,
+                       utils::GetSnapshots(snapshot_dir));
+  ASSERT_THAT(snapshots, ElementsAre(0, 5, 10));
+
+  // Make the checkpoint of iteration 10 incomplete by removing its snapshot
+  // record (see "AddSnapshot" in utils/snapshot.cc). Also add a file left by
+  // the interrupted manager.
+  ASSERT_OK(file::RecursivelyDelete(file::JoinPath(snapshot_dir, "snapshot_10"),
+                                    file::Defaults()));
+  const std::string leftover_path =
+      file::JoinPath(checkpoint_root, "10", "leftover");
+  ASSERT_OK(file::SetContent(leftover_path, "leftover"));
+  ASSERT_OK_AND_ASSIGN(snapshots, utils::GetSnapshots(snapshot_dir));
+  ASSERT_THAT(snapshots, ElementsAre(0, 5));
+
+  // Resume the training. The checkpoint of iteration 10 is created again.
+  TrainAndEvaluateModel();
+  EXPECT_EQ(model_description(), expected_model);
+  ASSERT_OK_AND_ASSIGN(snapshots, utils::GetSnapshots(snapshot_dir));
+  EXPECT_THAT(snapshots, ElementsAre(0, 5, 10));
+  ASSERT_OK_AND_ASSIGN(const bool leftover_exists,
+                       file::FileExists(leftover_path));
+  EXPECT_FALSE(leftover_exists);
 }
 
 // Train and test a model on the adult dataset with workers continuously

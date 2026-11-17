@@ -184,3 +184,17 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "checkpoint_test",
+    srcs = ["checkpoint_test.cc"],
+    deps = [
+        ":common",
+        ":dgbt",
+        "//yggdrasil_decision_forests/utils:filesystem",
+        "//yggdrasil_decision_forests/utils:snapshot",
+        "//yggdrasil_decision_forests/utils:test",
+        "@com_google_absl//absl/status",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
