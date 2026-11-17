@@ -1565,7 +1565,17 @@ SplitSearchResult ScanSplitsRandomBuckets(
     initializer.InitFull(&neg);
     initializer.InitEmpty(&pos);
 
-    constexpr int kNumBitsInRandom = 64;
+    // Number of random bits produced by each call to the random engine. Note
+    // that the engine's result_type may be wider than the number of random
+    // bits it produces (e.g. std::mt19937 returns a 64-bit uint_fast32_t on
+    // some platforms, but only the lower 32 bits are random).
+    constexpr int kNumBitsInRandom = utils::RandomEngine::word_size;
+    static_assert(kNumBitsInRandom <= 64);
+    static_assert(utils::RandomEngine::min() == 0);
+    static_assert(utils::RandomEngine::max() ==
+                  (kNumBitsInRandom == 64
+                       ? ~uint64_t{0}
+                       : (uint64_t{1} << kNumBitsInRandom) - 1));
     uint64_t random_bits = 0;
     int bits_left = 0;
 
