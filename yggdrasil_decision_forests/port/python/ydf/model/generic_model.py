@@ -1131,11 +1131,10 @@ Use `model.describe()` for more details.
         consumed as DenseTensorSpec(float32) by default) will be fed differently
         (e.g. RaggedTensor(int64)). Only compatible with mode="keras".
       mode: How the YDF model is converted into a TensorFlow SavedModel. 1) mode
-        = "keras" (default): Turn the model into a Keras 2 model using
-        TensorFlow Decision Forests, and then save it with
-        `tf_keras.models.save_model`. 2) mode = "tf" (recommended; will become
-        default): Turn the model into a TensorFlow Module, and save it with
-        `tf.saved_model.save`.
+        = "tf" (default): Turn the model into a TensorFlow Module, and save it
+        with `tf.saved_model.save`. 2) mode = "keras" (deprecated): Turn the
+        model into a Keras 2 model using TensorFlow Decision Forests, and then
+        save it with `tf_keras.models.save_model`.
       feature_dtypes: Mapping from feature name to TensorFlow dtype. Use this
         mapping to override feature dtypes. For instance, numerical features are
         encoded with tf.float32 by default. If you plan on feeding tf.float64 or
