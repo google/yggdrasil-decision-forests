@@ -465,7 +465,7 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide3(
             standard_deviation: 1.1180339887498949
           }
           discretized_numerical {
-            boundaries: 1e-45
+            boundaries: 1.17549435e-38  # FLT_MIN
             boundaries: 2.4999998
             boundaries: 2.5000002
             boundaries: 3.5
@@ -482,8 +482,8 @@ proto::DataSpecification ToyDatasetExpectedDataSpecGuide3(
           numerical { mean: 3 min_value: 2 max_value: 4 standard_deviation: 1 }
           count_nas: 2
           discretized_numerical {
-            boundaries: -1e-45
-            boundaries: 1e-45
+            boundaries: 0
+            boundaries: 1.17549435e-38  # FLT_MIN
             boundaries: 2.9999998
             original_num_unique_values: 2
             maximum_num_bins: 255

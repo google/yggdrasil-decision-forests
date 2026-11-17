@@ -27,6 +27,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/strings/strip.h"
 #include "absl/strings/substitute.h"
+#include "yggdrasil_decision_forests/dataset/data_spec.h"
 #include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/abstract_model.pb.h"
 #include "yggdrasil_decision_forests/utils/blob_sequence.h"
@@ -59,6 +60,18 @@ constexpr char kModelDoneFileName[] = "done";
 // Add changes to the model path to improve loading performance here.
 std::string ImproveModelReadingPath(const absl::string_view path) {
   return std::string(path);
+}
+
+// Flushes the subnormal discretized boundaries of models trained before they
+// were avoided, as they are evaluated as 0 by inference engines running with
+// FTZ/DAZ (e.g. TensorFlow). Must be called after the dataspec is read and
+// before the model is used.
+void SanitizeLoadedDataSpec(AbstractModel* model) {
+  if (dataset::FlushSubnormalDiscretizedBoundaries(
+          model->mutable_data_spec())) {
+    LOG_FIRST_N(INFO, 1) << "Subnormal discretized numerical boundaries were "
+                            "flushed while loading the model.";
+  }
 }
 }  // namespace
 
@@ -155,6 +168,7 @@ absl::Status LoadModel(absl::string_view directory,
           effective_directory,
           absl::StrCat(io_options.file_prefix.value(), kModelDataSpecFileName)),
       model->get()->mutable_data_spec(), file::Defaults()));
+  SanitizeLoadedDataSpec(model->get());
   RETURN_IF_ERROR(model->get()->Load(effective_directory, io_options));
   return model->get()->Validate();
 }
@@ -255,6 +269,7 @@ absl::StatusOr<std::unique_ptr<AbstractModel>> DeserializeModel(
   ASSIGN_OR_RETURN(has_data, reader.Read(&tmp));
   STATUS_CHECK(has_data);
   STATUS_CHECK(model->mutable_data_spec()->ParseFromString(tmp));
+  SanitizeLoadedDataSpec(model.get());
 
   // Read raw string.
   ASSIGN_OR_RETURN(has_data, reader.Read(&tmp));
