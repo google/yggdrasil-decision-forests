@@ -15,7 +15,7 @@
 r"""Wrappers around the YDF learners.
 
 This file is generated automatically by running the following commands:
-  bazel build //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/learner:specialized_learners\
+  bazel build //external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/learner:specialized_learners_generator\
   && bazel-bin/external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/learner/specialized_learners_generator\
   > external/ydf_cc/yggdrasil_decision_forests/port/python/ydf/learner/specialized_learners_pre_generated.py
 
@@ -1840,6 +1840,10 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       between snapshots when `resume_training=True`. Might be ignored by some
       learners.
     custom_metrics: A list of custom metrics to compute during training.
+    early_stopping_custom_metric: Name of a registered custom metric in
+      `custom_metrics` to use for early stopping instead of the primary
+      validation loss. Optimization direction is controlled by the metric's
+      `higher_is_better` attribute. Default: None.
     working_dir: Path to a directory available for the learning algorithm to
       store intermediate computation results. Depending on the learning
       algorithm and parameters, the working_dir might be optional, required, or
@@ -1965,6 +1969,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
       resume_training: bool = False,
       resume_training_snapshot_interval_seconds: int = 1800,
       custom_metrics: Optional[List[custom_metric.AbstractCustomMetric]] = None,
+      early_stopping_custom_metric: Optional[str] = None,
       working_dir: Optional[str] = None,
       num_threads: Optional[int] = None,
       tuner: Optional[tuner_lib.AbstractTuner] = None,
@@ -2123,6 +2128,7 @@ class GradientBoostedTreesLearner(generic_learner.GenericCCLearner):
         weights=weights,
         class_weights=class_weights,
         custom_metrics=custom_metrics,
+        early_stopping_custom_metric=early_stopping_custom_metric,
         ranking_group=ranking_group,
         uplift_treatment=uplift_treatment,
         data_spec_args=data_spec_args,

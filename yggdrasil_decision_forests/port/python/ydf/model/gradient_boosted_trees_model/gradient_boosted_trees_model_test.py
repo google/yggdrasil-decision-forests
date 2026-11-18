@@ -15,7 +15,7 @@
 """Tests for the Gradient Boosted trees models."""
 
 import os
-from typing import Dict, Tuple
+from typing import Any, Dict, Tuple
 
 from absl import logging
 from absl.testing import absltest
@@ -29,6 +29,7 @@ from ydf.dataset import dataspec
 from ydf.learner import custom_loss
 from ydf.learner import custom_metric
 from ydf.learner import specialized_learners
+from ydf.learner import tuner as tuner_lib
 from ydf.model import generic_model
 from ydf.model import model_lib
 from ydf.model.gradient_boosted_trees_model import gradient_boosted_trees_model
@@ -67,6 +68,30 @@ def _evaluate_binary_threshold(
     weighted_correct = np.sum(weights * is_correct)
     total_weight = np.sum(weights)
     return np.float32(weighted_correct / total_weight)
+
+
+def _evaluate_constant_regression_metric(
+    labels: nptt.NDArray[np.float32],
+    predictions: nptt.NDArray[np.float32],
+    weights: nptt.NDArray[np.float32],
+) -> np.float32:
+  del labels, predictions, weights
+  return np.float32(42.0)
+
+
+def _evaluate_prediction_variance(
+    labels: nptt.NDArray[Any],
+    predictions: nptt.NDArray[np.float32],
+    weights: nptt.NDArray[np.float32],
+) -> np.float32:
+  del labels, weights
+  return np.float32(np.var(predictions))
+
+
+_CONSTANT_REGRESSION_METRIC = custom_metric.RegressionMetric(
+    name="const_metric",
+    evaluation_func=_evaluate_constant_regression_metric,
+)
 
 
 def _evaluate_binary_threshold_no_weight_check(
@@ -661,6 +686,181 @@ class GradientBoostedTreesTest(parameterized.TestCase):
     val_diff = val_metrics["mean_diff"]
     self.assertLess(val_diff, 0.0, f"Expected negative diff, got {val_diff}")
     self.assertAlmostEqual(val_diff, -8.0, delta=1.0)
+
+  @parameterized.named_parameters(
+      (
+          "regression_minimize",
+          custom_metric.RegressionMetric,
+          generic_model.Task.REGRESSION,
+          [0.0, 0.0, 10.0, 10.0],
+          False,
+          2,
+          True,
+      ),
+      (
+          "regression_maximize",
+          custom_metric.RegressionMetric,
+          generic_model.Task.REGRESSION,
+          [0.0, 0.0, 10.0, 10.0],
+          True,
+          10,
+          False,
+      ),
+      (
+          "binary_minimize",
+          custom_metric.BinaryClassificationMetric,
+          generic_model.Task.CLASSIFICATION,
+          [0, 0, 1, 1],
+          False,
+          2,
+          True,
+      ),
+      (
+          "binary_maximize",
+          custom_metric.BinaryClassificationMetric,
+          generic_model.Task.CLASSIFICATION,
+          [0, 0, 1, 1],
+          True,
+          10,
+          False,
+      ),
+      (
+          "multiclass_minimize",
+          custom_metric.MultiClassificationMetric,
+          generic_model.Task.CLASSIFICATION,
+          [0, 1, 2, 2],
+          False,
+          6,
+          True,
+      ),
+      (
+          "multiclass_maximize",
+          custom_metric.MultiClassificationMetric,
+          generic_model.Task.CLASSIFICATION,
+          [0, 1, 2, 2],
+          True,
+          30,
+          False,
+      ),
+  )
+  def test_early_stopping_custom_metric_respects_direction(
+      self,
+      metric_cls,
+      task,
+      base_labels,
+      higher_is_better,
+      expected_trees,
+      expected_triggered,
+  ):
+    variance_metric = metric_cls(
+        name="pred_var",
+        evaluation_func=_evaluate_prediction_variance,
+        higher_is_better=higher_is_better,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0.0, 1.0, 2.0, 2.0] * 25),
+        "y": np.array(base_labels * 25),
+    })
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        task=task,
+        num_trees=10,
+        min_examples=1,
+        validation_ratio=0.2,
+        early_stopping="LOSS_INCREASE",
+        early_stopping_initial_iteration=1,
+        early_stopping_num_trees_look_ahead=2,
+        custom_metrics=[variance_metric],
+        early_stopping_custom_metric="pred_var",
+    ).train(df)
+
+    self.assertEqual(model.num_trees(), expected_trees)
+    self.assertEqual(model.early_stopping_triggered(), expected_triggered)
+
+  def test_early_stopping_custom_metric_truncates_constant_metric(self):
+    variance_metric = custom_metric.RegressionMetric(
+        name="pred_var",
+        evaluation_func=_evaluate_prediction_variance,
+        higher_is_better=True,
+    )
+    df = pd.DataFrame({
+        "x": np.array([0.0, 0.0, 1.0, 1.0] * 25),
+        "y": np.array([0.5, 1.5, 2.5, 3.5] * 25),
+    })
+
+    model = specialized_learners.GradientBoostedTreesLearner(
+        label="y",
+        task=generic_model.Task.REGRESSION,
+        num_trees=12,
+        min_examples=1,
+        validation_ratio=0.2,
+        early_stopping_initial_iteration=3,
+        early_stopping_num_trees_look_ahead=2,
+        custom_metrics=[variance_metric, _CONSTANT_REGRESSION_METRIC],
+        early_stopping_custom_metric="const_metric",
+    ).train(df)
+
+    self.assertEqual(model.num_trees(), 4)
+    self.assertTrue(model.early_stopping_triggered())
+
+  @parameterized.named_parameters(
+      (
+          "unknown_metric",
+          {"early_stopping_custom_metric": "missing"},
+          "does not match any registered custom metric",
+      ),
+      (
+          "empty_metric",
+          {"early_stopping_custom_metric": ""},
+          "does not match any registered custom metric",
+      ),
+      (
+          "duplicate_metric",
+          {
+              "custom_metrics": [
+                  _CONSTANT_REGRESSION_METRIC,
+                  _CONSTANT_REGRESSION_METRIC,
+              ],
+              "early_stopping_custom_metric": "const_metric",
+          },
+          'Multiple custom metrics registered with name "const_metric"',
+      ),
+      (
+          "without_custom_metrics",
+          {
+              "custom_metrics": None,
+              "early_stopping_custom_metric": "const_metric",
+          },
+          "does not match any registered custom metric",
+      ),
+      (
+          "with_tuner",
+          {
+              "early_stopping_custom_metric": "const_metric",
+              "tuner": tuner_lib.RandomSearchTuner(num_trials=2),
+          },
+          "Custom metrics are not supported for hyperparameter tuning.",
+      ),
+  )
+  def test_early_stopping_custom_metric_invalid_config_raises_error(
+      self, extra_kwargs, expected_error
+  ):
+    df = pd.DataFrame({
+        "x": np.array([0.0, 0.0, 1.0, 1.0] * 25),
+        "y": np.array([0.5, 1.5, 2.5, 3.5] * 25),
+    })
+    kwargs = {
+        "label": "y",
+        "task": generic_model.Task.REGRESSION,
+        "num_trees": 5,
+        "custom_metrics": [_CONSTANT_REGRESSION_METRIC],
+    }
+    kwargs.update(extra_kwargs)
+
+    learner = specialized_learners.GradientBoostedTreesLearner(**kwargs)
+    with self.assertRaisesRegex(ValueError, expected_error):
+      learner.train(df)
 
   def test_set_output_logits_classification(self):
     dataset = pd.read_csv(

@@ -69,6 +69,7 @@ class GenericLearner(abc.ABC):
       ],
       extra_training_config: Optional[abstract_learner_pb2.TrainingConfig],
       custom_metrics: Optional[List[custom_metric.AbstractCustomMetric]],
+      early_stopping_custom_metric: Optional[str] = None,
   ):
     # TODO: Refactor to a single hyperparameter dictionary with edit
     # access to these options.
@@ -88,6 +89,7 @@ class GenericLearner(abc.ABC):
     self._explicit_learner_arguments = explicit_learner_arguments
     self._extra_training_config = extra_training_config
     self._custom_metrics = custom_metrics
+    self._early_stopping_custom_metric = early_stopping_custom_metric
 
     if self._label is not None and not isinstance(label, str):
       raise ValueError("The 'label' should be a string")
@@ -639,6 +641,12 @@ class GenericCCLearner(GenericLearner):
         self._hyperparameters["apply_link_function"] = True
 
     cc_custom_metrics = []
+    if (
+        self._custom_metrics or self._early_stopping_custom_metric is not None
+    ) and self._tuner:
+      raise ValueError(
+          "Custom metrics are not supported for hyperparameter tuning."
+      )
     if self._custom_metrics:
       for py_custom_metric in self._custom_metrics:
 
@@ -654,6 +662,7 @@ class GenericCCLearner(GenericLearner):
         self._deployment_config,
         cc_custom_loss,
         cc_custom_metrics,
+        self._early_stopping_custom_metric,
     )
 
   def _get_vertical_dataset(

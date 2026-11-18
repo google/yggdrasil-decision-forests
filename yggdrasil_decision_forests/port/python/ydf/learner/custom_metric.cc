@@ -19,6 +19,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -54,7 +56,8 @@ CCBinaryClassificationMetric::ToCustomMetric() const {
           return (*safe_evaluation_func)(pylabels, pypredictions, pyweights);
         });
   };
-  return model::gradient_boosted_trees::CustomMetric{name, cc_evaluation_func};
+  return model::gradient_boosted_trees::CustomMetric{name, cc_evaluation_func,
+                                                     higher_is_better};
 }
 
 absl::StatusOr<model::gradient_boosted_trees::CustomMetric>
@@ -77,7 +80,8 @@ CCMultiClassificationMetric::ToCustomMetric() const {
           return (*safe_evaluation_func)(pylabels, pypredictions, pyweights);
         });
   };
-  return model::gradient_boosted_trees::CustomMetric{name, cc_evaluation_func};
+  return model::gradient_boosted_trees::CustomMetric{name, cc_evaluation_func,
+                                                     higher_is_better};
 }
 
 absl::StatusOr<model::gradient_boosted_trees::CustomMetric>
@@ -96,13 +100,15 @@ CCRegressionMetric::ToCustomMetric() const {
           return (*safe_evaluation_func)(pylabels, pypredictions, pyweights);
         });
   };
-  return model::gradient_boosted_trees::CustomMetric{name, cc_evaluation_func};
+  return model::gradient_boosted_trees::CustomMetric{name, cc_evaluation_func,
+                                                     higher_is_better};
 }
 
 absl::Status ApplyCustomMetric(
     const std::vector<CCCustomMetric>& custom_metrics,
+    const std::optional<std::string>& early_stopping_custom_metric,
     model::AbstractLearner* learner) {
-  if (custom_metrics.empty()) {
+  if (custom_metrics.empty() && !early_stopping_custom_metric.has_value()) {
     return absl::OkStatus();
   }
   auto* gbt_learner =
@@ -134,9 +140,8 @@ absl::Status ApplyCustomMetric(
     custom_metrics_internal.push_back(std::move(metric_func));
   }
 
-  if (!custom_metrics_internal.empty()) {
-    gbt_learner->SetCustomMetrics(custom_metrics_internal);
-  }
+  gbt_learner->SetCustomMetrics(custom_metrics_internal,
+                                early_stopping_custom_metric);
 
   return absl::OkStatus();
 }

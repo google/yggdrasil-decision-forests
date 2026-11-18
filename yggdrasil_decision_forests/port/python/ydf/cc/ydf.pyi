@@ -321,6 +321,7 @@ class CCRegressionMetric:
           ],
           np.float32,
       ],
+      higher_is_better: bool,
   ): ...
 
 class CCBinaryClassificationMetric:
@@ -335,6 +336,7 @@ class CCBinaryClassificationMetric:
           ],
           np.float32,
       ],
+      higher_is_better: bool,
   ): ...
 
 class CCMultiClassificationMetric:
@@ -349,6 +351,7 @@ class CCMultiClassificationMetric:
           ],
           np.float32,
       ],
+      higher_is_better: bool,
   ): ...
 
 class CCRegressionLoss:
@@ -458,6 +461,7 @@ def GetLearner(
             ]
         ]
     ],
+    early_stopping_custom_metric: Optional[str] = None,
 ) -> GenericCCLearner: ...
 
 def GetInvalidHyperparameters(

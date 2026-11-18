@@ -29,6 +29,7 @@ class AbstractCustomMetric:
   """Abstract Base class for custom metrics."""
 
   name: str
+  higher_is_better: bool = dataclasses.field(default=False, kw_only=True)
 
   def check_is_compatible_task(self, task: abstract_model_pb2.Task) -> None:
     raise NotImplementedError("Not implemented")
@@ -42,6 +43,11 @@ class AbstractCustomMetric:
           "The name of a custom metric must be a string. Received"
           f" {type(self.name)}"
       )
+    if not isinstance(self.higher_is_better, bool):
+      raise ValueError(
+          "higher_is_better must be a bool. Received"
+          f" {type(self.higher_is_better)}"
+      )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -54,6 +60,8 @@ class RegressionMetric(AbstractCustomMetric):
     evaluation_func: The evaluation function receives the labels, predictions
       (without activation function), and weights in that order, and must output
       the metric value as a float.
+    higher_is_better: Whether higher values of the metric indicate a better
+      model. Defaults to False (lower is better).
   """
 
   evaluation_func: Callable[
@@ -74,7 +82,9 @@ class RegressionMetric(AbstractCustomMetric):
       )
 
   def _to_cc(self):
-    return ydf.CCRegressionMetric(self.name, self.evaluation_func)
+    return ydf.CCRegressionMetric(
+        self.name, self.evaluation_func, self.higher_is_better
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -90,6 +100,8 @@ class BinaryClassificationMetric(AbstractCustomMetric):
     evaluation_func: The evaluation function receives the binary labels,
       predictions (without activation function), and weights, and must output
       the metric value as a float.
+    higher_is_better: Whether higher values of the metric indicate a better
+      model. Defaults to False (lower is better).
   """
 
   evaluation_func: Callable[
@@ -110,7 +122,9 @@ class BinaryClassificationMetric(AbstractCustomMetric):
       )
 
   def _to_cc(self):
-    return ydf.CCBinaryClassificationMetric(self.name, self.evaluation_func)
+    return ydf.CCBinaryClassificationMetric(
+        self.name, self.evaluation_func, self.higher_is_better
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -126,6 +140,8 @@ class MultiClassificationMetric(AbstractCustomMetric):
     evaluation_func: The evaluation function receives the labels (1-based),
       predictions (2D array, without activation function), and weights, and must
       output the metric value as a float.
+    higher_is_better: Whether higher values of the metric indicate a better
+      model. Defaults to False (lower is better).
   """
 
   evaluation_func: Callable[
@@ -146,4 +162,6 @@ class MultiClassificationMetric(AbstractCustomMetric):
       )
 
   def _to_cc(self):
-    return ydf.CCMultiClassificationMetric(self.name, self.evaluation_func)
+    return ydf.CCMultiClassificationMetric(
+        self.name, self.evaluation_func, self.higher_is_better
+    )

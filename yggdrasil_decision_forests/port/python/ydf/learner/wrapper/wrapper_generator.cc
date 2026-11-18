@@ -284,7 +284,7 @@ from $1utils import func_helpers
   std::string header = absl::Substitute(R"(r"""Wrappers around the YDF learners.
 
 This file is generated automatically by running the following commands:
-  bazel build //ydf/learner:specialized_learners\
+  bazel build //ydf/learner:specialized_learners_generator\
   && bazel-bin/ydf/learner/specialized_learners_generator\
   > ydf/learner/specialized_learners_pre_generated.py
 
@@ -367,13 +367,21 @@ absl::Status AppendCapabilityParameters(
     absl::StrAppend(fields_documentation,
                     R"(
     custom_metrics: A list of custom metrics to compute during training.
+    early_stopping_custom_metric: Name of a registered custom metric in
+      `custom_metrics` to use for early stopping instead of the primary
+      validation loss. Optimization direction is controlled by the metric's
+      `higher_is_better` attribute. Default: None.
     )");
     absl::StrAppend(fields_constructor, R"(
       custom_metrics: Optional[List[custom_metric.AbstractCustomMetric]] = None,
+      early_stopping_custom_metric: Optional[str] = None,
     )");
-    absl::StrAppend(custom_metrics_arg, "custom_metrics");
+    absl::StrAppend(
+        custom_metrics_arg,
+        "custom_metrics=custom_metrics,\n      "
+        "early_stopping_custom_metric=early_stopping_custom_metric,");
   } else {
-    absl::StrAppend(custom_metrics_arg, "None");
+    absl::StrAppend(custom_metrics_arg, "custom_metrics=None,");
   }
   return absl::OkStatus();
 }
@@ -740,7 +748,7 @@ $8
       label=label,
       weights=weights,
       class_weights=class_weights,
-      custom_metrics=$9,
+      $9
       ranking_group=ranking_group,
       uplift_treatment=uplift_treatment,
       data_spec_args=data_spec_args,

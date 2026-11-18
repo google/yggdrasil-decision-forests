@@ -24,6 +24,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -44,6 +45,7 @@ struct CCBinaryClassificationMetric {
 
   std::string name;
   MetricFunc evaluation_func;
+  bool higher_is_better = false;
 
   absl::StatusOr<model::gradient_boosted_trees::CustomMetric> ToCustomMetric()
       const;
@@ -56,6 +58,7 @@ struct CCMultiClassificationMetric {
 
   std::string name;
   MetricFunc evaluation_func;
+  bool higher_is_better = false;
 
   absl::StatusOr<model::gradient_boosted_trees::CustomMetric> ToCustomMetric()
       const;
@@ -68,6 +71,7 @@ struct CCRegressionMetric {
 
   std::string name;
   MetricFunc evaluation_func;
+  bool higher_is_better = false;
 
   absl::StatusOr<model::gradient_boosted_trees::CustomMetric> ToCustomMetric()
       const;
@@ -77,9 +81,11 @@ using CCCustomMetric =
     std::variant<std::monostate, CCBinaryClassificationMetric,
                  CCMultiClassificationMetric, CCRegressionMetric>;
 
-// Adds a custom metric to the given (not owned) learner.
+// Adds custom metrics and optional early stopping custom metric selection to
+// the given (not owned) learner.
 absl::Status ApplyCustomMetric(
     const std::vector<CCCustomMetric>& custom_metrics,
+    const std::optional<std::string>& early_stopping_custom_metric,
     model::AbstractLearner* learner);
 
 }  // namespace yggdrasil_decision_forests::port::python

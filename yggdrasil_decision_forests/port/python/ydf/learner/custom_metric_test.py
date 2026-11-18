@@ -22,6 +22,11 @@ from yggdrasil_decision_forests.model import abstract_model_pb2
 from ydf.learner import custom_metric
 
 
+def _zero_metric(labels, predictions, weights):
+  del labels, predictions, weights
+  return np.float32(0.0)
+
+
 class CustomMetricTest(parameterized.TestCase):
 
   @parameterized.parameters(
@@ -41,7 +46,7 @@ class CustomMetricTest(parameterized.TestCase):
   def test_incompatible_task(self, metric_cls, task):
     metric = metric_cls(
         name="test_metric",
-        evaluation_func=lambda l, p, w: np.float32(0.0),
+        evaluation_func=_zero_metric,
     )
     with self.assertRaisesRegex(ValueError, "A .* is only compatible with .*"):
       metric.check_is_compatible_task(task)
@@ -49,10 +54,22 @@ class CustomMetricTest(parameterized.TestCase):
   def test_compatible_task(self):
     metric = custom_metric.RegressionMetric(
         name="rmse",
-        evaluation_func=lambda l, p, w: np.float32(1.0),
+        evaluation_func=_zero_metric,
     )
     metric.check_is_compatible_task(abstract_model_pb2.REGRESSION)
     self.assertEqual(metric.name, "rmse")
+
+  @parameterized.named_parameters(
+      ("regression", custom_metric.RegressionMetric),
+      ("binary_classification", custom_metric.BinaryClassificationMetric),
+      ("multi_classification", custom_metric.MultiClassificationMetric),
+  )
+  def test_higher_is_better_defaults_and_overrides(self, metric_cls):
+    default_metric = metric_cls("m", _zero_metric)
+    self.assertFalse(default_metric.higher_is_better)
+
+    maximized_metric = metric_cls("m", _zero_metric, higher_is_better=True)
+    self.assertTrue(maximized_metric.higher_is_better)
 
 
 if __name__ == "__main__":

@@ -62,6 +62,7 @@ py_test(
         "//ydf/learner:custom_loss_py",
         "//ydf/learner:custom_metric_py",
         "//ydf/learner:specialized_learners",
+        "//ydf/learner:tuner",
         "//ydf/model:generic_model",
         "//ydf/model:model_lib",
         "//ydf/model/tree",
