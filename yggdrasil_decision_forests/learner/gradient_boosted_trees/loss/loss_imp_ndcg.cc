@@ -369,7 +369,7 @@ absl::Status NDCGLoss::UpdateGradients(
     }
     utils::concurrency::ConcurrentForLoop(
         thread_pool->num_threads(), thread_pool, ranking_index.groups().size(),
-        [&labels, &predictions, ranking_index, &gradient_data, &hessian_data,
+        [&labels, &predictions, &ranking_index, &gradient_data, &hessian_data,
          &random_seeds, lambda_loss = gbt_config_.lambda_loss(),
          gradient_use_non_normalized_dcg =
              gbt_config_.lambda_mart_ndcg().gradient_use_non_normalized_dcg(),
