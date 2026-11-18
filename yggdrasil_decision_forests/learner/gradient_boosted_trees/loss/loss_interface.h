@@ -192,6 +192,9 @@ struct CustomMetric {
   std::string name;
 
   CustomMetricFunction evaluation_function;
+
+  // Whether higher values of the metric indicate a better model.
+  bool higher_is_better = false;
 };
 
 // Loss to optimize during the training of a GBT.

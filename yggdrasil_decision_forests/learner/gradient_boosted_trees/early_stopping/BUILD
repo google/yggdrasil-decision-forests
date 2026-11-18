@@ -16,6 +16,7 @@ cc_library_ydf(
     deps = [
         ":early_stopping_snapshot_cc_proto",
         "//yggdrasil_decision_forests/utils:logging",
+        "//yggdrasil_decision_forests/utils:status_macros",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
     ],
@@ -41,6 +42,7 @@ cc_test(
         ":early_stopping_snapshot_cc_proto",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/status",
         "@com_google_googletest//:gtest_main",
     ],
 )

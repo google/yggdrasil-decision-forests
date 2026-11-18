@@ -16,6 +16,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_EARLY_STOPPING_EARLY_STOPPING_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_GRADIENT_BOOSTED_TREES_EARLY_STOPPING_EARLY_STOPPING_H_
 
+#include <optional>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -64,6 +65,18 @@ class EarlyStopping {
     trees_per_iterations_ = trees_per_iterations;
   }
 
+  // Metric index and optimization direction used for early stopping when
+  // "early_stopping_custom_metric" is set.
+  std::optional<int> best_metric_index() const { return best_metric_index_; }
+  bool best_metric_higher_is_better() const {
+    return best_metric_higher_is_better_;
+  }
+  void set_best_metric(const int best_metric_index,
+                       const bool best_metric_higher_is_better) {
+    best_metric_index_ = best_metric_index;
+    best_metric_higher_is_better_ = best_metric_higher_is_better;
+  }
+
   // Exports the internal representation of the class to a proto.
   proto::EarlyStoppingSnapshot Save() const;
 
@@ -71,26 +84,31 @@ class EarlyStopping {
   absl::Status Load(const proto::EarlyStoppingSnapshot& p);
 
  private:
+  bool IsBetter(float validation_loss,
+                const std::vector<float>& validation_secondary_metrics) const;
 
-  // Minimum validation loss over all the step of the model. Only valid if
-  // "min_validation_loss_num_trees>=0".
+
+  // Validation loss at the best step of the model. Only valid if
+  // "best_num_trees_ >= 0".
   float best_loss_ = 0.f;
   float last_loss_ = 0.f;
 
   std::vector<float> last_metrics_;
   std::vector<float> best_metrics_;
 
-  // Number of trees in the model with the validation loss
-  // "minimum_validation_loss_value".
+  // Number of trees in the model at the best validation step.
   int best_num_trees_ = -1;
   int last_num_trees_ = 0;
 
   int num_trees_look_ahead_;
 
+  std::optional<int> best_metric_index_;
+  bool best_metric_higher_is_better_ = false;
+
   // Iteration that starts the computation of the validation loss.
   //
-  // See GradientBoostedTreesTrainingConfig::early_stopping_start_iteration for
-  // more details.
+  // See GradientBoostedTreesTrainingConfig::early_stopping_initial_iteration
+  // for more details.
   int initial_iteration_;
 
   int trees_per_iterations_ = -1;

@@ -31,4 +31,6 @@ message EarlyStoppingSnapshot {
   optional int32 num_trees_look_ahead = 7;
   optional int32 trees_per_iterations = 8;
   optional int32 initial_iteration = 9;
+  optional int32 best_metric_index = 10;
+  optional bool best_metric_higher_is_better = 11;
 }

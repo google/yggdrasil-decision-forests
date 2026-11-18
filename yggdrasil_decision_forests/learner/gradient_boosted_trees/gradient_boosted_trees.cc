@@ -301,11 +301,21 @@ absl::Status TruncateModelWithEarlyStopping(
       config.gbt_config->early_stopping_initial_iteration();
   if (mdl->NumTrees() ==
       (early_stopping_initial_iteration + 1) * mdl->num_trees_per_iter()) {
+    const std::string metric_description =
+        (config.early_stopping_custom_metric_index.has_value() &&
+         *config.early_stopping_custom_metric_index <
+             mdl->training_logs().secondary_metric_names_size())
+            ? absl::StrCat("validation metric \"",
+                           mdl->training_logs().secondary_metric_names(
+                               *config.early_stopping_custom_metric_index),
+                           "\"")
+            : "validation loss";
     LOG(WARNING)
-        << "The best validation loss was obtained during iteration "
-        << early_stopping_initial_iteration
-        << ". This is the first step during which a validation loss was "
-           "computed, hence the validation loss might still have been "
+        << "The best " << metric_description
+        << " was obtained during iteration " << early_stopping_initial_iteration
+        << ". This is the first step during which a " << metric_description
+        << " was computed, hence the " << metric_description
+        << " might still have been "
            "unstable and not optimal. Following are examples of "
            "hyper-parameter changes that might help with the "
            "situation. Try them in order: (1) Decrease the 'shrinkage "
@@ -474,6 +484,18 @@ absl::Status TryLoadSnapshotFromDisk(
 
   // Load the model structure.
   RETURN_IF_ERROR(model->Load(model_path, /*io_options=*/{/*file_prefix=*/""}));
+  const std::vector<std::string> expected_secondary_metrics =
+      config.loss->SecondaryMetricNames();
+  const auto& loaded_secondary_metrics =
+      model->training_logs().secondary_metric_names();
+  if (!std::equal(loaded_secondary_metrics.begin(),
+                  loaded_secondary_metrics.end(),
+                  expected_secondary_metrics.begin(),
+                  expected_secondary_metrics.end())) {
+    return absl::InvalidArgumentError(
+        "Cannot resume training because the secondary metrics in the saved "
+        "snapshot do not match the current learner configuration.");
+  }
   *iter_idx = model->NumTrees() / model->num_trees_per_iter();
 
   // Load the state of the early stopping state manager.
@@ -689,12 +711,55 @@ absl::Status GradientBoostedTreesLearner::BuildAllTrainingConfiguration(
                  *all_config->gbt_config, all_config->train_config_link,
                  custom_loss_functions_));
 
+  if (!custom_metrics_.empty() && deployment().try_resume_training()) {
+    // TODO: b/583795069 - Decide/Standardize behavior of custom losses and
+    // custom metrics when resuming training.
+    return absl::InvalidArgumentError(
+        "Custom metrics are not supported with \"try_resume_training=True\" "
+        "(or \"resume_training=True\").");
+  }
+
   // TODO: b/505089842 - Add support for custom metrics in ranking/survival
   // task.
   for (const auto& custom_metric : custom_metrics_) {
     RETURN_IF_ERROR(
         CheckCustomMetric(custom_metric, all_config->train_config.task()));
     all_config->loss->RegisterCustomMetric(custom_metric);
+  }
+
+  if (early_stopping_custom_metric_.has_value()) {
+    const std::string& target_metric_name = *early_stopping_custom_metric_;
+    std::optional<size_t> matched_custom_idx;
+    for (size_t i = 0; i < custom_metrics_.size(); ++i) {
+      if (custom_metrics_[i].name == target_metric_name) {
+        if (matched_custom_idx.has_value()) {
+          return absl::InvalidArgumentError(absl::Substitute(
+              "Multiple custom metrics registered with name \"$0\".",
+              target_metric_name));
+        }
+        matched_custom_idx = i;
+      }
+    }
+    if (!matched_custom_idx.has_value()) {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "\"early_stopping_custom_metric\" is set to \"$0\", which does not "
+          "match any registered custom metric.",
+          target_metric_name));
+    }
+    if (all_config->gbt_config->early_stopping() ==
+        proto::GradientBoostedTreesTrainingConfig::NONE) {
+      return absl::InvalidArgumentError(absl::Substitute(
+          "\"early_stopping_custom_metric\" is set to \"$0\", but early "
+          "stopping is disabled (\"early_stopping\" is NONE or "
+          "\"validation_ratio\" is 0).",
+          target_metric_name));
+    }
+    const size_t num_secondary_metrics =
+        all_config->loss->SecondaryMetricNames().size();
+    all_config->early_stopping_custom_metric_index = static_cast<int>(
+        num_secondary_metrics - custom_metrics_.size() + *matched_custom_idx);
+    all_config->early_stopping_higher_is_better =
+        custom_metrics_[*matched_custom_idx].higher_is_better;
   }
 
   if (all_config->loss->RequireGroupingAttribute()) {
@@ -878,6 +943,10 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
   EarlyStopping early_stopping(
       config.gbt_config->early_stopping_num_trees_look_ahead(),
       config.gbt_config->early_stopping_initial_iteration());
+  if (config.early_stopping_custom_metric_index.has_value()) {
+    early_stopping.set_best_metric(*config.early_stopping_custom_metric_index,
+                                   config.early_stopping_higher_is_better);
+  }
 
   // Load the first sample of training dataset.
   const float sampling_ratio =
@@ -1497,6 +1566,10 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
       config.gbt_config->early_stopping_num_trees_look_ahead(),
       config.gbt_config->early_stopping_initial_iteration());
   early_stopping.set_trees_per_iterations(mdl->num_trees_per_iter_);
+  if (config.early_stopping_custom_metric_index.has_value()) {
+    early_stopping.set_best_metric(*config.early_stopping_custom_metric_index,
+                                   config.early_stopping_higher_is_better);
+  }
 
   ASSIGN_OR_RETURN(
       const auto preprocessing,
@@ -1561,6 +1634,8 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
           "\"try_resume_training=True\" requires a \"cache_path\" in the "
           "deployment configuration.");
     }
+    // TODO: b/583795069 - Decide/Standardize behavior of custom losses and
+    // custom metrics when resuming training.
     RETURN_IF_ERROR(TryLoadSnapshotFromDisk(
         config, has_validation_dataset, deployment_, gradient_sub_train_dataset,
         gradient_validation_dataset, &snapshots_idxs, mdl.get(), &iter_idx,

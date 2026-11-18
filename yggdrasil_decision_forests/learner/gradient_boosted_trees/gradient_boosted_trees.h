@@ -209,9 +209,13 @@ class GradientBoostedTreesLearner : public AbstractLearner {
     return custom_loss_functions_.index() > 0;
   }
 
-  // Sets the custom evaluation metrics.
-  void SetCustomMetrics(const std::vector<CustomMetric>& custom_metrics) {
+  // Sets the custom evaluation metrics and optionally the name of the custom
+  // metric to use for early stopping.
+  void SetCustomMetrics(
+      const std::vector<CustomMetric>& custom_metrics,
+      std::optional<std::string> early_stopping_custom_metric = std::nullopt) {
     custom_metrics_ = custom_metrics;
+    early_stopping_custom_metric_ = std::move(early_stopping_custom_metric);
   }
 
   bool HasCustomMetrics() const { return !custom_metrics_.empty(); }
@@ -230,6 +234,7 @@ class GradientBoostedTreesLearner : public AbstractLearner {
 
   CustomLossFunctions custom_loss_functions_;
   std::vector<CustomMetric> custom_metrics_;
+  std::optional<std::string> early_stopping_custom_metric_;
 };
 
 REGISTER_AbstractLearner(GradientBoostedTreesLearner,
@@ -450,6 +455,11 @@ struct AllTrainingConfiguration {
   //
   // Note: Ranking problem with RMSE loss is not grouped.
   int effective_validation_set_group = -1;
+
+  // Secondary metric index and optimization direction tracked by early
+  // stopping, if configured via "early_stopping_custom_metric".
+  std::optional<int> early_stopping_custom_metric_index;
+  bool early_stopping_higher_is_better = false;
 };
 
 // All the training dataset information from the point of view of the weak
