@@ -1668,6 +1668,43 @@ four entries,8,4,4.4
     test_utils.assertProto2Equal(self, ds.data_spec(), expected_data_spec)
     self.assertEqual("feature\n0\n4\n", ds._dataset.DebugString())
 
+  def test_singledimensional_negative_stride_float32(self):
+    data = np.array([0, 4], np.float32)
+    feature = data[::-1]
+    self.assertEqual(feature.strides, (-4,))
+
+    ds = dataset_lib.create_vertical_dataset({"feature": feature})
+    self.assertEqual("feature\n4\n0\n", ds._dataset.DebugString())
+
+  def test_singledimensional_unaligned_stride_float32(self):
+    raw = np.zeros(16, dtype=np.uint8)
+    # 4-byte float32 items separated by a 2-byte stride (not a multiple of 4).
+    feature = np.ndarray(shape=(2,), dtype=np.float32, buffer=raw, strides=(2,))
+    self.assertEqual(feature.strides, (2,))
+    with self.assertRaisesRegex(
+        ValueError,
+        r'"feature": The stride \(2 bytes\) is not a multiple of the item size'
+        r" \(4 bytes\).*x\.copy\(\)",
+    ):
+      dataset_lib.create_vertical_dataset({"feature": feature})
+
+  def test_singledimensional_unaligned_data_float32(self):
+    raw = np.zeros(12, dtype=np.uint8)
+    # float32 items starting at a 1-byte offset (not aligned to 4 bytes).
+    feature = np.ndarray(
+        shape=(2,), dtype=np.float32, buffer=raw, offset=1, strides=(4,)
+    )
+    self.assertFalse(feature.flags.aligned)
+    with self.assertRaisesRegex(
+        ValueError,
+        r'"feature": The data is not aligned to 4 bytes.*x\.copy\(\)',
+    ):
+      dataset_lib.create_vertical_dataset({"feature": feature})
+
+    # The suggested fix works.
+    ds = dataset_lib.create_vertical_dataset({"feature": feature.copy()})
+    self.assertEqual("feature\n0\n0\n", ds._dataset.DebugString())
+
   def test_singledimensional_strided_boolean(self):
     data = np.array([[True, False], [False, True]])
     feature = data[:, 0]  # "feature" shares the same memory as "data".

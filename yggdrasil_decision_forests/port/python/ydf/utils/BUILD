@@ -91,6 +91,7 @@ pybind_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@ydf_cc//yggdrasil_decision_forests/utils:logging",
+        "@ydf_cc//yggdrasil_decision_forests/utils:strided_span",
     ],
 )
 

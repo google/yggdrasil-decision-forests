@@ -22,58 +22,72 @@
 #include <pybind11/stl.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <string_view>
 #include <vector>
 
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
+#include "absl/strings/substitute.h"
 #include "absl/types/span.h"
-#include "yggdrasil_decision_forests/utils/logging.h"
+#include "yggdrasil_decision_forests/utils/strided_span.h"
 
 namespace py = ::pybind11;
 
 namespace yggdrasil_decision_forests::port::python {
 
-// A collection of values, similar to a "Span<const T>", but with a
-// stride (i.e., items are evenly spaced, but possibly with a constant gap).
-// It only supports what is needed by PYDF.
-//
-// "StridedSpan" does not own the underlying data and relies on the data
-// in "data". The initialization "py::array_t data" object should not be
-// destroyed before "StridedSpan".
 template <typename T>
-class StridedSpan {
- public:
-  // Build a "StridedSpan".
-  //
-  // Args:
-  //   data: A one-dimensional array of values.
-  StridedSpan(py::array_t<T>& data)
-      : item_stride_(data.strides(0) / data.itemsize()),
-        size_(static_cast<size_t>(data.shape(0))),
-        values_(data.data()) {
-    DCHECK_EQ(data.strides(0) % data.itemsize(), 0);
+using StridedSpan = utils::StridedSpan<T>;
+using StridedSpanFloat = utils::StridedSpan<float>;
+using StridedSpanInt = utils::StridedSpan<int>;
+
+// Creates a non-owning 1D "utils::StridedSpan" view over "data". "name"
+// identifies the array (e.g., a column name) in error messages.
+//
+// Returns an error if "data" is not one-dimensional, if its stride is not a
+// multiple of its item size, or if its data is not aligned for "T".
+//
+// The "py::array_t" object and its underlying buffer must outlive the returned
+// span.
+template <typename T, int ExtraFlags>
+absl::StatusOr<utils::StridedSpan<T>> StridedSpanFromNumpy(
+    const py::array_t<T, ExtraFlags>& data, const absl::string_view name) {
+  if (data.ndim() != 1) {
+    return absl::InvalidArgumentError(absl::Substitute(
+        "Invalid numpy array for \"$0\": Expected a 1-dimensional array, got "
+        "$1 dimensions.",
+        name, data.ndim()));
   }
-
-  // Number of values.
-  size_t size() const { return size_; }
-
-  bool empty() const { return size_ == 0; }
-
-  // Accesses to a value. "index" should be in [0, size).
-  T operator[](const size_t index) const {
-    DCHECK_LT(index, size_);
-    return values_[index * item_stride_];
+  constexpr absl::string_view kCopyHint =
+      " This can happen for fields of packed structured arrays, or for arrays "
+      "created from a raw buffer (e.g., with np.frombuffer or np.ndarray). "
+      "Pass a copy of the array instead, e.g., `x.copy()`.";
+  if (data.strides(0) % data.itemsize() != 0) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        absl::Substitute("Invalid numpy array for \"$0\": The stride ($1 "
+                         "bytes) is not a multiple of the item size ($2 "
+                         "bytes).",
+                         name, data.strides(0), data.itemsize()),
+        kCopyHint));
   }
+  if (data.shape(0) > 0 &&
+      reinterpret_cast<std::uintptr_t>(data.data()) % alignof(T) != 0) {
+    return absl::InvalidArgumentError(absl::StrCat(
+        absl::Substitute("Invalid numpy array for \"$0\": The data is not "
+                         "aligned to $1 bytes.",
+                         name, alignof(T)),
+        kCopyHint));
+  }
+  return utils::StridedSpan<T>(data.data(), static_cast<size_t>(data.shape(0)),
+                               data.strides(0) / data.itemsize());
+}
 
- private:
-  const size_t item_stride_;
-  const size_t size_;
-  const T* const values_;
-};
-
-typedef StridedSpan<float> StridedSpanFloat32;
-typedef StridedSpan<int> StridedSpanInt32;
+template <typename T, int ExtraFlags>
+absl::StatusOr<utils::StridedSpan<T>> StridedSpanFromNumpy(
+    const py::array_t<T, ExtraFlags>&&, absl::string_view) = delete;
 
 // Non owning accessor to a Numpy bytes array.
 struct NPByteArray {

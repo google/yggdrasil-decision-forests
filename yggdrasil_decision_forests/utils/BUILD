@@ -880,6 +880,15 @@ cc_library_ydf(
 )
 
 cc_library_ydf(
+    name = "strided_span",
+    hdrs = ["strided_span.h"],
+    deps = [
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library_ydf(
     name = "hash",
     hdrs = ["hash.h"],
     deps = [
@@ -1488,6 +1497,16 @@ cc_test(
     deps = [
         ":math",
         "@com_google_absl//absl/random",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "strided_span_test",
+    srcs = ["strided_span_test.cc"],
+    deps = [
+        ":strided_span",
+        "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",
     ],
 )

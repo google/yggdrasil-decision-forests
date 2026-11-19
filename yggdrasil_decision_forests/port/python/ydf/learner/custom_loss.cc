@@ -143,8 +143,10 @@ CCRegressionLoss::ToCustomRegressionLossFunctions() const {
           Check1DArrayShape(py_gradient, "gradient", gradient.size()));
       RETURN_IF_ERROR(Check1DArrayShape(py_hessian, "hessian", hessian.size()));
 
-      StridedSpanFloat32 py_gradient_accessor(py_gradient);
-      StridedSpanFloat32 py_hessian_accessor(py_hessian);
+      ASSIGN_OR_RETURN(const StridedSpanFloat py_gradient_accessor,
+                       StridedSpanFromNumpy(py_gradient, "gradient"));
+      ASSIGN_OR_RETURN(const StridedSpanFloat py_hessian_accessor,
+                       StridedSpanFromNumpy(py_hessian, "hessian"));
       for (ssize_t example_idx = 0; example_idx < gradient.size();
            ++example_idx) {
         // TODO: Consider removing this copy (also for other losses).
@@ -210,8 +212,10 @@ CCBinaryClassificationLoss::ToCustomBinaryClassificationLossFunctions() const {
           Check1DArrayShape(py_gradient, "gradient", gradient.size()));
       RETURN_IF_ERROR(Check1DArrayShape(py_hessian, "hessian", hessian.size()));
 
-      StridedSpanFloat32 py_gradient_accessor(py_gradient);
-      StridedSpanFloat32 py_hessian_accessor(py_hessian);
+      ASSIGN_OR_RETURN(const StridedSpanFloat py_gradient_accessor,
+                       StridedSpanFromNumpy(py_gradient, "gradient"));
+      ASSIGN_OR_RETURN(const StridedSpanFloat py_hessian_accessor,
+                       StridedSpanFromNumpy(py_hessian, "hessian"));
       for (ssize_t example_idx = 0; example_idx < gradient.size();
            ++example_idx) {
         gradient[example_idx] = -py_gradient_accessor[example_idx];
@@ -241,7 +245,9 @@ CCMultiClassificationLoss::ToCustomMultiClassificationLossFunctions() const {
       RETURN_IF_ERROR(Check1DArrayShape(py_initial_predictions,
                                         "initial_predictions",
                                         cc_initial_predictions.size()));
-      StridedSpanFloat32 accessor(py_initial_predictions);
+      ASSIGN_OR_RETURN(
+          const StridedSpanFloat accessor,
+          StridedSpanFromNumpy(py_initial_predictions, "initial_predictions"));
       for (ssize_t example_idx = 0; example_idx < cc_initial_predictions.size();
            ++example_idx) {
         cc_initial_predictions[example_idx] = accessor[example_idx];

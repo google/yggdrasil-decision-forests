@@ -115,7 +115,7 @@ absl::Status SetAndCheckNumRowsAndFillMissing(dataset::VerticalDataset& self,
 // the `unique_counts` parameter is given, builds a map of unique values of the
 // column. The name set in `column` is used in the error messages.
 absl::Status CollectNumericalColumnStatistics(
-    const StridedSpanFloat32 values, dataset::proto::Column* column,
+    const StridedSpanFloat values, dataset::proto::Column* column,
     absl::flat_hash_map<float, int>* unique_counts) {
   DCHECK(column->has_name());
 
@@ -180,7 +180,7 @@ absl::Status CollectNumericalColumnStatistics(
 
 // Creates a column spec for a numerical column.
 absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
-    const absl::string_view name, const StridedSpanFloat32 values) {
+    const absl::string_view name, const StridedSpanFloat values) {
   dataset::proto::Column column;
   column.set_name(name);
   column.set_type(dataset::proto::ColumnType::NUMERICAL);
@@ -190,7 +190,7 @@ absl::StatusOr<dataset::proto::Column> CreateNumericalColumnSpec(
 
 // Creates a column spec for a discretized numerical column.
 absl::StatusOr<dataset::proto::Column> CreateDiscretizedNumericalColumnSpec(
-    const absl::string_view name, const StridedSpanFloat32 values,
+    const absl::string_view name, const StridedSpanFloat values,
     std::optional<int64_t> maximum_num_bins) {
   dataset::proto::Column column;
   column.set_name(name);
@@ -235,7 +235,8 @@ absl::Status PopulateColumnNumericalNPFloat32(
     dataset::VerticalDataset& self, const std::string& name,
     py::array_t<float>& data, std::optional<dataset::proto::DType> ydf_dtype,
     std::optional<int> column_idx) {
-  StridedSpanFloat32 src_values(data);
+  ASSIGN_OR_RETURN(const StridedSpanFloat src_values,
+                   StridedSpanFromNumpy(data, name));
 
   NumericalColumn* column;
   if (!column_idx.has_value()) {
@@ -279,7 +280,8 @@ absl::Status PopulateColumnDiscretizedNumericalNPFloat32(
     dataset::VerticalDataset& self, const std::string& name,
     py::array_t<float>& data, std::optional<dataset::proto::DType> ydf_dtype,
     std::optional<int64_t> maximum_num_bins, std::optional<int> column_idx) {
-  StridedSpanFloat32 src_values(data);
+  ASSIGN_OR_RETURN(const StridedSpanFloat src_values,
+                   StridedSpanFromNumpy(data, name));
 
   DiscretizedNumericalColumn* column;
   dataset::proto::Column column_spec;
@@ -356,7 +358,8 @@ absl::Status PopulateColumnBooleanNPBool(
     dataset::VerticalDataset& self, const std::string& name,
     py::array_t<bool>& data, std::optional<dataset::proto::DType> ydf_dtype,
     std::optional<int> column_idx) {
-  StridedSpan<bool> src_values(data);
+  ASSIGN_OR_RETURN(const StridedSpan<bool> src_values,
+                   StridedSpanFromNumpy(data, name));
 
   BooleanColumn* column;
   if (!column_idx.has_value()) {
@@ -667,7 +670,8 @@ absl::Status PopulateColumnCategoricalIntegerizedNPInt32(
     py::array_t<int32_t>& data, std::optional<dataset::proto::DType> ydf_dtype,
     int max_val, int most_frequent_value, int num_missing,
     std::optional<int> column_idx) {
-  StridedSpanInt32 src_values(data);
+  ASSIGN_OR_RETURN(const StridedSpanInt src_values,
+                   StridedSpanFromNumpy(data, name));
   CategoricalColumn* column;
   std::optional<int32_t> num_unique_values;
   if (!column_idx.has_value()) {

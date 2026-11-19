@@ -49,8 +49,8 @@ namespace yggdrasil_decision_forests::port::python {
 namespace {
 
 absl::Status AddBinaryClassificationPredictions(
-    StridedSpanFloat32 raw_predictions, StridedSpanInt32 labels,
-    StridedSpanFloat32 weights,
+    StridedSpanFloat raw_predictions, StridedSpanInt labels,
+    StridedSpanFloat weights,
     const metric::proto::EvaluationOptions& eval_options,
     utils::RandomEngine* rnd, metric::proto::EvaluationResults* eval) {
   DCHECK(weights.empty() || weights.size() == labels.size());
@@ -108,8 +108,8 @@ absl::Status AddBinaryClassificationPredictions(
 }
 
 absl::Status AddMulticlassClassificationPredictions(
-    StridedSpanFloat32 raw_predictions, StridedSpanInt32 labels,
-    StridedSpanFloat32 weights, const int num_classes,
+    StridedSpanFloat raw_predictions, StridedSpanInt labels,
+    StridedSpanFloat weights, const int num_classes,
     const metric::proto::EvaluationOptions& eval_options,
     utils::RandomEngine* rnd, metric::proto::EvaluationResults* eval) {
   DCHECK_EQ(raw_predictions.size(), num_classes * labels.size());
@@ -157,8 +157,8 @@ absl::Status AddMulticlassClassificationPredictions(
 }
 
 absl::Status AddRegressionPredictions(
-    StridedSpanFloat32 raw_predictions, StridedSpanFloat32 labels,
-    StridedSpanFloat32 weights,
+    StridedSpanFloat raw_predictions, StridedSpanFloat labels,
+    StridedSpanFloat weights,
     const metric::proto::EvaluationOptions& eval_options,
     utils::RandomEngine* rnd, metric::proto::EvaluationResults* eval) {
   DCHECK_EQ(raw_predictions.size(), labels.size());
@@ -176,9 +176,8 @@ absl::Status AddRegressionPredictions(
 }
 
 absl::Status AddRankingPredictions(
-    const StridedSpanFloat32 raw_predictions, const StridedSpanFloat32 labels,
-    const StridedSpan<uint64_t> ranking_groups,
-    const StridedSpanFloat32 weights,
+    const StridedSpanFloat raw_predictions, const StridedSpanFloat labels,
+    const StridedSpan<uint64_t> ranking_groups, const StridedSpanFloat weights,
     const metric::proto::EvaluationOptions& eval_options,
     utils::RandomEngine* rnd, metric::proto::EvaluationResults* eval) {
   DCHECK_EQ(raw_predictions.size(), labels.size());
@@ -199,18 +198,18 @@ absl::Status AddRankingPredictions(
 
 template <typename LabelType>
 absl::Status AddNumpyPredictions(
-    StridedSpanFloat32 raw_predictions, StridedSpan<LabelType> labels,
+    StridedSpanFloat raw_predictions, StridedSpan<LabelType> labels,
     const metric::proto::EvaluationOptions& eval_options,
-    const dataset::proto::Column& label_column, StridedSpanFloat32 weights,
+    const dataset::proto::Column& label_column, StridedSpanFloat weights,
     StridedSpan<uint64_t> ranking_groups, utils::RandomEngine* rnd,
     metric::proto::EvaluationResults* eval);
 
 template <>
 absl::Status AddNumpyPredictions<int>(
-    const StridedSpanFloat32 raw_predictions, const StridedSpanInt32 labels,
+    const StridedSpanFloat raw_predictions, const StridedSpanInt labels,
     const metric::proto::EvaluationOptions& eval_options,
     const dataset::proto::Column& label_column,
-    const StridedSpanFloat32 weights,
+    const StridedSpanFloat weights,
     const StridedSpan<uint64_t> ranking_groups, utils::RandomEngine* rnd,
     metric::proto::EvaluationResults* eval) {
   DCHECK(weights.empty() || weights.size() == labels.size());
@@ -242,10 +241,9 @@ absl::Status AddNumpyPredictions<int>(
 
 template <>
 absl::Status AddNumpyPredictions<float>(
-    const StridedSpanFloat32 raw_predictions, const StridedSpanFloat32 labels,
+    const StridedSpanFloat raw_predictions, const StridedSpanFloat labels,
     const metric::proto::EvaluationOptions& eval_options,
-    const dataset::proto::Column& label_column,
-    const StridedSpanFloat32 weights,
+    const dataset::proto::Column& label_column, const StridedSpanFloat weights,
     const StridedSpan<uint64_t> ranking_groups, utils::RandomEngine* rnd,
     metric::proto::EvaluationResults* eval) {
   DCHECK(weights.empty() || weights.size() == labels.size());
@@ -297,10 +295,10 @@ absl::StatusOr<dataset::proto::Column> CreateLabelColumn(
 
 template <typename LabelType>
 absl::StatusOr<metric::proto::EvaluationResults> EvaluateRawPredictions(
-    const StridedSpanFloat32 raw_predictions,
+    const StridedSpanFloat raw_predictions,
     const StridedSpan<LabelType> labels,
     const metric::proto::EvaluationOptions& eval_options,
-    const StridedSpanFloat32 weights,
+    const StridedSpanFloat weights,
     const std::optional<std::vector<std::string>>& label_classes,
     const StridedSpan<uint64_t> ranking_groups, const int64_t random_seed) {
   metric::proto::EvaluationResults eval;
@@ -334,14 +332,17 @@ absl::StatusOr<metric::proto::EvaluationResults> EvaluatePredictions(
     py::array_t<float>& weights,
     std::optional<std::vector<std::string>> label_classes,
     py::array_t<uint64_t>& ranking_groups, const int64_t random_seed) {
-  STATUS_CHECK(predictions.ndim() == 1);
   DCHECK(ranking_groups.size() == 0 ||
          options.task() == model::proto::Task::RANKING);
+  ASSIGN_OR_RETURN(const StridedSpanFloat prediction_values,
+                   StridedSpanFromNumpy(predictions, "predictions"));
+  ASSIGN_OR_RETURN(const StridedSpan<LabelType> labels_values,
+                   StridedSpanFromNumpy(labels, "labels"));
+  ASSIGN_OR_RETURN(const StridedSpan<uint64_t> ranking_groups_values,
+                   StridedSpanFromNumpy(ranking_groups, "ranking_groups"));
+  ASSIGN_OR_RETURN(const StridedSpanFloat weights_values,
+                   StridedSpanFromNumpy(weights, "weights"));
   py::gil_scoped_release release;
-  StridedSpanFloat32 prediction_values(predictions);
-  StridedSpan<LabelType> labels_values(labels);
-  StridedSpan<uint64_t> ranking_groups_values(ranking_groups);
-  StridedSpanFloat32 weights_values(weights);
   return EvaluateRawPredictions(prediction_values, labels_values, options,
                                 weights_values, label_classes,
                                 ranking_groups_values, random_seed);
