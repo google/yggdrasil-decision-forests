@@ -1,13 +1,11 @@
-load("@rules_python//python:py_binary.bzl", "py_binary")
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_binary_ydf", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -15,7 +13,7 @@ py_library(
 # Binaries
 # ========
 
-py_binary(
+py_binary_ydf(
     name = "benchmark_train_speed_main",
     srcs = ["benchmark_train_speed_main.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -26,7 +24,7 @@ py_binary(
     ],
 )
 
-py_binary(
+py_binary_ydf(
     name = "benchmark_io_speed_main",
     srcs = ["benchmark_io_speed_main.py"],
     deps = [
@@ -40,7 +38,7 @@ py_binary(
 # Libraries
 # =========
 
-py_library(
+py_library_ydf(
     name = "benchmark_io_speed",
     srcs = ["benchmark_io_speed.py"],
     deps = [
@@ -51,7 +49,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "benchmark_train_speed",
     srcs = ["benchmark_train_speed.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -63,7 +61,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "benchmark_inference_speed",
     srcs = ["benchmark_inference_speed.py"],
     tags = ["tf_dep"],
@@ -85,7 +83,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "benchmark_inference_speed_test",
     srcs = ["benchmark_inference_speed_test.py"],
     tags = ["tf_dep"],

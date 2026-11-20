@@ -1,7 +1,5 @@
-load("@rules_python//python:py_library.bzl", "py_library")
-
 # Representation of a decision tree as a python object
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -19,7 +17,7 @@ filegroup(
 # Libraries
 # =========
 
-py_library(
+py_library_ydf(
     name = "all",  # TODO: Replace "tree"
     srcs = ["__init__.py"],
     deps = [
@@ -31,7 +29,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "tree",
     srcs = ["tree.py"],
     deps = [
@@ -44,7 +42,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "value",
     srcs = ["value.py"],
     deps = [
@@ -53,7 +51,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "condition",
     srcs = ["condition.py"],
     deps = [
@@ -63,7 +61,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "node",
     srcs = ["node.py"],
     deps = [
@@ -73,7 +71,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "plot",
     srcs = ["plot.py"],
     data = ["assets"],
@@ -84,7 +82,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "tree_test",
     srcs = ["tree_test.py"],
     data = [
@@ -102,7 +100,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "value_test",
     srcs = ["value_test.py"],
     deps = [
@@ -114,7 +112,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "node_test",
     srcs = ["node_test.py"],
     deps = [
@@ -125,7 +123,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "condition_test",
     srcs = ["condition_test.py"],
     deps = [
@@ -138,7 +136,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "plot_test",
     srcs = ["plot_test.py"],
     data = ["assets"],

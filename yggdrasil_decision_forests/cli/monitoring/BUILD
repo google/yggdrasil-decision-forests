@@ -1,5 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_binary")
-load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf", "py_binary_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -44,7 +43,7 @@ cc_binary_ydf(
     ],
 )
 
-py_binary(
+py_binary_ydf(
     name = "compare_benchmark",
     srcs = ["compare_benchmark.py"],
     deps = [

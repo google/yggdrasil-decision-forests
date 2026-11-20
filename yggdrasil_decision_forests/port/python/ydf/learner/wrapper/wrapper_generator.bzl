@@ -1,7 +1,6 @@
 """Wrapper rule generation utilities."""
 
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_binary_ydf", "py_library_ydf")
 
 def py_wrap_yggdrasil_learners(
         name = None,
@@ -65,7 +64,7 @@ def py_wrap_yggdrasil_learners(
     )
 
     # Python library around the generated .py source code.
-    py_library(
+    py_library_ydf(
         name = name,
         srcs = [name + ".py"],
         deps = [

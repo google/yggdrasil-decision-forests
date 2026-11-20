@@ -1,11 +1,11 @@
-load("@rules_python//python:py_library.bzl", "py_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -13,7 +13,7 @@ py_library(
 # Libraries
 # =========
 
-py_library(
+py_library_ydf(
     name = "util",
     srcs = ["util.py"],
     deps = [
@@ -23,7 +23,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "internal",
     srcs = ["internal.py"],
     deps = ["//ydf/monitoring:benchmark_io_speed"],
@@ -34,7 +34,7 @@ py_library(
 # so that `:api` does not link JAX. Those are added by the opt-in target
 # //ydf:experimental_deep (google3 users:
 # //third_party/py/ydf:experimental_deep). Without it, `ydf.experimental.*` raise a helpful error.
-py_library(
+py_library_ydf(
     name = "experimental",
     srcs = ["experimental.py"],
     deps = [
@@ -42,7 +42,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "help",
     srcs = ["help.py"],
     deps = [

@@ -1,10 +1,6 @@
-load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-
 # Learner bindings for PYDF
-load("@rules_python//python:py_binary.bzl", "py_binary")
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@rules_python//python:py_test.bzl", "py_test")
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf", "py_binary_ydf", "py_library_ydf", "py_test_ydf")
 load("//ydf/learner/wrapper:wrapper_generator.bzl", "py_wrap_yggdrasil_learners")
 
 package(
@@ -12,7 +8,7 @@ package(
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -20,7 +16,7 @@ py_library(
 # Binary
 # =========
 
-py_binary(
+py_binary_ydf(
     name = "worker_main",
     srcs = ["worker_main.py"],
     visibility = ["//visibility:public"],
@@ -121,7 +117,7 @@ pybind_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "generic_learner",
     srcs = ["generic_learner.py"],
     deps = [
@@ -148,7 +144,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "abstract_feature_selector",
     srcs = ["abstract_feature_selector.py"],
     deps = [
@@ -158,7 +154,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "feature_selector",
     srcs = ["feature_selector.py"],
     deps = [
@@ -172,7 +168,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "hyperparameters",
     srcs = ["hyperparameters.py"],
     deps = [
@@ -184,7 +180,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "custom_loss_py",
     srcs = ["custom_loss.py"],
     deps = [
@@ -194,7 +190,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "custom_metric_py",
     srcs = ["custom_metric.py"],
     deps = [
@@ -206,7 +202,7 @@ py_library(
 
 # This target is not referenced is included for documentation purposes only.
 # See `:specialized_learners` for further information.
-py_library(
+py_library_ydf(
     name = "specialized_learners_pre_generated",
     srcs = ["specialized_learners_pre_generated.py"],
     deps = [
@@ -227,7 +223,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "tuner",
     srcs = ["tuner.py"],
     deps = [
@@ -241,7 +237,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "worker",
     srcs = ["worker.py"],
     deps = [
@@ -291,7 +287,7 @@ pybind_library(
 # Tests
 # =====
 
-py_library(
+py_library_ydf(
     name = "learner_test_utils",
     testonly = 1,
     srcs = ["learner_test_utils.py"],
@@ -309,7 +305,7 @@ py_library(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "generic_learner_test",
     srcs = ["generic_learner_test.py"],
     deps = [
@@ -329,7 +325,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "random_forest_learner_test",
     size = "large",
     srcs = ["random_forest_learner_test.py"],
@@ -354,7 +350,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "gradient_boosted_trees_learner_test",
     size = "large",
     srcs = ["gradient_boosted_trees_learner_test.py"],
@@ -381,7 +377,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "cart_learner_test",
     srcs = ["cart_learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -399,7 +395,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "isolation_forest_learner_test",
     size = "large",
     srcs = ["isolation_forest_learner_test.py"],
@@ -421,7 +417,7 @@ py_test(
 
 # Splits the test with tensorflow so that non-tensorflow tests can be run in debug mode.
 # (TensorFlow does not compile in debug mode)
-py_test(
+py_test_ydf(
     name = "custom_loss_test",
     timeout = "long",
     srcs = ["custom_loss_test.py"],
@@ -443,7 +439,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "distributed_learner_test",
     srcs = ["distributed_learner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -463,7 +459,7 @@ py_test(
 
 # Splits the test with tensorflow so that non-tensorflow tests can be run in debug mode.
 # (TensorFlow does not compile in debug mode)
-py_test(
+py_test_ydf(
     name = "learner_with_tf_test",
     srcs = ["learner_with_tf_test.py"],
     tags = ["tf_dep"],
@@ -477,7 +473,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "hyperparameters_test",
     srcs = ["hyperparameters_test.py"],
     deps = [
@@ -488,7 +484,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "learner_with_xarray_test",
     srcs = ["learner_with_xarray_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -501,7 +497,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "tuner_test",
     srcs = ["tuner_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -524,7 +520,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "feature_selector_test",
     srcs = ["feature_selector_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -540,7 +536,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "custom_metric_test",
     srcs = ["custom_metric_test.py"],
     deps = [
