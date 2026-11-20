@@ -57,6 +57,20 @@ struct LossResults {
   std::optional<utils::IntegersConfusionMatrixDouble> confusion_table;
 };
 
+// Unit over which a loss value or a secondary metric is averaged. This defines
+// how evaluations computed on disjoint subsets of a dataset (e.g. by the
+// evaluation workers of the distributed GBT) are combined.
+enum class MetricAveraging {
+  // Weighted mean over the examples. Partial values are combined weighted by
+  // the sum of the example weights.
+  kExample,
+  // Weighted mean over the ranking groups, where the weight of a group is the
+  // weight of its most relevant item (e.g. NDCG). Partial values are combined
+  // weighted by the sum of the group weights (see
+  // "RankingGroupsIndices::SumGroupWeights").
+  kRankingGroup,
+};
+
 // One dimension of gradient and hessian values.
 struct GradientData {
   // Values of the gradient. "values[i]" is the gradient of the i-th example.
@@ -137,6 +151,11 @@ class RankingGroupsIndices {
 
   double NDCG(absl::Span<const float> predictions,
               const absl::Span<const float> weights, int truncation) const;
+
+  // Sum of the group weights, where the weight of a group is the weight of its
+  // most relevant item. This is the normalization factor of "NDCG". If
+  // "weights" is empty, returns the number of groups.
+  double SumGroupWeights(absl::Span<const float> weights) const;
 
   const std::vector<Group>& groups() const { return groups_; }
 
@@ -323,6 +342,16 @@ class AbstractLoss {
   // are the last entries of "SecondaryMetricNames", in the same order.
   std::vector<std::string> CustomMetricNames() const;
 
+  // Averaging unit of the loss value returned by the "Loss" methods.
+  virtual MetricAveraging LossAveraging() const {
+    return MetricAveraging::kExample;
+  }
+
+  // Averaging unit of each of the secondary metrics returned by the "Loss"
+  // methods, in the same order as "SecondaryMetricNames()". Custom metrics are
+  // averaged over the examples.
+  std::vector<MetricAveraging> SecondaryMetricAveragings() const;
+
   // The "Loss" methods compute the loss(es) for the currently accumulated
   // predictions. Like for "UpdateGradients", different version of "Loss" are
   // implemented for different representation of the label.
@@ -372,6 +401,14 @@ class AbstractLoss {
   const model::proto::Task task_;
   const dataset::proto::Column& label_column_;
   virtual std::vector<std::string> InternalSecondaryMetricNames() const = 0;
+
+  // Averaging unit of each of "InternalSecondaryMetricNames()". By default, all
+  // the metrics are averaged over the examples.
+  virtual std::vector<MetricAveraging> InternalSecondaryMetricAveragings()
+      const {
+    return std::vector<MetricAveraging>(InternalSecondaryMetricNames().size(),
+                                        MetricAveraging::kExample);
+  }
 
  private:
   std::vector<CustomMetric> custom_metrics_;

@@ -164,6 +164,17 @@ std::vector<std::string> MeanSquaredErrorLoss::InternalSecondaryMetricNames()
   }
 }
 
+std::vector<MetricAveraging>
+MeanSquaredErrorLoss::InternalSecondaryMetricAveragings() const {
+  if (task_ == model::proto::Task::RANKING) {
+    // The NDCG@5 is averaged over the groups.
+    return {MetricAveraging::kExample, MetricAveraging::kExample,
+            MetricAveraging::kRankingGroup};
+  } else {
+    return {MetricAveraging::kExample, MetricAveraging::kExample};
+  }
+}
+
 absl::StatusOr<LossResults> MeanSquaredErrorLoss::Loss(
     const absl::Span<const float> labels,
     const absl::Span<const float> predictions,

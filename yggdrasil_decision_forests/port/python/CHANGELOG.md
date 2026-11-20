@@ -4,6 +4,11 @@
 
 ### Fix
 
+-   Fix the aggregation of the ranking validation metrics (e.g. NDCG) of the
+    distributed GBT learner across evaluation workers. Partial NDCGs were
+    weighted by the sum of example weights instead of the sum of group weights,
+    biasing the validation loss and NDCG reported in the training logs and in
+    the model. The trees of the trained models are not affected.
 -   Fix the resumption of the distributed GBT learner after the manager is
     interrupted while creating a checkpoint (e.g. preemption). The training
     failed with `ALREADY_EXISTS` when creating this checkpoint again.

@@ -185,6 +185,10 @@ absl::Status DistributedGradientBoostedTreesWorker::Setup(
     if (welcome_.train_config().task() == model::proto::Task::RANKING) {
       ASSIGN_OR_RETURN(validation_.loss_cache,
                        loss_->CreateLossCache(*validation_.dataset));
+      ASSIGN_OR_RETURN(const auto* ranking_indices,
+                       validation_.loss_cache->ranking_indices());
+      validation_.sum_group_weights =
+          ranking_indices->SumGroupWeights(validation_.weights);
     }
   }
 
@@ -1245,6 +1249,10 @@ DistributedGradientBoostedTreesWorker::EvaluateWeakModelOnvalidationDataset() {
   validation_.evaluation.set_loss(loss_results.loss);
   validation_.evaluation.set_num_examples(validation_.dataset->nrow());
   validation_.evaluation.set_sum_weights(validation_.sum_weights);
+  if (validation_.sum_group_weights.has_value()) {
+    validation_.evaluation.set_sum_group_weights(
+        validation_.sum_group_weights.value());
+  }
   *validation_.evaluation.mutable_metrics() = {
       loss_results.secondary_metrics.begin(),
       loss_results.secondary_metrics.end()};
