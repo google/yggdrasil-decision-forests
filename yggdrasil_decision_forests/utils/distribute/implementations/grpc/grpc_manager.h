@@ -18,6 +18,7 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 #define YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_MANAGER_H_
 
+#include <atomic>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -32,6 +33,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
 #include "yggdrasil_decision_forests/utils/distribute/implementations/grpc/grpc.grpc.pb.h"
@@ -133,6 +135,9 @@ class GRPCManager : public AbstractManager {
         return tracked_stub_->stub.get();
       }
 
+      // Connection of the call.
+      const TrackedStub* tracked_stub() const { return tracked_stub_.get(); }
+
       void Release() {
         if (tracked_stub_ && context_) {
           utils::concurrency::MutexLock l(tracked_stub_->mutex);
@@ -225,6 +230,14 @@ class GRPCManager : public AbstractManager {
   absl::StatusOr<Worker::ActiveCall> GetStubForCall(
       Worker* worker, grpc::ClientContext* context);
 
+  // Drops the connection "failed_call" to the worker, if it is still the
+  // current one: the next calls use a new connection (a failed connection, e.g.
+  // half-open to a dead worker, is never reused). The calls in flight on the
+  // dropped connection continue. With several calls failing on the same
+  // connection, only the first one drops it.
+  void ResetWorkerConnection(Worker* worker,
+                             const Worker::ActiveCall& failed_call);
+
   // Starts a thread that checks an execute events registered with
   // "GetAllEvents".
   void StartEventCheckingThread();
@@ -243,6 +256,14 @@ class GRPCManager : public AbstractManager {
 
   // Manager UID.
   uint64_t manager_uid_;
+
+  // See "GRPCImp.request_timeout_seconds". Zero: no timeout.
+  absl::Duration request_timeout_ = absl::ZeroDuration();
+  // See "GRPCImp.keepalive_time_ms" and "GRPCImp.keepalive_timeout_ms".
+  int keepalive_time_ms_ = 0;
+  int keepalive_timeout_ms_ = 0;
+  // Identifier of the next request (see "Query.query_id").
+  std::atomic<uint64_t> next_query_id_{1};
 
   // Async query to execute by any worker.
   utils::concurrency::Channel<Blob> async_pending_queries_;

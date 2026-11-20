@@ -95,6 +95,12 @@ TEST(SingleThread, AsynchronousIntraWorkerCommunication) {
   all.Join();
 }
 
+TEST(SingleThread, BlockingIntraWorkerCommunication) {
+  auto all = CreateSingleThreadManager();
+  TestBlockingIntraWorkerCommunication(all.manager.get());
+  all.Join();
+}
+
 TEST(SingleThread, AsynchronousParallelWorkerExecution) {
   auto all = CreateSingleThreadManager(5);
   TestAsynchronousParallelWorkerExecution(all.manager.get());

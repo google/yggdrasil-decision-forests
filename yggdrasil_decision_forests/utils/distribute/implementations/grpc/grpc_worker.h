@@ -16,6 +16,7 @@
 #ifndef THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_WORKER_H_
 #define THIRD_PARTY_YGGDRASIL_DECISION_FORESTS_UTILS_DISTRIBUTE_IMPLEMENTATIONS_GRPC_WORKER_H_
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -23,8 +24,12 @@
 #include <vector>
 
 #include "grpcpp/server.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/synchronization/notification.h"
+#include "absl/time/time.h"
 #include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/concurrency_channel.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
@@ -54,6 +59,10 @@ class WorkerHook : public AbstractWorkerHook {
       AbstractWorker* emitter_worker) override;
 
   absl::StatusOr<Blob> NextAsynchronousAnswerFromOtherWorker(
+      AbstractWorker* emitter_worker) override;
+
+  absl::StatusOr<Blob> BlockingRequestToOtherWorker(
+      Blob blob, int target_worker_idx,
       AbstractWorker* emitter_worker) override;
 
  private:
@@ -124,9 +133,11 @@ class WorkerService final : public proto::Server::Service {
   void InitializerInterWorkerCommunication(
       const proto::WorkerConfig& worker_config);
 
-  // Ensures that the communication with another worker is ready.
+  // Ensures that the communication with another worker is ready. If
+  // "failed_stub" is the current stub of the worker (a call on it failed),
+  // replaces it with a new connection.
   absl::StatusOr<proto::Server::Stub*> EnsureIntraWorkerStubIsReady(
-      const int worker_idx);
+      int worker_idx, const proto::Server::Stub* failed_stub = nullptr);
 
   // Finalize the current worker communication.
   // No more inter worker communication should be done after this call, except
@@ -136,11 +147,33 @@ class WorkerService final : public proto::Server::Service {
   // Non owning pointer to the notification that stops the server.
   utils::concurrency::Notification* stop_server_ = nullptr;
 
-  // Active worker implementation.
+  // Active worker implementation. Only set once set up (i.e. "Setup"
+  // succeeded).
   std::unique_ptr<AbstractWorker> worker_;
+
+  // True when "worker_" is set and not being stopped. The requests of the
+  // other workers only run on a ready worker. Checked first without "mutex_",
+  // which is held during the set up of a worker (e.g. while it loads its
+  // dataset): a worker being set up (e.g. restarted) answers them with an
+  // error at once.
+  std::atomic<bool> worker_ready_{false};
 
   // UID of the manager. Only valid if worker_ is set.
   uint64_t manager_uid_;
+
+  // Requests from the manager being run, by manager uid and query id (see
+  // "Query.query_id"): a copy of a running request (sent again after a
+  // timeout) waits for it and returns its answer.
+  struct RunningQuery {
+    absl::Notification done;
+    absl::StatusOr<Blob> result;
+  };
+  absl::Mutex running_queries_mutex_;
+  absl::flat_hash_map<std::pair<uint64_t, uint64_t>,
+                      std::shared_ptr<RunningQuery>>
+      running_queries_ ABSL_GUARDED_BY(running_queries_mutex_);
+  // Runs a request of the manager (at most once per query id at a time).
+  absl::StatusOr<Blob> RunQueryOnce(const proto::Query& request);
 
   // Fields related to the inter worker communication.
   struct InterWorkerCommunication {
@@ -176,6 +209,13 @@ class WorkerService final : public proto::Server::Service {
   };
 
   std::unique_ptr<InterWorkerCommunication> intra_worker_communication_;
+  // Deadline of the requests to the other workers (0: none, see
+  // "WorkerConfig.request_timeout_seconds").
+  absl::Duration inter_worker_timeout_ = absl::ZeroDuration();
+  // Keep-alive of the connections to the other workers (see
+  // "WorkerConfig.keepalive_time_ms").
+  int keepalive_time_ms_ = 0;
+  int keepalive_timeout_ms_ = 0;
 
   // utils::concurrency::Mutex protecting the initialization of the worker.
   utils::concurrency::Mutex mutex_;

@@ -20,6 +20,10 @@ namespace distribute {
 
 std::atomic<int> ToyWorker::num_existing_toy_workers_{0};
 std::atomic<int> ToyWorker::max_num_existing_toy_workers_{0};
+std::atomic<int> ToyWorker::num_sleeps_{0};
+std::atomic<int> ToyWorker::setup_delay_ms_{0};
+std::atomic<int> ToyWorker::concurrent_sleeps_{0};
+std::atomic<int> ToyWorker::max_concurrent_sleeps_{0};
 
 }  // namespace distribute
 }  // namespace yggdrasil_decision_forests

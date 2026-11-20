@@ -32,6 +32,23 @@ TEST(IsTransientError, TransientErrors) {
       grpc::Status(grpc::StatusCode::UNAVAILABLE, "Warning: socket CLOSED")));
 }
 
+TEST(IsTransientError, DeadOrRestartedWorker) {
+  for (const char* message : {
+           "keepalive watchdog timeout",
+           "keepalive timeout",
+           "ping timeout",
+           "ipv4:10.0.0.1:1234: Connection timed out",
+           "connections to all backends failing; last error: UNAVAILABLE: "
+           "ipv6:[::1]:1234: Connection refused",
+           "DNS resolution failed for worker:1234",
+           "empty address list: name resolution failed",
+       }) {
+    EXPECT_TRUE(
+        IsTransientError(grpc::Status(grpc::StatusCode::UNAVAILABLE, message)))
+        << message;
+  }
+}
+
 TEST(IsTransientError, NonTransientErrors) {
   EXPECT_FALSE(IsTransientError(grpc::Status::OK));
   EXPECT_FALSE(IsTransientError(

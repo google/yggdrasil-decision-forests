@@ -114,11 +114,13 @@ cc_library_ydf(
     hdrs = ["toy_worker.h"],
     deps = [
         ":core",
+        "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:logging",
         "//yggdrasil_decision_forests/utils:status_macros",
         "//yggdrasil_decision_forests/utils:synchronization_primitives",
         "@com_google_absl//absl/log",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
