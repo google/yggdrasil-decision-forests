@@ -1,12 +1,12 @@
 # Learner bindings for PYDF
-load("@rules_python//python:py_binary.bzl", "py_binary")
+load("//yggdrasil_decision_forests/utils:compile.bzl", "py_binary_ydf")
 
 package(licenses = ["notice"])
 
 # Binary
 # =========
 
-py_binary(
+py_binary_ydf(
     name = "main",
     srcs = ["main.py"],
     deps = [

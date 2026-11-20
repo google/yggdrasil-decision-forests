@@ -4,12 +4,29 @@ load("@rules_proto//proto:defs.bzl", "proto_library")
 load("@com_google_protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_library.bzl", "py_library")
+load("@rules_python//python:py_test.bzl", "py_test")
 
 def cc_library_ydf(**attrs):
     native.cc_library(**attrs)
 
 def cc_binary_ydf(**attrs):
     native.cc_binary(**attrs)
+
+def _drop_google3_py_attrs(attrs):
+    attrs.pop("type_checking", None)
+    attrs.pop("strict_deps", None)
+    return attrs
+
+def py_library_ydf(**attrs):
+    py_library(**_drop_google3_py_attrs(attrs))
+
+def py_binary_ydf(**attrs):
+    py_binary(**_drop_google3_py_attrs(attrs))
+
+def py_test_ydf(**attrs):
+    py_test(**_drop_google3_py_attrs(attrs))
 
 def all_proto_library(
         name = None,

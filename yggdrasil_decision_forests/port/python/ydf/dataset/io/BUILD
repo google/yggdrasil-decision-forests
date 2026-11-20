@@ -1,14 +1,12 @@
-load("@rules_python//python:py_library.bzl", "py_library")
-
 # I/O bindings
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -21,7 +19,7 @@ py_library(
 # pass a Pandas DataFrame or a Xarray Dataset to YDF already depend on those libraries. Do not add
 # //third_party/py/pandas or //third_party/py/xarray here (build_cleaner may suggest it): they
 # would be linked into every YDF binary.
-py_library(
+py_library_ydf(
     name = "dataset_io_types",
     srcs = ["dataset_io_types.py"],
     deps = [
@@ -30,7 +28,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "dataset_io",
     srcs = ["dataset_io.py"],
     deps = [
@@ -47,7 +45,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "pandas_io",
     srcs = ["pandas_io.py"],
     deps = [
@@ -58,7 +56,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "polars_io",
     srcs = ["polars_io.py"],
     deps = [
@@ -67,7 +65,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "pyarrow_io",
     srcs = ["pyarrow_io.py"],
     deps = [
@@ -77,7 +75,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "xarray_io",
     srcs = ["xarray_io.py"],
     deps = [
@@ -86,13 +84,13 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "tensorflow_io",
     srcs = ["tensorflow_io.py"],
     deps = [":dataset_io_types"],
 )
 
-py_library(
+py_library_ydf(
     name = "pygrain_io",
     srcs = ["pygrain_io.py"],
     deps = [
@@ -102,7 +100,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "generator",
     srcs = ["generator.py"],
     deps = [
@@ -110,7 +108,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "numpy_io",
     srcs = ["numpy_io.py"],
     deps = [
@@ -122,7 +120,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "pandas_io_test",
     srcs = ["pandas_io_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -135,7 +133,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "polars_io_test",
     srcs = ["polars_io_test.py"],
     deps = [
@@ -146,7 +144,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "pyarrow_io_test",
     srcs = ["pyarrow_io_test.py"],
     deps = [
@@ -159,7 +157,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "xarray_io_test",
     srcs = ["xarray_io_test.py"],
     deps = [
@@ -173,7 +171,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "pygrain_io_test",
     srcs = ["pygrain_io_test.py"],
     # TODO: Figure out what to do with Pygrain support, since it does not work on MacOS.
@@ -192,7 +190,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "dataset_io_test",
     srcs = ["dataset_io_test.py"],
     deps = [
@@ -203,7 +201,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "numpy_io_test",
     srcs = ["numpy_io_test.py"],
     deps = [

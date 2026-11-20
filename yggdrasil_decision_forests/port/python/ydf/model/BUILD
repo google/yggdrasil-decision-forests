@@ -1,10 +1,6 @@
-load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-
 # Model bindings for PYDF
-load("@rules_python//python:py_binary.bzl", "py_binary")
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@rules_python//python:py_test.bzl", "py_test")
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "cc_library_ydf", "py_binary_ydf", "py_library_ydf", "py_test_ydf")
 load("@rules_cc//cc:cc_test.bzl", "cc_test")
 
 package(
@@ -12,7 +8,7 @@ package(
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -106,7 +102,7 @@ pybind_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "generic_model",
     srcs = ["generic_model.py"],
     deps = [
@@ -135,7 +131,7 @@ py_library(
 
 # Note: This build rule does not depends on TF. To use its functionalities, TF and TF-DF needs to be
 # imported manually by the call i.e. //third_party/py/tensorflow_decision_forests.
-py_library(
+py_library_ydf(
     name = "export_tf",
     srcs = ["export_tf.py"],
     deps = [
@@ -151,7 +147,7 @@ py_library(
 # YDF) does not link JAX (and XLA, XProf, etc.). To use its functionalities (e.g.
 # `model.to_jax_function()`), JAX needs to be added manually by the caller i.e.
 # //third_party/py/jax. Do not add //third_party/py/jax here (build_cleaner may suggest it).
-py_library(
+py_library_ydf(
     name = "export_jax",
     srcs = ["export_jax.py"],
     deps = [
@@ -169,7 +165,7 @@ py_library(
 # Note: This build rule intentionally does not depend on SKLearn. To use its functionalities (e.g.
 # `ydf.from_sklearn()`), SKLearn needs to be added manually by the caller i.e.
 # //third_party/py/sklearn. Do not add //third_party/py/sklearn here (build_cleaner may suggest it).
-py_library(
+py_library_ydf(
     name = "export_sklearn",
     srcs = ["export_sklearn.py"],
     deps = [
@@ -184,7 +180,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "model_lib",
     srcs = ["model_lib.py"],
     deps = [
@@ -199,7 +195,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "analysis",
     srcs = ["analysis.py"],
     deps = [
@@ -212,7 +208,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "model_metadata",
     srcs = ["model_metadata.py"],
     deps = [
@@ -221,7 +217,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "template_cpp_export",
     srcs = ["template_cpp_export.py"],
     deps = [
@@ -230,7 +226,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "optimizer_logs",
     srcs = ["optimizer_logs.py"],
     deps = [
@@ -239,7 +235,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "export_docker",
     srcs = ["export_docker.py"],
     deps = [
@@ -248,7 +244,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "feature_selector_logs",
     srcs = ["feature_selector_logs.py"],
     deps = [
@@ -260,7 +256,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "model_test",
     srcs = ["model_test.py"],
     data = [
@@ -286,7 +282,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "tf_model_test",
     srcs = ["tf_model_test.py"],
     data = [
@@ -361,7 +357,7 @@ genrule(
     tools = [":export_cc_generator"],
 )
 
-py_binary(
+py_binary_ydf(
     name = "export_cc_generator",
     srcs = ["export_cc_generator.py"],
     deps = [
@@ -372,7 +368,7 @@ py_binary(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "optimizer_logs_test",
     srcs = ["optimizer_logs_test.py"],
     deps = [
@@ -384,7 +380,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "jax_model_test",
     timeout = "long",
     srcs = ["jax_model_test.py"],
@@ -413,7 +409,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "sklearn_model_test",
     srcs = ["sklearn_model_test.py"],
     deps = [
@@ -426,7 +422,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "export_docker_test",
     srcs = ["export_docker_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],

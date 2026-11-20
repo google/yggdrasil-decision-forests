@@ -1,5 +1,4 @@
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -8,7 +7,7 @@ package(
 
 # User facing API of pydf.
 # TODO: Create alias for the library to be imported with "import ydf".
-py_library(
+py_library_ydf(
     name = "api",
     srcs = ["__init__.py"],
     visibility = ["//visibility:public"],
@@ -52,7 +51,7 @@ py_library(
 # Opt-in target enabling the JAX based deep models of `ydf.experimental` (e.g.
 # `ydf.experimental.MultiLayerPerceptronLearner`). Those are not part of `:api` as they depend on
 # JAX, Flax and Optax.
-py_library(
+py_library_ydf(
     name = "experimental_deep",
     visibility = ["//visibility:public"],
     deps = [
@@ -63,7 +62,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "package_inits",
     deps = [
         "//ydf/api:init",
@@ -85,7 +84,7 @@ py_library(
 )
 
 # All the YDF protos, including the ones possibly not used by PYDF.
-py_library(
+py_library_ydf(
     name = "ydf_protos",
     deps = [
         "@ydf_cc//yggdrasil_decision_forests/dataset:data_spec_py_proto",
@@ -130,7 +129,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "version",
     srcs = ["version.py"],
     deps = [
@@ -140,7 +139,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "api_test",
     srcs = ["api_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -163,7 +162,7 @@ py_test(
 
 # Checks that YDF works without its optional dependencies (JAX, scikit-learn). Do not add those
 # dependencies to this test.
-py_test(
+py_test_ydf(
     name = "api_without_optional_deps_test",
     srcs = ["api_without_optional_deps_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -175,7 +174,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "experimental_deep_test",
     srcs = ["experimental_deep_test.py"],
     deps = [

@@ -1,13 +1,12 @@
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -15,7 +14,7 @@ py_library(
 # Libraries
 # =========
 
-py_library(
+py_library_ydf(
     name = "evaluate",
     srcs = ["evaluate.py"],
     deps = [
@@ -28,7 +27,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "metric",
     srcs = [
         "display_metric.py",
@@ -85,7 +84,7 @@ pybind_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "metric_test",
     srcs = ["metric_test.py"],
     data = ["//test_data"],
@@ -99,7 +98,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "evaluate_test",
     srcs = ["evaluate_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],

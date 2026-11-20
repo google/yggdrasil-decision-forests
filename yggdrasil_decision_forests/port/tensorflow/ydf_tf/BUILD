@@ -1,5 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
-load("@rules_python//python:py_library.bzl", "py_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -30,7 +30,7 @@ cc_binary(
     deps = [":kernel_and_op"],
 )
 
-py_library(
+py_library_ydf(
     name = "ydf_tf",
     srcs = ["__init__.py"],
     visibility = ["//visibility:public"],
@@ -38,7 +38,7 @@ py_library(
 )
 
 # User-facing library to run models in TensorFlow.
-py_library(
+py_library_ydf(
     name = "api",
     srcs = ["api.py"],
     visibility = ["//visibility:public"],

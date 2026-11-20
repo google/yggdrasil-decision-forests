@@ -1,12 +1,11 @@
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -14,7 +13,7 @@ py_library(
 # Libraries
 # =========
 
-py_library(
+py_library_ydf(
     name = "tf_example",
     srcs = ["tf_example.py"],
     deps = [
@@ -26,7 +25,7 @@ py_library(
 
 # Note: This build rule does not depends on TF. To use its functionalities, TF needs to be
 # imported manually by the call i.e. //third_party/py/tensorflow.
-py_library(
+py_library_ydf(
     name = "tf_example_impl",
     srcs = ["tf_example_impl.py"],
     deps = [
@@ -36,7 +35,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "dataset_io",
     srcs = ["dataset_io.py"],
     deps = [
@@ -44,19 +43,19 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "help",
     srcs = ["help.py"],
     deps = [],
 )
 
-py_library(
+py_library_ydf(
     name = "vertex_ai",
     srcs = ["vertex_ai.py"],
     deps = [],
 )
 
-py_library(
+py_library_ydf(
     name = "log_book",
     srcs = ["log_book.py"],
     deps = [
@@ -67,7 +66,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "tf_example_test",
     srcs = ["tf_example_test.py"],
     data = [
@@ -85,7 +84,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "vertex_ai_test",
     srcs = ["vertex_ai_test.py"],
     deps = [
@@ -94,7 +93,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "log_book_test",
     srcs = ["log_book_test.py"],
     deps = [

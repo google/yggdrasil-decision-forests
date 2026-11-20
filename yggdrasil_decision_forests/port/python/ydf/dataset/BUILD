@@ -1,15 +1,13 @@
-load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-load("@rules_python//python:py_library.bzl", "py_library")
-
 # Dataset bindings for PYDF
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -44,7 +42,7 @@ pybind_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "dataset",
     srcs = ["dataset.py"],
     deps = [
@@ -60,7 +58,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "dataspec",
     srcs = ["dataspec.py"],
     deps = [
@@ -73,7 +71,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "dataset_test",
     srcs = ["dataset_test.py"],
     data = [
@@ -96,7 +94,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "dataset_with_tf_test",
     srcs = ["dataset_with_tf_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -110,7 +108,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "dataspec_test",
     srcs = ["dataspec_test.py"],
     deps = [

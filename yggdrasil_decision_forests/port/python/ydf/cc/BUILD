@@ -1,12 +1,12 @@
 load("@pybind11_bazel//:build_defs.bzl", "pybind_extension", "pybind_library")
-load("@rules_python//python:py_library.bzl", "py_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
