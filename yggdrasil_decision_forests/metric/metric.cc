@@ -68,6 +68,9 @@ namespace metric {
 
 namespace {
 
+using NoPromotePolicy =
+    boost::math::policies::policy<boost::math::policies::promote_double<false>>;
+
 // Returns the error of a prediction in log-space. Both arguments must be
 // non-negative.
 double ComputeLogError(double pred, double ground_truth) {
@@ -606,7 +609,8 @@ float PValueMeanIsGreaterThanZero(const std::vector<float>& sample) {
 
   const double statistic = mean * std::sqrt(sample.size()) / standard_deviation;
   const auto students_t =
-      boost::math::students_t_distribution<double>(sample.size() - 1);
+      boost::math::students_t_distribution<double, NoPromotePolicy>(
+          sample.size() - 1);
   return 1. - boost::math::cdf(students_t, statistic);
 }
 
@@ -641,8 +645,8 @@ ErrorBars<float> ComputeErrorIntervalForReliabilityDiagram(
       continue;
     }
 
-    upper[i] = boost::math::ibeta_inv(alpha, beta, upper_p);
-    lower[i] = boost::math::ibeta_inv(alpha, beta, lower_p);
+    upper[i] = boost::math::ibeta_inv(alpha, beta, upper_p, NoPromotePolicy());
+    lower[i] = boost::math::ibeta_inv(alpha, beta, lower_p, NoPromotePolicy());
 
     if (std::isnan(upper[i])) {
       upper[i] = mean_observed[i];
@@ -1937,11 +1941,13 @@ absl::StatusOr<std::unordered_map<std::string, std::string>> ExtractFlatMetrics(
 
 std::pair<float, float> AccuracyConfidenceInterval(
     const proto::EvaluationResults& eval, const float confidence_level) {
-  double lower = boost::math::binomial::find_lower_bound_on_p(
+  using BinomialDist =
+      boost::math::binomial_distribution<double, NoPromotePolicy>;
+  double lower = BinomialDist::find_lower_bound_on_p(
       eval.count_predictions_no_weight(),
       Accuracy(eval) * eval.count_predictions_no_weight(),
       1.f - confidence_level);
-  double upper = boost::math::binomial::find_upper_bound_on_p(
+  double upper = BinomialDist::find_upper_bound_on_p(
       eval.count_predictions_no_weight(),
       Accuracy(eval) * eval.count_predictions_no_weight(),
       1.f - confidence_level);
@@ -1962,7 +1968,8 @@ std::pair<float, float> AUCConfidenceInterval(const proto::Roc& roc,
     return {0, 1};
   }
   const double quantile = 1 - (1 - confidence_level) / 2;
-  const double z = boost::math::quantile(boost::math::normal(), quantile);
+  const double z = boost::math::quantile(
+      boost::math::normal_distribution<double, NoPromotePolicy>(), quantile);
   const double term1 = auc * (1 - auc);
   const double term2 = (n1 - 1) * (q1 - auc_square);
   const double term3 = (n2 - 1) * (q2 - auc_square);
@@ -1981,7 +1988,8 @@ std::pair<float, float> PRAUCConfidenceInterval(const proto::Roc& roc,
   const double eta = log(pr_auc / (1 - pr_auc));
   const double tau = 1. / std::sqrt(n * pr_auc * (1 - pr_auc));
   const double quantile = 1 - (1 - confidence_level) / 2;
-  const double z = boost::math::quantile(boost::math::normal(), quantile);
+  const double z = boost::math::quantile(
+      boost::math::normal_distribution<double, NoPromotePolicy>(), quantile);
   const double term1 = std::exp(eta - z * tau);
   const double term2 = std::exp(eta + z * tau);
   return {term1 / (1 + term1), term2 / (1 + term2)};
@@ -2315,7 +2323,8 @@ std::pair<float, float> RMSEConfidenceInterval(
             std::numeric_limits<double>::quiet_NaN()};
   }
 
-  const auto chi_square = boost::math::chi_squared_distribution<double>(n);
+  const auto chi_square =
+      boost::math::chi_squared_distribution<double, NoPromotePolicy>(n);
   const double q1 = quantile(chi_square, 1 - (1. - confidence_level) / 2);
   const double q2 = quantile(chi_square, (1. - confidence_level) / 2);
   const double c1 = std::sqrt(n / q1) * sampled_sd;
