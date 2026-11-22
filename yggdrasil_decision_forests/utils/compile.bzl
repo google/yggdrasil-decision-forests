@@ -14,6 +14,7 @@ def cc_binary_ydf(**attrs):
 def all_proto_library(
         name = None,
         deps = [],
+        option_deps = [],
         srcs = [],
         compile_cc = True,
         compile_py = True,
@@ -31,6 +32,7 @@ def all_proto_library(
     Args:
       name: Name of the proto rule. Should end with "_proto".
       deps: Dependencies of the proto rule.
+      option_deps: Option dependencies of the proto rule.
       srcs: Sources of the proto rule.
       compile_cc: If true, generate a cc proto rule.
       compile_py: If true, generate a py proto rule.
@@ -73,3 +75,11 @@ def all_proto_library(
             deps = [":" + name],
             visibility = visibility,
         )
+
+register_extension_info(
+    extension = all_proto_library,
+    label_regex_map = {
+        "deps": "deps:{extension_name}",
+        "option_deps": "option_deps:{extension_name}",
+    },
+)
