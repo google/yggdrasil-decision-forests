@@ -1,15 +1,12 @@
-load("@rules_python//python:py_library.bzl", "py_library")
-
 # Dataset bindings for PYDF
-load("@rules_python//python:py_test.bzl", "py_test")
-load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "all_proto_library", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -17,13 +14,13 @@ py_library(
 # Libraries
 # =========
 
-py_library(
+py_library_ydf(
     name = "jax_fallback",
     srcs = ["jax_fallback.py"],
     deps = [],
 )
 
-py_library(
+py_library_ydf(
     name = "safetensors_lib",
     srcs = ["safetensors_lib.py"],
     deps = [
@@ -32,7 +29,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "model_lib",
     srcs = ["model_lib.py"],
     deps = [
@@ -51,7 +48,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "generic_jax",
     srcs = ["generic_jax.py"],
     deps = [
@@ -95,7 +92,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "dataset",
     srcs = ["dataset.py"],
     deps = [
@@ -104,7 +101,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "metric",
     srcs = ["metric.py"],
     deps = [
@@ -113,7 +110,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "preprocessor",
     srcs = ["preprocessor.py"],
     deps = [
@@ -128,7 +125,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "layer",
     srcs = ["layer.py"],
     deps = [
@@ -137,13 +134,13 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "hyperparameter",
     srcs = ["hyperparameter.py"],
     deps = [],
 )
 
-py_library(
+py_library_ydf(
     name = "mlp",
     srcs = ["mlp.py"],
     deps = [
@@ -163,7 +160,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "tabular_transformer",
     srcs = ["tabular_transformer.py"],
     deps = [
@@ -184,7 +181,7 @@ py_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "analysis",
     srcs = ["analysis.py"],
     deps = [
@@ -213,7 +210,7 @@ all_proto_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "mlp_test",
     srcs = ["mlp_test.py"],
     data = [
@@ -237,7 +234,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "dataset_test",
     srcs = ["dataset_test.py"],
     data = [
@@ -253,7 +250,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "preprocessor_test",
     srcs = ["preprocessor_test.py"],
     deps = [
@@ -270,7 +267,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "hyperparameter_test",
     srcs = ["hyperparameter_test.py"],
     data = ["@ydf_cc//yggdrasil_decision_forests/test_data"],
@@ -281,7 +278,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "layer_test",
     srcs = ["layer_test.py"],
     deps = [
@@ -292,7 +289,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "safetensors_lib_test",
     srcs = ["safetensors_lib_test.py"],
     deps = [
@@ -304,7 +301,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "metric_test",
     srcs = ["metric_test.py"],
     deps = [
@@ -315,7 +312,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "analysis_test",
     srcs = ["analysis_test.py"],
     deps = [
@@ -334,7 +331,7 @@ py_test(
     ],
 )
 
-py_test(
+py_test_ydf(
     name = "tabular_transformer_test",
     size = "large",
     srcs = ["tabular_transformer_test.py"],

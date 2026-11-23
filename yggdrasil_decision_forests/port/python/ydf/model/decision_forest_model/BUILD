@@ -1,13 +1,12 @@
 load("@pybind11_bazel//:build_defs.bzl", "pybind_library")
-load("@rules_python//python:py_library.bzl", "py_library")
-load("@rules_python//python:py_test.bzl", "py_test")
+load("@ydf_cc//yggdrasil_decision_forests/utils:compile.bzl", "py_library_ydf", "py_test_ydf")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],
 )
 
-py_library(
+py_library_ydf(
     name = "init",
     srcs = ["__init__.py"],
 )
@@ -35,7 +34,7 @@ pybind_library(
     ],
 )
 
-py_library(
+py_library_ydf(
     name = "decision_forest_model",
     srcs = ["decision_forest_model.py"],
     deps = [
@@ -51,7 +50,7 @@ py_library(
 # Tests
 # =====
 
-py_test(
+py_test_ydf(
     name = "decision_forest_model_test",
     srcs = ["decision_forest_model_test.py"],
     data = [
