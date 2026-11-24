@@ -32,7 +32,7 @@ jobs:
       actions: write  # For gh cache delete
       contents: read
     with:
-      runner: linux-x86-n2-32
+      runner: linux-x86-n4-32
       compiler_config: ${{ matrix.compiler_config }}
       refresh_cache: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.refresh_cache == 'true') }}
       pull_request_base_sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
@@ -48,7 +48,7 @@ jobs:
       actions: write  # For gh cache delete
       contents: read
     with:
-      runner: linux-x86-n2-32
+      runner: linux-x86-n4-32
       python_version: ${{ matrix.python_version }}
       refresh_cache: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.refresh_cache == 'true') }}
       pull_request_base_sha: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}

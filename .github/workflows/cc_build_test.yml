@@ -6,7 +6,7 @@ on:
       runner:
         required: true
         type: string
-        description: "The GitHub runner label (e.g., linux-x86-n2-32)"
+        description: "The GitHub runner label (e.g., linux-x86-n4-32)"
       container_image:
         required: false
         type: string
