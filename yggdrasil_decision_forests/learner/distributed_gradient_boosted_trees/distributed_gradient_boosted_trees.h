@@ -40,8 +40,14 @@
 #ifndef YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_DISTRIBUTED_GRADIENT_BOOSTED_TREES_H_
 #define YGGDRASIL_DECISION_FORESTS_LEARNER_DISTRIBUTED_GRADIENT_BOOSTED_TREES_DISTRIBUTED_GRADIENT_BOOSTED_TREES_H_
 
+#include <cstddef>
+#include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
@@ -59,9 +65,13 @@
 #include "yggdrasil_decision_forests/learner/distributed_decision_tree/training.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/distributed_gradient_boosted_trees.pb.h"
 #include "yggdrasil_decision_forests/learner/distributed_gradient_boosted_trees/worker.pb.h"
+#include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_library.h"
+#include "yggdrasil_decision_forests/model/abstract_model.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.h"
 #include "yggdrasil_decision_forests/utils/distribute/core.h"
+#include "yggdrasil_decision_forests/utils/hyper_parameters.h"
+#include "yggdrasil_decision_forests/utils/random.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -213,7 +223,19 @@ class PartialEvaluationAggregator {
  public:
   // num_fragments: Number of partial evaluations required to form a complete
   //   evaluation. If 0, the aggregator is not "active".
-  PartialEvaluationAggregator(const int num_fragments) {
+  // loss_averaging: Averaging unit of the loss (see "AbstractLoss").
+  // metric_averagings: Averaging unit of each metric (see
+  //   "AbstractLoss::SecondaryMetricAveragings"). Metrics without an averaging
+  //   unit are averaged over the examples.
+  //
+  // Values averaged over the ranking groups (e.g. NDCG) are combined weighted
+  // by "sum_group_weights".
+  explicit PartialEvaluationAggregator(
+      const int num_fragments,
+      const gradient_boosted_trees::MetricAveraging loss_averaging,
+      std::vector<gradient_boosted_trees::MetricAveraging> metric_averagings)
+      : loss_averaging_(loss_averaging),
+        metric_averagings_(std::move(metric_averagings)) {
     data_.set_num_fragments(num_fragments);
   }
 
@@ -234,6 +256,8 @@ class PartialEvaluationAggregator {
 
  private:
   proto::PartialEvaluationAggregator data_;
+  gradient_boosted_trees::MetricAveraging loss_averaging_;
+  std::vector<gradient_boosted_trees::MetricAveraging> metric_averagings_;
 };
 
 absl::Status SetDefaultHyperParameters(

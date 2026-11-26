@@ -92,6 +92,14 @@ std::vector<std::string> AbstractLoss::CustomMetricNames() const {
   return names;
 }
 
+std::vector<MetricAveraging> AbstractLoss::SecondaryMetricAveragings() const {
+  std::vector<MetricAveraging> averagings = InternalSecondaryMetricAveragings();
+  DCHECK_EQ(averagings.size(), InternalSecondaryMetricNames().size());
+  averagings.insert(averagings.end(), custom_metrics_.size(),
+                    MetricAveraging::kExample);
+  return averagings;
+}
+
 absl::StatusOr<LossResults> AbstractLoss::Loss(
     const dataset::VerticalDataset& dataset, int label_col_idx,
     const absl::Span<const float> predictions,
@@ -294,6 +302,21 @@ double RankingGroupsIndices::NDCG(const absl::Span<const float> predictions,
   }
 
   return sum_weighted_ndcg / sum_weights;
+}
+
+double RankingGroupsIndices::SumTopGroupWeights(
+    const absl::Span<const float> weights) const {
+  DCHECK(weights.empty() || weights.size() == num_items_);
+  if (weights.empty()) {
+    return groups_.size();
+  }
+  // Note: Must match the group weighting of `NDCG()`.
+  double sum_weights = 0;
+  for (const auto& group : groups_) {
+    DCHECK(!group.items.empty());
+    sum_weights += weights[group.items.front().example_idx];
+  }
+  return sum_weights;
 }
 
 void RankingGroupsIndices::ExtractPredAndLabelRelevance(

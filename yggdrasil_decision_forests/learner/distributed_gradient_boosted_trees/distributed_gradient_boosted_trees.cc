@@ -466,7 +466,9 @@ TrainWithCache(
   }
 
   // Accumulator of validation loss and metrics.
-  PartialEvaluationAggregator validation_aggregator(num_eval_workers);
+  PartialEvaluationAggregator validation_aggregator(
+      num_eval_workers, loss->LossAveraging(),
+      loss->SecondaryMetricAveragings());
 
   ASSIGN_OR_RETURN(auto load_balancer,
                    distributed_decision_tree::LoadBalancer::Create(
@@ -1639,7 +1641,7 @@ absl::Status EmitCreateCheckpoint(
         const int new_worker_idx =
             (generic_result.worker_idx() + 1) % load_balancer->NumWorkers();
         // The worker was restarted and it misses the data required to create
-        // the checkpoint. Re-send the request to another worker.
+        // the checkpoint. Resend the request to another worker.
         LOG(WARNING) << "Worker #" << generic_result.worker_idx()
                      << " does not have the right data to create the "
                         "checkpoint. Trying worker #"
@@ -2126,26 +2128,55 @@ absl::Status PartialEvaluationAggregator::AddPartial(
     // Record the evaluation.
     *item.mutable_evaluation() = evaluation;
   } else {
-    // Merges two metrics weighted by "sum_weights".
-    const auto merge_metric = [&](const float previous_value,
-                                  const float new_value) {
-      return (previous_value * item.evaluation().sum_weights() +
-              new_value * evaluation.sum_weights()) /
-             (item.evaluation().sum_weights() + evaluation.sum_weights());
+    // Merges two metrics weighted by "sum_weights" (for values averaged over
+    // the examples) or by "sum_group_weights" (for values averaged over the
+    // ranking groups e.g. NDCG).
+    const auto merge_metric =
+        [&](const float previous_value, const float new_value,
+            const gradient_boosted_trees::MetricAveraging averaging)
+        -> absl::StatusOr<float> {
+      if (averaging == gradient_boosted_trees::MetricAveraging::kExample) {
+        return (previous_value * item.evaluation().sum_weights() +
+                new_value * evaluation.sum_weights()) /
+               (item.evaluation().sum_weights() + evaluation.sum_weights());
+      }
+      if (!item.evaluation().has_sum_group_weights() ||
+          !evaluation.has_sum_group_weights()) {
+        return absl::InvalidArgumentError("Missing sum of group weights.");
+      }
+      const double previous_weight = item.evaluation().sum_group_weights();
+      const double new_weight = evaluation.sum_group_weights();
+      // The per-group metrics of a partial evaluation without groups (or with
+      // only zero weight groups) are undefined.
+      if (new_weight == 0) {
+        return previous_value;
+      }
+      if (previous_weight == 0) {
+        return new_value;
+      }
+      return (previous_value * previous_weight + new_value * new_weight) /
+             (previous_weight + new_weight);
     };
 
-    // Merge the loss and emtrics weighted by "sum_weights".
-    item.mutable_evaluation()->set_loss(
-        merge_metric(item.evaluation().loss(), evaluation.loss()));
+    // Merge the loss and metrics.
+    ASSIGN_OR_RETURN(const float merged_loss,
+                     merge_metric(item.evaluation().loss(), evaluation.loss(),
+                                  loss_averaging_));
+    item.mutable_evaluation()->set_loss(merged_loss);
     if (item.mutable_evaluation()->metrics_size() !=
         evaluation.metrics_size()) {
       return absl::InvalidArgumentError("Unexpected number of metric values.");
     }
     for (int metric_idx = 0; metric_idx < evaluation.metrics_size();
          metric_idx++) {
-      item.mutable_evaluation()->set_metrics(
-          metric_idx, merge_metric(item.evaluation().metrics(metric_idx),
-                                   evaluation.metrics(metric_idx)));
+      const auto averaging =
+          metric_idx < static_cast<int>(metric_averagings_.size())
+              ? metric_averagings_[metric_idx]
+              : gradient_boosted_trees::MetricAveraging::kExample;
+      ASSIGN_OR_RETURN(const float merged_metric,
+                       merge_metric(item.evaluation().metrics(metric_idx),
+                                    evaluation.metrics(metric_idx), averaging));
+      item.mutable_evaluation()->set_metrics(metric_idx, merged_metric);
     }
 
     // Add the example count and weights.
@@ -2153,6 +2184,11 @@ absl::Status PartialEvaluationAggregator::AddPartial(
                                                evaluation.sum_weights());
     item.mutable_evaluation()->set_num_examples(
         item.evaluation().num_examples() + evaluation.num_examples());
+    if (evaluation.has_sum_group_weights()) {
+      item.mutable_evaluation()->set_sum_group_weights(
+          item.evaluation().sum_group_weights() +
+          evaluation.sum_group_weights());
+    }
   }
 
   item.set_num_fragments(item.num_fragments() + 1);

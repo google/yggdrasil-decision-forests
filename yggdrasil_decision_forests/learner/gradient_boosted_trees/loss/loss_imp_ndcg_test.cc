@@ -410,6 +410,35 @@ TEST(NDCGLossTest, SecondaryMetricNameTrucation10) {
   EXPECT_THAT(loss_imp.SecondaryMetricNames(), ElementsAre("NDCG@10"));
 }
 
+TEST(NDCGLossTest, SumTopGroupWeights) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset(false));
+  RankingGroupsIndices index;
+  ASSERT_OK(index.Initialize(dataset, 0, 1));
+
+  // Without weights, the sum of group weights is the number of groups.
+  EXPECT_DOUBLE_EQ(index.SumTopGroupWeights({}), 2.);
+
+  // The weight of a group is the weight of its most relevant item i.e. example
+  // #0 for the first group, and example #4 for the second group.
+  const std::vector<float> weights = {1.f, 2.f, 3.f, 4.f, 5.f};
+  EXPECT_DOUBLE_EQ(index.SumTopGroupWeights(weights), 1. + 5.);
+}
+
+TEST(NDCGLossTest, MetricAveragings) {
+  ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
+  const NDCGLoss ndcg_loss(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)}, 5);
+  EXPECT_EQ(ndcg_loss.LossAveraging(), MetricAveraging::kTopScoredGroup);
+  EXPECT_THAT(ndcg_loss.SecondaryMetricAveragings(),
+              ElementsAre(MetricAveraging::kTopScoredGroup));
+
+  const CrossEntropyNDCGLoss xe_ndcg_loss(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(0)});
+  EXPECT_EQ(xe_ndcg_loss.LossAveraging(), MetricAveraging::kTopScoredGroup);
+  EXPECT_THAT(xe_ndcg_loss.SecondaryMetricAveragings(), IsEmpty());
+}
+
 TEST(NDCGLossTest, InvalidTruncation) {
   ASSERT_OK_AND_ASSIGN(const auto dataset, CreateToyDataset(false));
   proto::GradientBoostedTreesTrainingConfig gbt_config;

@@ -97,6 +97,9 @@ class MeanSquaredErrorLoss : public AbstractLoss {
 
   std::vector<std::string> InternalSecondaryMetricNames() const override;
 
+  std::vector<MetricAveraging> InternalSecondaryMetricAveragings()
+      const override;
+
   absl::StatusOr<LossResults> Loss(
       absl::Span<const float> labels, absl::Span<const float> predictions,
       absl::Span<const float> weights, const AbstractLossCache* cache,

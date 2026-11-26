@@ -254,6 +254,29 @@ TEST(MeanSquareErrorLossTest, SecondaryMetricNamesRanking) {
               ElementsAre("rmse", "mse", "NDCG@5"));
 }
 
+TEST(MeanSquareErrorLossTest, MetricAveragingsRegression) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const MeanSquaredErrorLoss loss_imp_regression(
+      {{}, {}, model::proto::Task::REGRESSION, dataset.data_spec().columns(1)});
+  EXPECT_EQ(loss_imp_regression.LossAveraging(), MetricAveraging::kExample);
+  EXPECT_THAT(
+      loss_imp_regression.SecondaryMetricAveragings(),
+      ElementsAre(MetricAveraging::kExample, MetricAveraging::kExample));
+}
+
+TEST(MeanSquareErrorLossTest, MetricAveragingsRanking) {
+  ASSERT_OK_AND_ASSIGN(const dataset::VerticalDataset dataset,
+                       CreateToyDataset());
+  const MeanSquaredErrorLoss loss_imp_ranking(
+      {{}, {}, model::proto::Task::RANKING, dataset.data_spec().columns(1)});
+  EXPECT_EQ(loss_imp_ranking.LossAveraging(), MetricAveraging::kExample);
+  // The NDCG@5 is averaged over the groups.
+  EXPECT_THAT(loss_imp_ranking.SecondaryMetricAveragings(),
+              ElementsAre(MetricAveraging::kExample, MetricAveraging::kExample,
+                          MetricAveraging::kTopScoredGroup));
+}
+
 INSTANTIATE_TEST_SUITE_P(MeanSquareErrorLossTestWithWeightsAndThreads,
                          MeanSquareErrorLossTest, Combine(Bool(), Bool()));
 
