@@ -644,8 +644,11 @@ cc_test(
     deps = [
         ":loss_interface",
         "//yggdrasil_decision_forests/dataset:types",
+        "//yggdrasil_decision_forests/dataset:vertical_dataset",
         "//yggdrasil_decision_forests/learner/gradient_boosted_trees:gradient_boosted_trees_cc_proto",
         "//yggdrasil_decision_forests/model/decision_tree",
+        "//yggdrasil_decision_forests/model/decision_tree:builder",
+        "//yggdrasil_decision_forests/utils:concurrency",
         "//yggdrasil_decision_forests/utils:test",
         "@com_google_googletest//:gtest_main",
     ],

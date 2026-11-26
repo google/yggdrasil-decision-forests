@@ -16,7 +16,10 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_utils.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <cstdlib>
+#include <functional>
 #include <vector>
 
 #include "absl/status/status.h"
@@ -30,6 +33,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/logging.h"
 
 namespace yggdrasil_decision_forests {
@@ -211,31 +215,28 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
   return absl::OkStatus();
 }
 
-void UpdatePredictionWithSingleUnivariateTree(
+double UpdatePredictionWithSingleUnivariateTree(
     const dataset::VerticalDataset& dataset,
     const decision_tree::DecisionTree& tree, std::vector<float>* predictions,
-    double* mean_abs_prediction) {
+    const UnsignedExampleIdx begin_idx, const UnsignedExampleIdx end_idx) {
   double sum_abs_predictions = 0;
-  const UnsignedExampleIdx num_examples = dataset.nrow();
-  for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+  for (UnsignedExampleIdx example_idx = begin_idx; example_idx < end_idx;
        example_idx++) {
     const auto& leaf = tree.GetLeaf(dataset, example_idx);
     (*predictions)[example_idx] += leaf.regressor().top_value();
     sum_abs_predictions += std::abs(leaf.regressor().top_value());
   }
-  if (mean_abs_prediction) {
-    *mean_abs_prediction = sum_abs_predictions / num_examples;
-  }
+  return sum_abs_predictions;
 }
 
-void UpdatePredictionWithMultipleUnivariateTrees(
+double UpdatePredictionWithMultipleUnivariateTrees(
     const dataset::VerticalDataset& dataset,
     const std::vector<const decision_tree::DecisionTree*>& trees,
-    std::vector<float>* predictions, double* mean_abs_prediction) {
+    std::vector<float>* predictions, const UnsignedExampleIdx begin_idx,
+    const UnsignedExampleIdx end_idx) {
   double sum_abs_predictions = 0;
   const int num_trees = trees.size();
-  const UnsignedExampleIdx num_examples = dataset.nrow();
-  for (UnsignedExampleIdx example_idx = 0; example_idx < num_examples;
+  for (UnsignedExampleIdx example_idx = begin_idx; example_idx < end_idx;
        example_idx++) {
     for (int grad_idx = 0; grad_idx < num_trees; grad_idx++) {
       const auto& leaf = trees[grad_idx]->GetLeaf(dataset, example_idx);
@@ -244,25 +245,50 @@ void UpdatePredictionWithMultipleUnivariateTrees(
       sum_abs_predictions += std::abs(leaf.regressor().top_value());
     }
   }
-  if (mean_abs_prediction) {
-    if (num_examples == 0) {
-      *mean_abs_prediction = 0;
-    } else {
-      *mean_abs_prediction = sum_abs_predictions / num_examples;
-    }
-  }
+  return sum_abs_predictions;
 }
 
 absl::Status UpdatePredictions(
     const std::vector<const decision_tree::DecisionTree*>& trees,
     const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-    double* mean_abs_prediction) {
+    double* mean_abs_prediction, utils::concurrency::ThreadPool* thread_pool) {
+  const UnsignedExampleIdx num_examples = dataset.nrow();
+  if (num_examples == 0) {
+    if (mean_abs_prediction) {
+      *mean_abs_prediction = 0.0;
+    }
+    return absl::OkStatus();
+  }
+
+  std::function<double(size_t, size_t)> update_range;
   if (trees.size() == 1) {
-    UpdatePredictionWithSingleUnivariateTree(dataset, *trees.front(),
-                                             predictions, mean_abs_prediction);
+    update_range = [&](size_t begin_idx, size_t end_idx) {
+      return UpdatePredictionWithSingleUnivariateTree(
+          dataset, *trees.front(), predictions, begin_idx, end_idx);
+    };
   } else {
-    UpdatePredictionWithMultipleUnivariateTrees(dataset, trees, predictions,
-                                                mean_abs_prediction);
+    update_range = [&](size_t begin_idx, size_t end_idx) {
+      return UpdatePredictionWithMultipleUnivariateTrees(
+          dataset, trees, predictions, begin_idx, end_idx);
+    };
+  }
+
+  double sum_abs_predictions = 0;
+  if (thread_pool != nullptr && thread_pool->num_threads() > 1) {
+    std::vector<double> block_sums(thread_pool->num_threads(), 0.0);
+    utils::concurrency::ConcurrentForLoop(
+        block_sums.size(), thread_pool, num_examples,
+        [&](size_t block_idx, size_t begin_idx, size_t end_idx) {
+          block_sums[block_idx] = update_range(begin_idx, end_idx);
+        });
+    for (const double block_sum : block_sums) {
+      sum_abs_predictions += block_sum;
+    }
+  } else {
+    sum_abs_predictions = update_range(0, num_examples);
+  }
+  if (mean_abs_prediction) {
+    *mean_abs_prediction = sum_abs_predictions / num_examples;
   }
   return absl::OkStatus();
 }

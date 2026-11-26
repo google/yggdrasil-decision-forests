@@ -18,9 +18,13 @@
 #include <vector>
 
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "yggdrasil_decision_forests/dataset/types.h"
+#include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/gradient_boosted_trees.pb.h"
+#include "yggdrasil_decision_forests/model/decision_tree/builder.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 #include "yggdrasil_decision_forests/utils/test.h"
 
 namespace yggdrasil_decision_forests {
@@ -28,7 +32,9 @@ namespace model {
 namespace gradient_boosted_trees {
 namespace {
 
+using ::testing::DoubleNear;
 using ::testing::FloatNear;
+using ::testing::Pointwise;
 
 constexpr double kTestPrecision = 0.000001;
 
@@ -75,6 +81,75 @@ TEST(CreateSetLeafValueFunctor, Weighted) {
   EXPECT_EQ(node.node().regressor().distribution().sum_squares(),
             1 * 1 * 1 + 2 * 2 * 2);
   EXPECT_EQ(node.node().regressor().distribution().count(), 1 + 2);
+}
+
+dataset::VerticalDataset CreateNumericalDataset(int num_examples) {
+  dataset::VerticalDataset dataset;
+  *dataset.mutable_data_spec() =
+      PARSE_TEST_PROTO(R"pb(columns { type: NUMERICAL name: "x" })pb");
+  EXPECT_OK(dataset.CreateColumnsFromDataspec());
+  auto* col = dataset
+                  .MutableColumnWithCastWithStatus<
+                      dataset::VerticalDataset::NumericalColumn>(0)
+                  .value();
+  for (int i = 0; i < num_examples; ++i) {
+    col->Add(i);
+  }
+  dataset.set_nrow(num_examples);
+  return dataset;
+}
+
+decision_tree::DecisionTree CreateThresholdTree(float threshold,
+                                                float neg_value,
+                                                float pos_value) {
+  decision_tree::DecisionTree tree;
+  auto [pos, neg] =
+      decision_tree::TreeBuilder(&tree).ConditionIsGreater(0, threshold);
+  pos.LeafRegression(pos_value);
+  neg.LeafRegression(neg_value);
+  return tree;
+}
+
+TEST(UpdatePredictions, ParallelMatchesSequential) {
+  const auto dataset = CreateNumericalDataset(100);
+  const auto tree0 = CreateThresholdTree(49.5f, -1.5f, 2.25f);
+  const auto tree1 = CreateThresholdTree(29.5f, 0.5f, -0.25f);
+  utils::concurrency::ThreadPool thread_pool(/*num_threads=*/4,
+                                             {.name_prefix = "test"});
+
+  const std::vector<std::vector<const decision_tree::DecisionTree*>> cases = {
+      {&tree0}, {&tree0, &tree1}};
+  for (const auto& trees : cases) {
+    std::vector<float> seq_preds(dataset.nrow() * trees.size(), 0.5f);
+    std::vector<float> par_preds = seq_preds;
+    double seq_mean_abs = 0.0;
+    double par_mean_abs = 0.0;
+    ASSERT_OK(UpdatePredictions(trees, dataset, &seq_preds, &seq_mean_abs));
+    ASSERT_OK(UpdatePredictions(trees, dataset, &par_preds, &par_mean_abs,
+                                &thread_pool));
+    EXPECT_THAT(par_preds, Pointwise(FloatNear(kTestPrecision), seq_preds));
+    EXPECT_THAT(par_mean_abs, DoubleNear(seq_mean_abs, kTestPrecision));
+    if (trees.size() == 1) {
+      EXPECT_THAT(par_mean_abs,
+                  DoubleNear((50 * 1.5 + 50 * 2.25) / 100.0, kTestPrecision));
+    }
+  }
+}
+
+TEST(UpdatePredictions, EmptyDataset) {
+  const auto dataset = CreateNumericalDataset(0);
+  const auto tree = CreateThresholdTree(0.0f, 1.0f, 2.0f);
+  utils::concurrency::ThreadPool thread_pool(/*num_threads=*/4,
+                                             {.name_prefix = "test"});
+  std::vector<float> preds;
+  const std::vector<std::vector<const decision_tree::DecisionTree*>> cases = {
+      {&tree}, {&tree, &tree}};
+  for (const auto& trees : cases) {
+    double mean_abs = -1.0;
+    ASSERT_OK(
+        UpdatePredictions(trees, dataset, &preds, &mean_abs, &thread_pool));
+    EXPECT_EQ(mean_abs, 0.0);
+  }
 }
 
 }  // namespace

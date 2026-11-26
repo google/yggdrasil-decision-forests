@@ -1133,7 +1133,7 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
           RETURN_IF_ERROR(UpdatePredictions(
               last_trees, next_train_dataset->gradient_dataset,
               &next_train_dataset->predictions,
-              /*mean_abs_prediction=*/nullptr));
+              /*mean_abs_prediction=*/nullptr, thread_pool.get()));
           next_train_dataset->predictions_from_num_trees +=
               mdl->num_trees_per_iter();
         }
@@ -1232,7 +1232,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
       RETURN_IF_ERROR(UpdatePredictions(internal::RemoveUniquePtr(new_trees),
                                         validation->gradient_dataset,
                                         &validation->predictions,
-                                        /*mean_abs_prediction=*/nullptr));
+                                        /*mean_abs_prediction=*/nullptr,
+                                        thread_pool.get()));
       validation->predictions_from_num_trees += new_trees.size();
     }
 
@@ -1241,7 +1242,8 @@ GradientBoostedTreesLearner::ShardedSamplingTrain(
       RETURN_IF_ERROR(UpdatePredictions(internal::RemoveUniquePtr(new_trees),
                                         current_train_dataset->gradient_dataset,
                                         &current_train_dataset->predictions,
-                                        /*mean_abs_prediction=*/nullptr));
+                                        /*mean_abs_prediction=*/nullptr,
+                                        thread_pool.get()));
       current_train_dataset->predictions_from_num_trees += new_trees.size();
     }
 
@@ -1786,14 +1788,15 @@ GradientBoostedTreesLearner::TrainWithStatusImpl(
       // Update the predictions on the training dataset.
       RETURN_IF_ERROR(UpdatePredictions(
           internal::RemoveUniquePtr(new_trees), gradient_sub_train_dataset,
-          &sub_train_predictions, &mean_abs_prediction));
+          &sub_train_predictions, &mean_abs_prediction, thread_pool.get()));
 
       if (has_validation_dataset) {
         // Update the predictions on the validation dataset.
         RETURN_IF_ERROR(UpdatePredictions(internal::RemoveUniquePtr(new_trees),
                                           gradient_validation_dataset,
                                           &validation_predictions,
-                                          /*mean_abs_prediction=*/nullptr));
+                                          /*mean_abs_prediction=*/nullptr,
+                                          thread_pool.get()));
       }
     }
 

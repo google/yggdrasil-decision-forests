@@ -32,6 +32,7 @@
 #include "yggdrasil_decision_forests/learner/gradient_boosted_trees/loss/loss_interface.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.h"
 #include "yggdrasil_decision_forests/model/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/utils/concurrency.h"
 
 namespace yggdrasil_decision_forests {
 namespace model {
@@ -89,7 +90,8 @@ absl::Status SetLeafValueWithNewtonRaphsonStep(
 absl::Status UpdatePredictions(
     const std::vector<const decision_tree::DecisionTree*>& trees,
     const dataset::VerticalDataset& dataset, std::vector<float>* predictions,
-    double* mean_abs_prediction);
+    double* mean_abs_prediction,
+    utils::concurrency::ThreadPool* thread_pool = nullptr);
 
 }  // namespace gradient_boosted_trees
 }  // namespace model
