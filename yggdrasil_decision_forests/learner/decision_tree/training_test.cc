@@ -542,7 +542,8 @@ void TestSparseObliqueHistogramSplit(
 }
 
 TEST(SparseOblique, ClassificationHistogramRandom) {
-  TestSparseObliqueHistogramSplit(proto::NumericalSplit::HISTOGRAM_RANDOM, 63);
+  TestSparseObliqueHistogramSplit(proto::NumericalSplit::HISTOGRAM_RANDOM,
+                                  255);
 }
 
 TEST(SparseOblique, ClassificationHistogramEqualWidth) {
@@ -624,7 +625,7 @@ void TestSparseObliqueHistogramRegressionSplit(
 
 TEST(SparseOblique, RegressionHistogramRandom) {
   TestSparseObliqueHistogramRegressionSplit(
-      proto::NumericalSplit::HISTOGRAM_RANDOM, 63);
+      proto::NumericalSplit::HISTOGRAM_RANDOM, 255);
 }
 
 TEST(SparseOblique, RegressionHistogramEqualWidth) {

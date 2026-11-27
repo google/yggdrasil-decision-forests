@@ -329,8 +329,7 @@ message DecisionTreeTrainingConfig {
 
     // Controls how the split in the projection space is computed: EXACT
     // (default) or HISTOGRAM_* (Random or Equal Width). If num_candidates is
-    // not set, defaults to 63 (Random, vs 1 for axis-aligned splits) or 255
-    // (Equal Width).
+    // not set, defaults to 255 for both (vs 1 for axis-aligned Random splits).
     optional NumericalSplit projection_split = 13;
   }
 
