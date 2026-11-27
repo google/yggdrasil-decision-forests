@@ -18,6 +18,7 @@
 #include <stddef.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -47,6 +48,7 @@
 #include "yggdrasil_decision_forests/dataset/vertical_dataset.h"
 #include "yggdrasil_decision_forests/learner/abstract_learner.pb.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/decision_tree.pb.h"
+#include "yggdrasil_decision_forests/learner/decision_tree/histogram_binning.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/label.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/oblique.h"
 #include "yggdrasil_decision_forests/learner/decision_tree/splitter_accumulator.h"
@@ -2026,6 +2028,20 @@ static inline int EqualWidthThresholdIndex(const float attribute,
   return idx;
 }
 
+// Examples binned per HistogramBinner::Index call (stack buffers).
+constexpr size_t kHistogramBinningChunk = 256;
+
+// values[i] = attributes[examples[i]], NaN replaced by `na_replacement`.
+inline void GatherHistogramValues(
+    const absl::Span<const UnsignedExampleIdx> examples,
+    const absl::Span<const float> attributes, const float na_replacement,
+    float* values) {
+  for (size_t i = 0; i < examples.size(); ++i) {
+    const float attribute = attributes[examples[i]];
+    values[i] = std::isnan(attribute) ? na_replacement : attribute;
+  }
+}
+
 absl::StatusOr<SplitSearchResult>
 FindSplitLabelClassificationFeatureNumericalHistogram(
     const absl::Span<const UnsignedExampleIdx> selected_examples,
@@ -2084,15 +2100,37 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
        proto::NumericalSplit::HISTOGRAM_EQUAL_WIDTH);
 
   // Compute the split score of each threshold.
-  for (const auto example_idx : selected_examples) {
-    const int32_t label = labels[example_idx];
-    const float weight = weights.empty() ? 1.f : weights[example_idx];
-    float attribute = attributes[example_idx];
-    if (std::isnan(attribute)) {
-      attribute = na_replacement;
+  if (!use_equal_width_fast_path) {
+    const internal::HistogramBinner binner(bins);
+    std::array<float, kHistogramBinningChunk> values;
+    std::array<int32_t, kHistogramBinningChunk> bin_idxs;
+    for (size_t begin = 0; begin < selected_examples.size();
+         begin += kHistogramBinningChunk) {
+      const size_t num = std::min(kHistogramBinningChunk,
+                                  selected_examples.size() - begin);
+      GatherHistogramValues(selected_examples.subspan(begin, num), attributes,
+                            na_replacement, values.data());
+      binner.Index(absl::MakeConstSpan(values.data(), num),
+                   absl::MakeSpan(bin_idxs.data(), num));
+      for (size_t i = 0; i < num; ++i) {
+        if (bin_idxs[i] < 0) {
+          continue;
+        }
+        const auto example_idx = selected_examples[begin + i];
+        auto& split = candidate_splits[bin_idxs[i]];
+        split.num_positive_examples_without_weights++;
+        split.pos_label_distribution.Add(
+            labels[example_idx], weights.empty() ? 1.f : weights[example_idx]);
+      }
     }
-
-    if (use_equal_width_fast_path) {
+  } else {
+    for (const auto example_idx : selected_examples) {
+      const int32_t label = labels[example_idx];
+      const float weight = weights.empty() ? 1.f : weights[example_idx];
+      float attribute = attributes[example_idx];
+      if (std::isnan(attribute)) {
+        attribute = na_replacement;
+      }
       const int idx =
           EqualWidthThresholdIndex(attribute, min_value, max_value,
                                    static_cast<int>(candidate_splits.size()));
@@ -2121,18 +2159,6 @@ FindSplitLabelClassificationFeatureNumericalHistogram(
 
       it_split.num_positive_examples_without_weights++;
       it_split.pos_label_distribution.Add(label, weight);
-    } else {
-      auto it_split = std::upper_bound(
-          candidate_splits.begin(), candidate_splits.end(), attribute,
-          [](const float a, const CandidateSplit& b) {
-            return a < b.threshold;
-          });
-      if (it_split == candidate_splits.begin()) {
-        continue;
-      }
-      --it_split;
-      it_split->num_positive_examples_without_weights++;
-      it_split->pos_label_distribution.Add(label, weight);
     }
   }
 
@@ -2472,25 +2498,30 @@ FindSplitLabelRegressionFeatureNumericalHistogram(
   }
 
   // Compute the split score of each threshold.
-  for (const auto example_idx : selected_examples) {
-    const float label = labels[example_idx];
-    float attribute = attributes[example_idx];
-    if (std::isnan(attribute)) {
-      attribute = na_replacement;
-    }
-
-    auto it_split = std::upper_bound(
-        candidate_splits.begin(), candidate_splits.end(), attribute,
-        [](const float a, const CandidateSplit& b) { return a < b.threshold; });
-    if (it_split == candidate_splits.begin()) {
-      continue;
-    }
-    --it_split;
-    it_split->num_positive_examples_without_weights++;
-    if constexpr (weighted) {
-      it_split->pos_label_dist.Add(label, weights[example_idx]);
-    } else {
-      it_split->pos_label_dist.Add(label);
+  const internal::HistogramBinner binner(bins);
+  std::array<float, kHistogramBinningChunk> values;
+  std::array<int32_t, kHistogramBinningChunk> bin_idxs;
+  for (size_t begin = 0; begin < selected_examples.size();
+       begin += kHistogramBinningChunk) {
+    const size_t num =
+        std::min(kHistogramBinningChunk, selected_examples.size() - begin);
+    GatherHistogramValues(selected_examples.subspan(begin, num), attributes,
+                          na_replacement, values.data());
+    binner.Index(absl::MakeConstSpan(values.data(), num),
+                 absl::MakeSpan(bin_idxs.data(), num));
+    for (size_t i = 0; i < num; ++i) {
+      if (bin_idxs[i] < 0) {
+        continue;
+      }
+      const auto example_idx = selected_examples[begin + i];
+      const float label = labels[example_idx];
+      auto& split = candidate_splits[bin_idxs[i]];
+      split.num_positive_examples_without_weights++;
+      if constexpr (weighted) {
+        split.pos_label_dist.Add(label, weights[example_idx]);
+      } else {
+        split.pos_label_dist.Add(label);
+      }
     }
   }
 
