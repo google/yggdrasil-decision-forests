@@ -1386,11 +1386,10 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
       break;
   }
 
-  // Get test attributes indices. Unlike an eager up-front shuffle, the
-  //  candidate list is not shuffled up front: the random ordering is produced
-  //  lazily with one Fisher-Yates step per read.
-  // Fewer RNG draws are consumed, so trees differ from the eager-shuffle 
-  // implementation at a fixed seed.
+  // Get indices for attributes to test. 
+  //  The candidate list is not shuffled up front: the random order is produced
+  //  lazily with Fisher-Yates.
+  // Fewer RNG draws are consumed, so trees differ slightly
   std::vector<int32_t>& candidate_attributes = cache->candidate_attributes;
   candidate_attributes.assign(config_link.features().begin(),
                               config_link.features().end());
@@ -1403,8 +1402,8 @@ absl::StatusOr<bool> FindBestConditionSingleThreadManager(
   while (remaining_attributes_to_test >= 0 &&
          candidate_attribute_idx_in_candidate_list <
              candidate_attributes.size()) {
-    // Lazy Fisher-Yates step for the position about to be read. Each position
-    // is read at most once, so the resulting prefix is a uniform draw.
+    // Lazy Fisher-Yates step. Draws are uniform because each position
+    // is read at most once
     const size_t pos = candidate_attribute_idx_in_candidate_list;
     std::uniform_int_distribution<size_t> swap_with(
         pos, candidate_attributes.size() - 1);
@@ -1598,21 +1597,11 @@ absl::StatusOr<bool> FindBestConditionConcurrentManager(
   // Get the ordered indices of the attributes to test.
   int min_num_jobs_to_test;
   std::vector<int32_t>& candidate_attributes = cache->candidate_attributes;
-  // Lazy prefix Fisher-Yates, mirroring FindBestConditionSingleThreadManager:
-  // positions of candidate_attributes are read in order, at most once per node,
-  // only by this manager thread, so swapping lazily at read time yields the
-  // same distribution as a full shuffle for the tested prefix.
+  // Lazy prefix Fisher-Yates for uniform shuffle (equivalent to std::shuffle)
   //
-  // Two differences vs the single-threaded manager, both because the number of
-  // *scheduled* jobs is timing-dependent (workers can cause speculative
-  // scheduling past the early-exit point):
-  // 1. The vector is re-assigned every node. A permutation persisted across
-  //    nodes would depend on how many speculative swaps were applied, making
-  //    models non-reproducible run-to-run.
-  // 2. The swaps draw from a scratch engine seeded with one draw from
-  //    "random". The main engine therefore advances by exactly
-  //    1 + num_jobs draws per node (job seeds + the existing discard at the
-  //    end of this function), independent of worker timing.
+  // The swaps draw from a scratch engine seeded with one draw from
+  //    "random". This is to keep the main engine advancing by exactly
+  //    1 + num_jobs draws per node, independent of worker timing.
   candidate_attributes.assign(config_link.features().begin(),
                               config_link.features().end());
   min_num_jobs_to_test = NumAttributesToTest(
